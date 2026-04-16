@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Field — Ian Fike</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/design-system/display.css?v=506">
+</head>
+<body class="d-page">
+
+<!-- Nav -->
+<nav class="d-nav">
+  <a href="/" class="d-nav__name">CTRL.RODEO</a>
+  <ul class="d-nav__links">
+    <li class="d-nav__group d-nav__group--expanded" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field/" class="d-nav__link d-nav__link--active">Field</a></li>
+        <li><a href="/invoy/" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo/" class="d-nav__link">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/philosophy/" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
+  </ul>
+</nav>
+
+<!-- Subnav -->
+<div class="d-subnav">
+  <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
+  <a href="#experience" class="d-subnav__link">Experience</a>
+  <a href="#process" class="d-subnav__link">Process</a>
+  <a href="#impact" class="d-subnav__link">Impact</a>
+  <a href="#faq" class="d-subnav__link">FAQ</a>
+</div>
+
+<div class="d-contain">
+
+  <!-- Header — side by side -->
+  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
+    <!-- Hero animation — 500×500 square -->
+    <div style="width: 500px; height: 500px; flex-shrink: 0; overflow: hidden; background: #0A0A0A;">
+      <iframe src="/animations/hero.html" style="width: 500px; height: 500px; border: none; pointer-events: none; display: block;" id="heroFrame"></iframe>
+    </div>
+    <!-- Content -->
+    <div style="flex: 1;">
+      <span class="d-status d-status--dev">Beta</span>
+      <p class="d-headline d-headline--xl" style="margin-top: 12px;">Field</p>
+      <p class="d-body" style="margin-top: 12px;">Turning the voices of a complex on-scene interactions into structured medical notes - all offline.</p>
+
+      <dl class="d-overview" style="margin-top: 24px;">
+        <dt>Role</dt>
+        <dd>Founder, sole designer</dd>
+        <dt>Timeline</dt>
+        <dd>March 2026 – Present (5 weeks)</dd>
+        <dt>Status</dt>
+        <dd>Beta with 2 outdoor ed programs, 3 guiding agencies</dd>
+        <dt>Key tech</dt>
+        <dd>On-device AI (Whisper, Llama 3.2), offline-first, GPS</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- WHY THIS PROJECT -->
+  <div class="d-why d-why--dev" style="margin-top: 32px;">
+    <p class="d-why__label">Why this Project?</p>
+    <p class="d-why__headline">AI that structures messy input into compliant output — the same pattern as CPQ.</p>
+    <p class="d-why__body">Field takes unstructured voice and extracts structured, validated data in real time. That's the core challenge Roadrunner is solving: take a complex, ambiguous input (a deal) and produce a compliant, structured output (a quote). At an early-stage company co-developing with design partners, the interface IS the product. This project proves I can design AI-native flows from zero — where the model does the heavy lifting and the user confirms.</p>
+  </div>
+
+  <!-- FRAMING -->
+  <div id="framing" class="d-section">
+    <p class="d-label">Framing</p>
+    <p class="d-body">Search and rescue teams still use paper to document patient care. They write in the rain, in the dark, wearing gloves. Important details get lost. When they hand off a patient to a hospital, the notes are often incomplete or hard to read.</p>
+    <p class="d-body">Existing software was built for ambulances with Wi-Fi and keyboards. Nothing works for the backcountry — where there's no cell service, no keyboard, and no time to type.</p>
+
+    <p class="d-label" style="margin-top: 32px;">Personas</p>
+    <div class="d-personas">
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Primary user</span>
+        <span class="d-persona__name">First Responder</span>
+        <ul class="d-persona__needs">
+          <li>Has to document while treating the patient. Wearing gloves, often in bad weather. Might be new — this could be their first real call.</li>
+        </ul>
+      </div>
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Receives the note</span>
+        <span class="d-persona__name">Professional EMS</span>
+        <ul class="d-persona__needs">
+          <li>Needs organized data, not handwritten paragraphs. Wants vitals and a treatment plan in standard format.</li>
+        </ul>
+      </div>
+      <div class="d-persona" style="border: 1px solid var(--border-subtle, #33332f);">
+        <span class="d-persona__role">Information source</span>
+        <span class="d-persona__name">Patient</span>
+        <ul class="d-persona__needs">
+          <li>Describes symptoms out loud, often while in pain. Gives information out of order.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="d-section">
+    <p class="d-label">How It works</p>
+    <p class="d-body" style="margin-bottom: 24px;">The responder talks to the patient. The app listens, logs all medical details, and creates a patient record and SOAP note automatically. The record travels with the patient in a tap.</p>
+
+    <div class="d-flow">
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">01</span>
+        <span class="d-flow__step-label">Voice</span>
+        <span class="d-flow__step-desc">Mic records conversation</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">02</span>
+        <span class="d-flow__step-label">Transcribe</span>
+        <span class="d-flow__step-desc">MedASR Fine-Tuned, on-device</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">03</span>
+        <span class="d-flow__step-label">Extract</span>
+        <span class="d-flow__step-desc">Llama formats into compliant data</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">04</span>
+        <span class="d-flow__step-label">Review &amp; Refine</span>
+        <span class="d-flow__step-desc">Update fields with low confidence</span>
+      </div>
+      <span class="d-flow__arrow">→</span>
+      <div class="d-flow__step">
+        <span class="d-flow__step-num">05</span>
+        <span class="d-flow__step-label">Hand off</span>
+        <span class="d-flow__step-desc">Offline record transfer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE EXPERIENCE — Sticky scroll parallax -->
+  <div id="experience" class="d-section" style="border-bottom: none;">
+    <p class="d-label">Core Experience</p>
+
+    <div class="d-sticky-scroll">
+      <!-- Sticky phone column -->
+      <div class="d-sticky-scroll__phone" id="stickyPhone">
+        <div class="d-sticky-scroll__layers">
+          <!-- Layer 0: Transcript animation -->
+          <div class="d-sticky-scroll__layer is-active" data-step="0">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/transcript.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="animFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 1: SOAP note animation -->
+          <div class="d-sticky-scroll__layer" data-step="1">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/soap-note.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="soapFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 2: Manual Entry animation -->
+          <div class="d-sticky-scroll__layer" data-step="2">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/manual-entry.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="entryFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 3: Share / Handoff animation -->
+          <div class="d-sticky-scroll__layer" data-step="3">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/share.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="shareFrame"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrolling text column -->
+      <div class="d-sticky-scroll__text">
+        <!-- Step 0 -->
+        <div class="d-sticky-scroll__step is-active" data-step="0">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Dictation</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Keep treating, the note writes itself</p>
+          <p class="d-body" style="margin-top: 12px;">The provider talks to the patient. The app listens, identifies and organizes into compliant medical data in real time — all without touching the screen.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I can...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Capture information without distracting my care.</li>
+            <li class="d-body" style="font-size: 12px;">• Trust that the data is accurate & complete.</li>
+          </ul>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="d-sticky-scroll__step" data-step="1">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Incident Report</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">See a SOAP note as you work</p>
+          <p class="d-body" style="margin-top: 12px;">A SOAP note, the standard format of capturing patient information, builds itself as the encounter unfolds. Completion counters show progress per section. Stoplight warnings flag values that need confirmation before handoff.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• to see progress as I assess & treat the patient.</li>
+            <li class="d-body" style="font-size: 12px;">• clear warnings if unexpected data is captured.</li>
+            <li class="d-body" style="font-size: 12px;">• trust that my work is complete.</li>
+          </ul>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="d-sticky-scroll__step" data-step="2">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Manual Entry</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Always one hand on the patient</p>
+          <p class="d-body" style="margin-top: 12px;">Sometimes, data needs to be entered by hand. Capture vitals with cold hands, bad light, divided attention. No keyboard, no precision tapping.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• to enter data one-handed in critical situations.</li>
+            <li class="d-body" style="font-size: 12px;">• input targets I can hit reliably while wearing gloves in the cold.</li>
+          </ul>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="d-sticky-scroll__step" data-step="3">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">04</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Offline Care Transfer</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Continuity of care in a single tap</p>
+          <p class="d-body" style="margin-top: 12px;">When the patient is transferred, the critical information goes with them — even offline. An anonymized clinical summary can be sent via Apple Wallet, satellite, or SMS. The receiving team gets the whole case — not a phone call from memory.</p>
+          <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+          <p class="d-mono d-text--muted" style="margin-top: 4px;">As a responder, I need...</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• the patient record to travel with them in a format the receiving team can act on immediately.</li>
+            <li class="d-body" style="font-size: 12px;">• export options that work in remote terrain — Wallet, satellite, or clipboard.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROCESS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+
+    <div style="margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Design Decisions</p>
+    </div>
+
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Why is voice the right model?</p>
+        <p class="d-decision__a">Your hands are on the patient, not a keyboard. Field listens to the conversation and writes the documentation. We fine-tuned speech recognition for medical terminology and outdoor noise so it works where it's actually needed.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why allow manual entry?</p>
+        <p class="d-decision__a">Even with our fine-tuned models, AI misses things — a vital gets taken silently, some fields are never spoken aloud. Field provides glove-friendly manual input for every gap. Type into the narrative and structured fields auto-populate below.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">How do you trust AI output?</p>
+        <p class="d-decision__a">Every AI-extracted value shows where it came from. Grey means confident, amber means check it, red means missing. Each value traces to the exact moment in the transcript. The provider always knows what to trust.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why not let AI decide?</p>
+        <p class="d-decision__a">When it comes to suggesting what to do with a patient, Field shows recommendations but never pre-selects. The provider makes every clinical call. This keeps us on the right side of FDA regulation and keeps humans in charge of decisions where terrain, weather, and context matter more than data.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why does it need to work offline?</p>
+        <p class="d-decision__a">No cell service on a mountainside. Everything runs on-device. When connectivity returns, Field exports a standards-compliant file into the reporting systems agencies already use. It doesn't replace existing software — it replaces the paper and memory that come before it.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: 48px; margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Design Systems</p>
+    </div>
+
+    <div style="display: flex; gap: 48px; align-items: flex-start;">
+
+      <!-- Right: Token swatches (scrolls) -->
+      <div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 32px;">
+
+        <!-- Background -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">BACKGROUND</p>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <div><div style="height: 48px; background: #000000; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.app</span></div>
+            <div><div style="height: 48px; background: #0A0A0A; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.header</span></div>
+            <div><div style="height: 48px; background: #101010; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.row</span></div>
+            <div><div style="height: 48px; background: #111111; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.bar</span></div>
+            <div><div style="height: 48px; background: #161618; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.card</span></div>
+            <div><div style="height: 48px; background: #222222; border-radius: 8px; border: 1px solid #2A2A2A;"></div><span style="color: #666560; font-size: 10px; font-family: monospace; margin-top: 4px; display: block;">bg.elevated</span></div>
+          </div>
+        </div>
+
+        <!-- Text -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">TEXT</p>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 28px; border-radius: 6px; background: #0A0A0A; display: flex; align-items: center; justify-content: center;"><span style="color: #EEF8FE; font-size: 13px; font-weight: 700;">Aa</span></div><span style="color: #666560; font-size: 10px; font-family: monospace;">text.primary #EEF8FE</span></div>
+            <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 28px; border-radius: 6px; background: #0A0A0A; display: flex; align-items: center; justify-content: center;"><span style="color: #7D788B; font-size: 13px; font-weight: 700;">Aa</span></div><span style="color: #666560; font-size: 10px; font-family: monospace;">text.secondary #7D788B</span></div>
+            <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 28px; border-radius: 6px; background: #0A0A0A; display: flex; align-items: center; justify-content: center;"><span style="color: #A79EAF; font-size: 13px; font-weight: 700;">Aa</span></div><span style="color: #666560; font-size: 10px; font-family: monospace;">text.tertiary #A79EAF</span></div>
+          </div>
+        </div>
+
+        <!-- Semantic -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">SEMANTIC</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <div style="background: #DF1B41; border-radius: 20px; padding: 6px 14px; display: flex; align-items: center; gap: 5px;"><div style="width: 5px; height: 5px; border-radius: 50%; background: #fff;"></div><span style="color: #fff; font-size: 11px; font-weight: 700;">REC</span></div>
+            <div style="background: #263027; border-radius: 20px; padding: 6px 14px;"><span style="color: #31B23C; font-size: 11px; font-weight: 600;">8/8</span></div>
+            <div style="background: #222; border-radius: 20px; padding: 6px 14px;"><span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Review</span></div>
+            <div style="background: rgba(255,243,224,0.18); border-radius: 8px; padding: 6px 14px; display: flex; align-items: center; gap: 4px;"><span style="color: #F9CE86; font-size: 11px;">⚠</span><span style="color: #F9CE86; font-size: 11px;">Watch</span></div>
+            <div style="background: #411B1F; border-radius: 8px; padding: 6px 14px;"><span style="color: #FE1844; font-size: 11px; font-weight: 600;">142</span></div>
+          </div>
+        </div>
+
+        <!-- Speaker Identity -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">SPEAKER IDENTITY</p>
+          <div style="display: flex; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; background: #0A0A0A; border-radius: 20px; padding: 8px 14px;"><div style="width: 7px; height: 7px; border-radius: 50%; background: #00A480;"></div><span style="color: #00A480; font-size: 10px; font-weight: 700;">IF</span></div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #0A0A0A; border-radius: 20px; padding: 8px 14px;"><div style="width: 7px; height: 7px; border-radius: 50%; background: #F9CE86;"></div><span style="color: #F9CE86; font-size: 10px; font-weight: 700;">MC</span></div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #0A0A0A; border-radius: 20px; padding: 8px 14px;"><div style="width: 7px; height: 7px; border-radius: 50%; background: #009CC0;"></div><span style="color: #009CC0; font-size: 10px; font-weight: 700;">P2</span></div>
+          </div>
+        </div>
+
+        <!-- Border -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">BORDER</p>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <div><div style="height: 32px; background: #2A2A2A; border-radius: 6px;"></div><span style="color: #666560; font-size: 9px; font-family: monospace; margin-top: 4px; display: block;">subtle / tab</span></div>
+            <div><div style="height: 32px; background: #2C2C2E; border-radius: 6px;"></div><span style="color: #666560; font-size: 9px; font-family: monospace; margin-top: 4px; display: block;">card</span></div>
+            <div><div style="height: 32px; background: #232323; border-radius: 6px;"></div><span style="color: #666560; font-size: 9px; font-family: monospace; margin-top: 4px; display: block;">divider</span></div>
+          </div>
+        </div>
+
+        <!-- Spacing -->
+        <div>
+          <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 12px;">SPACING & GRID</p>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Screen margins</span><span style="color: #666560; font-size: 11px; font-family: monospace;">16–20px</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Card padding</span><span style="color: #666560; font-size: 11px; font-family: monospace;">14px 16px</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Card radius</span><span style="color: #666560; font-size: 11px; font-family: monospace;">12px</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Badge radius</span><span style="color: #666560; font-size: 11px; font-family: monospace;">20px</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Touch target min</span><span style="color: #666560; font-size: 11px; font-family: monospace;">72px</span></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: #A79EAF; font-size: 11px;">Typeface</span><span style="color: #666560; font-size: 11px; font-family: monospace;">Inter</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Left: Principles (sticky, fits single page height) -->
+      <div style="flex: 1; position: sticky; top: 140px;">
+        <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 20px;">DESIGN PRINCIPLES</p>
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <!-- Information -->
+          <div>
+            <p class="d-mono d-text--subtle" style="font-size: 9px; letter-spacing: 0.08em; margin-bottom: 10px;">INFORMATION</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Progressive disclosure</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Collapsed → expanded. Summaries → detail. Don't overwhelm.</p>
+              </div>
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Glanceable</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Color dots, coded cells, badge counts. Triage at speed.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interaction -->
+          <div>
+            <p class="d-mono d-text--subtle" style="font-size: 9px; letter-spacing: 0.08em; margin-bottom: 10px;">INTERACTION</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Thumb-reach</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">72px minimum touch targets. Bottom-pinned actions. One-handed.</p>
+              </div>
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Selection = border</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">#EEF8FE border on bg.elevated. Consistent across all controls.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Typography -->
+          <div>
+            <p class="d-mono d-text--subtle" style="font-size: 9px; letter-spacing: 0.08em; margin-bottom: 10px;">TYPOGRAPHY</p>
+            <div>
+              <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Inter, always</p>
+              <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Single typeface. Weight + size = hierarchy. Monospace for numbers only.</p>
+            </div>
+          </div>
+
+          <!-- Surface & Color -->
+          <div>
+            <p class="d-mono d-text--subtle" style="font-size: 9px; letter-spacing: 0.08em; margin-bottom: 10px;">SURFACE & COLOR</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Darkness-first</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Dark surfaces for outdoor and low-light. #EEF8FE on black.</p>
+              </div>
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Layered surfaces</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">App → card → elevated → input. Each step lighter. No shadows.</p>
+              </div>
+              <div>
+                <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Semantic color only</p>
+                <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Red = critical. Amber = warning. Green = success. Blue = info. No decoration.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Accessibility -->
+          <div>
+            <p class="d-mono d-text--subtle" style="font-size: 9px; letter-spacing: 0.08em; margin-bottom: 10px;">ACCESSIBILITY</p>
+            <div>
+              <p style="color: #EEF8FE; font-size: 13px; font-weight: 600;">Color is never the only signal</p>
+              <p style="color: #A79EAF; font-size: 12px; margin-top: 2px;">Every status uses color + text + position. Stoplight vitals pair background tint with numeric value. Badges show count and label. Nothing requires color vision alone to interpret.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- IMPACT -->
+  <div id="impact" class="d-section">
+    <p class="d-label">Impact</p>
+    <div class="d-metrics" style="margin: 16px calc(-1 * clamp(20px, 5vw, 64px)) 0;">
+      <div class="d-metric">
+        <div class="d-metric__value">4</div>
+        <div class="d-metric__label">Development Organizations</div>
+        <div class="d-metric__sub">1 outdoor ed, 1 SAR, 2 guiding agencies</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">600+</div>
+        <div class="d-metric__label">Recordings</div>
+        <div class="d-metric__sub">Across field + educational settings</div>
+      </div>
+      <div class="d-metric">
+        <div class="d-metric__value">1</div>
+        <div class="d-metric__label">Licensing Conversation</div>
+        <div class="d-metric__sub">National outdoor ed organizations</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div id="faq" class="d-section">
+    <p class="d-label">FAQ</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Does it work offline?</p>
+        <p class="d-decision__a">The app downloads two AI models and runs them locally. Works the same in town, in a canyon, or 30 miles from the nearest cell tower.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Does the dictation actually work?</p>
+        <p class="d-decision__a">Fine-tuned on 5000+ clinical recordings. Selected for high wind, rain, helicopter landings, ambient pain & multiple voices.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Is it compliant to privacy & data standards?</p>
+        <p class="d-decision__a">Compliant to HIPAA, NEMSIS, FHIR R4, USCDI v3.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Does it replace my ePCR?</p>
+        <p class="d-decision__a">Works with your existing ePCR. Send records to your administrator — they can add your Field Record with billing codes attached. Direct integrations in our roadmap.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Multiple casualty incidents (MCIs)?</p>
+        <p class="d-decision__a">Not yet. Working with SAR partners to follow FEMA command structures and participating in MCI scenarios.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="d-footer d-contain">
+  <a href="/" class="d-next">← Overview</a>
+  <a href="/invoy/" class="d-next">Invoy →</a>
+</footer>
+
+<!-- Sticky scroll: crossfade + phone sizing + animation triggers -->
+<script>
+(function() {
+  var PHONE_W = 402, PHONE_H = 856;
+  var NAV_H = 71, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H; // 125px
+
+  var stickyPhone = document.getElementById('stickyPhone');
+  var layers = document.querySelectorAll('.d-sticky-scroll__layer');
+  var steps = document.querySelectorAll('.d-sticky-scroll__step');
+  var started = {}; // track which iframes have been triggered
+  var activeStep = 0;
+
+  var PAD = 48; // padding around phone inside the black box
+
+  // Size phones to fit their layer container minus padding
+  function sizePhones() {
+    var phones = document.querySelectorAll('.d-anim-phone');
+    for (var i = 0; i < phones.length; i++) {
+      var layer = phones[i].parentElement;
+      var availW = layer.offsetWidth - PAD * 2;
+      var availH = layer.offsetHeight - PAD * 2;
+      var scale = Math.min(availW / PHONE_W, availH / PHONE_H);
+      phones[i].style.width = (PHONE_W * scale) + 'px';
+      phones[i].style.height = (PHONE_H * scale) + 'px';
+      phones[i].style.borderRadius = (48 * scale) + 'px';
+      var iframe = phones[i].querySelector('iframe');
+      if (iframe) {
+        iframe.style.transform = 'scale(' + scale + ')';
+        iframe.style.transformOrigin = 'top left';
+      }
+    }
+  }
+
+  // Pin sticky phone right below nav+subnav
+  function setStickyTop() {
+    if (!stickyPhone) return;
+    stickyPhone.style.top = CHROME + 'px';
+  }
+
+  // Reset an iframe by reloading its src — restarts the animation from scratch
+  function resetIframe(index) {
+    started[index] = false;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (iframe && iframe.dataset.src) {
+      iframe.src = ''; // clear
+    }
+  }
+
+  // Load and trigger an iframe animation
+  function triggerIframe(index) {
+    if (started[index]) return;
+    started[index] = true;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (!iframe || !iframe.dataset.src) return;
+    function send() {
+      try { iframe.contentWindow.postMessage('start', '*'); } catch(e) {}
+    }
+    iframe.addEventListener('load', send);
+    iframe.src = iframe.dataset.src;
+    setTimeout(send, 100);
+  }
+
+  // Update step opacities + active layer based on scroll position
+  function onScroll() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var closest = 0;
+    var minDist = Infinity;
+
+    // Set each step's opacity based on distance from viewport center
+    for (var i = 0; i < steps.length; i++) {
+      var rect = steps[i].getBoundingClientRect();
+      var center = rect.top + rect.height / 2;
+      var dist = Math.abs(center - vcenter);
+      // Fade starts at 0.4x step height from center → hits 0.15 at edges
+      var fadeRange = rect.height * 0.4;
+      var opacity = dist < fadeRange ? 1 : Math.max(0.15, 1 - (dist - fadeRange) / (rect.height * 0.3));
+      steps[i].style.opacity = opacity;
+
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+
+    // Check if section is in viewport
+    var isVisible = false;
+    if (stickyPhone) {
+      var phoneRect = stickyPhone.getBoundingClientRect();
+      var phoneCenter = phoneRect.top + phoneRect.height / 2;
+      var distFromCenter = Math.abs(phoneCenter - vcenter);
+      var viewH = window.innerHeight - CHROME;
+      isVisible = distFromCenter < viewH * 0.6;
+    }
+
+    // Toggle active layer — reset old, trigger new
+    if (closest !== activeStep) {
+      // Reset the animation that's being scrolled away from
+      resetIframe(activeStep);
+      activeStep = closest;
+      for (var j = 0; j < layers.length; j++) {
+        layers[j].classList.toggle('is-active', j === closest);
+      }
+      if (isVisible) triggerIframe(closest);
+    } else if (isVisible && !started[closest]) {
+      triggerIframe(closest);
+    }
+  }
+
+  // Throttle scroll with rAF
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(function() { onScroll(); ticking = false; });
+    }
+  }, { passive: true });
+
+  // Scroll snap — nudge to center the active step when scrolling settles
+  var snapTimer = null;
+  var SNAP_THRESHOLD = 80; // px from center to trigger snap
+  function snapToStep() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var step = steps[activeStep];
+    if (!step) return;
+    var rect = step.getBoundingClientRect();
+    var stepCenter = rect.top + rect.height / 2;
+    var offset = stepCenter - vcenter;
+    if (Math.abs(offset) > 10 && Math.abs(offset) < SNAP_THRESHOLD) {
+      window.scrollBy({ top: offset, behavior: 'smooth' });
+    }
+  }
+
+  window.addEventListener('scroll', function() {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapToStep, 200);
+  }, { passive: true });
+
+  // Init
+  sizePhones();
+  setStickyTop();
+  onScroll();
+  window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
+})();
+</script>
+
+<!-- Hero animation trigger -->
+<script>
+(function() {
+  var hero = document.getElementById('heroFrame');
+  if (!hero) return;
+  // Start immediately on load
+  hero.addEventListener('load', function() {
+    setTimeout(function() { hero.contentWindow.postMessage('start', '*'); }, 300);
+  });
+  hero.src = hero.src; // force load if cached
+})();
+</script>
+<script src="/portfolio.js"></script>
+</body>
+</html>

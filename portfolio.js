@@ -32,11 +32,10 @@
   function initKeyboard() {
     const pages = [
       '/',
-      '/field.html',
-      '/invoy.html',
-      '/livongo.html',
-      '/design-systems.html',
-      '/how-i-work.html'
+      '/field/',
+      '/invoy/',
+      '/livongo/',
+      '/philosophy/'
     ];
     const current = window.location.pathname;
     const idx = pages.findIndex(p => current.endsWith(p) || current.endsWith(p.replace('.html', '')));
@@ -72,6 +71,20 @@
       if (href && path.endsWith(href.replace('./', ''))) {
         link.classList.add('d-nav__link--active');
       }
+    });
+  }
+
+  // ── Nav accordion ──
+  function initNavAccordion() {
+    const groups = document.querySelectorAll('[data-nav-accordion]');
+    groups.forEach(group => {
+      const label = group.querySelector('.d-nav__group-label');
+      if (!label) return;
+
+      // Toggle on click
+      label.addEventListener('click', () => {
+        group.classList.toggle('d-nav__group--expanded');
+      });
     });
   }
 
@@ -237,6 +250,35 @@
     }
   }
 
+  // ── Project Modals ──
+  function initModals() {
+    // Open modal on card click
+    document.querySelectorAll('[data-modal]').forEach(trigger => {
+      trigger.addEventListener('click', e => {
+        e.preventDefault();
+        const id = trigger.getAttribute('data-modal');
+        const overlay = document.getElementById(id);
+        if (overlay) overlay.classList.add('d-modal-overlay--open');
+      });
+    });
+
+    // Close on overlay click (not modal content)
+    document.querySelectorAll('.d-modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('d-modal-overlay--open');
+      });
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.d-modal-overlay--open').forEach(o => {
+          o.classList.remove('d-modal-overlay--open');
+        });
+      }
+    });
+  }
+
   // ── Lock subnav below primary nav + set scroll offset ──
   function initStickyOffsets() {
     const nav = document.querySelector('.d-nav');
@@ -254,6 +296,8 @@
     initKeyboard();
     initSmoothScroll();
     initNavHighlight();
+    initNavAccordion();
+    initModals();
     initStickyOffsets();
     window.addEventListener('resize', initStickyOffsets);
   });

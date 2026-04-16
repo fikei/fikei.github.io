@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field — Hero</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Viewport: fixed 500×500 square ── */
+  body {
+    background: #0A0A0A;
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    width: 500px;
+    height: 500px;
+  }
+  body.embedded { background: transparent; }
+
+  .camera { width: 500px; height: 500px; overflow: hidden; position: relative; }
+
+  .canvas {
+    position: absolute;
+    width: 500px;
+    height: 2400px;
+    transform-origin: 0 0;
+  }
+
+  /* Vignette */
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 100;
+    background: radial-gradient(ellipse at center, transparent 30%, #0A0A0A 92%);
+  }
+  body.embedded .vignette {
+    background: radial-gradient(ellipse at center, transparent 30%, var(--bg, #111110) 92%);
+  }
+
+  /* Logo endcard */
+  .logo-card {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; opacity: 0; transition: opacity 1.2s ease;
+    background: #0A0A0A; pointer-events: none;
+  }
+  .logo-card.show { opacity: 1; }
+  .logo-card svg { width: 100px; height: 100px; }
+
+  /* Replay button */
+  .replay-btn {
+    position: absolute; bottom: 16px; right: 16px; z-index: 60;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .replay-btn.show { opacity: 1; pointer-events: auto; }
+  .replay-btn:hover { background: rgba(255,255,255,0.14); }
+  .replay-btn svg { width: 14px; height: 14px; }
+
+  /* ── Scene zones: each 500×500, content centered ── */
+  .zone {
+    position: absolute; left: 0; width: 500px; height: 500px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .zone--1 { top: 0; }
+  .zone--2 { top: 800px; }
+  .zone--3 { top: 1500px; }
+
+  /* ── Recording bar ── */
+  .rec-bar {
+    width: 320px; height: 48px;
+    background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 14px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
+  }
+  .rec-bar-left { display: flex; align-items: center; gap: 8px; }
+  .rec-bar-dot { width: 7px; height: 7px; border-radius: 50%; background: #FF3B30; animation: pulse 1.5s infinite; }
+  .rec-bar-label { color: #fff; font-size: 11px; font-weight: 600; }
+  .rec-bar-time { color: #636366; font-size: 10px; font-variant-numeric: tabular-nums; }
+  .rec-bar-stop {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #2C2C2E; border: 1.5px solid #3A3A3C;
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .rec-bar-stop-inner { width: 11px; height: 11px; border-radius: 2px; background: #FF3B30; }
+  .tap-ripple {
+    position: absolute; width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 59, 48, 0.35); transform: scale(0); opacity: 0;
+  }
+  .tap-ripple.animate { animation: ripple 0.7s cubic-bezier(0, 0, 0.2, 1) forwards; }
+
+  /* ── Typing ── */
+  .typing { display: flex; gap: 8px; align-items: center; }
+  .typing-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .typing-speaker { font-size: 9px; font-weight: 700; width: 20px; }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
+  .typing-dots span:nth-child(1) { animation: dotPulse 1s infinite 0s; }
+  .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
+  .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
+
+  /* ── Messages ── */
+  .msgs { width: 380px; }
+  .msg { display: flex; gap: 8px; padding: 8px 0; opacity: 0; transform: translateY(8px); }
+  .msg.show { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
+  .msg-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .msg-dot--if { background: #00A480; }
+  .msg-dot--mc { background: #F9CE86; }
+  .msg-speaker { font-size: 9px; font-weight: 700; width: 20px; flex-shrink: 0; margin-top: 3px; }
+  .msg-speaker--if { color: #00A480; }
+  .msg-speaker--mc { color: #F9CE86; }
+  .msg-text { color: #EEF8FE; font-size: 13px; line-height: 1.5; }
+
+  /* Badge */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #161618; border: 1px solid #2C2C2E; border-radius: 7px;
+    padding: 5px 9px; margin-top: 6px; width: fit-content;
+    position: relative; overflow: hidden; opacity: 0; transform: scale(0.9);
+  }
+  .badge.show { opacity: 1; transform: scale(1); transition: opacity 0.3s ease, transform 0.3s ease; }
+  .badge-dot { width: 4px; height: 4px; border-radius: 50%; background: #00A480; flex-shrink: 0; }
+  .badge-text { color: #A79EAF; font-size: 10px; font-weight: 500; }
+  .badge.loading .badge-text { opacity: 0; }
+  .badge.loading .badge-dot { animation: dotFlash 0.6s infinite; }
+  .badge.loading::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+    animation: shimmer 1.2s infinite;
+  }
+  .badge.tapping { animation: tapPulse 0.2s ease; }
+
+  /* Extraction card */
+  .extract-card {
+    background: #161618; border: 1px solid #2C2C2E; border-radius: 9px;
+    margin-top: 6px; overflow: hidden; max-height: 0; opacity: 0;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+  }
+  .extract-card.open { max-height: 300px; opacity: 1; }
+  .extract-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px; border-bottom: 1px solid #2C2C2E;
+  }
+  .extract-header-left { display: flex; align-items: center; gap: 5px; }
+  .extract-header-dot { width: 4px; height: 4px; border-radius: 50%; background: #00A480; }
+  .extract-header-text { color: #A79EAF; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-chevron { color: #3A3A3C; font-size: 11px; }
+  .extract-field { padding: 8px 10px; opacity: 0; transform: translateY(4px); }
+  .extract-field.show { opacity: 1; transform: translateY(0); transition: opacity 0.3s ease, transform 0.3s ease; }
+  .extract-field-label { color: #6B6571; font-size: 9px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-field-value { color: #EBEBF5; font-size: 12px; line-height: 1.4; margin-top: 3px; }
+
+  .badge-flow { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .badge-flow .badge { margin-top: 0; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes dotPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+  @keyframes dotFlash { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+  @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  @keyframes tapPulse { 0% { transform: scale(1); } 50% { transform: scale(0.95); } 100% { transform: scale(1); } }
+  @keyframes ripple { 0% { transform: scale(0); opacity: 0.6; } 100% { transform: scale(2.8); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div class="vignette"></div>
+<div class="logo-card" id="logoCard">
+  <svg width="500" height="500" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M409.388 287H90.612C89.6947 287 89.2614 285.868 89.9441 285.256L173.618 210.182C179.489 204.914 187.1 202 194.988 202H305.012C312.9 202 320.511 204.914 326.382 210.182L410.056 285.256C410.739 285.868 410.305 287 409.388 287Z" fill="url(#paint0_linear)"/>
+    <defs>
+      <linearGradient id="paint0_linear" x1="250" y1="202" x2="250" y2="287" gradientUnits="userSpaceOnUse">
+        <stop offset="0.0625" stop-color="#D9D9D9"/>
+        <stop offset="1" stop-color="#7A7A7A"/>
+      </linearGradient>
+    </defs>
+  </svg>
+</div>
+
+<div class="replay-btn" id="replayBtn" onclick="location.reload()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="1 4 1 10 7 10"></polyline>
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+  </svg>
+</div>
+
+<div class="camera">
+  <div class="canvas" id="canvas">
+
+    <!-- Zone 1: Recording bar — center (250, 250) -->
+    <div class="zone zone--1">
+      <div class="rec-bar">
+        <div class="rec-bar-left">
+          <div class="rec-bar-dot"></div>
+          <div>
+            <div class="rec-bar-label">Recording</div>
+            <div class="rec-bar-time" id="recTime">03:12</div>
+          </div>
+        </div>
+        <div class="rec-bar-stop" id="recStop">
+          <div class="rec-bar-stop-inner"></div>
+          <div class="tap-ripple" id="tapRipple"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone 2: Typing — center (250, 1050) -->
+    <div class="zone zone--2">
+      <div class="typing" id="typingEl" style="opacity: 0; transition: opacity 0.5s ease;">
+        <div class="typing-dot" style="background: #F9CE86;"></div>
+        <div class="typing-speaker" style="color: #F9CE86;">MC</div>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <!-- Zone 3: Messages — center (250, 1750) -->
+    <div class="zone zone--3">
+      <div class="msgs">
+        <div class="msg" id="msg2">
+          <div class="msg-dot msg-dot--mc"></div>
+          <div class="msg-speaker msg-speaker--mc">MC</div>
+          <div>
+            <div class="msg-text">I fell about 15 feet onto a rock slab. My left leg is killing me.</div>
+            <div class="badge" id="badge1">
+              <div class="badge-dot"></div>
+              <span class="badge-text">Chief Complaint</span>
+            </div>
+            <div class="extract-card" id="card1">
+              <div class="extract-header">
+                <div class="extract-header-left">
+                  <div class="extract-header-dot"></div>
+                  <span class="extract-header-text">CHIEF COMPLAINT</span>
+                </div>
+                <span class="extract-chevron">∧</span>
+              </div>
+              <div class="extract-field" id="field1">
+                <div class="extract-field-label">MECHANISM OF INJURY</div>
+                <div class="extract-field-value">Fall from ~15ft onto rock slab</div>
+              </div>
+              <div class="extract-field" id="field2">
+                <div class="extract-field-label">PRIMARY COMPLAINT</div>
+                <div class="extract-field-value">Left leg pain, limited mobility</div>
+              </div>
+              <div class="extract-field" id="field3">
+                <div class="extract-field-label">CONSCIOUSNESS</div>
+                <div class="extract-field-value">Alert, oriented, no LOC reported</div>
+              </div>
+            </div>
+            <div class="badge-flow">
+              <div class="badge" id="badge2">
+                <div class="badge-dot" style="background: #3A3A3C;"></div>
+                <span class="badge-text">Trauma Assessment</span>
+              </div>
+              <div class="badge" id="badge3">
+                <div class="badge-dot" style="background: #3A3A3C;"></div>
+                <span class="badge-text">Vitals Baseline</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  var canvas = document.getElementById('canvas');
+  var paused = window.location.search.indexOf('paused') > -1;
+  if (paused) document.body.classList.add('embedded');
+
+  // Viewport: 500×500. Center: (250, 250).
+  // centerOn(cx, cy, scale) places canvas point (cx,cy) at viewport center.
+  function centerOn(cx, cy, scale, dur, ease) {
+    canvas.style.transition = 'transform ' + dur + 's ' + (ease || 'cubic-bezier(0.4, 0, 0.2, 1)');
+    canvas.style.transform = 'translate(' + (-cx * scale + 250) + 'px,' + (-cy * scale + 250) + 'px) scale(' + scale + ')';
+  }
+
+  // Timer
+  var secs = 192;
+  function tick() {
+    secs++;
+    var m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('recTime').textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function start() {
+    var timer = setInterval(tick, 1000);
+
+    // Zone centers:
+    // Zone 1 (rec):    (250, 250)   — stop button offset: ~(390, 250)
+    // Zone 2 (typing): (250, 1050)
+    // Zone 3 (msgs):   (250, 1750)
+
+    // ═══ BEAT 1: Centered on stop button, full bar visible (0→2.5s) ═══
+    // Stop button center ≈ x=380. At 1.4×, visible=357px, bar (90-410) fits.
+    centerOn(380, 250, 1.4, 0.01);
+    setTimeout(function() { document.getElementById('tapRipple').classList.add('animate'); }, 600);
+
+    // ═══ BEAT 2: Pan to typing — slower pan, fade in/out (2.5→5.5s) ═══
+    setTimeout(function() { centerOn(250, 1050, 4.0, 0.8); }, 2500);
+    // Fade in typing after camera arrives
+    setTimeout(function() { document.getElementById('typingEl').style.opacity = '1'; }, 3200);
+    // Gentle drift
+    setTimeout(function() { centerOn(250, 1050, 3.5, 2.2, 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'); }, 3400);
+    // Fade out typing before leaving
+    setTimeout(function() { document.getElementById('typingEl').style.opacity = '0'; }, 5200);
+
+    // ═══ BEAT 3: Pan to messages at 1.2× (5.5→9s) ═══
+    setTimeout(function() { document.getElementById('msg2').classList.add('show'); }, 5600);
+    setTimeout(function() { centerOn(250, 1750, 1.2, 0.8); }, 5500);
+
+    setTimeout(function() { document.getElementById('badge1').classList.add('show', 'loading'); }, 7000);
+    setTimeout(function() { document.getElementById('badge1').classList.remove('loading'); }, 7800);
+
+    // ═══ BEAT 4: Tap → card opens (8.5→12.5s) ═══
+    setTimeout(function() { document.getElementById('badge1').classList.add('tapping'); }, 8800);
+    setTimeout(function() {
+      document.getElementById('badge1').style.display = 'none';
+      document.getElementById('card1').classList.add('open');
+      centerOn(250, 1790, 1.2, 0.6);
+    }, 9000);
+
+    setTimeout(function() { document.getElementById('field1').classList.add('show'); }, 9500);
+    setTimeout(function() { document.getElementById('field2').classList.add('show'); }, 10000);
+    setTimeout(function() { document.getElementById('field3').classList.add('show'); }, 10500);
+    setTimeout(function() { document.getElementById('badge2').classList.add('show'); }, 11200);
+    setTimeout(function() { document.getElementById('badge3').classList.add('show'); }, 11600);
+
+    // ═══ BEAT 5: Hold on final frame, then logo + replay (16s) ═══
+    setTimeout(function() {
+      clearInterval(timer);
+      document.getElementById('logoCard').classList.add('show');
+      setTimeout(function() { document.getElementById('replayBtn').classList.add('show'); }, 800);
+    }, 16000);
+  }
+
+  if (paused) {
+    window.addEventListener('message', function(e) { if (e.data === 'start') start(); });
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

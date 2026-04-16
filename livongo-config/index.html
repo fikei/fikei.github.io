@@ -5,19 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Livongo Config — Ian Fike</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../design-system/tokens.css">
-  <link rel="stylesheet" href="../design-system/components.css">
-  <link rel="stylesheet" href="../design-system/display.css">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="/design-system/display.css">
 </head>
 <body class="d-page">
 
 <nav class="d-nav">
-  <a href="./" class="d-nav__name">Ian Fike</a>
+  <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="./field.html" class="d-nav__link">Field</a></li>
-    <li><a href="./invoy.html" class="d-nav__link">Invoy</a></li>
-    <li><a href="./livongo.html" class="d-nav__link d-nav__link--active">Livongo</a></li>
-    <li><a href="./how-i-work.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group d-nav__group--expanded" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field/" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy/" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo/" class="d-nav__link d-nav__link--active">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/philosophy/" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
@@ -175,10 +181,10 @@
 </div>
 
 <footer class="d-footer d-contain">
-  <a href="./invoy.html" class="d-next">← Invoy</a>
-  <a href="./how-i-work.html" class="d-next">How I Work →</a>
+  <a href="/livongo/" class="d-next">← Livongo Registration</a>
+  <a href="/philosophy/" class="d-next">How I Work →</a>
 </footer>
 
-<script src="./portfolio.js"></script>
+<script src="/portfolio.js"></script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "-d", "/Users/ian/Documents/GitHub/fikei.github.io"],
+      "port": 4000,
+      "autoPort": true
+    }
+  ]
+}

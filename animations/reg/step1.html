@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 1 — Eligibility Confirmation</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  .card {
+    width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
+
+  .content { padding: 32px 28px 28px; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
+
+  .welcome {
+    background: #faf8f5;
+    border: 1px solid #ede8e1;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .welcome-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
+  .welcome-body { font-size: 13px; color: #4a4540; line-height: 1.6; }
+  .welcome-body strong { font-weight: 700; }
+
+  .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .form-group { flex: 1; display: flex; flex-direction: column; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group label .req { color: #d32f2f; }
+  .form-input {
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #bbb;
+    background: #fff;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    min-height: 42px;
+  }
+  .form-input.typing {
+    color: #333;
+    border-color: #1976D2;
+    box-shadow: 0 0 0 3px rgba(25,118,210,0.1);
+  }
+  .form-input.filled {
+    color: #333;
+    border-color: #ddd;
+    box-shadow: none;
+  }
+
+  .cta {
+    width: 100%;
+    padding: 14px;
+    background: #1976D2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="progress">
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:50%"></div></div>
+    <span class="pl pl--off">About You</span>
+    <div class="pb"></div>
+    <span class="pl pl--off">Welcome</span>
+  </div>
+
+  <div class="content">
+    <div class="title">Let's Get Started</div>
+    <div class="subtitle">We just need your name and date of birth to confirm your enrollment.</div>
+
+    <div class="welcome">
+      <div class="welcome-greeting">👋 Welcome to Livongo</div>
+      <div class="welcome-body"><strong>Pilot Trucking LLC</strong> has enrolled you in Livongo to help manage your diabetes. We'll confirm your eligibility with the information you provide.</div>
+    </div>
+
+    <div class="form-row field-1">
+      <div class="form-group">
+        <label>Legal First Name <span class="req">*</span></label>
+        <div class="form-input" id="fname">First name</div>
+      </div>
+      <div class="form-group">
+        <label>Legal Last Name <span class="req">*</span></label>
+        <div class="form-input" id="lname">Last name</div>
+      </div>
+    </div>
+
+    <div class="form-row field-2">
+      <div class="form-group">
+        <label>Date of Birth <span class="req">*</span></label>
+        <div class="form-input" id="dob">MM / DD / YYYY</div>
+      </div>
+    </div>
+
+    <button class="cta field-3">Confirm my identity</button>
+  </div>
+
+  <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
+</div>
+
+<script>
+(function() {
+  var fields = [
+    { id: 'fname', value: 'Sarah', delay: 2000 },
+    { id: 'lname', value: 'Chen', delay: 3200 },
+    { id: 'dob', value: '04 / 15 / 1988', delay: 4400 }
+  ];
+
+  function typeField(el, value, callback) {
+    el.classList.add('typing');
+    el.textContent = '';
+    var i = 0;
+    var interval = setInterval(function() {
+      el.textContent = value.slice(0, i + 1);
+      i++;
+      if (i >= value.length) {
+        clearInterval(interval);
+        setTimeout(function() {
+          el.classList.remove('typing');
+          el.classList.add('filled');
+          if (callback) callback();
+        }, 300);
+      }
+    }, 60);
+  }
+
+  function runSequence() {
+    fields.forEach(function(f) {
+      setTimeout(function() {
+        var el = document.getElementById(f.id);
+        if (el) typeField(el, f.value);
+      }, f.delay);
+    });
+  }
+
+  // Run on load and repeat with card loop (12s)
+  setTimeout(runSequence, 0);
+  setInterval(function() {
+    fields.forEach(function(f) {
+      var el = document.getElementById(f.id);
+      if (el) {
+        el.classList.remove('typing', 'filled');
+        el.style.color = '';
+      }
+    });
+    document.getElementById('fname').textContent = 'First name';
+    document.getElementById('fname').style.color = '#bbb';
+    document.getElementById('lname').textContent = 'Last name';
+    document.getElementById('lname').style.color = '#bbb';
+    document.getElementById('dob').textContent = 'MM / DD / YYYY';
+    document.getElementById('dob').style.color = '#bbb';
+    setTimeout(runSequence, 500);
+  }, 12000);
+})();
+</script>
+</body>
+</html>

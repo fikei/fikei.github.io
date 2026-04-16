@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 4 — Health History</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Roboto', sans-serif; background: #fff; color: #333; -webkit-font-smoothing: antialiased; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; background: #fff; z-index: 100; }
+  .logo { font-size: 18px; font-weight: 700; color: #333; text-decoration: none; }
+  .header-center { flex: 1; margin: 0 16px; }
+  .header-right { font-size: 11px; color: #666; display: flex; align-items: center; gap: 10px; }
+  .live-chat { color: #1976D2; font-weight: 500; }
+
+  /* Sectioned Progress Bar */
+  .progress-sections { display: flex; align-items: center; gap: 10px; }
+  .progress-section { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .progress-section-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #bbb; white-space: nowrap; }
+  .progress-section-label.active { color: #1976D2; }
+  .progress-section-label.done { color: #1976D2; }
+  .progress-section-bar { flex: 1; height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; }
+  .progress-section-fill { height: 100%; background: #1976D2; border-radius: 2px; width: 0; transition: width 0.4s ease; }
+  .progress-section-fill.complete { width: 100%; }
+
+  /* Step Container */
+  .step { max-width: 480px; margin: 0 auto; padding: 24px 20px 80px; }
+  .step h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; color: #222; }
+  .step .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.5; }
+
+  /* Data Disclosure Card */
+  .data-disclosure-card {
+    background: #faf8f5; border: 1px solid #ede8e1; border-radius: 10px;
+    padding: 14px 18px 16px; margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .data-disclosure-card .wc-greeting { font-size: 15px; font-weight: 600; color: #2d2a26; margin-bottom: 8px; }
+  .data-disclosure-card .wc-body { font-size: 12px; color: #4a4540; line-height: 1.6; }
+
+  /* Coverage Verified (records attribution) */
+  .coverage-verified {
+    background: #f5f9f9; border: 1px solid #d3d9d9; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 20px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .cv-icon { font-size: 16px; flex-shrink: 0; color: #43a047; }
+  .cv-text { font-size: 12px; color: #333; line-height: 1.5; }
+  .cv-text strong { font-weight: 700; }
+
+  /* Section label */
+  .section-label { font-size: 10px; font-weight: 600; color: #666; margin-top: 24px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  /* Form Elements */
+  .form-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .form-group { flex: 1; display: flex; flex-direction: column; position: relative; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .field-wrap { position: relative; }
+  input[type="number"], input[type="text"], select {
+    width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px;
+    font-family: 'Roboto', sans-serif; background: #fff; color: #333; min-height: 40px;
+  }
+  input[type="number"]::placeholder { color: #bbb; }
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4.5L9 1' fill='none' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 9px;
+  }
+
+  /* Prefilled dot */
+  .field-wrap.prefilled::after {
+    content: ""; position: absolute; right: 10px; top: 50%;
+    transform: translateY(-50%); width: 7px; height: 7px;
+    background: #1976D2; border-radius: 50%; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .field-wrap.prefilled.visible::after { opacity: 1; }
+  .field-wrap.prefilled--select::after { right: 30px; }
+  .field-wrap.prefilled input { padding-right: 24px; }
+  .field-wrap.prefilled select { padding-right: 44px; }
+
+  /* Question group */
+  .question-group { margin-bottom: 18px; }
+  .question-group .question { font-size: 13px; font-weight: 500; margin-bottom: 10px; color: #333; line-height: 1.4; }
+  .info-icon { color: #1976D2; font-size: 13px; margin-left: 4px; }
+
+  /* Radio & Checkbox Cards */
+  .radio-card, .checkbox-card {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    border: 1px solid #ddd; border-radius: 8px; margin-bottom: 6px;
+    font-size: 13px; min-height: 40px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .radio-card.selected, .checkbox-card.selected { border-color: #1976D2; background: #e3f2fd; }
+
+  .radio-dot, .check-square { flex-shrink: 0; transition: all 0.2s; }
+  .radio-dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #ccc; }
+  .radio-card.selected .radio-dot { border-color: #1976D2; background: #1976D2; box-shadow: inset 0 0 0 3px #fff; }
+  .check-square {
+    width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid #ccc;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; color: transparent;
+  }
+  .checkbox-card.selected .check-square { background: #1976D2; border-color: #1976D2; color: #fff; }
+
+  /* Preselected dot indicator */
+  .radio-card.preselected::after,
+  .checkbox-card.preselected::after {
+    content: ""; width: 7px; height: 7px; background: #1976D2;
+    border-radius: 50%; margin-left: auto; flex-shrink: 0;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .radio-card.preselected.visible::after,
+  .checkbox-card.preselected.visible::after { opacity: 1; }
+
+  /* Button */
+  .btn-next {
+    display: block; width: 100%; padding: 14px; background: #1976D2; color: #fff;
+    border: none; border-radius: 10px; font-size: 14px; font-weight: 500;
+    font-family: 'Roboto', sans-serif; margin-top: 20px; min-height: 48px;
+    box-shadow: 0 2px 6px rgba(25,118,210,0.25);
+  }
+  .btn-next .label-bold { font-weight: 600; }
+
+  /* Privacy banner */
+  .privacy-banner {
+    margin-top: 14px; padding: 10px 14px; background: #f9fbff;
+    border: 1px solid #e8eef8; border-radius: 8px;
+    font-size: 11px; color: #888; line-height: 1.5;
+  }
+
+  /* Footer */
+  .footer {
+    max-width: 480px; margin: 0 auto; padding: 14px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: #999; border-top: 1px solid #eee;
+  }
+  .footer .lang-toggle { color: #1976D2; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <a class="logo" href="#">Livongo</a>
+  <div class="header-center">
+    <div class="progress-sections">
+      <div class="progress-section">
+        <span class="progress-section-label done">Sign Up</span>
+        <div class="progress-section-bar"><div class="progress-section-fill complete" style="width:100%"></div></div>
+      </div>
+      <div class="progress-section">
+        <span class="progress-section-label active">About You</span>
+        <div class="progress-section-bar"><div class="progress-section-fill" style="width:66%"></div></div>
+      </div>
+      <div class="progress-section">
+        <span class="progress-section-label">Welcome</span>
+        <div class="progress-section-bar"><div class="progress-section-fill" style="width:0"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="live-chat">LIVE CHAT</span>
+  </div>
+</div>
+
+<!-- Step 4 Content -->
+<div class="step">
+  <h1>Health History</h1>
+  <p class="subtitle">These answers help your coach personalize your experience. Answer what you can — you can always update later.</p>
+
+  <div class="data-disclosure-card">
+    <div class="wc-greeting">🤝 Personal from day one.</div>
+    <div class="wc-body">Every answer here helps your coach meet your unique health needs — so your plan reflects your needs, not a one-size-fits-all checklist.</div>
+  </div>
+
+  <div class="coverage-verified">
+    <span class="cv-icon">🏥</span>
+    <div class="cv-text"><strong>Filled in from your records.</strong> Some answers below come from your health records to save you time. Review and update anything that's changed.</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Height</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Feet</label>
+        <div class="field-wrap prefilled prefilled--select" id="fw-ft">
+          <select><option selected>5</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Inches</label>
+        <div class="field-wrap prefilled prefilled--select" id="fw-in">
+          <select><option selected>10</option></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Weight</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Pounds</label>
+        <div class="field-wrap">
+          <input type="number" id="weight-input" placeholder="e.g. 185">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">Your Health Background</p>
+
+  <div class="question-group">
+    <div class="question">Have you ever been diagnosed with or taken medication for any of the following?</div>
+    <div class="checkbox-card" id="chk-chol">
+      <div class="check-square">✓</div>
+      <span>High Cholesterol</span>
+    </div>
+    <div class="checkbox-card preselected" id="chk-hbp">
+      <div class="check-square">✓</div>
+      <span>High Blood Pressure (Hypertension)</span>
+    </div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Do you smoke?</div>
+    <div class="radio-card" id="smoke-yes"><div class="radio-dot"></div> Yes</div>
+    <div class="radio-card" id="smoke-no"><div class="radio-dot"></div> No</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you had a flu vaccine within the last year? <span class="info-icon">ⓘ</span></div>
+    <div class="radio-card preselected" id="flu-yes"><div class="radio-dot"></div> Yes</div>
+    <div class="radio-card" id="flu-no"><div class="radio-dot"></div> No</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">Have you ever had the pneumonia vaccine? <span class="info-icon">ⓘ</span></div>
+    <div class="radio-card" id="pn-yes"><div class="radio-dot"></div> Yes</div>
+    <div class="radio-card" id="pn-no"><div class="radio-dot"></div> No</div>
+  </div>
+
+  <p class="section-label">Activity and Diet</p>
+
+  <div class="question-group">
+    <div class="question">How active are you?</div>
+    <div class="radio-card" id="act-reg"><div class="radio-dot"></div> Regularly Active</div>
+    <div class="radio-card" id="act-some"><div class="radio-dot"></div> Somewhat Active</div>
+    <div class="radio-card" id="act-not"><div class="radio-dot"></div> Not Active</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in increasing your activity level?</div>
+    <div class="radio-card" id="ai-very"><div class="radio-dot"></div> Very Interested</div>
+    <div class="radio-card" id="ai-unable"><div class="radio-dot"></div> Interested but physically unable</div>
+    <div class="radio-card" id="ai-some"><div class="radio-dot"></div> Somewhat interested</div>
+    <div class="radio-card" id="ai-not"><div class="radio-dot"></div> Not interested</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How satisfied are you with your current eating habits over the past week?</div>
+    <div class="radio-card" id="es-very"><div class="radio-dot"></div> Very satisfied</div>
+    <div class="radio-card" id="es-mod"><div class="radio-dot"></div> Moderately satisfied</div>
+    <div class="radio-card" id="es-un"><div class="radio-dot"></div> Unsatisfied</div>
+  </div>
+
+  <div class="question-group">
+    <div class="question">How interested are you in learning more about healthy eating?</div>
+    <div class="radio-card" id="ei-very"><div class="radio-dot"></div> Very interested</div>
+    <div class="radio-card" id="ei-mod"><div class="radio-dot"></div> Moderately interested</div>
+    <div class="radio-card" id="ei-not"><div class="radio-dot"></div> Not interested</div>
+  </div>
+
+  <p class="section-label">Demographics</p>
+
+  <div class="question-group">
+    <div class="question">Do you identify as any of the following?</div>
+    <div class="radio-card" id="eth-w"><div class="radio-dot"></div> White / Caucasian</div>
+    <div class="radio-card" id="eth-b"><div class="radio-dot"></div> Black / African American</div>
+    <div class="radio-card" id="eth-a"><div class="radio-dot"></div> Asian</div>
+    <div class="radio-card" id="eth-n"><div class="radio-dot"></div> Native American or Alaskan Native</div>
+    <div class="radio-card" id="eth-p"><div class="radio-dot"></div> Native Hawaiian or Pacific Islander</div>
+    <div class="radio-card" id="eth-h"><div class="radio-dot"></div> Spanish, Hispanic or Latino</div>
+    <div class="radio-card" id="eth-o"><div class="radio-dot"></div> Other</div>
+  </div>
+
+  <button class="btn-next"><span class="label-bold">Next:</span> Receiving Your Device</button>
+
+  <div class="privacy-banner">🔒 Your health information is private and protected. Only your care team can see it.</div>
+</div>
+
+<div class="footer">
+  <span>&copy; Livongo Health, All Rights Reserved.</span>
+  <span><span class="lang-toggle">🌐 English</span> &bull; PL000000</span>
+</div>
+
+<script>
+(function() {
+  function showDot(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('visible');
+    if (el.classList.contains('preselected')) el.classList.add('selected');
+  }
+  function selectCard(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add('selected');
+  }
+  function scrollTo(y) { window.scrollTo({ top: y, behavior: 'smooth' }); }
+
+  var weightInput = document.getElementById('weight-input');
+
+  function typeWeight(value) {
+    weightInput.value = '';
+    var i = 0;
+    function step() {
+      if (i <= value.length) {
+        weightInput.value = value.slice(0, i);
+        i++;
+        setTimeout(step, 100);
+      }
+    }
+    step();
+  }
+
+  function run() {
+    // t=1.2s — prefill height dots
+    setTimeout(function() { showDot('fw-ft'); }, 1200);
+    setTimeout(function() { showDot('fw-in'); }, 1500);
+
+    // t=2.2s — type weight
+    setTimeout(function() { typeWeight('192'); }, 2200);
+
+    // t=3.5s — scroll to Health Background + pre-select HBP
+    setTimeout(function() { scrollTo(240); }, 3500);
+    setTimeout(function() { showDot('chk-hbp'); }, 3900);
+
+    // t=4.7s — smoke No
+    setTimeout(function() { selectCard('smoke-no'); }, 4700);
+
+    // t=5.4s — flu preselected (from records)
+    setTimeout(function() { showDot('flu-yes'); }, 5400);
+
+    // t=6.1s — pneumonia No
+    setTimeout(function() { selectCard('pn-no'); }, 6100);
+
+    // t=6.8s — scroll to Activity & Diet
+    setTimeout(function() { scrollTo(680); }, 6800);
+
+    // t=7.6s — Somewhat Active
+    setTimeout(function() { selectCard('act-some'); }, 7600);
+
+    // t=8.4s — Very Interested in activity
+    setTimeout(function() { selectCard('ai-very'); }, 8400);
+
+    // t=9.1s — Moderately satisfied eating
+    setTimeout(function() { selectCard('es-mod'); }, 9100);
+
+    // t=9.8s — Very interested in healthy eating
+    setTimeout(function() { selectCard('ei-very'); }, 9800);
+
+    // t=10.5s — scroll to Demographics
+    setTimeout(function() { scrollTo(1280); }, 10500);
+
+    // t=11.3s — ethnicity: White/Caucasian
+    setTimeout(function() { selectCard('eth-w'); }, 11300);
+
+    // t=12s — scroll to CTA
+    setTimeout(function() { scrollTo(1640); }, 12000);
+  }
+
+  function reset() {
+    document.querySelectorAll('.field-wrap.prefilled').forEach(function(el) { el.classList.remove('visible'); });
+    document.querySelectorAll('.preselected').forEach(function(el) {
+      el.classList.remove('visible');
+      el.classList.remove('selected');
+    });
+    document.querySelectorAll('.radio-card.selected, .checkbox-card.selected').forEach(function(el) {
+      el.classList.remove('selected');
+    });
+    weightInput.value = '';
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  reset();
+  setTimeout(run, 400);
+
+  setInterval(function() {
+    reset();
+    setTimeout(run, 500);
+  }, 15000);
+})();
+</script>
+</body>
+</html>

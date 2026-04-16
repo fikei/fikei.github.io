@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field — Manual Entry</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A0A0A; font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; display: flex; justify-content: center; padding: 60px; }
+  body.embedded { padding: 0; background: transparent; }
+  body.embedded .phone__label { display: none; }
+
+  .phone { width: 402px; background: #1C1C1E; border-radius: 48px; padding: 6px; flex-shrink: 0; }
+  .phone-inner { border-radius: 42px; overflow: hidden; position: relative; width: 390px; height: 844px; background: #0A0A0A; }
+  .phone__label { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666560; margin-top: 16px; }
+
+  /* Fixed header */
+  .fixed-header { position: absolute; top: 0; left: 0; right: 0; z-index: 10; background: #0A0A0A; }
+  .tabs { display: flex; border-bottom: 1px solid #1C1C1E; background: #0A0A0A; }
+  .tab { padding: 10px 16px; font-size: 12px; letter-spacing: 0.3px; color: #9E97B1; }
+  .tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2.5px solid #EEF8FE; }
+
+  /* Scrollable SOAP body */
+  .soap-body { padding: 156px 16px 90px; overflow-y: auto; height: 844px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+  .soap-body::-webkit-scrollbar { display: none; }
+
+  /* Cards */
+  .soap-card { background: #101012; border-radius: 12px; padding: 14px 16px; }
+  .soap-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .soap-card-title { color: #7D788B; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+  .soap-counter { background: #222; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: #9E97B1; }
+  .soap-bullet { display: flex; gap: 8px; padding-left: 6px; }
+  .soap-bullet-dot { color: #6B6877; font-size: 13px; margin-top: 1px; }
+  .soap-bullet-text { color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5; }
+  .soap-footer-btn { background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; color: #9E97B1; margin-left: auto; }
+
+  /* Vitals table */
+  .vitals-table { border-radius: 8px; overflow: hidden; margin-top: 8px; }
+  .vitals-header { display: flex; background: #0A0A0A; padding: 8px; }
+  .vitals-header span { flex: 1; text-align: center; color: #A79EAF; font-size: 11px; font-weight: 500; }
+  .vitals-header span:first-child { flex-shrink: 0; width: 29px; text-align: left; }
+  .vitals-row { display: flex; align-items: center; padding: 3px 8px; min-height: 48px; }
+  .vitals-row-time { flex-shrink: 0; width: 30px; color: #A79EAF; font-size: 11px; font-weight: 500; }
+  .vitals-row-cells { display: flex; gap: 6px; flex: 1; }
+  .vital-cell { flex: 1; border-radius: 8px; padding: 8px; text-align: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vital-cell--normal { background: #101010; color: #A79EAF; }
+  .vital-cell--red { background: #411B1F; color: #FE1844; }
+  .vital-cell--amber { background: #363430; color: #F9CE86; }
+  .vital-cell--empty { color: rgba(255,255,255,0.2); font-family: monospace; font-size: 17px; }
+  .add-vitals-btn { background: #1F1F23; border-radius: 20px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #9E97B1; cursor: pointer; transition: background 0.15s; }
+  .add-vitals-btn.tapped { background: #2A2A2E; }
+
+  /* ═══ Bottom sheet drawer ═══ */
+  .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.3s; border-radius: 42px; }
+  .drawer-overlay.show { opacity: 1; pointer-events: auto; }
+
+  .drawer { position: absolute; bottom: 0; left: 0; right: 0; z-index: 30; background: #000; border-radius: 16px 16px 42px 42px; padding: 16px; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
+  .drawer.show { transform: translateY(0); }
+
+  .drawer-handle { width: 36px; height: 5px; border-radius: 3px; background: #3A3A3C; margin: 8px auto 12px; }
+  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 12px; }
+  .drawer-skip { color: #B0B0B0; font-size: 14px; font-weight: 500; }
+  .drawer-title { color: #9E99AD; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+  .drawer-step { color: #6B6571; font-size: 11px; font-weight: 500; text-align: right; width: 40px; }
+
+  /* Content crossfade */
+  #drawerContent { transition: opacity 0.2s ease; }
+
+  /* Option rows */
+  .opt-row { display: flex; align-items: center; background: #1A1A1A; border-radius: 12px; min-height: 56px; padding: 10px 16px; margin-bottom: 8px; opacity: 0.4; transition: background 0.15s, opacity 0.15s; }
+  .opt-row--active { background: #2A2A2E; opacity: 1; }
+  .opt-row--dim { opacity: 0.4; }
+  .opt-name { color: #EEF8FE; font-size: 14px; font-weight: 700; }
+  .opt-desc { color: #A79EAF; font-size: 12px; margin-top: 1px; }
+
+  /* Sub-chips (for LOR orientation) */
+  .sub-chips { display: flex; gap: 6px; padding-bottom: 6px; }
+  .sub-chip { flex: 1; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #1A1A1A; transition: background 0.15s; }
+  .sub-chip--active { background: #2A2A2E; }
+  .sub-chip-text { font-size: 13px; font-weight: 500; color: #666; }
+  .sub-chip-text--active { font-size: 14px; font-weight: 700; color: #EEF8FE; }
+
+  /* Stepper (HR, RR) */
+  .stepper-value { text-align: center; padding: 40px 0; }
+  .stepper-num { color: #EEF8FE; font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stepper-unit { color: #7D788B; font-size: 13px; font-weight: 600; margin-left: 8px; }
+  .stepper-btns { display: flex; gap: 8px; padding-bottom: 16px; }
+  .stepper-btn { flex: 1; height: 72px; border-radius: 12px; background: #1A1A1A; display: flex; align-items: center; justify-content: center; color: #EEF8FE; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; transition: background 0.1s; }
+  .stepper-btn.tapped { background: #2A2A2E; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 16px; }
+  .preset { border: 1px solid #2A2A2A; border-radius: 20px; padding: 8px 14px; color: #EEF8FE; font-size: 11px; font-weight: 600; transition: background 0.15s, border-color 0.15s; }
+  .preset.tapped { background: #2A2A2E; border-color: #EEF8FE; }
+
+  /* SCTM chips */
+  .sctm-section { margin-bottom: 16px; }
+  .sctm-label { color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px; }
+  .sctm-chips { display: flex; gap: 6px; }
+  .sctm-chip { flex: 1; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #1A1A1A; transition: background 0.15s; }
+  .sctm-chip--active { background: #2A2A2E; }
+  .sctm-chip-text { font-size: 13px; font-weight: 500; color: #666; }
+  .sctm-chip-text--active { font-size: 14px; font-weight: 700; color: #EEF8FE; }
+  .sctm-summary { background: #2A2A2E; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; }
+  .sctm-summary-title { color: #EEF8FE; font-size: 14px; font-weight: 700; }
+  .sctm-summary-desc { color: #A79EAF; font-size: 12px; margin-top: 1px; }
+
+  /* Save button */
+  .save-btn { background: #FFFFFF; border-radius: 12px; padding: 16px; text-align: center; color: #0A0A0A; font-size: 14px; font-weight: 700; transition: opacity 0.1s; }
+  .save-btn.tapped { opacity: 0.7; }
+
+  /* Tap ripple indicator */
+  @keyframes tapFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- Fixed header -->
+      <div class="fixed-header">
+        <div style="padding: 14px 20px 0; color: #E6E1E5; font-size: 15px; font-weight: 600;">9:41</div>
+        <div style="display: flex; align-items: center; padding: 12px 16px; gap: 16px;">
+          <span style="color: #CAC4D0; font-size: 20px; width: 18px;">←</span>
+          <div>
+            <div style="color: #A79EAF; font-size: 14px;">INC-2024-0847</div>
+            <div style="color: #A79EAF; font-size: 11px; font-weight: 500;">Apr 2, 2026</div>
+          </div>
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 5px; background: #DF1B41; border-radius: 20px; padding: 4px 11px; height: 22px;">
+            <div style="width: 5px; height: 5px; border-radius: 50%; background: #fff;"></div>
+            <span style="color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;">07:24</span>
+          </div>
+        </div>
+        <div class="tabs">
+          <div class="tab">Transcript</div>
+          <div class="tab tab--active">Incident Record</div>
+          <div class="tab">Share</div>
+        </div>
+      </div>
+
+      <!-- SOAP body (scrollable) -->
+      <div class="soap-body" id="soapBody" style="border-top: 1px solid rgba(255,255,255,0.1);">
+
+        <!-- Subjective -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 12px;">
+            <span class="soap-card-title">Subjective</span>
+            <span class="soap-counter">8/8</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Fall from 15ft onto rock slab</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">MOI: Height impact onto rock surface</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Activity: rock climbing</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 24px 0 8px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding-left: 6px; padding-top: 6px;">
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">All Fields Complete</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Edit</span>
+          </div>
+        </div>
+
+        <!-- Objective -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 6px;">
+            <span class="soap-card-title">Objective</span>
+            <span class="soap-counter">8/8</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">PHYSICAL EXAM</div>
+            <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Injury to Left Leg & Back</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Ankle: Acute Pain (Left), Non-weight bearing</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Back: Tenderness in Lumbar</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">No injuries to neck, head, torso or arms</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">MEDICAL HISTORY</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Allergies: Penicillin</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Medications: None reported</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 12px 6px 6px;">
+            <span style="color: #F9CE86; font-size: 13px; width: 9px;">⚠</span>
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">3 Fields Need Review</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Review</span>
+          </div>
+        </div>
+
+        <!-- Vitals card (animation scrolls to this) -->
+        <div class="soap-card" id="vitalsCard">
+          <div class="soap-card-header" style="padding-bottom: 12px;">
+            <span class="soap-card-title">Vitals</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #FE1844; font-size: 12px;">⚠</span>
+              <span style="color: #FE1844; font-size: 12px;">Vitals Due</span>
+            </div>
+          </div>
+          <div class="vitals-table">
+            <div class="vitals-header">
+              <span style="width:29px; text-align:left;">Time</span>
+              <span>LOR</span><span>HR</span><span>RR</span><span>SCTM</span><span>Pulse</span>
+            </div>
+            <div class="vitals-row" style="background: #101010;">
+              <span class="vitals-row-time">9:38</span>
+              <div class="vitals-row-cells">
+                <div class="vital-cell vital-cell--normal">AO4</div>
+                <div class="vital-cell vital-cell--red">142</div>
+                <div class="vital-cell vital-cell--amber">22</div>
+                <div class="vital-cell vital-cell--normal">PWD</div>
+                <div class="vital-cell vital-cell--normal">S</div>
+              </div>
+            </div>
+            <div class="vitals-row" style="background: #0A0A0A;">
+              <span class="vitals-row-time">9:53</span>
+              <div class="vitals-row-cells">
+                <div class="vital-cell" style="background: #0A0A0A; color: #A79EAF; font-size: 14px;">AO4</div>
+                <div class="vital-cell vital-cell--amber" style="font-size: 14px;">131</div>
+                <div class="vital-cell vital-cell--amber" style="font-size: 14px;">18</div>
+                <div class="vital-cell" style="background: #0A0A0A; color: #A79EAF; font-size: 14px;">PWD</div>
+                <div class="vital-cell" style="background: #0A0A0A; color: #A79EAF; font-size: 14px;">S</div>
+              </div>
+            </div>
+            <!-- Empty "Now" row that will fill in -->
+            <div class="vitals-row" style="background: #101010;" id="nowRow">
+              <span class="vitals-row-time">Now</span>
+              <div class="vitals-row-cells" id="nowCells">
+                <div class="vital-cell vital-cell--empty" id="cell-lor">-</div>
+                <div class="vital-cell vital-cell--empty" id="cell-hr">-</div>
+                <div class="vital-cell vital-cell--empty" id="cell-rr">-</div>
+                <div class="vital-cell vital-cell--empty" id="cell-sctm">-</div>
+                <div class="vital-cell vital-cell--empty" id="cell-pulse">-</div>
+              </div>
+            </div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+          <div style="padding: 16px 6px 6px;">
+            <div class="add-vitals-btn" id="addVitalsBtn">Add Vitals</div>
+          </div>
+        </div>
+
+        <!-- Assessment -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 8px;">
+            <span class="soap-card-title" style="color: #615D6D;">Assessment</span>
+            <span class="soap-counter">3/4</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">CONCERNS</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Acute ankle pain</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Lumbar pain</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">POSSIBLE PROGRESSIONS</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Spinal Injury,</span></div>
+          </div>
+          <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 6px 6px 0;">
+            <span style="color: #A79EAF; font-size: 11px; font-weight: 500;">All Fields Complete</span>
+            <span style="flex: 1;"></span>
+            <span class="soap-footer-btn">Edit</span>
+          </div>
+        </div>
+
+        <!-- Plan -->
+        <div class="soap-card" style="background: #101012;">
+          <div class="soap-card-header" style="padding-bottom: 8px;">
+            <span class="soap-card-title" style="color: #6B6571;">Plan</span>
+            <span class="soap-counter">4/6</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">TREATMENT</div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Splint Left Ankle</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Ibuprofen 400 mg</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Monitoring for Spinal Injury</span></div>
+            <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
+            <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 12px;">EVACUATION</div>
+            <div style="background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: inline-flex; align-items: center;">
+              <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Add Evacuation Plan</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Watch for (standalone) -->
+        <div style="background: #FFF3E02E; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: #F9CE86; font-size: 11px; font-weight: 600; width: 11px;">⚠</span>
+            <span style="color: #F9CE86; font-size: 12px; font-weight: 500;">Watch for:</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 16px;">
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Signs of increased pain</span></div>
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Heart Rate Rebound</span></div>
+            <div style="display: flex; gap: 8px;"><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">•</span><span style="color: #F9CE86; font-size: 12px; font-weight: 300;">Reduce Responsiveness</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Drawer overlay -->
+      <div class="drawer-overlay" id="drawerOverlay"></div>
+
+      <!-- Drawer -->
+      <div class="drawer" id="drawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-header">
+          <span class="drawer-skip" id="drawerSkip">Skip</span>
+          <span class="drawer-title" id="drawerTitle">Level of Responsiveness (LOR)</span>
+          <span class="drawer-step" id="drawerStep">1 of 5</span>
+        </div>
+        <div id="drawerContent"></div>
+        <div class="save-btn" id="saveBtn">Save</div>
+      </div>
+
+    </div>
+  </div>
+  <p class="phone__label">03 — Manual Entry</p>
+</div>
+
+<script>
+(function() {
+  var paused = window.location.search.indexOf('paused') > -1;
+  if (paused) document.body.classList.add('embedded');
+
+  var soapBody = document.getElementById('soapBody');
+  var drawer = document.getElementById('drawer');
+  var overlay = document.getElementById('drawerOverlay');
+  var drawerTitle = document.getElementById('drawerTitle');
+  var drawerContent = document.getElementById('drawerContent');
+  var drawerStep = document.getElementById('drawerStep');
+  var saveBtn = document.getElementById('saveBtn');
+  var addBtn = document.getElementById('addVitalsBtn');
+
+  function wait(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  // Open drawer (first time only)
+  function openDrawer(title, html, step) {
+    drawerTitle.textContent = title;
+    drawerStep.textContent = step + ' of 5';
+    drawerContent.innerHTML = html;
+    overlay.classList.add('show');
+    drawer.classList.add('show');
+    return wait(400);
+  }
+
+  // Swap drawer content in-place with crossfade
+  function swapDrawer(title, html, step) {
+    drawerContent.style.opacity = '0';
+    return wait(200).then(function() {
+      drawerTitle.textContent = title;
+      drawerStep.textContent = step + ' of 5';
+      drawerContent.innerHTML = html;
+      drawerContent.style.opacity = '1';
+      return wait(300);
+    });
+  }
+
+  // Close drawer (final)
+  function closeDrawer() {
+    drawer.classList.remove('show');
+    overlay.classList.remove('show');
+    return wait(400);
+  }
+
+  function tap(el) {
+    if (!el) return;
+    el.classList.add('tapped');
+    setTimeout(function() { el.classList.remove('tapped'); }, 150);
+  }
+
+  function fillCell(id, value, colorClass) {
+    var cell = document.getElementById(id);
+    if (!cell) return;
+    cell.textContent = value;
+    cell.className = 'vital-cell';
+    if (colorClass) cell.classList.add(colorClass);
+    else cell.style.cssText = 'background: #101010; color: #A79EAF; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; border-radius: 8px; padding: 8px; flex: 1;';
+  }
+
+  // ═══════ TEMPLATES — all start from NULL state ═══════
+
+  var lorHTML = '<div class="opt-row" id="lor-ao"><div><div class="opt-name" style="font-size:13px;">Alert + Oriented</div><div class="opt-desc" style="font-size:11px;">Awake, eyes open</div></div></div>' +
+    '<div class="sub-chips" id="lor-chips" style="display:none;"><div class="sub-chip" id="lor-person"><span class="sub-chip-text">Person</span></div><div class="sub-chip" id="lor-place"><span class="sub-chip-text">Place</span></div><div class="sub-chip" id="lor-time"><span class="sub-chip-text">Time</span></div><div class="sub-chip" id="lor-event"><span class="sub-chip-text">Event</span></div></div>' +
+    '<div class="opt-row" id="lor-verbal"><div><div class="opt-name" style="font-size:13px;">Verbal</div><div class="opt-desc" style="font-size:11px;">Responds to voice</div></div></div>' +
+    '<div class="opt-row" id="lor-pain"><div><div class="opt-name" style="font-size:13px;">Pain</div><div class="opt-desc" style="font-size:11px;">Responds to pain</div></div></div>' +
+    '<div class="opt-row" id="lor-unresp"><div><div class="opt-name" style="font-size:13px;">Unresponsive</div><div class="opt-desc" style="font-size:11px;">No response</div></div></div>';
+
+  var hrHTML = '<div class="stepper-value"><span class="stepper-num" id="hr-value">88</span><span class="stepper-unit">bpm</span></div>' +
+    '<div class="stepper-btns"><div class="stepper-btn" id="hr-m10">-10</div><div class="stepper-btn" id="hr-m1">-1</div><div class="stepper-btn" id="hr-p1">+1</div><div class="stepper-btn" id="hr-p10">+10</div></div>' +
+    '<div class="presets"><div class="preset" id="pre-60">60</div><div class="preset" id="pre-70">70</div><div class="preset" id="pre-80">80</div><div class="preset" id="pre-90">90</div><div class="preset" id="pre-100">100</div><div class="preset" id="pre-120">120</div></div>';
+
+  var rrHTML = '<div class="stepper-value"><span class="stepper-num" id="rr-value">16</span><span class="stepper-unit">breaths/min</span></div>' +
+    '<div class="stepper-btns"><div class="stepper-btn" id="rr-m10">-10</div><div class="stepper-btn" id="rr-m1">-1</div><div class="stepper-btn" id="rr-p1">+1</div><div class="stepper-btn" id="rr-p10">+10</div></div>' +
+    '<div class="presets"><div class="preset" id="rr-pre-12">12</div><div class="preset" id="rr-pre-16">16</div><div class="preset" id="rr-pre-20">20</div><div class="preset" id="rr-pre-24">24</div></div>';
+
+  var sctmHTML = '<div class="sctm-section"><div class="sctm-label">Color</div><div class="sctm-chips"><div class="sctm-chip" id="sc-pink"><span class="sctm-chip-text">Pink</span></div><div class="sctm-chip" id="sc-pale"><span class="sctm-chip-text">Pale</span></div><div class="sctm-chip" id="sc-flush"><span class="sctm-chip-text">Flushed</span></div><div class="sctm-chip" id="sc-cyan"><span class="sctm-chip-text">Cyan</span></div></div></div>' +
+    '<div class="sctm-section"><div class="sctm-label">Temperature</div><div class="sctm-chips"><div class="sctm-chip" id="st-warm"><span class="sctm-chip-text">Warm</span></div><div class="sctm-chip" id="st-cool"><span class="sctm-chip-text">Cool</span></div><div class="sctm-chip" id="st-hot"><span class="sctm-chip-text">Hot</span></div><div class="sctm-chip" id="st-cold"><span class="sctm-chip-text">Cold</span></div></div></div>' +
+    '<div class="sctm-section"><div class="sctm-label">Moisture</div><div class="sctm-chips"><div class="sctm-chip" id="sm-dry"><span class="sctm-chip-text">Dry</span></div><div class="sctm-chip" id="sm-moist"><span class="sctm-chip-text">Moist</span></div><div class="sctm-chip" id="sm-wet"><span class="sctm-chip-text">Wet</span></div></div></div>' +
+    '<div class="sctm-summary" id="sctm-summary" style="opacity:0;"><div class="sctm-summary-title" id="sctm-title"></div><div class="sctm-summary-desc" id="sctm-desc"></div></div>';
+
+  var pulseHTML = '<div class="opt-row" id="pulse-bounding"><div><div class="opt-name" style="font-size:13px;">Bounding</div><div class="opt-desc" style="font-size:11px;">Pounding, easy to feel</div></div></div>' +
+    '<div class="opt-row" id="pulse-normal"><div><div class="opt-name" style="font-size:13px;">Normal</div><div class="opt-desc" style="font-size:11px;">Steady beat at the wrist</div></div></div>' +
+    '<div class="opt-row" id="pulse-weak"><div><div class="opt-name" style="font-size:13px;">Weak</div><div class="opt-desc" style="font-size:11px;">Faint, hard to keep track of</div></div></div>' +
+    '<div class="opt-row" id="pulse-thready"><div><div class="opt-name" style="font-size:13px;">Thready</div><div class="opt-desc" style="font-size:11px;">Barely there, comes and goes</div></div></div>' +
+    '<div class="opt-row" id="pulse-absent"><div><div class="opt-name" style="font-size:13px;">Absent</div><div class="opt-desc" style="font-size:11px;">Can\'t feel anything</div></div></div>';
+
+  // Select an opt-row and dim others
+  function selectRow(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var rows = el.parentElement.querySelectorAll('.opt-row');
+    rows.forEach(function(r) { r.classList.remove('opt-row--active'); r.classList.add('opt-row--dim'); });
+    el.classList.remove('opt-row--dim');
+    el.classList.add('opt-row--active');
+    el.querySelector('.opt-name').style.fontSize = '14px';
+    el.querySelector('.opt-desc').style.fontSize = '12px';
+  }
+
+  // Select a chip (works for both sctm-chip and sub-chip)
+  function selectChip(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.classList.contains('sub-chip')) {
+      el.classList.add('sub-chip--active');
+      var t = el.querySelector('.sub-chip-text');
+      if (t) { t.classList.add('sub-chip-text--active'); }
+    } else {
+      el.classList.add('sctm-chip--active');
+      var t2 = el.querySelector('.sctm-chip-text');
+      if (t2) { t2.classList.add('sctm-chip-text--active'); }
+    }
+  }
+
+  // ═══════ ANIMATION SEQUENCE ═══════
+
+  async function startAnimation() {
+    // Scroll so Add Vitals is centered
+    await wait(400);
+    var addBtnRect = addBtn.getBoundingClientRect();
+    var scrollTarget = soapBody.scrollTop + addBtnRect.top - 390; // center in 844px screen
+    soapBody.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    await wait(1000);
+
+    // Tap Add Vitals
+    tap(addBtn);
+    await wait(300);
+
+    // ── 1. LOR (null state) ──
+    await openDrawer('Level of Responsiveness (LOR)', lorHTML, 1);
+    await wait(1000);
+    // Tap Alert + Oriented
+    selectRow('lor-ao');
+    tap(document.getElementById('lor-ao'));
+    await wait(600);
+    document.getElementById('lor-chips').style.display = 'flex';
+    await wait(600);
+    // Tap Person
+    selectChip('lor-person');
+    await wait(500);
+    // Tap Place
+    selectChip('lor-place');
+    await wait(500);
+    // Tap Time
+    selectChip('lor-time');
+    await wait(500);
+    // Tap Event
+    selectChip('lor-event');
+    await wait(700);
+    // Save → swap to HR
+    tap(saveBtn);
+    fillCell('cell-lor', 'AO4', 'vital-cell--normal');
+    await wait(600);
+
+    // ── 2. Heart Rate (swap in-place) ──
+    await swapDrawer('Heart Rate', hrHTML, 2);
+    await wait(700);
+    // Tap 120 preset
+    tap(document.getElementById('pre-120'));
+    document.getElementById('pre-120').classList.add('tapped');
+    document.getElementById('hr-value').textContent = '120';
+    await wait(600);
+    // +1, +1
+    tap(document.getElementById('hr-p1'));
+    await wait(400);
+    document.getElementById('hr-value').textContent = '121';
+    tap(document.getElementById('hr-p1'));
+    await wait(400);
+    document.getElementById('hr-value').textContent = '122';
+    await wait(700);
+    tap(saveBtn);
+    fillCell('cell-hr', '122', 'vital-cell--red');
+    await wait(600);
+
+    // ── 3. Respiratory Rate (swap in-place) ──
+    await swapDrawer('Respiratory Rate', rrHTML, 3);
+    await wait(700);
+    tap(document.getElementById('rr-p1'));
+    await wait(400);
+    document.getElementById('rr-value').textContent = '17';
+    tap(document.getElementById('rr-p1'));
+    await wait(400);
+    document.getElementById('rr-value').textContent = '18';
+    await wait(700);
+    tap(saveBtn);
+    fillCell('cell-rr', '18', 'vital-cell--amber');
+    await wait(600);
+
+    // ── 4. Skin / SCTM (swap in-place, null state) ──
+    await swapDrawer('Skin / SCTM', sctmHTML, 4);
+    await wait(700);
+    // Tap Pink
+    selectChip('sc-pink');
+    await wait(500);
+    // Tap Warm
+    selectChip('st-warm');
+    await wait(500);
+    // Tap Dry
+    selectChip('sm-dry');
+    await wait(500);
+    // Show summary
+    var summary = document.getElementById('sctm-summary');
+    document.getElementById('sctm-title').textContent = 'Pink / Warm / Dry';
+    document.getElementById('sctm-desc').textContent = 'Normal perfusion';
+    summary.style.opacity = '1';
+    await wait(700);
+    tap(saveBtn);
+    fillCell('cell-sctm', 'PWD', 'vital-cell--normal');
+    await wait(600);
+
+    // ── 5. Pulse (swap in-place, null state) ──
+    await swapDrawer('Pulse', pulseHTML, 5);
+    await wait(800);
+    // Tap Normal
+    selectRow('pulse-normal');
+    tap(document.getElementById('pulse-normal'));
+    await wait(700);
+    tap(saveBtn);
+    fillCell('cell-pulse', 'S', 'vital-cell--normal');
+    await wait(400);
+
+    // Close drawer
+    await closeDrawer();
+
+    // Update timestamp
+    await wait(300);
+    document.querySelector('#nowRow .vitals-row-time').textContent = '10:05';
+  }
+
+  if (paused) {
+    window.addEventListener('message', function(e) { if (e.data === 'start') startAnimation(); });
+  } else {
+    startAnimation();
+  }
+})();
+</script>
+</body>
+</html>

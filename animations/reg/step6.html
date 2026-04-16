@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 6 — You're In!</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; -webkit-font-smoothing: antialiased; }
+
+  .card {
+    width: 480px; background: #fff; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
+
+  .content { padding: 28px 28px 24px; }
+
+  /* Hero celebration card */
+  .hero {
+    background: #f5f9f9; border: 1px solid #d3d9d9; border-radius: 12px;
+    padding: 24px; display: flex; align-items: flex-start; gap: 16px;
+    margin-bottom: 28px;
+  }
+  .hero-icon { font-size: 28px; flex-shrink: 0; }
+  .hero-title { font-size: 20px; font-weight: 700; color: #222; margin-bottom: 4px; }
+  .hero-text { font-size: 14px; color: #555; line-height: 1.5; }
+
+  /* Journey section */
+  .section-title { font-size: 18px; font-weight: 600; color: #222; margin-bottom: 4px; }
+  .section-sub { font-size: 13px; color: #888; margin-bottom: 20px; }
+
+  /* Three cards */
+  .cards { display: flex; gap: 12px; margin-bottom: 28px; }
+  .next-card {
+    flex: 1; border: 1px solid #e8e8e8; border-radius: 10px;
+    padding: 16px 14px; text-align: center;
+  }
+  .nc-icon { font-size: 24px; margin-bottom: 8px; }
+  .nc-title { font-size: 13px; font-weight: 700; color: #222; margin-bottom: 6px; }
+  .nc-body { font-size: 11px; color: #666; line-height: 1.5; margin-bottom: 10px; }
+  .nc-tag { font-size: 10px; color: #999; font-style: italic; }
+
+  /* Impact stats */
+  .stats {
+    display: flex; gap: 0; border-radius: 10px; overflow: hidden;
+    background: linear-gradient(135deg, #f0f7ff 0%, #e8f5e9 100%);
+  }
+  .stat {
+    flex: 1; text-align: center; padding: 16px 8px;
+  }
+  .stat-num { font-size: 22px; font-weight: 700; color: #1976D2; margin-bottom: 2px; }
+  .stat-label { font-size: 10px; color: #666; line-height: 1.4; }
+
+  .cta {
+    width: 100%; padding: 14px; background: #fff; color: #1976D2; border: 2px solid #1976D2;
+    border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif;
+    margin-top: 20px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="progress">
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">Welcome</span>
+  </div>
+  <div class="content">
+    <div class="hero">
+      <span class="hero-icon">🎉</span>
+      <div>
+        <div class="hero-title">You're in!</div>
+        <div class="hero-text">You're officially part of the Livongo program. Your care team is ready.</div>
+      </div>
+    </div>
+
+    <div class="section-title">Start your journey today</div>
+    <div class="section-sub">Here's what to expect over the next few days.</div>
+
+    <div class="cards">
+      <div class="next-card nc1">
+        <div class="nc-icon">📱</div>
+        <div class="nc-title">Download the App</div>
+        <div class="nc-body">Track readings, set goals, and get personalized tips.</div>
+        <div class="nc-tag">iOS & Android</div>
+      </div>
+      <div class="next-card nc2">
+        <div class="nc-icon">👤</div>
+        <div class="nc-title">Meet Your Coach</div>
+        <div class="nc-body">A certified health coach will reach out within 48 hours.</div>
+        <div class="nc-tag">English & Spanish</div>
+      </div>
+      <div class="next-card nc3">
+        <div class="nc-icon">📦</div>
+        <div class="nc-title">Set Up Your Kit</div>
+        <div class="nc-body">Unbox your meter, download the app, take your first reading.</div>
+        <div class="nc-tag">5–7 business days</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">48%</div>
+        <div class="stat-label">Reduced diabetes incidence</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">15 mmHg</div>
+        <div class="stat-label">Blood pressure reduction</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">0.8%</div>
+        <div class="stat-label">Average A1C improvement</div>
+      </div>
+    </div>
+
+    <button class="cta">Open the app</button>
+  </div>
+</div>
+</body>
+</html>

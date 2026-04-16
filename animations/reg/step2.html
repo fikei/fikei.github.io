@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 2 — Account Creation</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  .card {
+    width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
+
+  .content { padding: 32px 28px 28px; }
+
+  /* Banner */
+  .verified {
+    background: #f5f9f9;
+    border: 1px solid #d3d9d9;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .verified-icon { font-size: 20px; flex-shrink: 0; }
+  .verified-text { font-size: 13px; color: #333; line-height: 1.6; }
+  .verified-text strong { font-weight: 700; }
+  .verified-check {
+    display: inline-block; color: #2e7d32; font-weight: 700;
+  }
+
+  .below-banner { }
+
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
+
+  .form-group { display: flex; flex-direction: column; margin-bottom: 14px; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group label .req { color: #d32f2f; }
+  .form-input {
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #333;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    min-height: 42px;
+  }
+  .form-input.typing {
+    border-color: #1976D2;
+    box-shadow: 0 0 0 3px rgba(25,118,210,0.1);
+  }
+  .form-input.filled {
+    border-color: #ddd;
+    box-shadow: none;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: opacity 0.3s, transform 0.3s; }
+  .dot.visible { opacity: 1; transform: scale(1); }
+
+  .source-label {
+    font-size: 10px; color: #1976D2; margin-top: 4px;
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .source-label.visible { opacity: 1; }
+
+  .field-group { opacity: 0; transform: translateY(8px); }
+
+  /* Password */
+  .pw-wrap { position: relative; }
+  .pw-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: #999; }
+  .pw-rules { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+  .pw-rule { font-size: 10px; color: #bbb; display: flex; align-items: center; gap: 4px; transition: color 0.3s; }
+  .pw-rule::before { content: "✕"; color: #ddd; font-size: 9px; transition: color 0.3s; }
+  .pw-rule.passed { color: #2e7d32; }
+  .pw-rule.passed::before { content: "✓"; color: #2e7d32; }
+
+  /* Terms */
+  .terms { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 8px; opacity: 0; transition: opacity 0.3s; }
+  .terms.visible { opacity: 1; }
+  .checkbox {
+    width: 16px; height: 16px; border: 1.5px solid #ccc; border-radius: 3px;
+    flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s;
+  }
+  .checkbox.checked { background: #1976D2; border-color: #1976D2; }
+  .checkbox.checked::after { content: "✓"; color: #fff; font-size: 10px; font-weight: 700; }
+  .terms-text { font-size: 12px; color: #666; line-height: 1.5; }
+  .terms-text a { color: #1976D2; text-decoration: none; }
+
+  .cta {
+    width: 100%; padding: 14px; background: #1976D2; color: #fff;
+    border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+    font-family: 'Roboto', sans-serif; margin-top: 12px;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .cta.visible { opacity: 1; }
+
+  .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="progress">
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--off">About You</span>
+    <div class="pb"></div>
+    <span class="pl pl--off">Welcome</span>
+  </div>
+
+  <div class="content">
+    <!-- Banner pops in FIRST -->
+    <div class="verified">
+      <span class="verified-icon">🔍</span>
+      <div class="verified-text"><strong>We found you!</strong> <span class="verified-check">✓</span><br>Your eligibility through <strong>Pilot Trucking LLC</strong> is confirmed — Livongo is covered at no cost to you.</div>
+    </div>
+
+    <!-- Rest fades in after banner -->
+    <div class="below-banner">
+      <div class="title">Create Your Account</div>
+      <div class="subtitle">Choose the email and phone you'd like us to use — we pre-filled what your employer had on file.</div>
+
+      <div class="form-group field-group" id="fg-email">
+        <label>Email Address <span class="req">*</span></label>
+        <div class="form-input" id="email-input">
+          <span id="email-text">s.chen@pilottrucking.com</span>
+          <div class="dot" id="dot-email"></div>
+        </div>
+        <div class="source-label" id="src-email">● From employer records</div>
+      </div>
+
+      <div class="form-group field-group" id="fg-phone">
+        <label>Mobile Phone Number <span class="req">*</span></label>
+        <div class="form-input" id="phone-input">
+          <span>(817) 555-0142</span>
+          <div class="dot" id="dot-phone"></div>
+        </div>
+        <div class="source-label" id="src-phone">● From employer records</div>
+      </div>
+
+      <div class="form-group field-group" id="fg-pw">
+        <label>Password <span class="req">*</span></label>
+        <div class="pw-wrap">
+          <div class="form-input" id="pw-input"><span id="pw-text">Create a password</span></div>
+          <span class="pw-toggle">👁</span>
+        </div>
+        <div class="pw-rules">
+          <span class="pw-rule" id="rule1">8+ characters</span>
+          <span class="pw-rule" id="rule2">1 number</span>
+          <span class="pw-rule" id="rule3">1 uppercase</span>
+        </div>
+      </div>
+
+      <div class="terms" id="terms">
+        <div class="checkbox" id="checkbox"></div>
+        <div class="terms-text">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></div>
+      </div>
+
+      <button class="cta" id="cta-btn">Create my account</button>
+    </div>
+  </div>
+
+  <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
+</div>
+
+<script>
+(function() {
+  function typeText(el, value, callback) {
+    var parent = el.closest('.form-input');
+    if (parent) parent.classList.add('typing');
+    el.textContent = '';
+    var i = 0;
+    var interval = setInterval(function() {
+      el.textContent = value.slice(0, i + 1);
+      i++;
+      if (i >= value.length) {
+        clearInterval(interval);
+        setTimeout(function() {
+          if (parent) { parent.classList.remove('typing'); parent.classList.add('filled'); }
+          if (callback) callback();
+        }, 200);
+      }
+    }, 50);
+  }
+
+  function showEl(el) { el.classList.add('visible'); }
+
+  function runSequence() {
+    // t=1.6s: fields fade in staggered
+    var fgs = document.querySelectorAll('.field-group');
+    setTimeout(function() {
+      fgs[0].style.opacity = '1'; fgs[0].style.transform = 'translateY(0)'; fgs[0].style.transition = 'all 0.4s ease';
+    }, 1600);
+    setTimeout(function() {
+      fgs[1].style.opacity = '1'; fgs[1].style.transform = 'translateY(0)'; fgs[1].style.transition = 'all 0.4s ease';
+    }, 1800);
+    setTimeout(function() {
+      fgs[2].style.opacity = '1'; fgs[2].style.transform = 'translateY(0)'; fgs[2].style.transition = 'all 0.4s ease';
+    }, 2000);
+
+    // t=2.5s: dots appear on pre-filled fields
+    setTimeout(function() { showEl(document.getElementById('dot-email')); }, 2500);
+    setTimeout(function() { showEl(document.getElementById('dot-phone')); }, 2700);
+    // t=2.8s: source labels
+    setTimeout(function() { showEl(document.getElementById('src-email')); }, 2800);
+    setTimeout(function() { showEl(document.getElementById('src-phone')); }, 3000);
+
+    // t=3.5s: email gets cleared and retyped with personal address
+    setTimeout(function() {
+      document.getElementById('src-email').classList.remove('visible');
+      document.getElementById('dot-email').classList.remove('visible');
+      typeText(document.getElementById('email-text'), 'sarah.chen@gmail.com');
+    }, 4000);
+
+    // t=5.5s: password types in
+    setTimeout(function() {
+      var pwText = document.getElementById('pw-text');
+      pwText.style.color = '#bbb';
+      typeText(pwText, '••••••••••', function() {
+        pwText.style.color = '#333';
+      });
+    }, 6000);
+
+    // t=7s: password rules pass
+    setTimeout(function() {
+      document.getElementById('rule1').classList.add('passed');
+      document.getElementById('rule2').classList.add('passed');
+      document.getElementById('rule3').classList.add('passed');
+    }, 7200);
+
+    // t=2.2s: terms visible
+    setTimeout(function() {
+      document.getElementById('terms').classList.add('visible');
+    }, 2200);
+    // t=2.4s: CTA visible
+    setTimeout(function() {
+      document.getElementById('cta-btn').classList.add('visible');
+    }, 2400);
+
+    // t=7.8s: checkbox checked
+    setTimeout(function() {
+      document.getElementById('checkbox').classList.add('checked');
+    }, 7800);
+
+    // t=8.5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    }, 8500);
+  }
+
+  setTimeout(runSequence, 0);
+
+  // Reset and loop with card animation (16s)
+  setInterval(function() {
+    document.querySelectorAll('.field-group').forEach(function(el) {
+      el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; el.style.transition = 'none';
+    });
+    document.querySelectorAll('.dot, .source-label').forEach(function(el) { el.classList.remove('visible'); });
+    document.getElementById('email-text').textContent = 's.chen@pilottrucking.com';
+    document.getElementById('pw-text').textContent = 'Create a password';
+    document.getElementById('pw-text').style.color = '#bbb';
+    document.querySelectorAll('.pw-rule').forEach(function(el) { el.classList.remove('passed'); });
+    document.querySelectorAll('.form-input').forEach(function(el) { el.classList.remove('typing', 'filled'); });
+    document.getElementById('checkbox').classList.remove('checked');
+    document.getElementById('terms').classList.remove('visible');
+    document.getElementById('cta-btn').classList.remove('visible');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setTimeout(runSequence, 500);
+  }, 16000);
+})();
+</script>
+</body>
+</html>

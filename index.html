@@ -7,18 +7,23 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
-  <link rel="stylesheet" href="/design-system/display.css">
+  <link rel="stylesheet" href="/design-system/display.css?v=506">
 </head>
 <body class="d-page">
 
 <nav class="d-nav">
   <a href="/" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
-    <li><a href="/field.html" class="d-nav__link">Field</a></li>
-    <li><a href="/invoy.html" class="d-nav__link">Invoy</a></li>
-    <li><a href="/livongo.html" class="d-nav__link">Livongo</a></li>
-    <li><a href="/design-systems.html" class="d-nav__link">Design Systems</a></li>
-    <li><a href="/how-i-work.html" class="d-nav__link">How I Work</a></li>
+    <li class="d-nav__group" data-nav-accordion>
+      <span class="d-nav__group-label">Case Studies</span>
+      <ul class="d-nav__group-items">
+        <li><a href="/field/" class="d-nav__link">Field</a></li>
+        <li><a href="/invoy/" class="d-nav__link">Invoy</a></li>
+        <li><a href="/livongo/" class="d-nav__link">Livongo</a></li>
+      </ul>
+    </li>
+    <li><a href="/philosophy/" class="d-nav__link">Philosophy</a></li>
+    <li><a href="#" class="d-nav__link">Contact</a></li>
   </ul>
 </nav>
 
@@ -37,80 +42,223 @@
     </div>
   </div>
 
-  <!-- Suggested for You -->
-  <div class="d-section">
-    <p class="d-label">Suggested for you</p>
+  <!-- Case Studies -->
+  <div class="d-section" style="border-bottom: none;">
+    <p class="d-label">Case Studies</p>
     <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
-      <a href="/field.html" class="d-card">
+      <a href="/field/" class="d-card">
         <span class="d-card__tag">Solo Founder · AI · High Complexity</span>
-        <span class="d-card__title">Voice-First Clinical Documentation</span>
+        <span class="d-card__title">Field</span>
         <span class="d-card__desc">Voice-driven clinical documentation for first responders. On-device AI, offline-first</span>
         <span class="d-card__tag" style="margin-top: auto;">Beta</span>
       </a>
-      <a href="/invoy.html" class="d-card">
-        <span class="d-card__tag">Behavior Change · Design System</span>
-        <span class="d-card__title">Engagement Loops & Weight Loss</span>
-        <span class="d-card__desc">Weekly behavioral coaching lifecycle. MVP design system.</span>
-        <span class="d-card__tag" style="margin-top: auto;">Shipped</span>
+      <a href="/invoy/" class="d-card">
+        <span class="d-card__tag">Weight · Design System</span>
+        <span class="d-card__title">Invoy' Weekly Weight Loop</span>
+        <span class="d-card__desc">Creading</span>
+        <span class="d-card__tag" style="margin-top: auto; color: var(--color-success, #22c55e);">Shipped</span>
       </a>
-      <a href="/livongo.html" class="d-card">
+      <a href="/livongo/" class="d-card">
         <span class="d-card__tag">Infrastructure · B2B · Scale</span>
-        <span class="d-card__title">B2B Sales Configuration & End User Onboarding</span>
-        <span class="d-card__desc">Simplifying product configuration at enterprise scale.</span>
+        <span class="d-card__title">Livongo</span>
+        <span class="d-card__desc">Client configuration stability while growing</span>
       </a>
     </div>
   </div>
 
-  <!-- Utilities -->
-  <div class="d-section">
-    <p class="d-label">Utilities</p>
-    <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
-      <a href="/how-i-work.html" class="d-card">
-        <span class="d-card__tag">AI · iOS · 0→1</span>
-        <span class="d-card__title">Design System Manager</span>
-        <span class="d-card__desc">Generate and manage your design system from Figma, Paper, Github or live code.</span>
-      </a>
-      <a href="#" class="d-card">
+  <!-- Philosophies -->
+  <div style="padding: 20px 0 12px; border-bottom: 1px solid var(--border-subtle, #33332f);">
+    <p class="d-label" style="margin-bottom: 0;">Philosophies</p>
+  </div>
+
+  <!-- How I Work -->
+  <div class="d-section" style="border-bottom: none; background: var(--bg-surface, #1a1a18); margin: 0 calc(-1 * clamp(20px, 5vw, 64px)); padding: 64px clamp(20px, 5vw, 64px);">
+    <p class="d-label">How I Work</p>
+    <p class="d-headline d-headline--lg">Scaling Design with AI</p>
+    <p class="d-body" style="margin-top: 12px;">The design system is the source of truth, the constraint engine, and the AI's instruction set. Claude Code writes components constrained to the system. Systemic audits compliance. I govern.</p>
+  </div>
+
+  <!-- Personal Projects -->
+  <div class="d-section" style="border-bottom: none;">
+    <p class="d-label">Personal Projects</p>
+    <div class="d-cards d-cards--2" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
+      <a href="#" class="d-card" data-modal="modal-calendar">
         <span class="d-card__tag">Shipped · Mobile · Design System</span>
         <span class="d-card__title">Add to Calendar</span>
         <span class="d-card__desc">Quickly</span>
       </a>
-      <a href="#" class="d-card">
+      <a href="#" class="d-card" data-modal="modal-favicons">
         <span class="d-card__tag">B2B · Configuration · Scale</span>
         <span class="d-card__title">Favicons</span>
+        <span class="d-card__desc">Generate a favicon from AI, Photo or Type. GUI or API.</span>
       </a>
     </div>
-  </div>
-
-  <!-- Personal Projects -->
-  <div class="d-section">
-    <p class="d-label">Personal Projects</p>
     <div class="d-cards" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
-      <a href="#" class="d-card">
+      <a href="#" class="d-card" data-modal="modal-boards">
         <span class="d-card__tag">AI · iOS · 0→1</span>
         <span class="d-card__title">Boards</span>
-        <span class="d-card__desc">SF's Best events all in one place.</span>
+        <span class="d-card__desc">A link manager - Contextual, beautiful, actionable.</span>
       </a>
-      <a href="#" class="d-card">
+      <a href="#" class="d-card" data-modal="modal-events">
         <span class="d-card__tag">Shipped · Mobile · Design System</span>
         <span class="d-card__title">Events</span>
-        <span class="d-card__desc">SF's best events all in one place.</span>
+        <span class="d-card__desc">Curated local events. Personalized based on Boards.</span>
       </a>
-      <a href="#" class="d-card">
+      <a href="#" class="d-card" data-modal="modal-soundscape">
         <span class="d-card__tag">B2B · Configuration · Scale</span>
         <span class="d-card__title">Soundscape</span>
+        <span class="d-card__desc">Visualizer that responds to your music.</span>
       </a>
     </div>
   </div>
 
-  <!-- How I Work teaser -->
-  <div class="d-section">
-    <p class="d-label">How I Work</p>
-    <p class="d-headline d-headline--lg">One designer, five products, AI-assisted delivery.</p>
-    <p class="d-body" style="margin-top: 12px;">The design system is the source of truth, the constraint engine, and the AI's instruction set. Claude Code writes components constrained to the system. Systemic audits compliance. I govern.</p>
-    <a href="/how-i-work.html" class="d-next" style="display: inline-block; margin-top: 16px;">Read more →</a>
-  </div>
+</div>
 
+<!-- Project Modals -->
+
+<!-- Add to Calendar -->
+<div class="d-modal-overlay" id="modal-calendar">
+  <div class="d-modal">
+    <div class="d-modal__hero">
+      <div class="d-modal__image"><img src="/images/portfolio/calendar.png" alt="Add to Calendar — scheduling interface"></div>
+      <div class="d-modal__content">
+        <span class="d-modal__tag">Personal Project</span>
+        <p class="d-modal__title">Add to Calendar</p>
+        <p class="d-modal__desc">Open a browser window. Scan for events. Add to your Google Calendar.</p>
+        <dl class="d-overview" style="margin-top: 24px;">
+          <dt>Role</dt>
+          <dd>Lead product designer (Senior PM)</dd>
+          <dt>Platform</dt>
+          <dd>Chrome Extension</dd>
+          <dt>Key Tech</dt>
+          <dd>Google APIs, Claude APIs</dd>
+          <dt>Tools</dt>
+          <dd>Claude Code</dd>
+        </dl>
+        <a href="/calendar/" class="d-next" style="display: inline-block; margin-top: 20px;">View project →</a>
+      </div>
+    </div>
+    <div class="d-modal__footer">
+      <p class="d-label">Learnings</p>
+      <p class="d-body" style="margin-top: 12px;">Building a Chrome extension that reads arbitrary web pages taught me how fragile scraping is. Claude handles the ambiguity — it reads the page like a person would and extracts event data that regex never could.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Favicons -->
+<div class="d-modal-overlay" id="modal-favicons">
+  <div class="d-modal">
+    <div class="d-modal__hero">
+      <div class="d-modal__image"><img src="/images/portfolio/favicon.png" alt="Favicon Generator — AI-powered favicon creator"></div>
+      <div class="d-modal__content">
+        <span class="d-modal__tag">Personal Project</span>
+        <p class="d-modal__title">Favicons</p>
+        <p class="d-modal__desc">Generate a favicon from AI, Photo or Type. GUI or API.</p>
+        <dl class="d-overview" style="margin-top: 24px;">
+          <dt>Role</dt>
+          <dd>Solo builder</dd>
+          <dt>Platform</dt>
+          <dd>Web app + REST API</dd>
+          <dt>Key Tech</dt>
+          <dd>Claude Vision, Canvas API</dd>
+          <dt>Tools</dt>
+          <dd>Claude Code, Supabase</dd>
+        </dl>
+        <a href="/favicon/" class="d-next" style="display: inline-block; margin-top: 20px;">View project →</a>
+      </div>
+    </div>
+    <div class="d-modal__footer">
+      <p class="d-label">Learnings</p>
+      <p class="d-body" style="margin-top: 12px;">Favicons are deceptively hard at small sizes. AI generation needs heavy post-processing to look sharp at 16x16. The API mode turned out to be more useful than the GUI — developers want a curl command, not a UI.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Boards -->
+<div class="d-modal-overlay" id="modal-boards">
+  <div class="d-modal">
+    <div class="d-modal__hero">
+      <div class="d-modal__image"><img src="/images/portfolio/boards.png" alt="Boards — link curation and organization"></div>
+      <div class="d-modal__content">
+        <span class="d-modal__tag">Personal Project</span>
+        <p class="d-modal__title">Boards</p>
+        <p class="d-modal__desc">A link manager. Contextual, beautiful, actionable.</p>
+        <dl class="d-overview" style="margin-top: 24px;">
+          <dt>Role</dt>
+          <dd>Solo founder, designer, developer</dd>
+          <dt>Platform</dt>
+          <dd>iOS, Web</dd>
+          <dt>Key Tech</dt>
+          <dd>Claude Haiku, Supabase, Vanilla JS</dd>
+          <dt>Tools</dt>
+          <dd>Claude Code, Paper</dd>
+        </dl>
+        <a href="/boards/" class="d-next" style="display: inline-block; margin-top: 20px;">View project →</a>
+      </div>
+    </div>
+    <div class="d-modal__footer">
+      <p class="d-label">Learnings</p>
+      <p class="d-body" style="margin-top: 12px;">AI categorization works best when it augments existing behavior instead of replacing it. Members save links the same way they always did — Boards just organizes them automatically and surfaces patterns across interests.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Events -->
+<div class="d-modal-overlay" id="modal-events">
+  <div class="d-modal">
+    <div class="d-modal__hero">
+      <div class="d-modal__image"><img src="/images/portfolio/events.png" alt="Events — curated local event discovery"></div>
+      <div class="d-modal__content">
+        <span class="d-modal__tag">Personal Project</span>
+        <p class="d-modal__title">Events</p>
+        <p class="d-modal__desc">Curated local events. Personalized based on Boards.</p>
+        <dl class="d-overview" style="margin-top: 24px;">
+          <dt>Role</dt>
+          <dd>Solo founder, designer, developer</dd>
+          <dt>Platform</dt>
+          <dd>Web</dd>
+          <dt>Key Tech</dt>
+          <dd>Event scraping, Claude Haiku, Supabase</dd>
+          <dt>Tools</dt>
+          <dd>Claude Code</dd>
+        </dl>
+        <a href="/events/" class="d-next" style="display: inline-block; margin-top: 20px;">View project →</a>
+      </div>
+    </div>
+    <div class="d-modal__footer">
+      <p class="d-label">Learnings</p>
+      <p class="d-body" style="margin-top: 12px;">Event data is messy — every source formats differently. The real product insight was connecting events to what someone already saves in Boards, so recommendations feel personal instead of algorithmic.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Soundscape -->
+<div class="d-modal-overlay" id="modal-soundscape">
+  <div class="d-modal">
+    <div class="d-modal__hero">
+      <div class="d-modal__image"><img src="/images/portfolio/soundscape.png" alt="Soundscape — audio-reactive visualizer"></div>
+      <div class="d-modal__content">
+        <span class="d-modal__tag">Personal Project</span>
+        <p class="d-modal__title">Soundscape</p>
+        <p class="d-modal__desc">Visualizer that responds to your music.</p>
+        <dl class="d-overview" style="margin-top: 24px;">
+          <dt>Role</dt>
+          <dd>Solo builder</dd>
+          <dt>Platform</dt>
+          <dd>Web (WebGL)</dd>
+          <dt>Key Tech</dt>
+          <dd>Web Audio API, Three.js, GLSL shaders</dd>
+          <dt>Tools</dt>
+          <dd>Claude Code</dd>
+        </dl>
+        <a href="/soundscape/" class="d-next" style="display: inline-block; margin-top: 20px;">View project →</a>
+      </div>
+    </div>
+    <div class="d-modal__footer">
+      <p class="d-label">Learnings</p>
+      <p class="d-body" style="margin-top: 12px;">Real-time audio analysis is surprisingly accessible with the Web Audio API. The challenge was making the visuals feel connected to the music rather than just reactive — frequency mapping to visual parameters required hand-tuning, not just math.</p>
+    </div>
+  </div>
 </div>
 
 <footer class="d-footer d-contain">

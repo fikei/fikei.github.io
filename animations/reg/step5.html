@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reg Step 5 — Shipping</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: transparent; font-family: 'Roboto', sans-serif; display: flex; justify-content: center; -webkit-font-smoothing: antialiased; }
+
+  .card {
+    width: 480px; background: #fff; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  .progress { display: flex; align-items: center; gap: 10px; padding: 16px 28px; border-bottom: 1px solid #eee; }
+  .pl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .pl--on { color: #1976D2; }
+  .pl--off { color: #bbb; }
+  .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+  .pf { height: 100%; background: #1976D2; border-radius: 2px; }
+
+  .content { padding: 32px 28px 28px; }
+  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
+  .sub { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
+  .sub strong { font-weight: 700; }
+
+  .kit {
+    background: #f5f9ff; border: 1px solid #e0eaf5; border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 20px;
+  }
+  .kit-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: #333; }
+  .kit-check { color: #1976D2; font-weight: 700; }
+
+  .source {
+    background: #f0f7ff; border: 1px solid #d0e3f8; border-left: 3px solid #1976D2;
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;
+    font-size: 12px; color: #555; line-height: 1.5; display: flex; align-items: flex-start; gap: 10px;
+  }
+  .source-icon { font-size: 16px; flex-shrink: 0; }
+
+  .fg { display: flex; flex-direction: column; margin-bottom: 14px; }
+  .fg label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .fi {
+    padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; background: #fff; display: flex; align-items: center; justify-content: space-between;
+    color: #333; min-height: 42px; transition: color 0.4s;
+  }
+  .fi--dim { color: #bbb; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
+  .dot.visible { opacity: 1; }
+  .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .form-row .fg { flex: 1; margin-bottom: 0; }
+
+  .cta {
+    width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="progress">
+    <span class="pl pl--on">Sign Up</span>
+    <div class="pb"><div class="pf" style="width:100%"></div></div>
+    <span class="pl pl--on">About You</span>
+    <div class="pb"><div class="pf" style="width:85%"></div></div>
+    <span class="pl pl--off">Welcome</span>
+  </div>
+  <div class="content">
+    <div class="title">Receiving Your Device</div>
+    <div class="sub">Your meter, strips, and supplies ship free — fully covered by <strong>Pilot Trucking LLC</strong>.</div>
+
+    <div class="kit">
+      <div class="kit-item"><span class="kit-check">✓</span> An advanced glucose meter ($200 value)</div>
+      <div class="kit-item"><span class="kit-check">✓</span> 150 strips (with unlimited refills)</div>
+      <div class="kit-item"><span class="kit-check">✓</span> Lancing device, lancets, and carrying case</div>
+    </div>
+
+    <div class="source">
+      <span class="source-icon">🏢</span>
+      <span>This is the address we have on file from your employer. Update any field if needed before continuing.</span>
+    </div>
+
+    <div class="fg af1">
+      <label>Street Address *</label>
+      <div class="fi fi--dim" id="addr"><span id="addr-text">Street address</span><div class="dot" id="d1"></div></div>
+    </div>
+
+    <div class="fg af2" style="margin-bottom: 0;">
+      <label>Apt / Suite / Floor</label>
+      <div class="fi fi--dim">Apt / Suite / Floor (optional)</div>
+    </div>
+
+    <div class="form-row af3" style="margin-top: 14px;">
+      <div class="fg">
+        <label>City *</label>
+        <div class="fi fi--dim" id="city"><span id="city-text">City</span><div class="dot" id="d2"></div></div>
+      </div>
+      <div class="fg" style="max-width: 100px;">
+        <label>State *</label>
+        <div class="fi fi--dim" id="state"><span id="state-text">State</span><div class="dot" id="d3"></div></div>
+      </div>
+      <div class="fg" style="max-width: 120px;">
+        <label>Zip Code *</label>
+        <div class="fi fi--dim" id="zip"><span id="zip-text">Zip</span><div class="dot" id="d4"></div></div>
+      </div>
+    </div>
+
+    <button class="cta">Ship my kit</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var fills = [
+    { textId: 'addr-text', fiId: 'addr', dotId: 'd1', value: '1847 Oak Ridge Drive', delay: 2000 },
+    { textId: 'city-text', fiId: 'city', dotId: 'd2', value: 'Fort Worth', delay: 2800 },
+    { textId: 'state-text', fiId: 'state', dotId: 'd3', value: 'TX', delay: 3200 },
+    { textId: 'zip-text', fiId: 'zip', dotId: 'd4', value: '76102', delay: 3600 }
+  ];
+
+  function run() {
+    // t=4.5s: scroll down to reveal CTA button
+    setTimeout(function() {
+      window.scrollTo({ top: 80, behavior: 'smooth' });
+    }, 4500);
+
+    fills.forEach(function(f) {
+      setTimeout(function() {
+        var el = document.getElementById(f.textId);
+        var fi = document.getElementById(f.fiId);
+        el.textContent = f.value;
+        fi.classList.remove('fi--dim');
+        fi.style.color = '#333';
+        setTimeout(function() {
+          document.getElementById(f.dotId).classList.add('visible');
+        }, 200);
+      }, f.delay);
+    });
+  }
+
+  setTimeout(run, 0);
+
+  setInterval(function() {
+    fills.forEach(function(f) {
+      var el = document.getElementById(f.textId);
+      var fi = document.getElementById(f.fiId);
+      el.textContent = f.textId === 'addr-text' ? 'Street address' : f.textId === 'city-text' ? 'City' : f.textId === 'state-text' ? 'State' : 'Zip';
+      fi.classList.add('fi--dim');
+      fi.style.color = '';
+      document.getElementById(f.dotId).classList.remove('visible');
+    });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setTimeout(run, 500);
+  }, 12000);
+})();
+</script>
+</body>
+</html>
