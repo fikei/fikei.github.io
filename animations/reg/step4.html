@@ -22,44 +22,60 @@
   .pb { flex: 1; height: 3px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
   .pf { height: 100%; background: #1976D2; border-radius: 2px; }
 
-  .content { padding: 32px 28px 28px; }
-  .title { font-size: 24px; font-weight: 600; color: #222; margin-bottom: 6px; }
-  .sub { font-size: 14px; color: #666; line-height: 1.5; margin-bottom: 20px; }
+  .content { padding: 28px 28px 24px; }
+  .title { font-size: 22px; font-weight: 600; color: #222; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 16px; }
 
-  .banner { border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px; }
-  .banner--warm { background: #faf8f5; border: 1px solid #ede8e1; }
+  .banner { border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
   .banner--blue { background: #f0f7ff; border: 1px solid #d0e3f8; border-left: 3px solid #1976D2; }
-  .banner-icon { font-size: 18px; flex-shrink: 0; }
-  .banner-text { font-size: 13px; color: #444; line-height: 1.6; }
+  .banner-icon { font-size: 16px; flex-shrink: 0; }
+  .banner-text { font-size: 12px; color: #444; line-height: 1.5; }
   .banner-text strong { font-weight: 600; }
 
-  .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .section-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 8px; }
+
+  .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
   .form-group { flex: 1; display: flex; flex-direction: column; }
-  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group label { font-size: 10px; font-weight: 600; color: #666; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
   .fi {
-    padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px;
-    font-size: 14px; color: #333; background: #fff;
+    padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 13px; color: #333; background: #fff;
     display: flex; align-items: center; justify-content: space-between;
-    min-height: 42px; transition: border-color 0.3s, box-shadow 0.3s;
+    min-height: 38px; transition: border-color 0.3s, box-shadow 0.3s;
   }
+  .fi--dim { color: #bbb; }
   .fi.typing { border-color: #1976D2; box-shadow: 0 0 0 3px rgba(25,118,210,0.1); }
   .fi.filled { border-color: #ddd; box-shadow: none; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: all 0.3s; }
   .dot.visible { opacity: 1; }
 
-  .section-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 10px; }
-
-  .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #333; }
+  .check-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #333; }
+  .check-row:last-child { border-bottom: none; }
   .check-box {
-    width: 18px; height: 18px; border: 1.5px solid #ccc; border-radius: 4px; flex-shrink: 0;
+    width: 16px; height: 16px; border: 1.5px solid #ccc; border-radius: 3px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.3s;
   }
   .check-box.checked { background: #1976D2; border-color: #1976D2; }
-  .check-box.checked::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 700; }
-  .check-pre { display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 10px; color: #1976D2; }
+  .check-box.checked::after { content: "✓"; color: #fff; font-size: 10px; font-weight: 700; }
+  .check-pre { display: flex; align-items: center; gap: 4px; margin-left: auto; font-size: 9px; color: #1976D2; }
 
-  .cta { width: 100%; padding: 14px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 16px; }
+  .radio-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .radio-card {
+    flex: 1; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 13px; color: #333; display: flex; align-items: center; gap: 7px;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .radio-card.selected { border-color: #1976D2; background: #f5f9ff; }
+  .radio-dot {
+    width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ccc; flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .radio-card.selected .radio-dot {
+    border-color: #1976D2; background: #1976D2; box-shadow: inset 0 0 0 3px #fff;
+  }
+
+  .cta { width: 100%; padding: 12px; background: #1976D2; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: 'Roboto', sans-serif; margin-top: 14px; }
 </style>
 </head>
 <body>
@@ -73,43 +89,96 @@
   </div>
   <div class="content">
     <div class="title">Health History</div>
-    <div class="sub">These answers help your coach personalize your experience. Answer what you can — you can always update later.</div>
+    <div class="sub">Help your coach personalize your plan. We've pre-filled what we could from your records.</div>
 
-    <div class="banner banner--warm">
-      <span class="banner-icon">🤝</span>
-      <div class="banner-text"><strong>Personal from day one.</strong> Every answer helps your coach create a plan that reflects your needs.</div>
-    </div>
     <div class="banner banner--blue">
       <span class="banner-icon">🏥</span>
-      <div class="banner-text"><strong>Filled in from your records.</strong> Some answers below come from your health records. Review and update anything that's changed.</div>
+      <div class="banner-text"><strong>Pre-filled from your records.</strong> Review and update anything that's changed.</div>
     </div>
 
-    <div class="form-row f1">
+    <div class="section-label">Body Measurements</div>
+    <div class="form-row">
       <div class="form-group">
         <label>Height — Feet</label>
-        <div class="fi"><span>5</span><div class="dot" id="dot1"></div></div>
+        <div class="fi"><span>5</span><div class="dot" id="dot-hf"></div></div>
       </div>
       <div class="form-group">
         <label>Height — Inches</label>
-        <div class="fi"><span>10</span><div class="dot" id="dot2"></div></div>
+        <div class="fi"><span>10</span><div class="dot" id="dot-hi"></div></div>
       </div>
-    </div>
-    <div class="form-row f2">
       <div class="form-group">
         <label>Weight (lbs)</label>
-        <div class="fi" id="weight-field"><span id="weight-text" style="color: #bbb;">e.g. 185</span></div>
+        <div class="fi fi--dim" id="weight-field"><span id="weight-text">e.g. 185</span></div>
       </div>
     </div>
 
-    <div class="section-label">Your Health Background</div>
-    <div class="check-row c1">
-      <div class="check-box" id="check1"></div>
-      <span>High Cholesterol</span>
+    <div class="section-label">Diabetes Info</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Diabetes Type</label>
+        <div class="fi"><span>Type 2</span><div class="dot" id="dot-dt"></div></div>
+      </div>
+      <div class="form-group">
+        <label>Year Diagnosed</label>
+        <div class="fi"><span>2019</span><div class="dot" id="dot-yr"></div></div>
+      </div>
     </div>
-    <div class="check-row c2">
-      <div class="check-box" id="check2"></div>
-      <span>High Blood Pressure (Hypertension)</span>
-      <div class="check-pre"><div class="dot" id="dot3"></div></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Last A1C Result</label>
+        <div class="fi"><span>7.8%</span><div class="dot" id="dot-a1c"></div></div>
+      </div>
+      <div class="form-group">
+        <label>Last A1C Date</label>
+        <div class="fi"><span>Nov 2025</span><div class="dot" id="dot-a1d"></div></div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 12px;">
+      <label>Current Medications</label>
+      <div class="fi"><span>Metformin 500mg, Lisinopril 10mg</span><div class="dot" id="dot-med"></div></div>
+    </div>
+
+    <div class="section-label">Do you smoke?</div>
+    <div class="radio-row">
+      <div class="radio-card" id="smoke-no"><div class="radio-dot"></div> No</div>
+      <div class="radio-card" id="smoke-former"><div class="radio-dot"></div> Former</div>
+      <div class="radio-card" id="smoke-yes"><div class="radio-dot"></div> Yes</div>
+    </div>
+
+    <div class="section-label">How often do you exercise?</div>
+    <div class="radio-row">
+      <div class="radio-card" id="ex-rarely"><div class="radio-dot"></div> Rarely</div>
+      <div class="radio-card" id="ex-1-2"><div class="radio-dot"></div> 1–2x/wk</div>
+      <div class="radio-card" id="ex-3"><div class="radio-dot"></div> 3+/wk</div>
+    </div>
+
+    <div class="section-label">Health Conditions</div>
+    <div class="check-row">
+      <div class="check-box" id="chk-bp"></div>
+      <span>High Blood Pressure</span>
+      <div class="check-pre"><div class="dot" id="dot-bp"></div></div>
+    </div>
+    <div class="check-row">
+      <div class="check-box" id="chk-chol"></div>
+      <span>High Cholesterol</span>
+      <div class="check-pre"><div class="dot" id="dot-chol"></div></div>
+    </div>
+    <div class="check-row">
+      <div class="check-box" id="chk-heart"></div>
+      <span>Heart Disease</span>
+    </div>
+    <div class="check-row">
+      <div class="check-box" id="chk-kidney"></div>
+      <span>Kidney Disease</span>
+    </div>
+    <div class="check-row">
+      <div class="check-box" id="chk-eye"></div>
+      <span>Eye Problems (Retinopathy)</span>
+    </div>
+    <div class="check-row">
+      <div class="check-box" id="chk-neuro"></div>
+      <span>Neuropathy</span>
     </div>
 
     <button class="cta">Confirm my health info</button>
@@ -136,42 +205,73 @@
     }, 80);
   }
 
-  function run() {
-    // t=2s: pre-fill dots on height fields
-    setTimeout(function() { document.getElementById('dot1').classList.add('visible'); }, 2000);
-    setTimeout(function() { document.getElementById('dot2').classList.add('visible'); }, 2300);
+  function show(id) { document.getElementById(id).classList.add('visible'); }
+  function check(id) { document.getElementById(id).classList.add('checked'); }
+  function select(id) { document.getElementById(id).classList.add('selected'); }
 
-    // t=3s: type weight
+  function run() {
+    // t=1.5s: pre-fill dots cascade on records-sourced fields
+    setTimeout(function() { show('dot-hf'); }, 1500);
+    setTimeout(function() { show('dot-hi'); }, 1700);
+    setTimeout(function() { show('dot-dt'); }, 1900);
+    setTimeout(function() { show('dot-yr'); }, 2100);
+    setTimeout(function() { show('dot-a1c'); }, 2300);
+    setTimeout(function() { show('dot-a1d'); }, 2500);
+    setTimeout(function() { show('dot-med'); }, 2700);
+
+    // t=3s: type weight (user-entered)
     setTimeout(function() {
       var wt = document.getElementById('weight-text');
       var fi = document.getElementById('weight-field');
+      fi.classList.remove('fi--dim');
       typeText(wt, '192', fi);
     }, 3000);
 
-    // t=4s: hypertension checkbox + dot
+    // t=4s: scroll to middle section
     setTimeout(function() {
-      document.getElementById('check2').classList.add('checked');
-      document.getElementById('dot3').classList.add('visible');
+      window.scrollTo({ top: 200, behavior: 'smooth' });
     }, 4200);
 
-    // t=5.5s: scroll down to reveal CTA button
+    // t=4.5s: select smoking "No"
+    setTimeout(function() { select('smoke-no'); }, 4800);
+
+    // t=5.2s: select exercise "1-2x/wk"
+    setTimeout(function() { select('ex-1-2'); }, 5500);
+
+    // t=6s: scroll to health conditions
     setTimeout(function() {
-      window.scrollTo({ top: 120, behavior: 'smooth' });
-    }, 5500);
+      window.scrollTo({ top: 450, behavior: 'smooth' });
+    }, 6200);
+
+    // t=6.5s: check conditions from records
+    setTimeout(function() {
+      check('chk-bp'); show('dot-bp');
+    }, 6800);
+    setTimeout(function() {
+      check('chk-chol'); show('dot-chol');
+    }, 7200);
+
+    // t=8.5s: scroll to CTA
+    setTimeout(function() {
+      window.scrollTo({ top: 600, behavior: 'smooth' });
+    }, 8500);
   }
 
   setTimeout(run, 0);
 
   setInterval(function() {
+    // Reset all
     document.querySelectorAll('.dot').forEach(function(d) { d.classList.remove('visible'); });
     document.querySelectorAll('.check-box').forEach(function(c) { c.classList.remove('checked'); });
+    document.querySelectorAll('.radio-card').forEach(function(r) { r.classList.remove('selected'); });
     document.querySelectorAll('.fi').forEach(function(f) { f.classList.remove('typing', 'filled'); });
     var wt = document.getElementById('weight-text');
     wt.textContent = 'e.g. 185';
     wt.style.color = '#bbb';
+    document.getElementById('weight-field').classList.add('fi--dim');
     window.scrollTo({ top: 0, behavior: 'auto' });
     setTimeout(run, 500);
-  }, 13000);
+  }, 14000);
 })();
 </script>
 </body>
