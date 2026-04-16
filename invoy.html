@@ -30,30 +30,33 @@
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
   <a href="#experience" class="d-subnav__link">Experience</a>
+  <a href="#content" class="d-subnav__link">Content</a>
   <a href="#process" class="d-subnav__link">Process</a>
-  <a href="#design-system" class="d-subnav__link">Design System</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
   <a href="#learnings" class="d-subnav__link">Learnings</a>
 </div>
 
 <div class="d-contain">
 
-  <!-- Header + Overview -->
-  <div style="padding: 48px 0 0;">
-    <span class="d-status d-status--shipped">Shipped</span>
-    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy's Weekly Plans</p>
-    <p class="d-body" style="margin-top: 12px;">A weekly coaching system for weight management. Members plan their week, check in daily, review progress, and adjust — with coach support when the data says they need it.</p>
+  <!-- Header — side by side -->
+  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
+    <div style="width: 400px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+    <div style="flex: 1;">
+      <span class="d-status d-status--shipped">Shipped</span>
+      <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy's Weekly Plans</p>
+      <p class="d-body" style="margin-top: 12px;">A weekly coaching system for weight management. Members plan their week, check in daily, review progress, and adjust — with coach support when the data says they need it.</p>
 
-    <dl class="d-overview">
-      <dt>Role</dt>
-      <dd>Lead product designer (Senior PM)</dd>
-      <dt>Company</dt>
-      <dd>Invoy Health</dd>
-      <dt>Scope</dt>
-      <dd>Concept Design, Feature UI, Design System</dd>
-      <dt>Status</dt>
-      <dd>Shipped to production, ~CTR M3</dd>
-    </dl>
+      <dl class="d-overview" style="margin-top: 24px;">
+        <dt>Role</dt>
+        <dd>Lead product designer (Senior PM)</dd>
+        <dt>Company</dt>
+        <dd>Invoy Health</dd>
+        <dt>Scope</dt>
+        <dd>Concept Design, Feature UI, Design System</dd>
+        <dt>Status</dt>
+        <dd>Shipped to production, ~CTR M3</dd>
+      </dl>
+    </div>
   </div>
 
   <!-- FRAMING -->
@@ -92,8 +95,8 @@
 
   <!-- HOW IT WORKS -->
   <div class="d-section">
-    <p class="d-label">How It works</p>
-    <p class="d-body">Description of how it works</p>
+    <p class="d-label">How It Works</p>
+    <p class="d-body">A closed loop. Each week starts with a plan. Each day feeds data back into the plan. At the end of the week, you review what happened. The system adapts. The coach intervenes only when the data says you need it.</p>
     <div class="d-flow" style="margin-top: 24px;">
       <div class="d-flow__step">
         <span class="d-flow__step-num">01</span>
@@ -125,65 +128,237 @@
   <div id="experience" class="d-section">
     <p class="d-label">Core Experience</p>
 
-    <!-- Weekly Planning -->
-    <div class="d-grid-2" style="margin-top: 24px;">
-      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
-        <span class="d-mono">[screenshot]</span>
-      </div>
-      <div>
-        <p class="d-label">01</p>
-        <p class="d-headline d-headline--md">Weekly Planning</p>
-        <p class="d-mono" style="margin-top: 4px;">Your week, planned around real life</p>
-        <p class="d-body" style="margin-top: 16px;">"Any events this week?" routes into one of five plan variants. The member answers one question. The system does the branching.</p>
-        <div style="margin-top: 20px;">
-          <p class="d-label">Jobs to be done</p>
-          <ul class="d-persona__needs">
-            <li>As a member, I need my plan to account for travel and social events, so I'm not set up to fail.</li>
-            <li>As a member, I need lighter goals when life is busy, so I stay engaged instead of giving up.</li>
-            <li>As a member, I need a rebound plan activated automatically when I plan a cheat meal.</li>
-          </ul>
+    <!-- 01: Weekly Goals — with animation -->
+    <div style="display: flex; gap: 24px; padding: 32px 0; align-items: center;">
+      <div id="weeklyPlanContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="weeklyPlanPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/animations/weekly-plan.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="weeklyPlanFrame"></iframe>
         </div>
+      </div>
+      <script>
+      (function() {
+        var container = document.getElementById('weeklyPlanContainer');
+        var phone = document.getElementById('weeklyPlanPhone');
+        var pad = 20;
+        function sizePhone() {
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85);
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+
+        // Scroll trigger
+        var started = false;
+        var iframe = document.getElementById('weeklyPlanFrame');
+        var observer = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting && !started) {
+            started = true;
+            iframe.addEventListener('load', function() {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            });
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            }
+            observer.disconnect();
+          }
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      })();
+      </script>
+      <div style="flex: 1;">
+        <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+        <p class="d-headline d-headline--md" style="margin-top: 4px;">Weekly Goals</p>
+        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Understanding your capacity</p>
+        <p class="d-body" style="margin-top: 12px;">"Any events this week?" One question routes into five plan types — Base, Busy Week, Cheat & Rebound, Edit Plan, or Accelerate. The member sets realistic capacity for the week. The system adapts the plan to match.</p>
+        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a member, I can...</p>
+        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+          <li class="d-body" style="font-size: 12px;">• set my weekly capacity with one question so my plan matches real life.</li>
+          <li class="d-body" style="font-size: 12px;">• plan a cheat meal and get a rebound plan queued without judgment.</li>
+          <li class="d-body" style="font-size: 12px;">• start the week knowing what "on plan" looks like for me this week.</li>
+          <li class="d-body" style="font-size: 12px;">• skip the planning guilt — the system meets me where I am.</li>
+        </ul>
       </div>
     </div>
 
-    <!-- Week in Review -->
-    <div class="d-grid-2" style="margin-top: 24px;">
-      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
-        <span class="d-mono">[screenshot]</span>
-      </div>
-      <div>
-        <p class="d-label">02</p>
-        <p class="d-headline d-headline--md">Week in Review</p>
-        <p class="d-mono" style="margin-top: 4px;">See what worked without reading charts</p>
-        <p class="d-body" style="margin-top: 16px;">Weight delta, progress bars, sparkline, activity matrix, AI summary — one scroll. Every number reads without explanation.</p>
-        <div style="margin-top: 20px;">
-          <p class="d-label">Jobs to be done</p>
-          <ul class="d-persona__needs">
-            <li>As a member, I need to see whether my weight moved and why, so I connect actions to results.</li>
-            <li>As a member, I need a summary I can absorb in under a minute, even when the data is complex.</li>
-          </ul>
+    <!-- 02: Daily Check-In — with animation -->
+    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: center; flex-direction: row-reverse;">
+      <div id="dailyCheckinContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="dailyCheckinPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/animations/daily-checkin.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="dailyCheckinFrame"></iframe>
         </div>
+      </div>
+      <script>
+      (function() {
+        var container = document.getElementById('dailyCheckinContainer');
+        var phone = document.getElementById('dailyCheckinPhone');
+        var pad = 20;
+        function sizePhone() {
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85);
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+
+        var started = false;
+        var iframe = document.getElementById('dailyCheckinFrame');
+        var observer = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting && !started) {
+            started = true;
+            iframe.addEventListener('load', function() {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            });
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            }
+            observer.disconnect();
+          }
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      })();
+      </script>
+      <div style="flex: 1;">
+        <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+        <p class="d-headline d-headline--md" style="margin-top: 4px;">Daily Check-In</p>
+        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Celebrate wins and missteps</p>
+        <p class="d-body" style="margin-top: 12px;">Score, mood, meals, adherence — captured daily and fed back into the weekly plan. The system treats every data point as signal, not judgment. Score increases trigger reinforcement. Drops trigger coach triage and a recovery path.</p>
+        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a member, I can...</p>
+        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+          <li class="d-body" style="font-size: 12px;">• see how today connects to what I planned this week.</li>
+          <li class="d-body" style="font-size: 12px;">• log my day in under 60 seconds.</li>
+          <li class="d-body" style="font-size: 12px;">• understand why my score changed and what to do about it.</li>
+        </ul>
       </div>
     </div>
 
-    <!-- Updated Checkin Flow -->
-    <div class="d-grid-2" style="margin-top: 24px;">
-      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
-        <span class="d-mono">[screenshot]</span>
+    <!-- 03: Week in Review -->
+    <div style="display: flex; gap: 24px; padding: 32px 0; border-top: 1px solid var(--border-subtle, #33332f); align-items: flex-start;">
+      <div style="width: 384px; aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); flex-shrink: 0;"></div>
+      <div style="flex: 1;">
+        <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
+        <p class="d-headline d-headline--md" style="margin-top: 4px;">Week in Review</p>
+        <p class="d-mono d-text--subtle" style="margin-top: 4px;">Building motivation</p>
+        <p class="d-body" style="margin-top: 12px;">Weight delta, progress bars, sparkline, activity matrix, AI summary — one scroll. The review connects effort to outcomes so the member sees what worked, not just what happened. Every number reads without explanation.</p>
+        <p class="d-label" style="margin-top: 20px;">Jobs To Be Done</p>
+        <p class="d-mono d-text--muted" style="margin-top: 4px;">As a member, I can...</p>
+        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+          <li class="d-body" style="font-size: 12px;">• see whether my weight moved and why, so I connect actions to results.</li>
+          <li class="d-body" style="font-size: 12px;">• absorb a full week of complex data in under a minute.</li>
+          <li class="d-body" style="font-size: 12px;">• carry momentum into next week's plan because I saw what worked.</li>
+        </ul>
       </div>
-      <div>
-        <p class="d-label">03</p>
-        <p class="d-headline d-headline--md">Updated Checkin Flow</p>
-        <p class="d-mono" style="margin-top: 4px;">Every day connects to the week</p>
-        <p class="d-body" style="margin-top: 16px;">Daily check-ins capture score, mood, meals, adherence — then feed into the weekly loop. Score drops trigger triage. Increases trigger reinforcement.</p>
-        <div style="margin-top: 20px;">
-          <p class="d-label">Jobs to be done</p>
-          <ul class="d-persona__needs">
-            <li>As a member, I need today's check-in to connect to what I planned this week, so each day feels purposeful.</li>
-            <li>As a member, I need to understand why my score dropped and what to do about it.</li>
-            <li>As a member, I need going off plan to lead to a recovery path, not a guilt message.</li>
-          </ul>
-        </div>
+    </div>
+  </div>
+
+  <!-- CONTENT STRATEGY -->
+  <div id="content" class="d-section">
+    <p class="d-label">Content Strategy</p>
+    <p class="d-body">Invoy's coaching team ran everything through phone calls, spreadsheets, and manual check-ins. The workflows were effective but didn't scale. We mapped every coaching interaction, found the repeating patterns, and flattened them into UI components the system could deliver without a human in the loop.</p>
+    <p class="d-body">The goal wasn't to replace coaches — it was to give them leverage. The system handles the routine; the coach steps in when the data says a member actually needs them.</p>
+
+    <!-- Workflow Abstraction -->
+    <div style="margin-top: 32px; margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Workflow Abstraction</p>
+      <p class="d-mono d-text--subtle" style="margin-top: 4px;">From coaching calls to system logic</p>
+    </div>
+
+    <p class="d-body" style="margin-bottom: 24px;">Every coaching interaction fell into one of a few categories. We mapped the trigger, the coach action, and the outcome — then built each one into the product.</p>
+
+    <!-- Abstraction chart -->
+    <div style="border: 1px solid var(--border-subtle, #33332f); font-family: var(--font-mono, monospace); font-size: 12px;">
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle, #33332f); background: var(--bg-surface, #1a1a18);">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-subtle, #666560); text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; border-right: 1px solid var(--border-subtle, #33332f);">Trigger</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-subtle, #666560); text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; border-right: 1px solid var(--border-subtle, #33332f);">Old: Coach Action</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-subtle, #666560); text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px;">New: System Action</div>
+      </div>
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle, #33332f);">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Score drops 2+ days</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Coach calls member</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-muted, #8a8885);">Score Drop CTA → coach triage queue</div>
+      </div>
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle, #33332f);">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Member plans cheat meal</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Coach builds rebound plan manually</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-muted, #8a8885);">Auto-queue Cheat & Rebound flow</div>
+      </div>
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle, #33332f);">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Week starts without a plan</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Coach texts reminder</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-muted, #8a8885);">Push: "Ready to plan your week?"</div>
+      </div>
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle, #33332f);">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Week ends</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Coach reviews spreadsheet, calls member</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-muted, #8a8885);">Week in Review auto-generated</div>
+      </div>
+      <div style="display: flex;">
+        <div style="width: 200px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Member hits goal streak</div>
+        <div style="width: 240px; padding: 10px 16px; color: var(--fg-muted, #8a8885); border-right: 1px solid var(--border-subtle, #33332f);">Coach sends congrats text</div>
+        <div style="flex: 1; padding: 10px 16px; color: var(--fg-muted, #8a8885);">Score increase → reinforcement card</div>
+      </div>
+    </div>
+
+    <!-- Stakeholder Management -->
+    <div style="margin-top: 48px; margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Stakeholder Management</p>
+      <p class="d-mono d-text--subtle" style="margin-top: 4px;">Three teams, one loop</p>
+    </div>
+
+    <p class="d-body">The coaching team owned the workflows. The clinical team owned the health logic. Product owned the interface. Each group had different definitions of success — coaches wanted flexibility, clinical wanted compliance, product wanted simplicity.</p>
+    <p class="d-body">The weekly plan framework became the shared language. Every feature decision mapped back to: <strong>does this make the loop work better?</strong> Coaches got automated triage. Clinical got standardized scoring. Product got a single interaction model that covered all five plan types.</p>
+
+    <!-- Push Notifications -->
+    <div style="margin-top: 48px; margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">03</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Push Notifications</p>
+      <p class="d-mono d-text--subtle" style="margin-top: 4px;">Contextual nudges, not interruptions</p>
+    </div>
+
+    <p class="d-body">Push notifications were designed as part of the engagement loop — not a marketing channel. Every notification tied to a specific state in the weekly plan. No notification fired without a reason the member could trace back to their own data.</p>
+
+    <div class="d-decisions" style="margin-top: 16px;">
+      <div class="d-decision">
+        <p class="d-decision__q">Plan not set by Monday</p>
+        <p class="d-decision__a">"Ready to plan your week?" — routes directly into the planning flow. Sent once. No follow-up spam.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Score drop (2+ days)</p>
+        <p class="d-decision__a">"Your coach wants to check in" — flags the coach queue and gives the member a direct path to the recovery flow.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Weekly review ready</p>
+        <p class="d-decision__a">"See how your week went" — triggers after the last check-in of the week. The review is already built; the member just opens it.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Goal streak (3+ days on plan)</p>
+        <p class="d-decision__a">"You're on a 3-day streak" — reinforcement, not a call to action. The member sees momentum without needing to do anything.</p>
       </div>
     </div>
   </div>
@@ -191,10 +366,13 @@
   <!-- PROCESS -->
   <div id="process" class="d-section">
     <p class="d-label">Process</p>
-    <p class="d-label" style="margin-top: 16px;">01</p>
-    <p class="d-headline d-headline--md">Design Decisions</p>
-    <p class="d-mono" style="margin-top: 4px;">TBD</p>
-    <div class="d-decisions" style="margin-top: 16px;">
+
+    <div style="margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Design Decisions</p>
+    </div>
+
+    <div class="d-decisions">
       <div class="d-decision">
         <p class="d-decision__q">Why does one question split into 5 different flows?</p>
         <p class="d-decision__a">Members shouldn't need to understand the system's logic. "Any events this week?" routes automatically into Base, Busy Week, Cheat & Rebound, Edit Plan, or Accelerate.</p>
@@ -208,25 +386,27 @@
         <p class="d-decision__a">People look at this once a week. It has to be complete and fast to scan.</p>
       </div>
     </div>
-  </div>
 
-  <!-- DESIGN SYSTEM -->
-  <div id="design-system" class="d-section">
-    <p class="d-label">02</p>
-    <p class="d-headline d-headline--md">Design Systems</p>
-    <p class="d-mono" style="margin-top: 4px;">TBD</p>
-    <div class="d-gallery d-gallery--3" style="margin-top: 24px;">
+    <div style="margin-top: 48px; margin-bottom: 24px;">
+      <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+      <p class="d-headline d-headline--md" style="margin-top: 4px;">Design Systems</p>
+    </div>
+
+    <div class="d-gallery d-gallery--3">
       <div class="d-gallery__item">
-        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
-        <span class="d-gallery__caption">Score classes</span>
+        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+          <span class="d-mono d-text--subtle" style="font-size: 11px;">Score Classes</span>
+        </div>
       </div>
       <div class="d-gallery__item">
-        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
-        <span class="d-gallery__caption">Type & Options</span>
+        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+          <span class="d-mono d-text--subtle" style="font-size: 11px;">Type & Options</span>
+        </div>
       </div>
       <div class="d-gallery__item">
-        <div style="aspect-ratio: 3/4; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">[screenshot]</span></div>
-        <span class="d-gallery__caption">Components</span>
+        <div style="height: 280px; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: flex-end; padding: 12px;">
+          <span class="d-mono d-text--subtle" style="font-size: 11px;">Components</span>
+        </div>
       </div>
     </div>
   </div>
@@ -249,6 +429,25 @@
         <div class="d-metric__value">30</div>
         <div class="d-metric__label">Components shipped</div>
         <div class="d-metric__sub">With documented governance rules</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEARNINGS -->
+  <div id="learnings" class="d-section">
+    <p class="d-label">Learnings</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">A loop beats a list</p>
+        <p class="d-decision__a">Features that reference each other (plan → check-in → review → adapt) create engagement that standalone screens can't. The member doesn't need to remember context — the system carries it.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Recovery paths > shame</p>
+        <p class="d-decision__a">Rebound flows kept members in the system after bad days. Guilt messaging would have lost them. Designing for failure states is designing for retention.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">One question can hide five flows</p>
+        <p class="d-decision__a">"Any events this week?" is simple for the member but routes into complex branching logic underneath. The best UX hides the system's complexity, not the user's options.</p>
       </div>
     </div>
   </div>
