@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoy — Weekly Planning Flow</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0A0A0A; display: flex; justify-content: center; padding: 60px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-synthesis: none; }
+  body.embedded { padding: 0; background: transparent; }
+  body.embedded .phone__label { display: none; }
+
+  .phone { width: 402px; background: #1C1C1E; border-radius: 48px; padding: 6px; flex-shrink: 0; }
+  .phone-inner { border-radius: 42px; overflow: hidden; position: relative; width: 390px; height: 844px; background: white; }
+  .phone__label { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666560; margin-top: 16px; }
+
+  /* Persistent nav overlay */
+  .persistent-nav { position: absolute; top: 0; left: 0; right: 0; z-index: 10; background: white; padding: 36px 36px 0; display: flex; align-items: center; justify-content: space-between; }
+  .nav-el { color: #B2B2B2; font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; line-height: 22px; }
+  .nav-label { letter-spacing: -0.41px; }
+
+  /* Screen stack */
+  .screen { position: absolute; inset: 0; width: 390px; height: 844px; background: white; opacity: 0; pointer-events: none; display: flex; flex-direction: column; font-size: 12px; line-height: 16px; overflow: hidden; }
+  .screen.active { opacity: 1; pointer-events: auto; z-index: 2; }
+  .screen.entering { animation: fadeIn 0.5s ease forwards; }
+  .screen.exiting { animation: fadeOut 0.5s ease forwards; z-index: 1; }
+  .screen.slide-up { animation: slideUp 0.5s cubic-bezier(0.32,0.72,0,1) forwards; }
+  .screen.slide-down { animation: slideDown 0.5s cubic-bezier(0.32,0.72,0,1) forwards; z-index: 1; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes slideUp { from { opacity: 1; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideDown { from { opacity: 1; transform: translateY(0); } to { opacity: 1; transform: translateY(100%); } }
+
+  /* Banner */
+  .plan-banner { background: #2A3C56; border-radius: 16px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; margin: 0 26px; }
+  .plan-banner-text { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 15px; font-weight: 600; color: white; letter-spacing: -0.41px; }
+  .plan-banner-arrow { font-family: "SF Pro Text", sans-serif; font-size: 17px; color: white; }
+
+  /* Card container — below nav */
+  .card { padding: 80px 36px 36px; display: flex; flex-direction: column; gap: 24px; flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  .card::-webkit-scrollbar { display: none; }
+  .card-fade-out { animation: cardFadeOut 0.35s ease forwards; }
+  .card-fade-in { animation: cardFadeIn 0.35s ease forwards; }
+  @keyframes cardFadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes cardFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Typography — all left-aligned */
+  .heading { font-family: "SF Pro", system-ui, sans-serif; font-size: 28px; font-weight: 510; letter-spacing: -0.5px; line-height: 34px; color: #191919; text-align: left; }
+  .body-muted { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; letter-spacing: -0.41px; line-height: 26px; color: #6B6B6B; text-align: left; }
+  .label-md { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; font-weight: 500; letter-spacing: -0.41px; line-height: 22px; color: #191919; }
+  .label-bold { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.41px; line-height: 22px; color: #191919; }
+  .text-item { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; letter-spacing: -0.41px; line-height: 22px; color: #221D1D; }
+  .text-freq { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 15px; letter-spacing: -0.41px; line-height: 18px; color: #191919; }
+  .text-muted { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; letter-spacing: -0.41px; line-height: 22px; color: #B2B2B2; }
+  .text-sub { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 15px; letter-spacing: -0.41px; line-height: 18px; color: #B2B2B2; }
+  .text-green { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 15px; letter-spacing: -0.41px; line-height: 18px; color: #477E63; }
+
+  /* Plan row */
+  .plan-row { display: flex; align-items: center; justify-content: space-between; border-radius: 20px; padding: 12px 16px; }
+  .plan-row--bg { background: #F2F2F2; }
+  .plan-row--highlight { background: rgba(121,188,249,0.18); }
+  .plan-left { display: flex; align-items: center; gap: 12px; }
+  .dot { flex-shrink: 0; width: 36px; height: 36px; border-radius: 18px; }
+  .dot--green { background: #6FCC9F; border-radius: 9999px; }
+  .dot--navy { background: #2A3C56; }
+  .dot--marigold { background: #FAB52A; }
+  .dot--apricot { background: #F68C50; border-radius: 9999px; }
+
+  /* CTA */
+  .cta { background: #2A3C56; border-radius: 26px; padding: 16px; text-align: center; }
+  .cta-text { font-family: "SF Pro Text", system-ui, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.41px; line-height: 22px; color: white; display: block; width: 100%; }
+
+  /* Callout */
+  .callout-green { background: #E4F5EC; border-radius: 16px; padding: 12px 16px; }
+
+  /* Section */
+  .section { display: flex; flex-direction: column; gap: 12px; }
+  .section-head { display: flex; justify-content: space-between; align-items: start; }
+  .kebab { color: #707070; font-family: "SF Pro Text", sans-serif; font-size: 28px; font-weight: 700; line-height: 34px; width: 12px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 24px; align-items: center; height: 22px; }
+  .tab-active { cursor: pointer; }
+
+  /* Calendar dot matrix */
+  .cal-header { display: flex; padding-left: 70px; width: 322px; }
+  .cal-header span { flex-shrink: 0; width: 36px; text-align: center; font-family: "SF Pro Text", sans-serif; font-size: 15px; font-weight: 700; line-height: 18px; color: #191919; }
+  .cal-row { display: flex; align-items: center; }
+  .cal-label { flex-shrink: 0; width: 70px; font-family: "SF Pro Text", sans-serif; font-size: 11px; font-weight: 700; line-height: 14px; color: #191919; }
+  .cal-cell { flex-shrink: 0; width: 36px; display: flex; justify-content: center; }
+  .cal-dot { border-radius: 12px; width: 24px; height: 24px; }
+  .cal-dot-sm { border-radius: 3px; width: 6px; height: 6px; background: #D6D6D6; }
+
+  /* Animated elements */
+  .anim { opacity: 0; transform: translateY(10px); }
+  .anim.show { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease; }
+
+  /* Tab content swap — crossfade via grid stack */
+  .tab-stack { display: grid; }
+  .tab-stack > * { grid-area: 1 / 1; transition: opacity 0.5s ease; }
+  .tab-stack > .hidden { opacity: 0; pointer-events: none; visibility: hidden; }
+
+  /* Tap pulse */
+  @keyframes tapPulse { 0% { transform: scale(1); } 50% { transform: scale(0.96); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+  .pulse { animation: tapPulse 0.3s ease; }
+
+  /* Selectable plan row */
+  .plan-row--selectable { transition: background 0.3s ease; }
+  .plan-row--selectable .text-item { transition: color 0.3s ease; }
+  .plan-row--selectable.selected { background: rgba(121,188,249,0.18); animation: tapPulse 0.25s ease; }
+  .plan-row--selectable.selected .text-item { color: #224D72; }
+
+  /* Home screen */
+  .home-content { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; flex: 1; padding: 0 40px; }
+  .home-greeting { font-family: "SF Pro", system-ui, sans-serif; font-size: 34px; font-weight: 510; color: #191919; text-align: center; letter-spacing: -0.5px; line-height: 41px; }
+  .home-stat-val { font-family: "SF Pro", system-ui, sans-serif; font-size: 26px; font-weight: 700; color: #191919; letter-spacing: -0.5px; line-height: 28px; }
+  .home-stat-label { font-family: "SF Pro Text", sans-serif; font-size: 15px; color: #B2B2B2; letter-spacing: -0.41px; }
+
+  @media (max-width: 480px) {
+    body:not(.embedded) { padding: 24px 0; }
+    body:not(.embedded) .phone { transform: scale(0.85); transform-origin: top center; }
+  }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- Persistent nav (hidden on home) -->
+      <div class="persistent-nav" id="persistentNav" style="opacity:0;transition:opacity 0.4s ease;">
+        <span class="nav-el">←</span>
+        <span class="nav-el nav-label">Weekly Review</span>
+        <span class="nav-el">×</span>
+      </div>
+
+      <!-- SCREEN 0: Home (from Paper JSX) -->
+      <div class="screen active" id="screen0" style="background:white;border-radius:30px;">
+        <!-- Status bar -->
+        <div style="display:flex;flex-direction:column;flex-shrink:0;padding:14px 26px 0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:15px;font-weight:600;color:#191919;">9:41</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:12px;font-weight:600;color:#191919;">||||</span>
+              <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:14px;color:#191919;">▲</span>
+              <div style="width:24px;height:11px;border-radius:3px;background:#191919;"></div>
+            </div>
+          </div>
+          <!-- Top nav -->
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;">
+            <div style="width:28px;height:28px;border-radius:14px;background:#2A3C56;position:relative;">
+              <div style="width:8px;height:8px;border-radius:4px;background:#6FCC9F;border:2px solid white;position:absolute;right:-2px;top:-2px;"></div>
+            </div>
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;font-weight:600;color:#191919;letter-spacing:-0.41px;">Home</span>
+            <div style="width:36px;height:36px;border-radius:18px;border:2px solid #2A3C56;display:flex;align-items:center;justify-content:center;">
+              <div style="width:12px;height:12px;border-radius:6px;border:1.5px solid #2A3C56;"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Plan your week banner -->
+        <div id="planBanner" style="display:flex;flex-direction:column;gap:8px;background:rgba(121,188,249,0.12);border-radius:20px;padding:20px 24px;margin:16px 16px 0;">
+          <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;font-weight:500;color:#191919;letter-spacing:-0.41px;">Plan your week with Invoy</span>
+          <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:15px;color:#797979;letter-spacing:-0.41px;line-height:18px;">Make the most out of your day checks with Invoy by planning how you want to impact your weight this week.</span>
+        </div>
+        <!-- Main content -->
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;flex:1;padding:0 40px;">
+          <!-- Sunrise -->
+          <div style="width:220px;height:220px;border-radius:110px;background:#FAF5EB;display:flex;flex-direction:column;align-items:center;overflow:hidden;position:relative;">
+            <div style="width:90px;height:45px;border-radius:45px 45px 0 0;background:#E8A830;position:absolute;top:82px;"></div>
+            <div style="width:4px;height:18px;border-radius:2px;background:#E8A830;position:absolute;top:58px;left:108px;"></div>
+            <div style="width:4px;height:14px;border-radius:2px;background:#E8A830;position:absolute;top:62px;left:88px;transform:rotate(-25deg);"></div>
+            <div style="width:4px;height:14px;border-radius:2px;background:#E8A830;position:absolute;top:62px;left:128px;transform:rotate(25deg);"></div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:center;position:absolute;top:132px;">
+              <div style="width:130px;height:5px;border-radius:3px;background:#A8D4E2;"></div>
+              <div style="width:100px;height:5px;border-radius:3px;background:#BEE0EC;"></div>
+              <div style="width:70px;height:5px;border-radius:3px;background:#D0EAF2;"></div>
+            </div>
+          </div>
+          <span style="font-family:'SF Pro Display',system-ui,sans-serif;font-size:34px;font-weight:600;line-height:41px;text-align:center;color:#191919;width:324px;">Good morning, Charlie.</span>
+          <div style="background:#2A3C56;border-radius:30px;padding:18px 56px;">
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;font-weight:600;color:white;letter-spacing:-0.41px;">Let's check-in</span>
+          </div>
+          <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:17px;color:#191919;letter-spacing:-0.41px;">Yesterday, you got:</span>
+          <div style="display:flex;gap:32px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:44px;height:44px;border-radius:22px;background:#ECEAE6;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:18px;color:#5A7080;">🔥</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:26px;font-weight:700;color:#191919;letter-spacing:-0.5px;line-height:28px;">5.9</span>
+                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:15px;color:#B2B2B2;letter-spacing:-0.41px;">Fat Burn</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:44px;height:44px;border-radius:22px;background:#ECEAE6;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:18px;color:#5A7080;">✓</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <span style="font-family:'SF Pro',system-ui,sans-serif;font-size:26px;font-weight:700;color:#191919;letter-spacing:-0.5px;line-height:28px;">4 days</span>
+                <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:15px;color:#B2B2B2;letter-spacing:-0.41px;">Check-in Streak</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Tab bar -->
+        <div style="display:flex;justify-content:space-around;align-items:flex-start;padding:10px 0 28px;border-top:1px solid #F0F0F0;flex-shrink:0;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:20px;color:#2A3C56;">⌂</span>
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:10px;font-weight:600;color:#2A3C56;letter-spacing:-0.41px;">Home</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:20px;color:#B2B2B2;">📊</span>
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:10px;color:#B2B2B2;letter-spacing:-0.41px;">Journey</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:20px;color:#B2B2B2;">🍴</span>
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:10px;color:#B2B2B2;letter-spacing:-0.41px;">Food</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:20px;color:#B2B2B2;">💬</span>
+            <span style="font-family:'SF Pro Text',system-ui,sans-serif;font-size:10px;color:#B2B2B2;letter-spacing:-0.41px;">Support</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 1: Review Base Plan -->
+      <div class="screen" id="screen1">
+        <div class="card">
+          <div style="display:flex;flex-direction:column;gap:24px;padding:8px 0;">
+            <div class="heading">Review Base Plan</div>
+            <div class="body-muted" style="padding-right:36px;">Your base plan is the core of your Invoy experience. It is set by a coach at the beginning of a program cycle or over coaching calls.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:36px;">
+            <div class="section">
+              <div class="section-head">
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+                  <span class="label-md">Invoy Basics</span>
+                  <span class="text-sub">The tools for monitoring</span>
+                </div>
+                <span class="kebab">⋮</span>
+              </div>
+              <div class="plan-row plan-row--bg">
+                <div class="plan-left"><div class="dot dot--green"></div><span class="text-item">Breath Test & Check-in</span></div>
+                <span class="text-freq">Daily</span>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-head">
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+                  <span class="label-md">Plan: Carbohydrate Restriction</span>
+                  <span class="text-sub">Durable strategies for change</span>
+                </div>
+                <span class="kebab">⋮</span>
+              </div>
+              <div class="plan-row plan-row--bg">
+                <div class="plan-left"><div class="dot dot--navy"></div><span class="text-item">Less than 20g Carbs</span></div>
+                <span class="text-freq">Daily</span>
+              </div>
+            </div>
+            <div class="cta" id="s1-cta"><span class="cta-text">Review Weekly Goals</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 2: Add Weekly Goals -->
+      <div class="screen" id="screen2">
+        <div class="card">
+          <div style="display:flex;flex-direction:column;gap:24px;padding:8px 0;">
+            <div class="heading">Add Weekly Goals</div>
+            <div class="body-muted" style="padding-right:36px;">Your boosts this week are aiming for weight loss. All recommendations are based on your last week, past habits and people like you.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;flex:1;">
+            <div class="section" style="padding-bottom:8px;">
+              <span class="label-md">Coach Recommended</span>
+              <div class="plan-row plan-row--selectable" id="sel-if">
+                <div class="plan-left"><div class="dot dot--apricot"></div><span class="text-item">Intermittent Fasting</span></div>
+                <span class="text-freq">x1</span>
+              </div>
+            </div>
+            <div class="section" style="padding-bottom:8px;">
+              <span class="label-md">Daily Focus</span>
+              <div class="plan-row">
+                <div class="plan-left"><div class="dot dot--marigold"></div><span class="text-item">Remove Added Sugars</span></div>
+                <span class="text-freq">Daily</span>
+              </div>
+              <div class="plan-row plan-row--selectable" id="sel-greens">
+                <div class="plan-left"><div class="dot dot--marigold"></div><span class="text-item">Add 1 Serving Greens</span></div>
+                <span class="text-freq">Daily</span>
+              </div>
+            </div>
+            <div class="section" style="padding-bottom:8px;">
+              <span class="label-md">Weekly Boosts</span>
+              <div class="plan-row plan-row--selectable" id="sel-exercise">
+                <div class="plan-left"><div class="dot dot--apricot"></div><span class="text-item">30 Min Exercise</span></div>
+                <span class="text-freq">x 3</span>
+              </div>
+              <div class="plan-row">
+                <div class="plan-left"><div class="dot dot--apricot"></div><span class="text-item">Remove Starches</span></div>
+                <span class="text-freq">x 3</span>
+              </div>
+            </div>
+            <div class="cta" id="s2-cta"><span class="cta-text">Add Boosts</span></div>
+            <div class="text-muted" style="text-align:center;">Skip this week</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 3: This Week on Invoy (At a Glance → By Day) -->
+      <div class="screen" id="screen3">
+        <div class="card" id="screen3Card" style="overflow-y:auto;">
+          <div style="display:flex;flex-direction:column;gap:16px;padding:8px 0;">
+            <div class="heading">This Week on Invoy</div>
+            <div class="body-muted" style="padding-right:36px;">Here is your personal weight management plan for this week.</div>
+            <div class="tabs">
+              <span class="label-bold" id="tabGlance">At a Glance</span>
+              <span class="text-muted tab-active" id="tabDay">By Day</span>
+            </div>
+          </div>
+
+          <!-- Tab panels stacked -->
+          <div class="tab-stack">
+          <!-- At a Glance content -->
+          <div id="glanceContent" style="display:flex;flex-direction:column;gap:0;transition:opacity 0.5s ease;">
+            <div class="plan-row anim" id="s3-r1">
+              <div class="plan-left"><div class="dot dot--green"></div><span class="text-item">Test & Check-in</span></div>
+              <span class="text-freq">Daily</span>
+            </div>
+            <div class="plan-row anim" id="s3-r2">
+              <div class="plan-left"><div class="dot dot--navy"></div><span class="text-item">Less than 20g Carbs</span></div>
+              <span class="text-freq">Daily</span>
+            </div>
+            <div class="plan-row anim" id="s3-r3">
+              <div class="plan-left"><div class="dot dot--marigold"></div><span class="text-item">Add 1 Serving Greens</span></div>
+              <span class="text-freq">Daily</span>
+            </div>
+            <div class="plan-row anim" id="s3-r4">
+              <div class="plan-left"><div class="dot dot--apricot"></div><span class="text-item">30 Min Exercise</span></div>
+              <span class="text-freq">x 3</span>
+            </div>
+            <div class="plan-row anim" id="s3-r5">
+              <div class="plan-left"><div class="dot dot--apricot"></div><span class="text-item">Intermittent Fasting</span></div>
+              <span class="text-freq">x 1</span>
+            </div>
+            <div class="callout-green anim" id="s3-callout" style="margin-top:8px;">
+              <span class="text-green">We will remind you about boosts.</span>
+            </div>
+          </div>
+
+          <!-- By Day content (hidden initially) -->
+          <div id="dayContent" class="hidden" style="display:flex;flex-direction:column;gap:16px;transition:opacity 0.5s ease;">
+            <div style="display:flex;flex-direction:column;gap:26px;align-items:center;">
+              <div class="cal-header"><span>Su</span><span>M</span><span>T</span><span>W</span><span>Th</span><span>F</span><span>S</span></div>
+              <!-- Check In -->
+              <div class="cal-row">
+                <span class="cal-label">Check In</span>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#6FCC9F;"></div></div>
+              </div>
+              <!-- Base Plan -->
+              <div class="cal-row">
+                <span class="cal-label">Base Plan</span>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#2A3C56;"></div></div>
+              </div>
+              <!-- Daily Focus -->
+              <div class="cal-row">
+                <span class="cal-label">Daily Focus</span>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#FAB52A;"></div></div>
+              </div>
+              <!-- Boosts -->
+              <div class="cal-row">
+                <span class="cal-label">Boosts</span>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+                <div class="cal-cell"><div class="cal-dot" style="background:#F68C50;"></div></div>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+                <div class="cal-cell"><div class="cal-dot-sm"></div></div>
+              </div>
+            </div>
+            <div class="callout-green" style="margin-top:16px;">
+              <span class="text-green">We added Boosts on T, Th & F</span>
+            </div>
+          </div>
+          </div><!-- /tab-stack -->
+
+          <!-- Commit section -->
+          <div class="anim" id="s3-commit" style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
+            <span class="label-md">Ready to commit?</span>
+            <span class="body-muted">Lock in your plan. We'll handle the reminders.</span>
+          </div>
+          <div class="cta anim" id="s3-cta"><span class="cta-text">Commit & Start Your Week</span></div>
+        </div>
+      </div>
+
+      <!-- screen4 reuses screen0 (Home) -->
+
+    </div>
+  </div>
+  <p class="phone__label">01 — Weekly Planning Flow</p>
+</div>
+
+<script>
+(function() {
+  var screens = ['screen0','screen1','screen2','screen3'];
+  var currentIdx = 0;
+
+  function showItems(ids, stagger) {
+    ids.forEach(function(id, i) {
+      setTimeout(function() {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('show');
+      }, i * (stagger || 200));
+    });
+  }
+
+  function transitionTo(idx) {
+    return new Promise(function(resolve) {
+      var curr = document.getElementById(screens[currentIdx]);
+      var next = document.getElementById(screens[idx]);
+      var nav = document.getElementById('persistentNav');
+      var fromHome = currentIdx === 0;
+      var toHome = idx === 0;
+
+      if (toHome) {
+        // Slide planning flow down, reveal home underneath
+        nav.style.transition = 'opacity 0.4s ease';
+        nav.style.opacity = '0';
+        // Reset scroll and ensure screen is fully visible before sliding
+        var currCard = curr.querySelector('.card');
+        if (currCard) { currCard.scrollTop = 0; currCard.style.opacity = '1'; }
+        // Show home underneath, slide current down over it
+        next.classList.add('active');
+        next.style.zIndex = '1';
+        curr.style.zIndex = '10';
+        curr.style.position = 'absolute';
+        curr.classList.add('slide-down');
+        setTimeout(function() {
+          curr.classList.remove('active', 'slide-down');
+          curr.style.zIndex = '';
+          curr.style.position = '';
+          next.style.zIndex = '';
+        }, 600);
+      } else if (fromHome) {
+        // Slide planning flow up over home
+        nav.style.opacity = '1';
+        next.classList.add('active', 'slide-up');
+        setTimeout(function() {
+          next.classList.remove('slide-up');
+          curr.classList.remove('active');
+        }, 600);
+      } else {
+        // Fade card content only between plan screens — nav stays
+        var currCard = curr.querySelector('.card');
+        var nextCard = next.querySelector('.card');
+        if (currCard) currCard.classList.add('card-fade-out');
+        setTimeout(function() {
+          curr.classList.remove('active');
+          next.classList.add('active');
+          if (nextCard) {
+            nextCard.style.opacity = '0';
+            nextCard.classList.add('card-fade-in');
+          }
+          setTimeout(function() {
+            if (currCard) currCard.classList.remove('card-fade-out');
+            if (nextCard) { nextCard.classList.remove('card-fade-in'); nextCard.style.opacity = ''; }
+          }, 400);
+        }, 350);
+      }
+      currentIdx = idx;
+      setTimeout(resolve, fromHome || toHome ? 600 : 750);
+    });
+  }
+
+  function wait(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  async function runAnimation() {
+    // Screen 0: Home — pause to see home state
+    await wait(2500);
+
+    // Tap "Plan your week" banner
+    document.getElementById('planBanner').classList.add('pulse');
+    await wait(500);
+
+    // Screen 1: Review Base Plan — fade in with nav
+    await transitionTo(1);
+    await wait(2500);
+
+    // Tap "Review Weekly Goals"
+    document.getElementById('s1-cta').classList.add('pulse');
+    await wait(500);
+
+    // Screen 2: Add Weekly Goals — fade in, then select items
+    await transitionTo(2);
+    await wait(1200);
+
+    // Select Intermittent Fasting
+    document.getElementById('sel-if').classList.add('selected');
+    await wait(800);
+
+    // Select Add 1 Serving Greens
+    document.getElementById('sel-greens').classList.add('selected');
+    await wait(800);
+
+    // Select 30 Min Exercise
+    document.getElementById('sel-exercise').classList.add('selected');
+    await wait(1000);
+
+    // Tap Add Boosts
+    document.getElementById('s2-cta').classList.add('pulse');
+    await wait(500);
+
+    // Screen 3: This Week on Invoy — At a Glance first
+    await transitionTo(3);
+    await wait(400);
+    showItems(['s3-r1','s3-r2','s3-r3','s3-r4','s3-r5'], 150);
+    await wait(1200);
+    showItems(['s3-callout'], 0);
+    await wait(600);
+
+    // Fade in commit section + CTA together
+    showItems(['s3-commit'], 0);
+    await wait(400);
+    showItems(['s3-cta'], 0);
+    await wait(1500);
+
+    // Tap "By Day" tab
+    var tabDay = document.getElementById('tabDay');
+    var tabGlance = document.getElementById('tabGlance');
+    tabDay.style.fontWeight = '700';
+    tabDay.style.color = '#191919';
+    tabGlance.style.fontWeight = '400';
+    tabGlance.style.color = '#B2B2B2';
+
+    // Crossfade: hide glance, show day
+    document.getElementById('glanceContent').classList.add('hidden');
+    document.getElementById('dayContent').classList.remove('hidden');
+    await wait(1500);
+
+    // Scroll to commit section
+    var card = document.getElementById('screen3Card');
+    card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
+    await wait(1500);
+
+    // Hold on commit, then beat on CTA
+    await wait(500);
+    document.getElementById('s3-cta').classList.add('pulse');
+    await wait(500);
+
+    // Slide planning flow down — return to Home
+    // Swap banner to confirmation before sliding back
+    var banner = document.getElementById('planBanner');
+    banner.style.background = '#E4F5EC';
+    banner.innerHTML = '<span style="font-family:\'SF Pro Text\',system-ui,sans-serif;font-size:17px;font-weight:500;color:#477E63;letter-spacing:-0.41px;">Your week is planned</span><span style="font-family:\'SF Pro Text\',system-ui,sans-serif;font-size:15px;color:#6B9E82;letter-spacing:-0.41px;line-height:18px;">You\'re all set. We\'ll remind you about your goals.</span>';
+    await transitionTo(0);
+
+    // Hold confirmation banner
+    await wait(5000);
+
+    // Fade out banner and collapse space smoothly
+    var bannerHeight = banner.offsetHeight;
+    banner.style.transition = 'opacity 0.4s ease';
+    banner.style.opacity = '0';
+    await wait(400);
+    banner.style.transition = 'margin-top 0.5s ease, padding 0.5s ease, height 0.5s ease';
+    banner.style.height = bannerHeight + 'px';
+    banner.style.overflow = 'hidden';
+    // Force reflow
+    banner.offsetHeight;
+    banner.style.height = '0';
+    banner.style.padding = '0 24px';
+    banner.style.marginTop = '0';
+    banner.style.marginBottom = '0';
+  }
+
+  var paused = window.location.search.indexOf('paused') > -1;
+  if (paused) document.body.classList.add('embedded');
+
+  var started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    runAnimation();
+  }
+
+  if (paused) {
+    window.addEventListener('message', function(e) {
+      if (e.data === 'start') start();
+    });
+  } else {
+    start();
+  }
+})();
+</script>
+
+</body>
+</html>

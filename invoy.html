@@ -95,10 +95,52 @@
     <p class="d-body">The weekly planning flow is the core deliverable. It takes what coaches were doing manually — reviewing a member's base plan, suggesting goals, and scheduling the week — and turns it into a 4-step flow the member completes in under 2 minutes.</p>
 
     <!-- Weekly Planning -->
-    <div class="d-grid-2" style="margin-top: 24px;">
-      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
-        <span class="d-mono">[weekly planning animation]</span>
+    <div class="d-grid-2" style="margin-top: 24px; align-items: center;">
+      <div id="weeklyPlanContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="weeklyPlanPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/animations/weekly-plan.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="weeklyPlanFrame"></iframe>
+        </div>
       </div>
+      <script>
+      (function() {
+        var container = document.getElementById('weeklyPlanContainer');
+        var phone = document.getElementById('weeklyPlanPhone');
+        var pad = 20;
+        function sizePhone() {
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85);
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+        var started = false;
+        var iframe = document.getElementById('weeklyPlanFrame');
+        var observer = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting && !started) {
+            started = true;
+            iframe.addEventListener('load', function() {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            });
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            }
+            observer.disconnect();
+          }
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      })();
+      </script>
       <div>
         <p class="d-label">01</p>
         <p class="d-headline d-headline--md">Weekly Planning</p>
@@ -133,9 +175,51 @@
           </ul>
         </div>
       </div>
-      <div style="background: #1a1a18; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center;">
-        <span class="d-mono">[daily check-in screenshot]</span>
+      <div id="dailyCheckinContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+        <div id="dailyCheckinPhone" style="overflow: hidden; border-radius: 48px;">
+          <iframe src="/animations/daily-checkin.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="dailyCheckinFrame"></iframe>
+        </div>
       </div>
+      <script>
+      (function() {
+        var container = document.getElementById('dailyCheckinContainer');
+        var phone = document.getElementById('dailyCheckinPhone');
+        var pad = 20;
+        function sizePhone() {
+          var chrome = 49 + 45 + 32 + 32 + 40;
+          var available = window.innerHeight - chrome;
+          var phoneH = 856;
+          var phoneW = 402;
+          var scale = Math.min(available / phoneH, 0.85);
+          var w = phoneW * scale;
+          var h = phoneH * scale;
+          phone.style.width = w + 'px';
+          phone.style.height = h + 'px';
+          phone.style.borderRadius = (48 * scale) + 'px';
+          var iframe = phone.querySelector('iframe');
+          iframe.style.transform = 'scale(' + scale + ')';
+          iframe.style.transformOrigin = 'top left';
+          container.style.width = (w + pad * 2) + 'px';
+        }
+        sizePhone();
+        window.addEventListener('resize', sizePhone);
+        var started = false;
+        var iframe = document.getElementById('dailyCheckinFrame');
+        var observer = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting && !started) {
+            started = true;
+            iframe.addEventListener('load', function() {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            });
+            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
+            }
+            observer.disconnect();
+          }
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      })();
+      </script>
     </div>
   </div>
 
