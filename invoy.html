@@ -63,28 +63,29 @@
   <!-- FRAMING -->
   <div id="framing" class="d-section">
     <p class="d-label">Framing</p>
-    <p class="d-body">Five problems defined the project. Each was a design problem, not a science problem — the clinical model worked, but the interface was getting in the way.</p>
+    <p class="d-body">Invoy was a metabolic health startup with a breath sensor that could detect fat burn. 20,000 members, a clinical protocol that produced real results for members who engaged, and a coaching model that was buckling under its own weight — each coach managed 100–200 members manually. The product worked. Engagement didn't. Roughly 30% of members interacted beyond the daily breath test, and the coaching team couldn't scale without automation.</p>
+    <p class="d-body" style="margin-top: 12px;">Five problems defined the project. Each was a design problem, not a science problem — the clinical model worked, but the interface was getting in the way.</p>
 
     <div class="d-decisions" style="margin-top: 24px;">
       <div class="d-decision">
-        <p class="d-decision__q">1. Science-backed but unapproachable</p>
-        <p class="d-decision__a">Invoy is a medical product distributed through doctors. The voice had to feel trustworthy. But "trustworthy" had calcified into clinical and cold. Members weren't connecting with the app emotionally. We needed the authority of a clinical partner with the warmth of a coach who knows your name.</p>
+        <p class="d-decision__q">No engagement rhythm beyond breath tests</p>
+        <p class="d-decision__a">One daily push notification. Members who missed a day had no reason to come back. We needed a weekly cadence — planning, check-in, mid-week boost, review — so the daily notification became one beat in a larger rhythm.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">2. Coaching knowledge trapped in internal tools</p>
-        <p class="d-decision__a">Coaches managed 100–200 members each. They set up weekly plans — carb restriction, intermittent fasting, daily focus goals — through a robust internal tool with APIs. Members never saw any of it. The goal: surface the plan in a consumable way, and extract enough of the coach's decision-making to suggest weekly goals automatically. Accelerates (internal name for stretch goals) needed a facelift to become accessible, settable, and consumable by members.</p>
+        <p class="d-decision__q">Coaching knowledge trapped in internal tools</p>
+        <p class="d-decision__a">Coaches built weekly plans through an internal tool. Members never saw any of it. The goal: surface the plan and extract enough of the coach's decision-making to suggest goals automatically.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">3. Scientific language that didn't land</p>
-        <p class="d-decision__a">We kept direct language for the actions people needed to take — "Less than 20g Carbs" stayed "Less than 20g Carbs." But the structure around those actions was impenetrable. "Accelerants" became "Weekly Goals." "Base plan adherence" became "Your Plan." The vocabulary shifted where behavior needed to feel natural, and stayed precise where accuracy mattered.</p>
+        <p class="d-decision__q">Scientific language that didn't land</p>
+        <p class="d-decision__a">Actions stayed precise — "Less than 20g Carbs" kept its name. But the structure around them was impenetrable. "Accelerants" became "Weekly Goals." "Base plan adherence" became "Your Plan."</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">4. No design system, every screen bespoke</p>
-        <p class="d-decision__a">Every screen in the app was a one-off. We knew the speed and quality value of a design system, but couldn't stop to build one in isolation. Instead, we carved out a space for the system to start — the weekly planning flow — and applied it to the surrounding screens so the transition wouldn't feel jarring. Color, type, and spacing rules were applied universally first, then components formalized from the patterns that emerged.</p>
+        <p class="d-decision__q">Clinical tone, no warmth</p>
+        <p class="d-decision__a">A medical product distributed through doctors — the voice had calcified into clinical and cold. We needed the authority of a clinical partner with the warmth of a coach who knows your name.</p>
       </div>
       <div class="d-decision">
-        <p class="d-decision__q">5. No engagement rhythm beyond daily check-ins</p>
-        <p class="d-decision__a">The app sent one push notification: time to check in. That was it. Members who missed a day had no reason to come back. We designed a push notification structure that created a weekly rhythm — prompts for weekly planning, review arrival, and mid-week boosts when time was running out. The daily notification became one beat in a larger cadence.</p>
+        <p class="d-decision__q">No design system, every screen bespoke</p>
+        <p class="d-decision__a">We carved out the weekly planning flow as the system's proving ground. Color, type, and spacing applied universally first, then components formalized from the patterns that emerged.</p>
       </div>
     </div>
   </div>
@@ -94,132 +95,57 @@
     <p class="d-label">Experience</p>
     <p class="d-body">The weekly planning flow is the core deliverable. It takes what coaches were doing manually — reviewing a member's base plan, suggesting goals, and scheduling the week — and turns it into a 4-step flow the member completes in under 2 minutes.</p>
 
-    <!-- Weekly Planning -->
-    <div class="d-grid-2" style="margin-top: 24px; align-items: center;">
-      <div id="weeklyPlanContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
-        <div id="weeklyPlanPhone" style="overflow: hidden; border-radius: 48px;">
-          <iframe src="/animations/weekly-plan.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="weeklyPlanFrame"></iframe>
+    <div class="d-sticky-scroll" style="margin-top: 24px;">
+      <!-- Sticky phone column -->
+      <div class="d-sticky-scroll__phone" id="stickyPhone">
+        <div class="d-sticky-scroll__layers">
+          <!-- Layer 0: Daily check-in (no engagement rhythm) -->
+          <div class="d-sticky-scroll__layer is-active" data-step="0">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/daily-checkin.html?paused" style="width: 404px; height: 856px; border: none; pointer-events: none; display: block;" id="checkinFrame"></iframe>
+            </div>
+          </div>
+          <!-- Layer 1: Weekly planning -->
+          <div class="d-sticky-scroll__layer" data-step="1">
+            <div class="d-anim-phone" style="overflow: hidden; border-radius: 48px;">
+              <iframe data-src="/animations/weekly-plan.html?paused" style="width: 404px; height: 856px; border: none; pointer-events: none; display: block;" id="planningFrame"></iframe>
+            </div>
+          </div>
         </div>
       </div>
-      <script>
-      (function() {
-        var container = document.getElementById('weeklyPlanContainer');
-        var phone = document.getElementById('weeklyPlanPhone');
-        var pad = 20;
-        function sizePhone() {
-          var chrome = 49 + 45 + 32 + 32 + 40;
-          var available = window.innerHeight - chrome;
-          var phoneH = 856;
-          var phoneW = 402;
-          var scale = Math.min(available / phoneH, 0.85);
-          var w = phoneW * scale;
-          var h = phoneH * scale;
-          phone.style.width = w + 'px';
-          phone.style.height = h + 'px';
-          phone.style.borderRadius = (48 * scale) + 'px';
-          var iframe = phone.querySelector('iframe');
-          iframe.style.transform = 'scale(' + scale + ')';
-          iframe.style.transformOrigin = 'top left';
-          container.style.width = (w + pad * 2) + 'px';
-        }
-        sizePhone();
-        window.addEventListener('resize', sizePhone);
-        var started = false;
-        var iframe = document.getElementById('weeklyPlanFrame');
-        var observer = new IntersectionObserver(function(entries) {
-          if (entries[0].isIntersecting && !started) {
-            started = true;
-            iframe.addEventListener('load', function() {
-              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-            });
-            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-            }
-            observer.disconnect();
-          }
-        }, { threshold: 0.3 });
-        observer.observe(container);
-      })();
-      </script>
-      <div>
-        <p class="d-label">01</p>
-        <p class="d-headline d-headline--md">Weekly Planning</p>
-        <p class="d-mono" style="margin-top: 4px;">Your week, planned around real life</p>
-        <p class="d-body" style="margin-top: 16px;">The flow starts by showing the member their base plan — the carb restriction or fasting protocol their coach set up. Then it surfaces weekly goals the system recommends based on last week's data, past habits, and people with similar profiles. The member reviews, adjusts, and commits.</p>
-        <div style="margin-top: 20px;">
-          <p class="d-label">Design Decisions</p>
-          <ul class="d-list">
-            <li>"Review Your Base Plan" makes the coach's work visible for the first time — members see what they're on and why</li>
-            <li>Goals split into three tiers: Coach Recommended, Daily Focus, and Weekly Boosts — escalating commitment without overwhelming</li>
-            <li>Confirmation screen shows the full week at a glance and day-by-day, so the member knows exactly what they're signing up for</li>
-            <li>"Skip this week" is always available — no guilt, no friction</li>
-          </ul>
-        </div>
-      </div>
-    </div>
 
-    <!-- Daily Check-in -->
-    <div class="d-grid-2" style="margin-top: 48px;">
-      <div>
-        <p class="d-label">02</p>
-        <p class="d-headline d-headline--md">Daily Check-in</p>
-        <p class="d-mono" style="margin-top: 4px;">Yesterday's actions, today's plan</p>
-        <p class="d-body" style="margin-top: 16px;">The daily check-in was redesigned to reflect the weekly plan. Instead of a generic "how did you do" question, the check-in now shows the member's specific goals — their carb target, daily focus items, and weekly boosts — and asks them to mark each one. The slider for carbs replaced the old icon-tap pattern, making the input faster and more precise.</p>
-        <div style="margin-top: 20px;">
-          <p class="d-label">What Changed</p>
-          <ul class="d-list">
-            <li>Carb target shown inline with a 3-point slider (On Plan / About / Over) — replaces the old multi-icon grid</li>
-            <li>Daily Focus and Weekly Boosts appear as checkable items with completion counts</li>
-            <li>"Reflect on Yesterday" framing shifts tone from grading to learning</li>
-            <li>Weekly goal review link at the bottom creates a bridge back to the planning flow</li>
+      <!-- Scrolling text column -->
+      <div class="d-sticky-scroll__text">
+        <!-- Step 0: No engagement rhythm -->
+        <div class="d-sticky-scroll__step is-active" data-step="0">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Daily Check-in</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Yesterday's actions, today's plan</p>
+          <p class="d-body" style="margin-top: 12px;">The daily check-in was redesigned to reflect the weekly plan. Instead of a generic "how did you do" question, the check-in now shows the member's specific goals — their carb target, daily focus items, and weekly boosts — and asks them to mark each one. The slider for carbs replaced the old icon-tap pattern, making the input faster and more precise.</p>
+          <p class="d-label" style="margin-top: 20px;">What Changed</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• Carb target shown inline with a 3-point slider (On Plan / About / Over) — replaces the old multi-icon grid</li>
+            <li class="d-body" style="font-size: 12px;">• Daily Focus and Weekly Boosts appear as checkable items with completion counts</li>
+            <li class="d-body" style="font-size: 12px;">• "Reflect on Yesterday" framing shifts tone from grading to learning</li>
+            <li class="d-body" style="font-size: 12px;">• Weekly goal review link at the bottom creates a bridge back to the planning flow</li>
+          </ul>
+        </div>
+
+        <!-- Step 1: Weekly Planning -->
+        <div class="d-sticky-scroll__step" data-step="1">
+          <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+          <p class="d-headline d-headline--md" style="margin-top: 4px;">Weekly Planning</p>
+          <p class="d-mono d-text--subtle" style="margin-top: 4px;">Your week, planned around real life</p>
+          <p class="d-body" style="margin-top: 12px;">The flow starts by showing the member their base plan — the carb restriction or fasting protocol their coach set up. Then it surfaces weekly goals the system recommends based on last week's data, past habits, and people with similar profiles. The member reviews, adjusts, and commits.</p>
+          <p class="d-label" style="margin-top: 20px;">Design Decisions</p>
+          <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
+            <li class="d-body" style="font-size: 12px;">• "Review Your Base Plan" makes the coach's work visible for the first time — members see what they're on and why</li>
+            <li class="d-body" style="font-size: 12px;">• Goals split into three tiers: Coach Recommended, Daily Focus, and Weekly Boosts — escalating commitment without overwhelming</li>
+            <li class="d-body" style="font-size: 12px;">• Confirmation screen shows the full week at a glance and day-by-day</li>
+            <li class="d-body" style="font-size: 12px;">• "Skip this week" is always available — no guilt, no friction</li>
           </ul>
         </div>
       </div>
-      <div id="dailyCheckinContainer" style="flex-shrink: 0; background: #000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
-        <div id="dailyCheckinPhone" style="overflow: hidden; border-radius: 48px;">
-          <iframe src="/animations/daily-checkin.html?paused" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="dailyCheckinFrame"></iframe>
-        </div>
-      </div>
-      <script>
-      (function() {
-        var container = document.getElementById('dailyCheckinContainer');
-        var phone = document.getElementById('dailyCheckinPhone');
-        var pad = 20;
-        function sizePhone() {
-          var chrome = 49 + 45 + 32 + 32 + 40;
-          var available = window.innerHeight - chrome;
-          var phoneH = 856;
-          var phoneW = 402;
-          var scale = Math.min(available / phoneH, 0.85);
-          var w = phoneW * scale;
-          var h = phoneH * scale;
-          phone.style.width = w + 'px';
-          phone.style.height = h + 'px';
-          phone.style.borderRadius = (48 * scale) + 'px';
-          var iframe = phone.querySelector('iframe');
-          iframe.style.transform = 'scale(' + scale + ')';
-          iframe.style.transformOrigin = 'top left';
-          container.style.width = (w + pad * 2) + 'px';
-        }
-        sizePhone();
-        window.addEventListener('resize', sizePhone);
-        var started = false;
-        var iframe = document.getElementById('dailyCheckinFrame');
-        var observer = new IntersectionObserver(function(entries) {
-          if (entries[0].isIntersecting && !started) {
-            started = true;
-            iframe.addEventListener('load', function() {
-              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-            });
-            if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-              setTimeout(function() { iframe.contentWindow.postMessage('start', '*'); }, 500);
-            }
-            observer.disconnect();
-          }
-        }, { threshold: 0.3 });
-        observer.observe(container);
-      })();
-      </script>
     </div>
   </div>
 
@@ -384,5 +310,130 @@
 </footer>
 
 <script src="/portfolio.js"></script>
+<script>
+(function() {
+  var PHONE_W = 404, PHONE_H = 856;
+  var NAV_H = 71, SUBNAV_H = 54, CHROME = NAV_H + SUBNAV_H;
+
+  var stickyPhone = document.getElementById('stickyPhone');
+  var layers = document.querySelectorAll('.d-sticky-scroll__layer');
+  var steps = document.querySelectorAll('.d-sticky-scroll__step');
+  var started = {};
+  var activeStep = 0;
+  var PAD = 48;
+
+  function sizePhones() {
+    var phones = document.querySelectorAll('.d-anim-phone');
+    for (var i = 0; i < phones.length; i++) {
+      var layer = phones[i].parentElement;
+      var availW = layer.offsetWidth - PAD * 2;
+      var availH = layer.offsetHeight - PAD * 2;
+      var scale = Math.min(availW / PHONE_W, availH / PHONE_H);
+      phones[i].style.width = (PHONE_W * scale) + 'px';
+      phones[i].style.height = (PHONE_H * scale) + 'px';
+      phones[i].style.borderRadius = (48 * scale) + 'px';
+      var iframe = phones[i].querySelector('iframe');
+      if (iframe) {
+        iframe.style.transform = 'scale(' + scale + ')';
+        iframe.style.transformOrigin = 'top left';
+      }
+    }
+  }
+
+  function setStickyTop() {
+    if (!stickyPhone) return;
+    stickyPhone.style.top = CHROME + 'px';
+  }
+
+  function resetIframe(index) {
+    started[index] = false;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (iframe && iframe.dataset.src) {
+      iframe.src = '';
+    }
+  }
+
+  function triggerIframe(index) {
+    if (started[index]) return;
+    started[index] = true;
+    var iframe = layers[index] ? layers[index].querySelector('iframe') : null;
+    if (!iframe || !iframe.dataset.src) return;
+    function send() {
+      try { iframe.contentWindow.postMessage('start', '*'); } catch(e) {}
+    }
+    iframe.addEventListener('load', send);
+    iframe.src = iframe.dataset.src;
+    setTimeout(send, 100);
+  }
+
+  function onScroll() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var closest = 0;
+    var minDist = Infinity;
+
+    for (var i = 0; i < steps.length; i++) {
+      var rect = steps[i].getBoundingClientRect();
+      var center = rect.top + rect.height / 2;
+      var dist = Math.abs(center - vcenter);
+      var fadeRange = rect.height * 0.4;
+      var opacity = dist < fadeRange ? 1 : Math.max(0.15, 1 - (dist - fadeRange) / (rect.height * 0.3));
+      steps[i].style.opacity = opacity;
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+
+    var isVisible = false;
+    if (stickyPhone) {
+      var phoneRect = stickyPhone.getBoundingClientRect();
+      var phoneCenter = phoneRect.top + phoneRect.height / 2;
+      var distFromCenter = Math.abs(phoneCenter - vcenter);
+      var viewH = window.innerHeight - CHROME;
+      isVisible = distFromCenter < viewH * 0.6;
+    }
+
+    if (closest !== activeStep) {
+      resetIframe(activeStep);
+      activeStep = closest;
+      for (var j = 0; j < layers.length; j++) {
+        layers[j].classList.toggle('is-active', j === closest);
+      }
+      if (isVisible) triggerIframe(closest);
+    } else if (isVisible && !started[closest]) {
+      triggerIframe(closest);
+    }
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(function() { onScroll(); ticking = false; });
+    }
+  }, { passive: true });
+
+  var snapTimer = null;
+  var SNAP_THRESHOLD = 80;
+  function snapToStep() {
+    var vcenter = CHROME + (window.innerHeight - CHROME) / 2;
+    var step = steps[activeStep];
+    if (!step) return;
+    var rect = step.getBoundingClientRect();
+    var stepCenter = rect.top + rect.height / 2;
+    var offset = stepCenter - vcenter;
+    if (Math.abs(offset) > 10 && Math.abs(offset) < SNAP_THRESHOLD) {
+      window.scrollBy({ top: offset, behavior: 'smooth' });
+    }
+  }
+
+  window.addEventListener('scroll', function() {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapToStep, 200);
+  }, { passive: true });
+
+  sizePhones();
+  setStickyTop();
+  onScroll();
+  window.addEventListener('resize', function() { sizePhones(); setStickyTop(); });
+})();
+</script>
 </body>
 </html>
