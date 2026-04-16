@@ -88,21 +88,7 @@
       "WebFetch(domain:www.docusign.com)",
       "WebFetch(domain:docs.readwise.io)",
       "WebFetch(domain:www.moesif.com)",
-      "mcp__paper__get_basic_info",
-      "mcp__paper__get_children",
-      "mcp__paper__get_tree_summary",
-      "mcp__paper__get_jsx",
-      "mcp__paper__get_node_info",
-      "mcp__paper__write_html",
-      "WebSearch",
-      "mcp__paper__set_text_content",
-      "mcp__paper__get_guide",
-      "mcp__paper__get_font_family_info",
-      "mcp__paper__get_screenshot",
-      "mcp__paper__get_computed_styles",
-      "Skill(push)",
-      "Skill(push:*)",
-      "WebFetch(domain:invoy.com)"
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }
