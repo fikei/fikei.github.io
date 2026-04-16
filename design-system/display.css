@@ -96,6 +96,11 @@
 
 /* ── Sections ── */
 
+.d-section,
+[id] {
+  scroll-margin-top: var(--scroll-offset, 104px);
+}
+
 .d-section {
   padding: 64px 0;
   border-bottom: 1px solid var(--border-subtle, #33332f);
