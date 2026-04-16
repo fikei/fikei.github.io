@@ -70,17 +70,21 @@
 .d-nav__group {
   display: flex;
   align-items: center;
-  gap: 28px;
 }
 
 .d-nav__group-label {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--fg, #e8e6e3);
+  color: var(--fg-muted, #8a8885);
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.d-nav__group-label:hover,
+.d-nav__group--expanded .d-nav__group-label {
+  color: var(--fg, #e8e6e3);
 }
 
 .d-nav__group-items {
