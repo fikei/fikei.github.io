@@ -181,7 +181,6 @@
 
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Problem</a>
-  <a href="#shift" class="d-subnav__link">Reframe</a>
   <a href="#deliverable" class="d-subnav__link">Experience</a>
   <a href="#process" class="d-subnav__link">Decisions</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
@@ -213,7 +212,7 @@
     <p class="d-body">Livongo, a chronic conditions management company, was in growing pains. In 2 years, it grown from a one to five health programs sold in dozens of combinations. Every combination changed which registration fields a member saw. The rules for 50 unique client configurations lived in a spreadsheet that operations cross-referenced manually for every new launch. Complexity ballooned & metrics suffered.</p>
     <p class="d-body">No where was the downstream product pain felt more than during onboarding members. The registration flow grew from 20 standard questions to 74 possible fields.</p>
 
-    <p class="d-body" style="margin-top: 32px;">The data told the story. Every step bled members, but the reasons weren't what anyone expected.</p>
+    <p class="d-body">The data told the story. Every step bled members, but the reasons weren't what anyone expected.</p>
 
     <div class="funnel">
       <!-- 100% start → 91% remain (9% loss) -->
@@ -262,38 +261,15 @@
       </div>
     </div>
 
-    <p class="d-body">The program steps were one unsurprising culprit — historically, 11% dropoff this had balloned to more than 33% drop-off for our multi-program members. Moreover, people werent signing up for all of the program they were offered. At a step where the system already knew which programs the member qualified for, The product was overoptimizing for choice. This left revenue, but more importantly, benefits on the table for people who already enrolled.</p>
-    <p class="d-body" style="margin-top: 16px;">How could we reduce the friction in registration? How could we minimize what we asked?</p>
-  </div>
-
-  <!-- THE SHIFT -->
-  <div id="shift" class="d-section">
-    <p class="d-label">The Shift</p>
-    <p class="d-body">The org measured success by enrollment — each signup triggered 6 months of guaranteed revenue. But the data showed a bigger prize hiding behind it. Activation — 6+ blood sugar checks in 3 weeks — drove 12-month retention and 18 months of revenue.</p>
-    <p class="d-body">Registration wasn't just a conversion funnel. It was the first moment a member decided whether to trust the product with their health data. Building trust at onboarding was the lever for durable growth, not just completion.</p>
-
-    <div class="metric-pair">
-      <div class="metric-item">
-        <span class="metric-item__label">Enrollment</span>
-        <span class="metric-item__value metric-item__value--default">6 months</span>
-        <span class="metric-item__sub">guaranteed revenue</span>
-      </div>
-      <span class="metric-arrow">→</span>
-      <div class="metric-item">
-        <span class="metric-item__label">Activation</span>
-        <span class="metric-item__value metric-item__value--accent">18 months</span>
-        <span class="metric-item__sub">revenue + retention</span>
-      </div>
-    </div>
-
-    <p class="d-body">That reframe changed what the flow optimized for. Instead of minimizing fields, we asked: what does each field need to earn trust? Three patterns emerged — fields the system could <strong>skip</strong> entirely, fields it could <strong>pre-fill for confirmation</strong>, and fields where it had to <strong>ask</strong> but with context about why.</p>
+    <p class="d-body" style="margin-top: 32px;">The program steps were one unsurprising culprit — historically, 11% dropoff this had balloned to more than 33% drop-off for our multi-program members. Moreover, people werent signing up for all of the program they were offered. At a step where the system already knew which programs the member qualified for, The product was overoptimizing for choice. This left revenue, but more importantly, benefits on the table for people who already enrolled.</p>
+    <p class="d-body">How could we reduce the friction in registration? How could we minimize what we asked?</p>
   </div>
 
   <!-- DELIVERABLE -->
   <div id="deliverable" class="d-section" style="border-bottom: none;">
     <p class="d-label">Deliverable</p>
     <p class="d-body">At its core, the solution was simple, but a large technical lift. Due to the nature of our client relationships, We had information upstream about members - demographics, health conditions, even specific health data.</p>
-    <p class="d-body" style="margin-top: 16px;">This led us to build a system that, given member verification, would allow us prefill, confirm or skip the information we needed during onboarding. The art was keeping the member in control & maintaining transparency so the process built trust rather than eroded it.</p>
+    <p class="d-body">This led us to build a system that, given member verification, would allow us prefill, confirm or skip the information we needed during onboarding. The art was keeping the member in control & maintaining transparency so the process built trust rather than eroded it.</p>
 
     <div class="d-sticky-scroll">
       <!-- Sticky animation column -->
@@ -462,7 +438,7 @@
     </div>
 
     <!-- Interactive CTA — after sticky scroll -->
-    <div class="interactive-cta" style="margin-top: 48px;">
+    <div class="interactive-cta" style="margin-top: 32px;">
       <div class="interactive-cta__content">
         <div class="interactive-cta__title">Walk the full flow yourself</div>
         <div class="interactive-cta__body">Both the original 9-step flow and the optimized 6-step flow are interactive prototypes. Use arrow keys to navigate each step.</div>
@@ -515,9 +491,9 @@
       </div>
     </div>
 
-    <p class="d-body" style="margin-top: 24px; color: var(--fg-dim, #666560);">No spike in support tickets or errors post-launch.</p>
+    <p class="d-body" style="margin-top: 32px; color: var(--fg-dim, #666560);">No spike in support tickets or errors post-launch.</p>
 
-    <div class="d-callout" style="margin-top: 32px; border-left-color: var(--accent-cyan, #00fff7);">
+    <div class="d-callout" style="margin-top: 24px; border-left-color: var(--accent-cyan, #00fff7);">
       <p class="d-callout__body"><strong>This is the same problem as CPQ.</strong> Programs are SKUs. Qualification rules are pricing rules. The registration flow is the quote. The spreadsheet is the same artifact that CPQ platforms replace with automated configuration. We replaced it with a system that reads upstream data and adapts the flow in real time.</p>
       <p class="d-callout__body" style="margin-top: 8px;"><a href="/reg/" style="color: var(--accent-cyan, #00fff7); text-decoration: none;">View the interactive flow comparison at ctrl.rodeo/reg →</a></p>
     </div>
