@@ -279,12 +279,15 @@
     });
   }
 
-  // ── Lock subnav below primary nav ──
+  // ── Lock subnav below primary nav + set scroll offset ──
   function initStickyOffsets() {
     const nav = document.querySelector('.d-nav');
     const subnav = document.querySelector('.d-subnav');
-    if (!nav || !subnav) return;
-    subnav.style.top = nav.offsetHeight + 'px';
+    if (!nav) return;
+    const navH = nav.offsetHeight;
+    const subnavH = subnav ? subnav.offsetHeight : 0;
+    if (subnav) subnav.style.top = navH + 'px';
+    document.documentElement.style.setProperty('--scroll-offset', (navH + subnavH) + 'px');
   }
 
   // ── Init ──
@@ -296,5 +299,6 @@
     initNavAccordion();
     initModals();
     initStickyOffsets();
+    window.addEventListener('resize', initStickyOffsets);
   });
 })();

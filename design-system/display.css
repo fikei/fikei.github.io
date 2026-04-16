@@ -142,6 +142,11 @@
 
 /* ── Sections ── */
 
+.d-section,
+[id] {
+  scroll-margin-top: var(--scroll-offset, 104px);
+}
+
 .d-section {
   position: relative;
   padding: 64px 0;
