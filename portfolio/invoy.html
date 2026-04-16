@@ -12,7 +12,7 @@
 <body class="d-page">
 
 <nav class="d-nav">
-  <a href="./" class="d-nav__name">Ian Fike</a>
+  <a href="./" class="d-nav__name">CTRL.RODEO</a>
   <ul class="d-nav__links">
     <li><a href="./field.html" class="d-nav__link">Field</a></li>
     <li><a href="./invoy.html" class="d-nav__link d-nav__link--active">Invoy</a></li>
@@ -23,7 +23,7 @@
 
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Framing</a>
-  <a href="#deliverable" class="d-subnav__link">Deliverable</a>
+  <a href="#experience" class="d-subnav__link">Experience</a>
   <a href="#process" class="d-subnav__link">Process</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
 </div>
@@ -34,20 +34,23 @@
   <div style="padding: 48px 0 0;">
     <span class="d-status d-status--shipped">Shipped</span>
     <p class="d-headline d-headline--xl" style="margin-top: 12px;">Invoy</p>
-    <p class="d-body" style="margin-top: 12px;">A weekly coaching system for metabolic health. Members plan their week, check in daily, review their progress, and adjust — with coach support when the data says they need it.</p>
+    <p class="d-body" style="margin-top: 12px;">Making metabolic health coaching feel like a partnership, not a prescription. A breath sensor tells you if you're burning fat. The app turns that signal into a weekly rhythm of planning, checking in, and adapting.</p>
 
     <dl class="d-overview">
       <dt>Role</dt>
-      <dd>Lead product designer</dd>
-      <dt>Company</dt>
-      <dd>Livongo / Teladoc Health</dd>
-      <dt>Platform</dt>
-      <dd>iOS, Android</dd>
+      <dd>Designer &amp; PM, 3-person eng team</dd>
       <dt>Scope</dt>
-      <dd>15+ sub-flows, 30-component design system, 100+ screens</dd>
-      <dt>Status</dt>
-      <dd>Shipped to production</dd>
+      <dd>Weekly planning flow, daily check-in redesign, push notification system, design system foundation</dd>
+      <dt>Timeline</dt>
+      <dd>2 weeks planning, 2 sprints — design and engineering ran in parallel</dd>
     </dl>
+  </div>
+
+  <!-- WHY THIS PROJECT -->
+  <div class="d-why d-why--shipped" style="margin-top: 48px;">
+    <p class="d-why__label">Why this project?</p>
+    <p class="d-why__headline">The data existed. The coaching worked. Members just couldn't see it.</p>
+    <p class="d-why__body">Invoy already had the hard pieces — a breath sensor that measured fat burn, coaches who built weekly plans, and a carb-restriction protocol that worked. But the member-facing app didn't reflect any of it. Coaches set goals behind the scenes in an internal tool. Members checked in daily without knowing what they were working toward. Roughly 30% engaged beyond breath tests. The product had depth. The interface didn't.</p>
   </div>
 
   <!-- FRAMING -->
@@ -70,81 +73,62 @@
         <span class="d-persona__role">Secondary user</span>
         <span class="d-persona__name">Coach</span>
         <ul class="d-persona__needs">
-          <li>Manages 50+ members — needs to spot who needs help fast</li>
+          <li>Manages 100–200 members — needs to spot who needs help fast</li>
           <li>Wants data-backed reasons to reach out</li>
-          <li>Needs to suggest specific plan changes</li>
+          <li>Needs to suggest specific plan changes, not generic nudges</li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- DELIVERABLE -->
-  <div id="deliverable" class="d-section">
-    <p class="d-label">Deliverable</p>
+  <!-- EXPERIENCE -->
+  <div id="experience" class="d-section" style="border-bottom: none;">
+    <p class="d-label">Experience</p>
+    <p class="d-body" style="margin-top: 12px;">The weekly planning flow is the core deliverable. It takes what coaches were doing manually — reviewing a member's base plan, suggesting goals, and scheduling the week — and turns it into a 2-step flow the member completes in under 2 minutes. The daily check-in drops alongside it, rebuilt to reflect the new weekly plan.</p>
 
-    <p class="d-label" style="margin-top: 24px;">The weekly loop</p>
-    <div class="d-flow">
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">01</span>
-        <span class="d-flow__step-label">Plan</span>
-        <span class="d-flow__step-desc">Set goals. Flag upcoming events. The app picks one of 5 plan types.</span>
+    <!-- Weekly Planning -->
+    <div style="display: flex; gap: 48px; align-items: flex-start; margin-top: 48px; flex-wrap: wrap;">
+      <div style="flex-shrink: 0;">
+        <div style="overflow: hidden; border-radius: 48px;">
+          <iframe data-src="/animations/weekly-plan.html?paused&embedded" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="weeklyPlanFrame"></iframe>
+        </div>
       </div>
-      <span class="d-flow__arrow">→</span>
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">02</span>
-        <span class="d-flow__step-label">Execute</span>
-        <span class="d-flow__step-desc">Daily check-ins. Breath test, mood, meals, plan tracking.</span>
-      </div>
-      <span class="d-flow__arrow">→</span>
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">03</span>
-        <span class="d-flow__step-label">Reflect</span>
-        <span class="d-flow__step-desc">End-of-week review. Weight change, plan completion, trends.</span>
-      </div>
-      <span class="d-flow__arrow">→</span>
-      <div class="d-flow__step">
-        <span class="d-flow__step-num">04</span>
-        <span class="d-flow__step-label">Adapt</span>
-        <span class="d-flow__step-desc">Coach reviews patterns. Next week's plan adjusts.</span>
+      <div style="flex: 1; min-width: 320px;">
+        <p class="d-mono" style="color: var(--fg-subtle, #666560);">01</p>
+        <p class="d-headline d-headline--md" style="margin-top: 4px;">Weekly Planning</p>
+        <p class="d-mono" style="color: var(--fg-subtle, #666560); margin-top: 4px;">Your week, planned around real life</p>
+        <p class="d-body" style="margin-top: 12px;">The flow starts by showing the member their base plan — the carb restriction or fasting protocol their coach set up. Then it surfaces weekly goals the system recommends based on last week's data, past habits, and people with similar profiles. The member reviews, adjusts, and commits.</p>
+
+        <p class="d-label" style="margin-top: 24px;">Design Decisions</p>
+        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+          <li class="d-body" style="font-size: 13px;">• "Review Your Base Plan" makes the coach's work visible for the first time — members see what they're on and why.</li>
+          <li class="d-body" style="font-size: 13px;">• Goals split into three tiers: Coach Recommended, Daily Focus, and Weekly Boosts — escalating commitment without overwhelming.</li>
+          <li class="d-body" style="font-size: 13px;">• Confirmation screen shows the full week at a glance and day-by-day, so the member knows exactly what they're signing up for.</li>
+          <li class="d-body" style="font-size: 13px;">• "Skip this week" is always available — no guilt, no friction.</li>
+        </ul>
       </div>
     </div>
 
-    <div class="d-gallery d-gallery--4" style="margin-top: 32px;">
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Week Planning [screenshot]</span></div>
-        <span class="d-gallery__caption">Set intentions, flag events. 5 plan variants from one entry point.</span>
+    <!-- Daily Check-in -->
+    <div style="display: flex; gap: 48px; align-items: flex-start; margin-top: 96px; flex-wrap: wrap;">
+      <div style="flex-shrink: 0;">
+        <div style="overflow: hidden; border-radius: 48px;">
+          <iframe data-src="/animations/daily-checkin.html?paused&embedded" style="width: 402px; height: 856px; border: none; pointer-events: none; display: block;" id="dailyCheckinFrame"></iframe>
+        </div>
       </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Daily Focus [screenshot]</span></div>
-        <span class="d-gallery__caption">Daily check-in with score factors and nutrition tracking.</span>
-      </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Review of Week [screenshot]</span></div>
-        <span class="d-gallery__caption">Weight change, progress bars, trend line, day-by-day activity grid.</span>
-      </div>
-      <div class="d-gallery__item">
-        <div style="aspect-ratio: 9/19; background: #1a1a18; display: flex; align-items: center; justify-content: center;"><span class="d-mono">Rebound [screenshot]</span></div>
-        <span class="d-gallery__caption">When the score drops: what happened, possible causes, next steps.</span>
-      </div>
-    </div>
+      <div style="flex: 1; min-width: 320px;">
+        <p class="d-mono" style="color: var(--fg-subtle, #666560);">02</p>
+        <p class="d-headline d-headline--md" style="margin-top: 4px;">Daily Check-in</p>
+        <p class="d-mono" style="color: var(--fg-subtle, #666560); margin-top: 4px;">Yesterday's actions, today's focus</p>
+        <p class="d-body" style="margin-top: 12px;">The daily check-in was redesigned to reflect the weekly plan. Instead of a generic "how did you do" question, the check-in now shows the member's specific goals — their carb target, daily focus items, and weekly boosts — and asks them to mark each one. The slider for carb cards replaced the old line-tap pattern, making the input faster and more precise.</p>
 
-    <hr class="d-rule">
-
-    <p class="d-label">Design System</p>
-    <p class="d-body">30 components with rules for when to use each one. The system tells the team which page template to start with, which button style means "go forward" vs "dismiss," and which card to show when the score drops vs. when it rises.</p>
-
-    <div class="d-decisions" style="margin-top: 16px;">
-      <div class="d-decision">
-        <p class="d-decision__q">Page/Title vs Page/Questions</p>
-        <p class="d-decision__a">Title pages explain what's coming. Questions pages collect data. A sub-flow always starts with a Title page — never a Questions page.</p>
-      </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Button hierarchy</p>
-        <p class="d-decision__a">Dark button = main action. Light button = alternative. Text-only = dismiss. Same rule on every screen in every flow.</p>
-      </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Score → card mapping</p>
-        <p class="d-decision__a">Score drops get an amber card with "what we know" and a coach button. Score increases get a green card with encouragement. This is documented, not decided per screen.</p>
+        <p class="d-label" style="margin-top: 24px;">What Changed</p>
+        <ul style="list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+          <li class="d-body" style="font-size: 13px;">• Carb target shown inline with a 3-point slider (On Plan / About / Over) — replaces the old multi-icon grid.</li>
+          <li class="d-body" style="font-size: 13px;">• Daily Focus and Weekly Boosts appear as checkable items with completion counts.</li>
+          <li class="d-body" style="font-size: 13px;">• "Reflect on Yesterday" framing shifts tone from graging to learning.</li>
+          <li class="d-body" style="font-size: 13px;">• Weekly goal review link at the bottom creates a bridge back to the planning flow.</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -152,18 +136,133 @@
   <!-- PROCESS -->
   <div id="process" class="d-section">
     <p class="d-label">Process</p>
-    <div class="d-decisions">
-      <div class="d-decision">
-        <p class="d-decision__q">Why does one question ("any events this week?") split into 5 different flows?</p>
-        <p class="d-decision__a">Members shouldn't need to understand the system's logic. If they have a busy week, the app gives them a lighter plan with optional boosters. If they're planning a cheat meal, the rebound flow activates. The routing is automatic — one question does the work of a settings page.</p>
+
+    <!-- 01 Plan & Goal Design -->
+    <div class="d-subsection" style="margin-top: 24px;">
+      <p class="d-subsection__num">01</p>
+      <p class="d-subsection__title">Plan &amp; Goal Design</p>
+      <p class="d-subsection__kicker">Pulling the coach's playbook into the product.</p>
+      <p class="d-body" style="margin-top: 16px;">The real product at Invoy was the coach. Each one ran 100–200 members through an internal admin tool — choosing protocols, setting carbs per day, deciding when to step someone down. The plan existed. It just didn't exist for the member.</p>
+
+      <div class="d-beat" style="margin-top: 40px;">
+        <span class="d-beat__label">Surface</span>
+        <p class="d-beat__headline">Show members the plan they were already on.</p>
+        <p class="d-beat__body">Members were already on a plan they couldn't see — carb restriction as the default entry point, calorie restriction or intermittent fasting as alternates. Internally called "Accelerates," these weekly structures got a member-facing facelift and a plainer name: <strong>Goals</strong>. Target, duration, definition of a good week — now visible inside the app, not buried in a coach's spreadsheet.</p>
       </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Why treat a bad day as a "rebound" instead of a failure?</p>
-        <p class="d-decision__a">Most health apps make you feel bad when you go off plan. Invoy built a dedicated recovery flow: it shows what happened, suggests why, and offers specific next steps like scheduling a coach call or adding a fasting boost. Members who see a path back stay engaged. Members who feel judged stop opening the app.</p>
+
+      <div class="d-beat">
+        <span class="d-beat__label">Extract</span>
+        <p class="d-beat__headline">Get the coach's logic out of their head.</p>
+        <p class="d-beat__body">Two weeks of planning sat between the design team and engineering — mapping the decisions coaches made manually, separating the procedural from the judgment calls. Stepping a member down in carbs after two clean weeks. Flagging a stall. Suggesting next week's target from last week's adherence. The app could now propose the plan a coach would have proposed. Coach approves, or overrides. The 60% of their week that was data entry went back to the members who actually needed a human.</p>
       </div>
-      <div class="d-decision">
-        <p class="d-decision__q">Why pack so much data into the weekly review screen?</p>
-        <p class="d-decision__a">People look at this once a week. It has to be complete and fast to scan. Weight change, three progress bars, a week-long trend line, a day-by-day activity grid, and an AI-written summary — all on one scroll. Every number is readable without explanation.</p>
+
+      <div class="d-pullquote">
+        <p class="d-pullquote__body">"The unlock wasn't replacing the coach. It was freeing them from the 60% of their week that was copy-paste."</p>
+      </div>
+    </div>
+
+    <!-- 02 Voice & Tone -->
+    <div class="d-subsection">
+      <p class="d-subsection__num">02</p>
+      <p class="d-subsection__title">Voice &amp; Tone</p>
+      <p class="d-subsection__kicker">Direct where it counts. Friendly everywhere else.</p>
+      <p class="d-body" style="margin-top: 16px;">Invoy earned trust with science — the breath device doesn't lie, and the copy around it shouldn't either. But scientific had crept into corners where it was just friction. We drew a line: keep precise language in the actions we were asking members to take, simplify every structural term around the program itself.</p>
+
+      <div class="d-compare">
+        <div class="d-compare__col">
+          <span class="d-compare__label">Before</span>
+          <span class="d-compare__item">Accelerates</span>
+          <span class="d-compare__item">Base Plan</span>
+          <span class="d-compare__item">Protocol</span>
+          <span class="d-compare__item">Compliance score</span>
+        </div>
+        <div class="d-compare__col d-compare__col--after">
+          <span class="d-compare__label">After</span>
+          <span class="d-compare__item">Weekly Goals</span>
+          <span class="d-compare__item">Your Plan</span>
+          <span class="d-compare__item">Plan</span>
+          <span class="d-compare__item">On track / Off pace</span>
+        </div>
+      </div>
+
+      <div class="d-kept">
+        <span class="d-kept__label">Kept precise — the science stays where it matters</span>
+        <span class="d-kept__items">Caloric deficit · Fat-burn range · Carbs per day · Breath score</span>
+        <span class="d-kept__note">These terms members had to internalize to run the program well. Softening them would have broken the trust the device built.</span>
+      </div>
+    </div>
+
+    <!-- 03 Engagement Strategy -->
+    <div class="d-subsection">
+      <p class="d-subsection__num">03</p>
+      <p class="d-subsection__title">Engagement Strategy</p>
+      <p class="d-subsection__kicker">A notification system shaped like the week, not just the day.</p>
+      <p class="d-body" style="margin-top: 16px;">The old cadence was one push: the daily check-in. A heartbeat, not a program. Members who slipped had nothing pulling them back; members who stayed had no sense of the larger arc. We mapped four beats to the new weekly loop so each trigger landed at a moment that actually mattered.</p>
+
+      <div class="d-push-list">
+        <div class="d-push">
+          <div class="d-push__meta">
+            <span class="d-push__time">Monday · 9:00 AM</span>
+            <span class="d-push__type">Weekly Planning</span>
+          </div>
+          <div class="d-push__body">
+            <span class="d-push__title">Let's set this week's goal.</span>
+            <span class="d-push__detail">Two minutes. Based on how last week went. → opens weekly planning</span>
+          </div>
+        </div>
+        <div class="d-push">
+          <div class="d-push__meta">
+            <span class="d-push__time">Daily · 8:00 AM</span>
+            <span class="d-push__type">Daily Check-in</span>
+          </div>
+          <div class="d-push__body">
+            <span class="d-push__title">Quick breath, then on with your day.</span>
+            <span class="d-push__detail">See yesterday's goal. Log today's. → opens daily check-in</span>
+          </div>
+        </div>
+        <div class="d-push">
+          <div class="d-push__meta">
+            <span class="d-push__time">Thursday · 2:00 PM</span>
+            <span class="d-push__type">Mid-week Boost</span>
+          </div>
+          <div class="d-push__body">
+            <span class="d-push__title">3 days left to hit this week's goal.</span>
+            <span class="d-push__detail">You're slightly off pace. Here's where you stand. → opens progress view</span>
+          </div>
+        </div>
+        <div class="d-push">
+          <div class="d-push__meta">
+            <span class="d-push__time">Sunday · 7:00 PM</span>
+            <span class="d-push__type">Weekly Review</span>
+          </div>
+          <div class="d-push__body">
+            <span class="d-push__title">Your week's in. Let's see how it went.</span>
+            <span class="d-push__detail">Weight trend, plan adherence, fat-burn days. → opens weekly review</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 Design System -->
+    <div class="d-subsection">
+      <p class="d-subsection__num">04</p>
+      <p class="d-subsection__title">Introducing A Design System</p>
+      <p class="d-subsection__kicker">Started inside the feature. Applied everywhere.</p>
+      <p class="d-body" style="margin-top: 16px;">Every screen had been built bespoke. A system would pay for itself — the question was how to start one without stopping shipping. This project was the wedge. We built the weekly planning and Goal surfaces on a new foundation — type scale, color tokens, component primitives — then applied the visual layer to the surrounding screens so members never crossed a jarring seam. After this project, shipping on the system was the default, not a negotiation.</p>
+
+      <div class="d-gallery d-gallery--3" style="margin-top: 32px;">
+        <div class="d-gallery__item">
+          <div style="aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: center; justify-content: center;"><span class="d-mono">Goal cards [screenshot]</span></div>
+          <span class="d-gallery__caption">Goal cards — the core component that carried the system out to neighboring screens.</span>
+        </div>
+        <div class="d-gallery__item">
+          <div style="aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: center; justify-content: center;"><span class="d-mono">Type &amp; color [screenshot]</span></div>
+          <span class="d-gallery__caption">Type and color tokens applied to surrounding screens first. Components followed.</span>
+        </div>
+        <div class="d-gallery__item">
+          <div style="aspect-ratio: 4/5; background: var(--bg-surface, #1a1a18); border: 1px solid var(--border-subtle, #33332f); display: flex; align-items: center; justify-content: center;"><span class="d-mono">Components [screenshot]</span></div>
+          <span class="d-gallery__caption">Component inventory grew outward from the weekly planning flow as adjacent work got touched.</span>
+        </div>
       </div>
     </div>
   </div>
@@ -173,20 +272,24 @@
     <p class="d-label">Impact</p>
     <div class="d-metrics" style="margin: 0 calc(-1 * clamp(20px, 5vw, 64px));">
       <div class="d-metric">
-        <div class="d-metric__value">↑</div>
+        <div class="d-metric__value">30% → ?</div>
         <div class="d-metric__label">Daily check-in completion</div>
-        <div class="d-metric__sub">Connected weekly planning to daily engagement</div>
+        <div class="d-metric__sub">Prior baseline on breath checks alone; new baseline uninstrumented at launch.</div>
       </div>
       <div class="d-metric">
-        <div class="d-metric__value">↑</div>
-        <div class="d-metric__label">Weight loss outcomes</div>
-        <div class="d-metric__sub">Closed loop between data, coaching, and plan adaptation</div>
+        <div class="d-metric__value">100:1</div>
+        <div class="d-metric__label">Coach → member ratio</div>
+        <div class="d-metric__sub">Weekly planning automated the 60% of a coach's week that was plan setup.</div>
       </div>
       <div class="d-metric">
         <div class="d-metric__value">30</div>
         <div class="d-metric__label">Components shipped</div>
-        <div class="d-metric__sub">Design system with documented governance rules</div>
+        <div class="d-metric__sub">Design system seeded inside the feature, applied across adjacent screens.</div>
       </div>
+    </div>
+
+    <div class="d-callout" style="margin-top: 48px;">
+      <p class="d-callout__body"><strong style="color: var(--fg, #e8e6e3);">Early-stage metrics caveat.</strong> Invoy was a seed-stage startup. We didn't have the instrumentation for controlled A/B tests or statistically significant lift measurements. The engagement baseline (30% of members checking in beyond breath tests) was directional. What we could measure: coaches ran twice as many members through manual plan setup, and the weekly planning flow became the most-used feature within two weeks of launch.</p>
     </div>
   </div>
 
@@ -198,5 +301,36 @@
 </footer>
 
 <script src="./portfolio.js"></script>
+<script>
+  // Trigger embedded animations on scroll-into-view
+  (function() {
+    var frames = document.querySelectorAll('iframe[data-src]');
+    var started = {};
+
+    function load(frame) {
+      if (started[frame.id]) return;
+      started[frame.id] = true;
+      var send = function() {
+        try { frame.contentWindow.postMessage('start', '*'); } catch(e) {}
+      };
+      frame.addEventListener('load', send);
+      frame.src = frame.dataset.src;
+    }
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) {
+            load(e.target);
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.2 });
+      frames.forEach(function(f) { io.observe(f); });
+    } else {
+      frames.forEach(load);
+    }
+  })();
+</script>
 </body>
 </html>
