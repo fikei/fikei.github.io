@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
   <link rel="stylesheet" href="/design-system/display.css?v=506">
+  <style>
+    .process-section { background: transparent; transition: background 0.2s ease; }
+    .process-section:hover { background: var(--bg-surface, #1a1a18); }
+  </style>
 </head>
 <body class="d-page">
 
@@ -67,11 +71,12 @@
   </div>
 
   <!-- Process -->
-  <div class="d-section" style="border-bottom: none; background: var(--bg-surface, #1a1a18); margin: 0 calc(-1 * clamp(20px, 5vw, 64px)); padding: 64px clamp(20px, 5vw, 64px);">
+  <a href="/philosophy/" class="d-section process-section" style="display: block; text-decoration: none; color: inherit; border-bottom: none; margin: 0 calc(-1 * clamp(20px, 5vw, 64px)); padding: 64px clamp(20px, 5vw, 64px);">
     <p class="d-label">Process</p>
     <p class="d-headline d-headline--lg">Scaling Design with AI</p>
-    <p class="d-body" style="margin-top: 12px;">Across Field, Invoy, and Livongo, the same pattern: messy domain input, structured compliant output, design carrying the judgment between. AI handles the volume. The design system enforces quality. I decide what should exist.</p>
-  </div>
+    <p class="d-body" style="margin-top: 12px;">AI owns divergence — generating options, exploring the space. I own convergence — deciding what ships, refining what's right. A design system validates the seam between. Claude Code generates inside its constraints. Systemic audits drift. Paper is where the final 10% gets refined by hand. The double diamond is durable; the division of labor is new.</p>
+    <p class="d-mono" style="margin-top: 16px; color: var(--fg-muted, #8a8885);">Read the full Process →</p>
+  </a>
 
   <!-- Personal Projects -->
   <div class="d-section" style="border-bottom: none; display: none;">
@@ -108,6 +113,11 @@
   </div>
 
 </div>
+
+<footer style="max-width: 960px; margin: 120px auto 0; padding: 40px clamp(20px, 5vw, 64px) 64px; border-top: 1px solid var(--border-subtle, #33332f); display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;">
+  <span class="d-mono" style="color: var(--fg-muted, #8a8885);">© 2026 Ian Fike</span>
+  <a href="/philosophy/" class="d-mono" style="color: var(--fg-muted, #8a8885); text-decoration: none;">Built on the portfolio's own design system →</a>
+</footer>
 
 <!-- Project Modals -->
 
