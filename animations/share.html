@@ -71,6 +71,20 @@
   .export-section { color: #B3ABBC; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-align: center; margin: 12px 0; }
   .export-footnote { color: rgba(176,176,176,0.4); font-size: 11px; text-align: center; padding-top: 8px; }
 
+  /* Toast */
+  .toast {
+    position: absolute; bottom: 40px; left: 16px; right: 16px; z-index: 40;
+    display: flex; align-items: center; gap: 10px;
+    background: #161618; border: 1px solid #2C2C2E; border-radius: 12px;
+    padding: 14px 16px;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast-dot { width: 6px; height: 6px; border-radius: 50%; background: #31B23C; flex-shrink: 0; }
+  .toast-text { color: #EEF8FE; font-size: 13px; font-weight: 600; }
+  .toast-sub { color: #A79EAF; font-size: 11px; margin-top: 1px; }
+
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 </style>
 </head>
@@ -228,7 +242,7 @@
             </div>
           </div>
           <div style="flex: 1;"></div>
-          <div style="background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: flex; align-items: center;">
+          <div id="nadiaSend" style="background: #1F1F23; border-radius: 20px; padding: 0 16px; height: 36px; display: flex; align-items: center; transition: background 0.15s;">
             <span style="color: #9E97B1; font-size: 11px; font-weight: 600;">Send</span>
           </div>
         </div>
@@ -268,6 +282,15 @@
         </div>
         <div class="export-section">EXPORT FULL INCIDENT RECORD</div>
         <div class="export-footnote">FHIR R4 Bundle includes vitals, conditions, medications, and procedures with ICD-10/SNOMED/RxNorm codes.</div>
+      </div>
+
+      <!-- Toast -->
+      <div class="toast" id="toast">
+        <div class="toast-dot"></div>
+        <div>
+          <div class="toast-text">Sent to Nadia Allendes</div>
+          <div class="toast-sub">EMT · Nevada County</div>
+        </div>
       </div>
 
     </div>
@@ -323,8 +346,23 @@
 
     await wait(1500);
 
-    // Tap "Tap to Send"
-    tap(document.getElementById('expBtn1'));
+    // Tap Nadia's Send button
+    var nadiaSend = document.getElementById('nadiaSend');
+    nadiaSend.style.background = '#2A2A2E';
+    await wait(200);
+    nadiaSend.style.background = '#1F1F23';
+    await wait(300);
+
+    // Close export sheet + nearby panel
+    document.getElementById('exportSheet').classList.remove('show');
+    document.getElementById('nearbyPanel').style.transform = 'translateY(-100%)';
+    await wait(400);
+    document.getElementById('exportOverlay').classList.remove('show');
+
+    await wait(300);
+
+    // Show success toast
+    document.getElementById('toast').classList.add('show');
   }
 
   if (paused) {
