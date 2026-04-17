@@ -376,14 +376,15 @@
 .d-personas {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1px;
-  background: var(--border-subtle, #33332f);
+  gap: 12px;
+  background: transparent;
   margin-top: 32px;
 }
 
 .d-persona {
   padding: 24px;
   background: var(--bg, #111110);
+  border: 1px solid var(--border-subtle, #33332f);
   display: flex;
   flex-direction: column;
   gap: 8px;
