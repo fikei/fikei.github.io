@@ -631,6 +631,7 @@
 .d-sticky-scroll {
   display: flex;
   gap: 48px;
+  margin-top: 36px;
   align-items: flex-start;
 }
 
