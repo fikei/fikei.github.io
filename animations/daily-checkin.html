@@ -181,15 +181,6 @@
 
   async function runAnimation() {
     await wait(1200);
-    // Select first segment (less than 20g)
-    document.getElementById('seg1').style.background = '#78A8C8';
-    await wait(800);
-    // Check greens
-    document.getElementById('check1').classList.add('checked');
-    await wait(600);
-    // Check exercise
-    document.getElementById('check2').classList.add('checked');
-    await wait(600);
     // Scroll down
     var card = document.getElementById('reflectCard');
     card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
