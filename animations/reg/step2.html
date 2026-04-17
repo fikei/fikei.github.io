@@ -74,17 +74,14 @@
     border-color: #ddd;
     box-shadow: none;
   }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; opacity: 0; transition: opacity 0.3s, transform 0.3s; }
-  .dot.visible { opacity: 1; transform: scale(1); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1976D2; flex-shrink: 0; }
 
   .source-label {
     font-size: 10px; color: #1976D2; margin-top: 4px;
     display: flex; align-items: center; gap: 4px;
-    opacity: 0; transition: opacity 0.3s;
   }
-  .source-label.visible { opacity: 1; }
 
-  .field-group { opacity: 0; transform: translateY(8px); }
+  .field-group { }
 
   /* Password */
   .pw-wrap { position: relative; }
@@ -96,8 +93,7 @@
   .pw-rule.passed::before { content: "✓"; color: #2e7d32; }
 
   /* Terms */
-  .terms { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 8px; opacity: 0; transition: opacity 0.3s; }
-  .terms.visible { opacity: 1; }
+  .terms { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 8px; }
   .checkbox {
     width: 16px; height: 16px; border: 1.5px solid #ccc; border-radius: 3px;
     flex-shrink: 0; margin-top: 2px;
@@ -113,9 +109,7 @@
     width: 100%; padding: 14px; background: #1976D2; color: #fff;
     border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
     font-family: 'Roboto', sans-serif; margin-top: 12px;
-    opacity: 0; transition: opacity 0.3s;
   }
-  .cta.visible { opacity: 1; }
 
   .privacy { font-size: 11px; color: #999; text-align: center; padding: 12px 28px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 </style>
@@ -145,16 +139,14 @@
 
       <div class="form-group field-group" id="fg-email">
         <label>Email Address <span class="req">*</span></label>
-        <div class="form-input" id="email-input">
-          <span id="email-text">s.chen@pilottrucking.com</span>
-          <div class="dot" id="dot-email"></div>
+        <div class="form-input filled" id="email-input">
+          <span id="email-text">sarah.chen@gmail.com</span>
         </div>
-        <div class="source-label" id="src-email">● From employer records</div>
       </div>
 
       <div class="form-group field-group" id="fg-phone">
         <label>Mobile Phone Number <span class="req">*</span></label>
-        <div class="form-input" id="phone-input">
+        <div class="form-input filled" id="phone-input">
           <span>(817) 555-0142</span>
           <div class="dot" id="dot-phone"></div>
         </div>
@@ -164,18 +156,18 @@
       <div class="form-group field-group" id="fg-pw">
         <label>Password <span class="req">*</span></label>
         <div class="pw-wrap">
-          <div class="form-input" id="pw-input"><span id="pw-text">Create a password</span></div>
+          <div class="form-input filled" id="pw-input"><span id="pw-text">••••••••••</span></div>
           <span class="pw-toggle">👁</span>
         </div>
         <div class="pw-rules">
-          <span class="pw-rule" id="rule1">8+ characters</span>
-          <span class="pw-rule" id="rule2">1 number</span>
-          <span class="pw-rule" id="rule3">1 uppercase</span>
+          <span class="pw-rule passed" id="rule1">8+ characters</span>
+          <span class="pw-rule passed" id="rule2">1 number</span>
+          <span class="pw-rule passed" id="rule3">1 uppercase</span>
         </div>
       </div>
 
       <div class="terms" id="terms">
-        <div class="checkbox" id="checkbox"></div>
+        <div class="checkbox checked" id="checkbox"></div>
         <div class="terms-text">By continuing, I accept Livongo Health's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></div>
       </div>
 
@@ -186,111 +178,5 @@
   <div class="privacy">🔒 Your data is encrypted and never shared outside of your care team.</div>
 </div>
 
-<script>
-(function() {
-  function typeText(el, value, callback) {
-    var parent = el.closest('.form-input');
-    if (parent) parent.classList.add('typing');
-    el.textContent = '';
-    var i = 0;
-    var interval = setInterval(function() {
-      el.textContent = value.slice(0, i + 1);
-      i++;
-      if (i >= value.length) {
-        clearInterval(interval);
-        setTimeout(function() {
-          if (parent) { parent.classList.remove('typing'); parent.classList.add('filled'); }
-          if (callback) callback();
-        }, 200);
-      }
-    }, 50);
-  }
-
-  function showEl(el) { el.classList.add('visible'); }
-
-  function runSequence() {
-    // t=1.6s: fields fade in staggered
-    var fgs = document.querySelectorAll('.field-group');
-    setTimeout(function() {
-      fgs[0].style.opacity = '1'; fgs[0].style.transform = 'translateY(0)'; fgs[0].style.transition = 'all 0.4s ease';
-    }, 1600);
-    setTimeout(function() {
-      fgs[1].style.opacity = '1'; fgs[1].style.transform = 'translateY(0)'; fgs[1].style.transition = 'all 0.4s ease';
-    }, 1800);
-    setTimeout(function() {
-      fgs[2].style.opacity = '1'; fgs[2].style.transform = 'translateY(0)'; fgs[2].style.transition = 'all 0.4s ease';
-    }, 2000);
-
-    // t=2.5s: dots appear on pre-filled fields
-    setTimeout(function() { showEl(document.getElementById('dot-email')); }, 2500);
-    setTimeout(function() { showEl(document.getElementById('dot-phone')); }, 2700);
-    // t=2.8s: source labels
-    setTimeout(function() { showEl(document.getElementById('src-email')); }, 2800);
-    setTimeout(function() { showEl(document.getElementById('src-phone')); }, 3000);
-
-    // t=3.5s: email gets cleared and retyped with personal address
-    setTimeout(function() {
-      document.getElementById('src-email').classList.remove('visible');
-      document.getElementById('dot-email').classList.remove('visible');
-      typeText(document.getElementById('email-text'), 'sarah.chen@gmail.com');
-    }, 4000);
-
-    // t=5.5s: password types in
-    setTimeout(function() {
-      var pwText = document.getElementById('pw-text');
-      pwText.style.color = '#bbb';
-      typeText(pwText, '••••••••••', function() {
-        pwText.style.color = '#333';
-      });
-    }, 6000);
-
-    // t=7s: password rules pass
-    setTimeout(function() {
-      document.getElementById('rule1').classList.add('passed');
-      document.getElementById('rule2').classList.add('passed');
-      document.getElementById('rule3').classList.add('passed');
-    }, 7200);
-
-    // t=2.2s: terms visible
-    setTimeout(function() {
-      document.getElementById('terms').classList.add('visible');
-    }, 2200);
-    // t=2.4s: CTA visible
-    setTimeout(function() {
-      document.getElementById('cta-btn').classList.add('visible');
-    }, 2400);
-
-    // t=7.8s: checkbox checked
-    setTimeout(function() {
-      document.getElementById('checkbox').classList.add('checked');
-    }, 7800);
-
-    // t=8.5s: scroll down to reveal CTA button
-    setTimeout(function() {
-      window.scrollTo({ top: 200, behavior: 'smooth' });
-    }, 8500);
-  }
-
-  setTimeout(runSequence, 0);
-
-  // Reset and loop with card animation (16s)
-  setInterval(function() {
-    document.querySelectorAll('.field-group').forEach(function(el) {
-      el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; el.style.transition = 'none';
-    });
-    document.querySelectorAll('.dot, .source-label').forEach(function(el) { el.classList.remove('visible'); });
-    document.getElementById('email-text').textContent = 's.chen@pilottrucking.com';
-    document.getElementById('pw-text').textContent = 'Create a password';
-    document.getElementById('pw-text').style.color = '#bbb';
-    document.querySelectorAll('.pw-rule').forEach(function(el) { el.classList.remove('passed'); });
-    document.querySelectorAll('.form-input').forEach(function(el) { el.classList.remove('typing', 'filled'); });
-    document.getElementById('checkbox').classList.remove('checked');
-    document.getElementById('terms').classList.remove('visible');
-    document.getElementById('cta-btn').classList.remove('visible');
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    setTimeout(runSequence, 500);
-  }, 16000);
-})();
-</script>
 </body>
 </html>

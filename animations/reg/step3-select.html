@@ -32,10 +32,7 @@
   /* Bundle card */
   .bundle {
     border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden;
-    opacity: 0; transform: translateY(8px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
   }
-  .bundle.in { opacity: 1; transform: translateY(0); }
 
   .bundle__header {
     padding: 14px 18px; background: #fafafa; border-bottom: 1px solid #f0f0f0;
@@ -69,10 +66,7 @@
     display: flex; align-items: center; gap: 14px;
     padding: 16px 20px; border: 1px dashed #c8c8c8; background: #fafafa;
     border-radius: 10px;
-    opacity: 0; transform: translateY(8px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
   }
-  .consider__card.in { opacity: 1; transform: translateY(0); }
   .consider__body { flex: 1; }
   .consider__name { font-size: 14px; font-weight: 600; color: #222; }
   .consider__desc { font-size: 12px; color: #777; margin-top: 2px; line-height: 1.4; }
@@ -171,25 +165,5 @@
   </div>
 </div>
 
-<script>
-(function() {
-  function run() {
-    setTimeout(function() { document.getElementById('bundle').classList.add('in'); }, 600);
-    setTimeout(function() { document.getElementById('consider').classList.add('in'); }, 1800);
-    setTimeout(function() {
-      window.scrollTo({ top: 100, behavior: 'smooth' });
-    }, 4000);
-  }
-
-  setTimeout(run, 0);
-
-  setInterval(function() {
-    document.getElementById('bundle').classList.remove('in');
-    document.getElementById('consider').classList.remove('in');
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    setTimeout(run, 500);
-  }, 14000);
-})();
-</script>
 </body>
 </html>
