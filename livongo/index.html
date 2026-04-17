@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Livongo Onboarding — Ian Fike</title>
+  <title>Livongo Registration — Ian Fike</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
@@ -182,6 +182,7 @@
 <div class="d-subnav">
   <a href="#framing" class="d-subnav__link d-subnav__link--active">Problem</a>
   <a href="#deliverable" class="d-subnav__link">Experience</a>
+  <a href="#process" class="d-subnav__link">Decisions</a>
   <a href="#impact" class="d-subnav__link">Impact</a>
 </div>
 
@@ -190,14 +191,14 @@
   <!-- Header -->
   <div style="padding: 48px 0 0;">
     <span class="d-status d-status--shipped">Shipped</span>
-    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Livongo Onboarding</p>
-    <p class="d-body" style="margin-top: 12px;">Reshaping onboarding as a tool for trust and partnership. 9 steps became 6. A spreadsheet became an API. Completion metrics became activation metrics.</p>
+    <p class="d-headline d-headline--xl" style="margin-top: 12px;">Livongo Registration</p>
+    <p class="d-body" style="margin-top: 12px;">Reshaping onboarding as a high conversion tool for trust and partnership.</p>
 
     <dl class="d-overview">
       <dt>Role</dt>
       <dd>Senior PM, Member Growth</dd>
       <dt>Scope</dt>
-      <dd>50 configs × 74 fields = 3,700 decision points</dd>
+      <dd>Strategy, Product Design, Stakeholder management</dd>
       <dt>Platform</dt>
       <dd>Web registration, Salesforce config, internal APIs</dd>
     </dl>
@@ -219,7 +220,7 @@
     <p class="d-body">The data told the story. Every step bled members, but the reasons weren't what anyone expected.</p>
 
     <div class="funnel">
-      <!-- 100% start → 91% remain (9% loss) -->
+      <!-- 100% → 91% remain (−9%) -->
       <div class="funnel-row">
         <span class="funnel-label">Identity & Basic Info</span>
         <div class="funnel-bar">
@@ -228,40 +229,50 @@
         </div>
         <span class="funnel-pct funnel-pct--low">−9%</span>
       </div>
-      <!-- 91% → 69% remain (22% loss) -->
+      <!-- 91% → 80% remain (−12%) -->
       <div class="funnel-row">
         <span class="funnel-label">Sponsor</span>
         <div class="funnel-bar">
-          <div class="funnel-remaining" style="width: 69%;"></div>
-          <div class="funnel-loss funnel-loss--mid" style="left: 69%; width: 22%;"></div>
+          <div class="funnel-remaining" style="width: 80%;"></div>
+          <div class="funnel-loss funnel-loss--mid" style="left: 80%; width: 12%;"></div>
         </div>
-        <span class="funnel-pct funnel-pct--mid">−22%</span>
+        <span class="funnel-pct funnel-pct--mid">−12%</span>
       </div>
-      <!-- 69% → 37% remain (32% loss) -->
+      <!-- 80% → 65% remain (−19%) -->
       <div class="funnel-row">
         <span class="funnel-label">Insurance</span>
         <div class="funnel-bar">
-          <div class="funnel-remaining" style="width: 37%;"></div>
-          <div class="funnel-loss funnel-loss--high" style="left: 37%; width: 32%;"></div>
+          <div class="funnel-remaining" style="width: 65%;"></div>
+          <div class="funnel-loss funnel-loss--mid" style="left: 65%; width: 19%;"></div>
         </div>
-        <span class="funnel-pct funnel-pct--high">−32%</span>
+        <span class="funnel-pct funnel-pct--mid">−19%</span>
       </div>
-      <!-- 37% → 16% remain (21% loss) -->
+      <!-- 65% → 57% remain (−12%) -->
       <div class="funnel-row">
-        <span class="funnel-label funnel-label--highlight">Product Selection</span>
+        <span class="funnel-label">Program Selection</span>
         <div class="funnel-bar">
-          <div class="funnel-remaining" style="width: 16%;"></div>
-          <div class="funnel-loss funnel-loss--high" style="left: 16%; width: 21%;"></div>
+          <div class="funnel-remaining" style="width: 57%;"></div>
+          <div class="funnel-loss funnel-loss--mid" style="left: 57%; width: 12%;"></div>
+        </div>
+        <span class="funnel-pct funnel-pct--mid">−12%</span>
+      </div>
+      <!-- 57% → 45% remain (−21%) — highlight: multi-program pain -->
+      <div class="funnel-row">
+        <span class="funnel-label funnel-label--highlight">Program Setup</span>
+        <div class="funnel-bar">
+          <div class="funnel-remaining" style="width: 45%;"></div>
+          <div class="funnel-loss funnel-loss--high" style="left: 45%; width: 21%;"></div>
         </div>
         <span class="funnel-pct funnel-pct--high">−21%</span>
       </div>
-      <!-- 16% → ~0% remain (18% loss, but capped) -->
+      <!-- 45% → 37% remain (−8%) -->
       <div class="funnel-row">
         <span class="funnel-label">Health Intake</span>
         <div class="funnel-bar">
-          <div class="funnel-loss funnel-loss--mid" style="left: 0; width: 16%;"></div>
+          <div class="funnel-remaining" style="width: 37%;"></div>
+          <div class="funnel-loss funnel-loss--low" style="left: 37%; width: 8%;"></div>
         </div>
-        <span class="funnel-pct funnel-pct--mid">−18%</span>
+        <span class="funnel-pct funnel-pct--low">−8%</span>
       </div>
     </div>
 
@@ -455,6 +466,21 @@
     </div>
   </div>
 
+  <!-- PROCESS / DECISIONS -->
+  <div id="process" class="d-section">
+    <p class="d-label">Process</p>
+    <div class="d-decisions">
+      <div class="d-decision">
+        <p class="d-decision__q">Why did more context increase completion?</p>
+        <p class="d-decision__a">The org assumed shorter = better. But members weren't dropping off because of length — they were dropping off because they didn't understand why they were being asked. Transparency banners, data source attribution, and partnership-oriented copy gave people a reason to keep going.</p>
+      </div>
+      <div class="d-decision">
+        <p class="d-decision__q">Why reframe onboarding as trust, not completion?</p>
+        <p class="d-decision__a">Enrollment drove 6 months of revenue. But activation — 6+ blood sugar checks in 3 weeks — drove 12+ month retention and 18 months of revenue. The org bias was "less is more" and "completion, not context." But for someone newly diagnosed, onboarding is the first trust moment. Partnership over authority.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- IMPACT -->
   <div id="impact" class="d-section">
     <p class="d-label">Impact</p>
@@ -529,7 +555,13 @@
     var pad = 24; // breathing room above and below
     var availH = window.innerHeight - CHROME - pad * 2;
     var layersEl = stickyReg.querySelector('.d-sticky-scroll__layers');
-    if (layersEl) layersEl.style.height = availH + 'px';
+    if (layersEl) {
+      // Cap height at max aspect ratio 3:4 (h/w) so container doesn't get too tall on large screens
+      var MAX_H_OVER_W = 4 / 3;
+      var w = layersEl.offsetWidth;
+      var maxH = w * MAX_H_OVER_W;
+      layersEl.style.height = Math.min(availH, maxH) + 'px';
+    }
     stickyReg.style.top = (CHROME + pad) + 'px';
   }
 
@@ -583,10 +615,10 @@
     }
   }, { passive: true });
 
-  sizeFrames();
   setStickyTop();
+  sizeFrames();
   onScroll();
-  window.addEventListener('resize', function() { sizeFrames(); setStickyTop(); });
+  window.addEventListener('resize', function() { setStickyTop(); sizeFrames(); });
 })();
 </script>
 </body>

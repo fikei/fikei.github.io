@@ -87,7 +87,7 @@
 
     <div class="fg af1">
       <label>Street Address *</label>
-      <div class="fi fi--dim" id="addr"><span id="addr-text">Street address</span><div class="dot" id="d1"></div></div>
+      <div class="fi" id="addr"><span id="addr-text">1847 Oak Ridge Drive</span><div class="dot visible" id="d1"></div></div>
     </div>
 
     <div class="fg af2" style="margin-bottom: 0;">
@@ -98,15 +98,15 @@
     <div class="form-row af3" style="margin-top: 14px;">
       <div class="fg">
         <label>City *</label>
-        <div class="fi fi--dim" id="city"><span id="city-text">City</span><div class="dot" id="d2"></div></div>
+        <div class="fi" id="city"><span id="city-text">Fort Worth</span><div class="dot visible" id="d2"></div></div>
       </div>
       <div class="fg" style="max-width: 100px;">
         <label>State *</label>
-        <div class="fi fi--dim" id="state"><span id="state-text">State</span><div class="dot" id="d3"></div></div>
+        <div class="fi" id="state"><span id="state-text">TX</span><div class="dot visible" id="d3"></div></div>
       </div>
       <div class="fg" style="max-width: 120px;">
         <label>Zip Code *</label>
-        <div class="fi fi--dim" id="zip"><span id="zip-text">Zip</span><div class="dot" id="d4"></div></div>
+        <div class="fi" id="zip"><span id="zip-text">76102</span><div class="dot visible" id="d4"></div></div>
       </div>
     </div>
 
@@ -114,50 +114,5 @@
   </div>
 </div>
 
-<script>
-(function() {
-  var fills = [
-    { textId: 'addr-text', fiId: 'addr', dotId: 'd1', value: '1847 Oak Ridge Drive', delay: 2000 },
-    { textId: 'city-text', fiId: 'city', dotId: 'd2', value: 'Fort Worth', delay: 2800 },
-    { textId: 'state-text', fiId: 'state', dotId: 'd3', value: 'TX', delay: 3200 },
-    { textId: 'zip-text', fiId: 'zip', dotId: 'd4', value: '76102', delay: 3600 }
-  ];
-
-  function run() {
-    // t=4.5s: scroll down to reveal CTA button
-    setTimeout(function() {
-      window.scrollTo({ top: 80, behavior: 'smooth' });
-    }, 4500);
-
-    fills.forEach(function(f) {
-      setTimeout(function() {
-        var el = document.getElementById(f.textId);
-        var fi = document.getElementById(f.fiId);
-        el.textContent = f.value;
-        fi.classList.remove('fi--dim');
-        fi.style.color = '#333';
-        setTimeout(function() {
-          document.getElementById(f.dotId).classList.add('visible');
-        }, 200);
-      }, f.delay);
-    });
-  }
-
-  setTimeout(run, 0);
-
-  setInterval(function() {
-    fills.forEach(function(f) {
-      var el = document.getElementById(f.textId);
-      var fi = document.getElementById(f.fiId);
-      el.textContent = f.textId === 'addr-text' ? 'Street address' : f.textId === 'city-text' ? 'City' : f.textId === 'state-text' ? 'State' : 'Zip';
-      fi.classList.add('fi--dim');
-      fi.style.color = '';
-      document.getElementById(f.dotId).classList.remove('visible');
-    });
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    setTimeout(run, 500);
-  }, 12000);
-})();
-</script>
 </body>
 </html>
