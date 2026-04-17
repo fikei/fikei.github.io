@@ -181,6 +181,9 @@
 
   async function runAnimation() {
     await wait(1200);
+    // Fill last segment (greater than 20g — went high)
+    document.getElementById('seg3').style.background = '#F68C50';
+    await wait(800);
     // Scroll down
     var card = document.getElementById('reflectCard');
     card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
