@@ -18,7 +18,7 @@
   /* Fixed header */
   .fixed-header { position: absolute; top: 0; left: 0; right: 0; z-index: 10; background: #0A0A0A; }
   .tabs { display: flex; border-bottom: 1px solid #1C1C1E; background: #0A0A0A; }
-  .tab { padding: 10px 16px; font-size: 12px; letter-spacing: 0.3px; color: #9E97B1; }
+  .tab { padding: 10px 16px; font-size: 12px; letter-spacing: 0.3px; color: #A79EAF; }
   .tab--active { color: #EEF8FE; font-weight: 700; border-bottom: 2.5px solid #EEF8FE; }
 
   /* Scrollable SOAP body */
@@ -38,17 +38,17 @@
   /* Vitals table */
   .vitals-table { border-radius: 8px; overflow: hidden; margin-top: 8px; }
   .vitals-header { display: flex; background: #0A0A0A; padding: 8px; }
-  .vitals-header span { flex: 1; text-align: center; color: #A79EAF; font-size: 11px; font-weight: 500; }
+  .vitals-header span { flex: 1; text-align: center; color: #B0B0B0; font-size: 11px; font-weight: 500; }
   .vitals-header span:first-child { flex-shrink: 0; width: 29px; text-align: left; }
   .vitals-row { display: flex; align-items: center; padding: 3px 8px; min-height: 48px; }
-  .vitals-row-time { flex-shrink: 0; width: 30px; color: #A79EAF; font-size: 11px; font-weight: 500; }
+  .vitals-row-time { flex-shrink: 0; width: 30px; color: #B0B0B0; font-size: 11px; font-weight: 500; }
   .vitals-row-cells { display: flex; gap: 6px; flex: 1; }
   .vital-cell { flex: 1; border-radius: 8px; padding: 8px; text-align: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .vital-cell--normal { background: #101010; color: #A79EAF; }
+  .vital-cell--normal { background: #101010; color: #AAAAAA; }
   .vital-cell--red { background: #411B1F; color: #FE1844; }
   .vital-cell--amber { background: #363430; color: #F9CE86; }
   .vital-cell--empty { color: rgba(255,255,255,0.2); font-family: monospace; font-size: 17px; }
-  .add-vitals-btn { background: #1F1F23; border-radius: 20px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #9E97B1; cursor: pointer; transition: background 0.15s; }
+  .add-vitals-btn { background: #1F1F23; border-radius: 20px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #B0B0B0; cursor: pointer; transition: background 0.15s; }
   .add-vitals-btn.tapped { background: #2A2A2E; }
 
   /* ═══ Bottom sheet drawer ═══ */
@@ -61,7 +61,7 @@
   .drawer-handle { width: 36px; height: 5px; border-radius: 3px; background: #3A3A3C; margin: 8px auto 12px; }
   .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 12px; }
   .drawer-skip { color: #B0B0B0; font-size: 14px; font-weight: 500; }
-  .drawer-title { color: #9E99AD; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+  .drawer-title { color: #7D788B; font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
   .drawer-step { color: #6B6571; font-size: 11px; font-weight: 500; text-align: right; width: 40px; }
 
   /* Content crossfade */
@@ -124,7 +124,7 @@
         <div style="display: flex; align-items: center; padding: 12px 16px; gap: 16px;">
           <span style="color: #CAC4D0; font-size: 20px; width: 18px;">←</span>
           <div>
-            <div style="color: #A79EAF; font-size: 14px;">INC-2024-0847</div>
+            <div style="color: #EEF8FE; font-size: 14px;">INC-2024-0847</div>
             <div style="color: #A79EAF; font-size: 11px; font-weight: 500;">Apr 2, 2026</div>
           </div>
           <div style="margin-left: auto; display: flex; align-items: center; gap: 5px; background: #DF1B41; border-radius: 20px; padding: 4px 11px; height: 22px;">
@@ -150,8 +150,8 @@
           </div>
           <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
             <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Fall from 15ft onto rock slab</div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">MOI: Height impact onto rock surface</span></div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Activity: rock climbing</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 15px; line-height: 1.5;">MOI: Height impact onto rock surface</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 15px; line-height: 1.5;">Activity: rock climbing</span></div>
           </div>
           <div style="border-top: 1px solid #232323; margin: 24px 0 8px;"></div>
           <div style="display: flex; align-items: center; gap: 6px; padding-left: 6px; padding-top: 6px;">
@@ -170,13 +170,13 @@
           <div style="display: flex; flex-direction: column; gap: 6px; padding-left: 6px;">
             <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">PHYSICAL EXAM</div>
             <div style="color: #EEF8FE; font-size: 14px; font-weight: 700; line-height: 1.5;">Injury to Left Leg & Back</div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Ankle: Acute Pain (Left), Non-weight bearing</span></div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Back: Tenderness in Lumbar</span></div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">No injuries to neck, head, torso or arms</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 14px; line-height: 1.5;">Ankle: Acute Pain (Left), Non-weight bearing</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 14px; line-height: 1.5;">Back: Tenderness in Lumbar</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 14px; line-height: 1.5;">No injuries to neck, head, torso or arms</span></div>
             <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
             <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">MEDICAL HISTORY</div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 15px; line-height: 1.5;">Allergies: Penicillin</span></div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Medications: None reported</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 15px; line-height: 1.5;">Allergies: Penicillin</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 14px; line-height: 1.5;">Medications: None reported</span></div>
           </div>
           <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
           <div style="display: flex; align-items: center; gap: 6px; padding: 12px 6px 6px;">
@@ -251,7 +251,7 @@
             <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span class="soap-bullet-text">Lumbar pain</span></div>
             <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
             <div style="color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; padding: 6px 0 10px;">POSSIBLE PROGRESSIONS</div>
-            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #A79EAF; font-size: 14px; line-height: 1.5;">Spinal Injury,</span></div>
+            <div class="soap-bullet"><span class="soap-bullet-dot">•</span><span style="color: #E5DAEF; font-size: 14px; line-height: 1.5;">Spinal Injury,</span></div>
           </div>
           <div style="border-top: 1px solid #232323; margin: 16px 0 6px;"></div>
           <div style="display: flex; align-items: center; gap: 6px; padding: 6px 6px 0;">

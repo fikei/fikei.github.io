@@ -36,7 +36,7 @@
   /* Field design tokens */
   .ts-header { display: flex; align-items: center; padding: 12px 16px; gap: 16px; }
   .ts-back { color: #A79EAF; font-size: 20px; width: 18px; }
-  .ts-id { color: #A79EAF; font-size: 14px; line-height: 1.5; }
+  .ts-id { color: #EEF8FE; font-size: 14px; line-height: 1.5; }
   .ts-date { color: #A79EAF; font-size: 11px; font-weight: 500; }
   .ts-rec-pill { display: flex; align-items: center; gap: 5px; background: #DF1B41; border-radius: 20px; padding: 4px 11px; height: 22px; margin-left: auto; }
   .ts-rec-pill span { color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -64,7 +64,7 @@
   .msg-speaker--mc { color: #F9CE86; }
   .msg-speaker--p2 { color: #009CC0; }
   .msg-content { flex: 1; min-width: 0; }
-  .msg-text { color: #EEF8FE; font-size: 14px; line-height: 1.5; }
+  .msg-text { color: #EFF8FF; font-size: 14px; line-height: 1.5; }
 
   /* Badge (collapsed extraction tag) */
   .badge { display: none; align-items: center; gap: 6px; background: #161618; border: 1px solid #2C2C2E; border-radius: 8px; padding: 6px 10px; margin-top: 8px; cursor: pointer; width: fit-content; position: relative; overflow: hidden; }
@@ -98,7 +98,7 @@
   .extract-chevron { color: #3A3A3C; font-size: 12px; transition: transform 0.3s; }
   .extract-card.open .extract-chevron { transform: rotate(180deg); }
   .extract-field { padding: 10px 12px; }
-  .extract-field-label { color: #6B6571; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
+  .extract-field-label { color: #A79EAF; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; }
   .extract-field-value { color: #EBEBF5; font-size: 13px; line-height: 1.45; margin-top: 4px; }
 
   /* Typing indicator */
@@ -109,9 +109,9 @@
   .typing-speaker { font-size: 10px; font-weight: 700; width: 22px; color: #3A3A3C; }
   .typing-dots { display: flex; gap: 4px; }
   .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: #3A3A3C; }
-  .typing-dots span:nth-child(1) { animation: dotPulse 1s infinite 0s; }
-  .typing-dots span:nth-child(2) { animation: dotPulse 1s infinite 0.15s; }
-  .typing-dots span:nth-child(3) { animation: dotPulse 1s infinite 0.3s; }
+  .typing-dots span:nth-child(1) { background: #3A3A3C; animation: dotPulse 1s infinite 0s; }
+  .typing-dots span:nth-child(2) { background: #2C2C2E; animation: dotPulse 1s infinite 0.15s; }
+  .typing-dots span:nth-child(3) { background: #1C1C1E; animation: dotPulse 1s infinite 0.3s; }
 
   /* Recording bar — floating pill */
   .rec-bar { position: absolute; bottom: 28px; left: 16px; right: 16px; height: 52px; background: #1C1C1E; border: 1px solid #2C2C2E; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
