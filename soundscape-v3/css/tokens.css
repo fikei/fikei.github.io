@@ -1,0 +1,201 @@
+/* ============================================
+   CTRL Design System
+   A unified design language for ctrl.rodeo projects
+   ============================================ */
+
+/* ============================================
+   Color Tokens
+   ============================================ */
+:root {
+  /* Core palette */
+  --color-black: #000;
+  --color-white: #fff;
+
+  /* Grays - 10 step scale */
+  --gray-100: #111;
+  --gray-200: #1a1a1a;
+  --gray-300: #222;
+  --gray-400: #333;
+  --gray-500: #666;
+  --gray-600: #999;
+  --gray-700: #999;
+  --gray-800: #ccc;
+  --gray-900: #e0e0e0;
+
+  /* Status colors */
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+
+  /* Terminal accent colors */
+  --accent-amber: #ffb000;
+  --accent-green: #39ff14;
+  --accent-cyan: #00fff7;
+  --accent-magenta: #ff44ff;
+
+  /* Platform colors (music) */
+  --color-spotify: #1DB954;
+  --color-soundcloud: #FF5500;
+  --color-apple-music: #FC3C44;
+  --color-bandcamp: #1DA0C3;
+  --color-tidal: #00FFFF;
+  --color-youtube-music: #FF0000;
+
+  /* Overlays */
+  --overlay-light: rgba(0, 0, 0, 0.5);
+  --overlay-medium: rgba(0, 0, 0, 0.8);
+  --overlay-heavy: rgba(0, 0, 0, 0.95);
+}
+
+/* ============================================
+   Semantic Color Tokens (Theme-aware)
+   ============================================ */
+:root {
+  /* Dark mode (default) */
+  --bg: #111110;
+  --bg-surface: #1a1a18;
+  --bg-elevated: #22221f;
+
+  --fg: #e8e6e3;
+  --fg-muted: #8a8885;
+  --fg-subtle: #666560;
+
+  --border: #e8e6e3;
+  --border-subtle: #33332f;
+
+  --interactive: #e8e6e3;
+  --interactive-hover: #111110;
+  --color-link: #00fff7;
+  --bg-code: #1a1a1e;
+}
+
+:root.light {
+  /* Light mode */
+  --bg: #faf9f7;
+  --bg-surface: #faf9f7;
+  --bg-elevated: #e8e6e3;
+
+  --fg: #1a1a18;
+  --fg-muted: #8a8885;
+  --fg-subtle: #666560;
+
+  --border: #1a1a18;
+  --border-subtle: #ccc8c0;
+
+  --interactive: #1a1a18;
+  --interactive-hover: #faf9f7;
+  --color-link: #0055aa;
+  --bg-code: #f5f5f0;
+}
+
+/* ============================================
+   Typography Tokens
+   ============================================ */
+:root {
+  /* Font families */
+  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", "Cascadia Code", "Consolas", monospace;
+  --font-primary: var(--font-mono);
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-serif: Georgia, "Times New Roman", Times, serif;
+
+  /* Base font size */
+  --text-base: 14px;
+
+  /* Font sizes — unified scale (replaces both DS and Boards scales) */
+  --text-2xs: 8px;
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 40px;
+  --text-4xl: 48px;
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.8;
+
+  /* Letter spacing */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.3em;
+  --tracking-mono: 0;
+  --tracking-display: -0.03em;
+}
+
+/* ============================================
+   Spacing Tokens
+   ============================================ */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+/* ============================================
+   Animation Tokens
+   ============================================ */
+:root {
+  /* Durations */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.15s;
+  --duration-slow: 0.2s;
+  --duration-slower: 0.3s;
+  --duration-slowest: 0.5s;
+
+  /* Easings */
+  --ease-default: ease;
+  --ease-linear: linear;
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+}
+
+/* ============================================
+   Layout Tokens
+   ============================================ */
+:root {
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --border-thin: 1px;
+  --border-medium: 2px;
+  --border-thick: 4px;
+
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 50;
+  --z-modal: 100;
+  --z-overlay: 200;
+  --z-toast: 300;
+
+  /* Focus */
+  --focus-ring: 2px solid #00fff7;
+  --focus-ring-offset: 2px;
+}
+
+/* ============================================
+   Breakpoint Tokens
+   ============================================ */
+:root {
+  --bp-sm: 600px;
+  --bp-md: 900px;
+  --bp-lg: 1200px;
+  --container-terminal: 80ch;
+  --gutter-page: clamp(16px, 5vw, 64px);
+}
