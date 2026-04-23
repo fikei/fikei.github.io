@@ -19,6 +19,9 @@ export const KNOB_NAMES = [
   "softness",     // 0..1  shape edge smoothness (0 = sharp polygon, 1 = circle)
   "noise",        // 0..1  noise modulation depth
   "scale",        // 0..1  pattern size
+  "organic",      // 0..1  geometric shape ↔ voronoi cell field crossfade
+  "pixelate",     // 0..1  0 = native resolution, 1 = hard blocky
+  "posterize",    // 0..1  0 = smooth gradients, 1 = flat color bands
   // Appearance
   "hue",          // 0..1  hue rotation; 0.5 = neutral, 0 = -π, 1 = +π
   "saturation",   // 0..1
@@ -36,7 +39,10 @@ export const DEFAULT_KNOBS = {
   softness: 0.85,
   noise: 0.35,
   scale: 0.55,
-  hue: 0.5,           // 0.5 = no rotation; 0 = -π, 1 = +π
+  organic: 0,         // 0 = pure shape, 1 = pure voronoi
+  pixelate: 0,        // 0 = no pixelation
+  posterize: 0,       // 0 = no posterization
+  hue: 0.5,
   saturation: 0.55,
   contrast: 0.45,
   feedback: 0.65,
@@ -47,15 +53,18 @@ export const DEFAULT_KNOBS = {
 export const KNOB_PRESETS = {
   drift: {
     speed: 0.2, response: 0.55, density: 0.3, symmetry: 0.2, softness: 0.92,
-    noise: 0.4, scale: 0.55, hue: 0.5, saturation: 0.5, contrast: 0.4, feedback: 0.78,
+    noise: 0.4, scale: 0.55, organic: 0.15, pixelate: 0, posterize: 0,
+    hue: 0.5, saturation: 0.5, contrast: 0.4, feedback: 0.78,
   },
   pulse: {
     speed: 0.55, response: 0.8, density: 0.7, symmetry: 0.55, softness: 0.25,
-    noise: 0.5, scale: 0.5, hue: 0.5, saturation: 0.68, contrast: 0.65, feedback: 0.4,
+    noise: 0.5, scale: 0.5, organic: 0, pixelate: 0.15, posterize: 0.2,
+    hue: 0.5, saturation: 0.68, contrast: 0.65, feedback: 0.4,
   },
   minimal: {
     speed: 0.15, response: 0.45, density: 0.15, symmetry: 0.15, softness: 0.95,
-    noise: 0.2, scale: 0.7, hue: 0.5, saturation: 0.35, contrast: 0.35, feedback: 0.85,
+    noise: 0.2, scale: 0.7, organic: 0, pixelate: 0, posterize: 0.1,
+    hue: 0.5, saturation: 0.35, contrast: 0.35, feedback: 0.85,
   },
 };
 

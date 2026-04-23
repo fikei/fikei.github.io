@@ -124,11 +124,32 @@ window.loadEngine = function loadEngine() {
   // noise texture as input to both halves the noise-sampling work.
   const sharedNoise = noise(noiseFreqF, noiseSpeedF);
 
+  // Voronoi cell field as an alternate base. `organic` knob crossfades
+  // between the shape-based base and the voronoi base via .blend().
+  // organic=0 → pure geometric shape, organic=1 → pure cell field,
+  // in-between yields a hybrid.
+  const voronoiBase = voronoi(
+    () => 3 + k("density") * 9,              // cell count follows density
+    () => 0.05 + speedK() * 0.25,            // cell drift speed
+    () => 0.2 + k("softness") * 0.7,         // blending / edge smoothness
+  );
+
+  // Pixelate mapping: knob 0..1 → pixel-count 1024..5 (exponential so low
+  // values are near-native and only the top of the range looks blocky).
+  const pixelateN = () => Math.pow(2, 10 - k("pixelate") * 7.5);
+
+  // Posterize bins: knob 0..1 → bins 200..2 (also exponential, so the
+  // effect doesn't become visible until the top ~40% of the knob range).
+  const posterizeBins = () =>
+    Math.max(2, Math.round(200 * Math.pow(1 - k("posterize"), 2) + 2));
+
   shape(sides, patternScale, edgeBlur)
     .repeat(tileCount, tileCount)
     .rotate(0, rotSpeed)
     .scrollX(0, scrollXSpeed)
     .scrollY(0, scrollYSpeed)
+    // Blend in voronoi base by the `organic` knob. Value 0 = no voronoi.
+    .blend(voronoiBase, () => k("organic"))
     .modulate(sharedNoise, modAmount)
     .modulateScale(
       sharedNoise,
@@ -138,12 +159,16 @@ window.loadEngine = function loadEngine() {
     .saturate(saturate)
     .contrast(contrastF)
     .brightness(brightnessAdj)
-    // `hue` knob rotates the color wheel post-color. 0.5 = neutral,
-    // 0 = -π (backward), 1 = +π (forward). Since hue is circular, 0 and
-    // 1 land on the same visual result; the knob just lets the user
-    // slide in either direction from neutral.
+    // `hue` knob rotates the color wheel post-color. 0.5 = neutral.
     .hue(() => (k("hue") - 0.5) * Math.PI * 2)
+    // `posterize` quantizes the color space. Near-invisible below ~0.4
+    // on the knob (many bins); becomes hard flat bands above ~0.7.
+    .posterize(posterizeBins, 1)
     .kaleid(kaleidN)
+    // `pixelate` is the last visual op so blockiness covers everything.
+    // Keeping it after kaleid means the blocks line up with the image,
+    // not with the kaleid segments.
+    .pixelate(pixelateN, pixelateN)
     .blend(o0, feedbackAmt)
     .out();
 };

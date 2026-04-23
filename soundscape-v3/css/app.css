@@ -385,6 +385,38 @@ html, body {
   pointer-events: none;
   transition: left var(--duration-fast) var(--ease-out);
 }
+/* Ghost indicator: shows the live routed value. Smaller than the main
+   handle and muted, so it reads as "live feedback" not "your setting". */
+.knob__ghost {
+  display: none;
+  position: absolute; top: 50%;
+  width: 4px; height: 8px;
+  background: var(--gray-600);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+/* Auto-compile checkbox inside the prompt actions row */
+.prompt__auto {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer; user-select: none;
+  margin-left: auto;
+}
+.prompt__auto input[type="checkbox"] {
+  appearance: none;
+  width: 10px; height: 10px;
+  background: var(--color-black);
+  border: 1px solid var(--color-white);
+  cursor: pointer;
+}
+.prompt__auto input[type="checkbox"]:checked {
+  background: var(--color-white);
+}
 
 .btn--icon {
   width: 30px; height: 30px;
