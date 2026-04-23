@@ -81,12 +81,20 @@ export async function compilePrompt({
       body: JSON.stringify({ text, images }),
     });
   } catch (e) {
-    // Network failure (proxy not running, CORS, offline). Surface a useful
-    // message; this is the common case in a fresh production deploy.
-    throw new Error(
-      `proxy unreachable at ${proxyUrl} — run server/proxy.js locally, ` +
-      `or set localStorage.ss.proxyUrl to a hosted compile endpoint`
-    );
+    // Network failure — tailor the message to the context. On a deployed
+    // host "run server/proxy.js locally" is useless advice; point at the
+    // hosted proxy config. On localhost, the usual local-dev advice applies.
+    const isLocal =
+      location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    const msg = isLocal
+      ? `proxy unreachable at ${proxyUrl} — run server/proxy.js locally, ` +
+        `or set localStorage.ss.proxyUrl to a hosted compile endpoint`
+      : `compile backend not configured for this deployment. ` +
+        `The site owner needs to either (a) deploy server/worker.js to ` +
+        `Cloudflare and set window.SS_PROXY_URL on the page, or (b) you ` +
+        `can run a local proxy and set localStorage.ss.proxyUrl to point ` +
+        `at it. See server/DEPLOY.md.`;
+    throw new Error(msg);
   }
   let data;
   try {
