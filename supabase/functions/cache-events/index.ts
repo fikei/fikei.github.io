@@ -270,9 +270,19 @@ serve(async (req: Request) => {
       }
     }
 
-    // Split into inserts and updates
-    const toInsert = validRows.filter(r => !existingMap.has(r.event_key as string))
-    const toUpdate = validRows.filter(r => existingMap.has(r.event_key as string))
+    // Split into inserts and updates. De-dupe within batch by event_key so a
+    // single intra-batch collision doesn't abort the whole insert (Postgres
+    // unique-constraint violation kills a multi-row insert atomically).
+    const seenKeys = new Set<string>()
+    const toInsert: Record<string, unknown>[] = []
+    const toUpdate: Record<string, unknown>[] = []
+    for (const r of validRows) {
+      const k = r.event_key as string
+      if (existingMap.has(k)) { toUpdate.push(r); continue }
+      if (seenKeys.has(k)) continue
+      seenKeys.add(k)
+      toInsert.push(r)
+    }
 
     // Batch insert new events
     if (toInsert.length > 0) {
