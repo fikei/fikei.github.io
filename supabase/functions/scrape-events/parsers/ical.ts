@@ -10,8 +10,11 @@ export async function scrapeIcal(source: EventSource): Promise<ScrapedEvent[]> {
 }
 
 function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
+  // RFC 5545 line-unfolding: CRLF + (SPACE|TAB) continues the previous line.
+  const unfolded = text.replace(/\r?\n[ \t]/g, '')
+
   const events: ScrapedEvent[] = []
-  const blocks = text.split('BEGIN:VEVENT')
+  const blocks = unfolded.split('BEGIN:VEVENT')
 
   for (let i = 1; i < blocks.length; i++) {
     const block = blocks[i].split('END:VEVENT')[0]
