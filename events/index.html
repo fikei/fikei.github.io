@@ -1383,7 +1383,7 @@ body {
             <th class="col-name" data-sort="name">Event <span class="data-table__sort">&#9650;</span></th>
             <th class="col-venue" data-sort="venue">Venue <span class="data-table__sort">&#9650;</span></th>
             <th class="col-type" data-sort="contentType">Type <span class="data-table__sort">&#9650;</span></th>
-            <th class="col-genre" data-sort="genre">Genre <span class="data-table__sort">&#9650;</span></th>
+            <th class="col-genre" data-sort="genre">Tags <span class="data-table__sort">&#9650;</span></th>
             <th class="col-price" data-sort="price">Price <span class="data-table__sort">&#9650;</span></th>
             <th class="col-ages" data-sort="ages">Ages <span class="data-table__sort">&#9650;</span></th>
             <th class="col-promoter" data-sort="promoter">Promoter <span class="data-table__sort">&#9650;</span></th>
@@ -1613,7 +1613,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.9.0';
+  const VERSION = '1.10.0';
   console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
 
   // ============================================
@@ -1923,25 +1923,53 @@ body {
     return stock?.category || 'other';
   }
 
-  // --- Event Type Detection ---
+  // --- Event Classification (type + tags, applied to any source) ---
+  // Ordered rules: first matching rule decides contentType; all matching rules
+  // contribute tags. Umbrella source categories (social/other/music) always
+  // re-classify — Luma's "discover" feed is a social grab-bag mixing tech,
+  // climate, networking, parties etc.
+  const EVENT_TYPE_RULES = [
+    { type: 'dj-set',     tags: ['DJ Set'],   re: /\b(dj\s|dj:|selector|b2b|all[-\s]?night[-\s]?long|rave|warehouse|afterparty|club\s*night)/i },
+    { type: 'festival',   tags: ['Festival'], re: /\b(festival|fest)\b/i },
+    { type: 'live-music', tags: ['Live'],     re: /\b(concert|showcase|residency|live\s+music|band\b|tour)\b/i },
+    { type: 'comedy',     tags: ['Comedy'],   re: /\b(comedy|stand[-\s]?up|open[-\s]?mic|improv)\b/i },
+    { type: 'film',       tags: ['Film'],     re: /\b(screening|film|movie|cinema|double[-\s]feature)\b/i },
+    { type: 'theater',    tags: ['Theater'],  re: /\b(theater|theatre|play|musical|opera|ballet)\b/i },
+    { type: 'tech',       tags: ['Tech'],     re: /\b(tech|startup|hack|ai\b|ml\b|llm|agent|demo\s*day|pitch|saas|devops|blockchain|web3|crypto|engineering|founders?|\bvc\b|venture|investor|product|data|developer|dev\b)\b/i },
+    { type: 'tech',       tags: ['Climate'],  re: /\b(climate|sustainability|clean\s*energy|decarboniz|net[-\s]?zero|carbon|circular(ity)?)\b/i },
+    { type: 'tech',       tags: ['Networking'], re: /\b(meetup|networking|hackathon|roundtable|panel|summit|forum|breakfast|mixer\s+for)\b/i },
+    { type: 'art',        tags: ['Art'],      re: /\b(gallery|exhibition|art\s*walk|opening\s*reception|museum|installation|sculpture|mural|vernissage)\b/i },
+    { type: 'art',        tags: ['Design'],   re: /\b(design|architecture|\bux\b|creative\s*direction|portfolio|typography|graphic\s*design)\b/i },
+    { type: 'literary',   tags: ['Literary'], re: /\b(reading|author|book\s*launch|poetry|literary|zine|book\s*signing|bookstore|lecture|speaker)\b/i },
+    { type: 'wellness',   tags: ['Wellness'], re: /\b(yoga|meditation|wellness|mindfulness|breathwork|healing|sound\s*bath)\b/i },
+    { type: 'social',     tags: ['Social'],   re: /\b(happy\s*hour|brunch|picnic|party|gathering|community|social\b)\b/i },
+  ];
+
+  const UMBRELLA_CATEGORIES = new Set(['social', 'other', 'music']);
+
+  function classifyEvent(ev) {
+    const text = [(ev.name || ''), (ev.genre || ''), (ev.description || '')].join(' ').toLowerCase();
+    let detectedType = null;
+    const tags = new Set();
+    for (const rule of EVENT_TYPE_RULES) {
+      if (rule.re.test(text)) {
+        if (!detectedType) detectedType = rule.type;
+        rule.tags.forEach(t => tags.add(t));
+      }
+    }
+    return { type: detectedType, tags: [...tags] };
+  }
+
   function detectEventType(ev) {
     const cat = ev.contentType;
-    if (cat && cat !== 'other' && cat !== 'music') return cat;
-    const text = ((ev.name || '') + ' ' + (ev.genre || '')).toLowerCase();
-    if (/\b(festival|fest)\b/.test(text)) return 'festival';
-    if (/\b(dj\b|selector|b2b|all.night.long|rave|warehouse|afterparty|club\s*night)/.test(text)) return 'dj-set';
-    if (/\b(live|concert|performance|showcase|residency|band)\b/.test(text) && cat === 'music') return 'live-music';
-    if (/\b(comedy|stand.?up|open.?mic|improv)\b/.test(text)) return 'comedy';
-    if (/\b(screening|film|movie|cinema|double.feature)\b/.test(text)) return 'film';
-    if (/\b(theater|theatre|play|musical|opera|ballet)\b/.test(text)) return 'theater';
-    if (/\b(tech|startup|hack|ai\b|ml\b|demo\s*day|pitch|saas|devops|blockchain|web3|crypto|meetup|networking|workshop)\b/i.test(text)) return 'tech';
-    if (/\b(gallery|exhibition|art\s*walk|opening\s*reception|museum|installation|sculpture|mural|vernissage)\b/i.test(text)) return 'art';
-    if (/\b(design|architecture|ux\b|creative\s*direction|portfolio|typography|graphic\s*design)\b/i.test(text)) return 'design';
-    if (/\b(reading|author|book\s*launch|poetry|literary|zine|book\s*signing|bookstore|lecture|speaker)\b/i.test(text)) return 'literary';
-    if (/\b(yoga|meditation|wellness|mindfulness|breathwork|healing|sound\s*bath)\b/i.test(text)) return 'wellness';
-    if (/\b(social|mixer|happy\s*hour|brunch|picnic|party|gathering|community)\b/i.test(text) && cat === 'social') return 'social';
-    return cat || 'other';
+    const { type } = classifyEvent(ev);
+    // Trust a specific (non-umbrella) contentType from the source; otherwise detect.
+    if (cat && !UMBRELLA_CATEGORIES.has(cat)) return cat;
+    if (type) return type;
+    return cat || getSourceCategory(ev.source) || 'other';
   }
+
+  function detectEventTags(ev) { return classifyEvent(ev).tags; }
 
   // --- Genre Cleanup ---
   const GENRE_TYPE_WORDS = new Set(['concert', 'festival', 'live', 'performance', 'screening', 'film', 'movie', 'show', 'event', 'dj set', 'club night', 'party']);
@@ -2405,14 +2433,14 @@ body {
       const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
       // Type
       const typeLabel = CONTENT_TYPES[ev.contentType] || '';
-      // Genre: clean then infer if empty
+      // Tags: AI-enriched > keyword-detected > cleaned genre (fallback)
+      const tagSet = new Map(); // lower → original
+      const addTag = (t) => { if (t) { const k = t.toLowerCase(); if (!tagSet.has(k)) tagSet.set(k, t); } };
+      (ev.enrichedTags || []).forEach(addTag);
+      detectEventTags(ev).forEach(addTag);
       const cleanedGenre = cleanGenreField(ev.genre) || inferGenreFromContext(ev);
-      const allTags = cleanedGenre ? cleanedGenre.split(/,\s*/).slice(0, 4) : [];
-      if (ev.enrichedTags && ev.enrichedTags.length > 0) {
-        for (const t of ev.enrichedTags) {
-          if (allTags.length < 4 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
-        }
-      }
+      if (cleanedGenre) cleanedGenre.split(/,\s*/).forEach(addTag);
+      const allTags = [...tagSet.values()].slice(0, 4);
       const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
       // Price with tooltip
       const priceData = formatPriceDisplay(ev.price);

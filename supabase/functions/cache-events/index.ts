@@ -246,6 +246,7 @@ serve(async (req: Request) => {
         promoter: ev.promoter || null,
         url: ev.url,
         content_type: ev.contentType || null,
+        description: ev.description || null,
         scraped_at: new Date().toISOString(),
       }
     }))
@@ -306,12 +307,15 @@ serve(async (req: Request) => {
       }
     }
 
-    // Batch update existing events (refresh scraped_at)
+    // Batch update existing events (refresh scraped_at + backfill description
+    // if newly available — parsers that didn't used to emit it may now).
     if (toUpdate.length > 0) {
       for (const row of toUpdate) {
+        const patch: Record<string, unknown> = { scraped_at: row.scraped_at }
+        if (row.description) patch.description = row.description
         const { error: updateErr } = await supabase
           .from('events')
-          .update({ scraped_at: row.scraped_at })
+          .update(patch)
           .eq('event_key', row.event_key)
 
         if (updateErr) {
