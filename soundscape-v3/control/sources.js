@@ -104,6 +104,7 @@ export const DEFAULT_ROUTING = {
   softness:   { source: "none",       intensity: 0 },
   noise:      { source: "high",       intensity: 0.2 },
   scale:      { source: "mid",        intensity: 0.1 },
+  hue:        { source: "none",       intensity: 0 },
   saturation: { source: "energy",     intensity: 0.1 },
   contrast:   { source: "transient",  intensity: 0.25 },
   feedback:   { source: "none",       intensity: 0 },

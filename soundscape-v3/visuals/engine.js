@@ -138,6 +138,11 @@ window.loadEngine = function loadEngine() {
     .saturate(saturate)
     .contrast(contrastF)
     .brightness(brightnessAdj)
+    // `hue` knob rotates the color wheel post-color. 0.5 = neutral,
+    // 0 = -π (backward), 1 = +π (forward). Since hue is circular, 0 and
+    // 1 land on the same visual result; the knob just lets the user
+    // slide in either direction from neutral.
+    .hue(() => (k("hue") - 0.5) * Math.PI * 2)
     .kaleid(kaleidN)
     .blend(o0, feedbackAmt)
     .out();
