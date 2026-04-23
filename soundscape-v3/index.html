@@ -95,10 +95,12 @@
       <div id="knobs-panel"></div>
     </section>
 
-    <section class="section">
-      <h3 class="section__title">Semantic axes</h3>
-      <div id="axes-panel"></div>
-    </section>
+    <!--
+      Semantic axis sliders removed for now. CLAP still runs and updates
+      window.viz.axis[*]; values are visible in the debug HUD (press `d`).
+      The bus + compiler output all still flow, so this can be brought
+      back as-is. See control/axes.js for the underlying machinery.
+    -->
   </aside>
 
   <div class="hud" id="hud"></div>
@@ -295,6 +297,10 @@
     const axisEls = new Map();
 
     function renderAxisPanel() {
+      // Sidebar slider UI is currently hidden; bail out if the panel was
+      // removed. The underlying axisBus and CLAP updates still run — values
+      // are observable via window.viz.axis and in the debug HUD.
+      if (!axesPanel) return;
       axesPanel.innerHTML = "";
       axisEls.clear();
       for (const ax of axisBus.axes) {
