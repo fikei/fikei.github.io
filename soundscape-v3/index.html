@@ -181,7 +181,11 @@
     refreshDevices();
     navigator.mediaDevices?.addEventListener?.('devicechange', () => refreshDevices(sourceSel.value));
 
-    // ---------- knob panel ----------
+    // ---------- knob bus + panel ----------
+    // Must declare knobBus before renderKnobPanel runs below — the panel
+    // reads knobBus.isLocked() at render time, and `const` bindings live
+    // in a temporal dead zone until the declaration is reached.
+    const knobBus = createKnobBus(DEFAULT_KNOBS);
     const knobsPanel = $("knobs-panel");
     const knobEls = new Map();
     function renderKnobPanel() {
@@ -433,11 +437,9 @@
       statusBar.classList.add("active");
     }
 
-    // Knob bus — single source of truth for all continuous primitives.
-    const knobBus = createKnobBus(DEFAULT_KNOBS);
-
     // Preset buttons = named knob target sets. No chain teardown, just a
-    // smooth glide through knob space.
+    // smooth glide through knob space. (knobBus is declared earlier so
+    // renderKnobPanel can see it at module evaluation time.)
     let currentPreset = localStorage.getItem("ss.preset") || "drift";
     function applyKnobPreset(name) {
       const targets = KNOB_PRESETS[name];
