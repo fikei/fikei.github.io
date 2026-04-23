@@ -246,6 +246,66 @@ html, body {
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn--filled { background: var(--color-white); color: var(--color-black); }
 .btn--filled:hover { background: var(--color-black); color: var(--color-white); }
+.btn--sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+}
+
+.hint-line {
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+/* Knob sliders (Stage 3.5) — 0..1 one-sided version of the axis track */
+.knob { margin-bottom: var(--space-3); }
+.knob__header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--space-1);
+}
+.knob__name {
+  font-size: var(--text-2xs);
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+.knob__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-white);
+}
+.knob__track {
+  height: 20px;
+  position: relative;
+  cursor: ew-resize;
+  touch-action: none;
+  display: flex; align-items: center;
+}
+.knob__rail {
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 2px; transform: translateY(-50%);
+  background: var(--gray-400);
+  pointer-events: none;
+}
+.knob__fill {
+  position: absolute; top: 50%; left: 0;
+  height: 2px; width: 0;
+  transform: translateY(-50%);
+  background: var(--color-white);
+  pointer-events: none;
+  transition: width var(--duration-fast) var(--ease-out);
+}
+.knob__handle {
+  position: absolute; top: 50%;
+  width: 8px; height: 12px;
+  background: var(--color-white);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left var(--duration-fast) var(--ease-out);
+}
 
 .btn--icon {
   width: 30px; height: 30px;

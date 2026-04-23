@@ -73,16 +73,28 @@
     </section>
 
     <section class="section">
-      <h3 class="section__title">Semantic axes</h3>
-      <div id="axes-panel"></div>
+      <h3 class="section__title">Starting point</h3>
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap" id="preset-buttons">
+        <button class="btn btn--sm" data-preset="drift">Drift</button>
+        <button class="btn btn--sm" data-preset="pulse">Pulse</button>
+        <button class="btn btn--sm" data-preset="minimal">Minimal</button>
+      </div>
+      <div class="hint-line">transitions knob values — no cuts</div>
     </section>
 
     <section class="section">
-      <h3 class="section__title">Preset</h3>
-      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap" id="preset-buttons">
-        <button class="btn" data-preset="drift">Drift</button>
-        <button class="btn" data-preset="pulse">Pulse</button>
-      </div>
+      <h3 class="section__title">Transition</h3>
+      <select class="select" id="transition-sel" style="width:100%"></select>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Primitives</h3>
+      <div id="knobs-panel"></div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Semantic axes</h3>
+      <div id="axes-panel"></div>
     </section>
   </aside>
 
@@ -90,21 +102,26 @@
 
   <!-- Runtime -->
   <script src="https://unpkg.com/hydra-synth@1.3.29/dist/hydra-synth.js"></script>
-  <script src="visuals/drift.js"></script>
-  <script src="visuals/pulse.js"></script>
+  <script src="visuals/engine.js"></script>
 
   <script type="module">
     import { startAudio, listInputDevices } from "./audio/features.js";
     import { startClap } from "./audio/clap.js";
     import { DEFAULT_AXES, createAxisBus } from "./control/axes.js";
+    import {
+      createKnobBus, DEFAULT_KNOBS, KNOB_NAMES, KNOB_PRESETS,
+      TRANSITION_MODES, DEFAULT_TRANSITION,
+    } from "./control/knobs.js";
     import { compilePrompt, fileToImage, hexToNormRGB } from "./llm/compiler.js";
 
     // ---------- shared /viz/ state ----------
     window.viz = {
       energy: 0, transient: 0, beat_phase: 0, brightness: 0.3, bpm: 120,
-      axis: {},
-      palette: [],       // raw hex strings from Stage 3 LLM
-      paletteRGB: [],    // parallel array of [r,g,b] in [0,1]
+      low: 0, mid: 0, high: 0,       // Stage-3.5 frequency-band energies
+      axis: {},                      // CLAP semantic axes
+      knob: {},                      // continuous primitives (engine.js reads these)
+      palette: [],                   // raw hex strings from LLM
+      paletteRGB: [],                // parallel [r,g,b] in 0..1
     };
     function setPalette(hexes) {
       if (!Array.isArray(hexes)) return;
@@ -158,6 +175,77 @@
     }
     refreshDevices();
     navigator.mediaDevices?.addEventListener?.('devicechange', () => refreshDevices(sourceSel.value));
+
+    // ---------- knob panel ----------
+    const knobsPanel = $("knobs-panel");
+    const knobEls = new Map();
+    function renderKnobPanel() {
+      knobsPanel.innerHTML = "";
+      knobEls.clear();
+      for (const name of KNOB_NAMES) {
+        const row = document.createElement("div");
+        row.className = "knob";
+        row.innerHTML = `
+          <div class="knob__header">
+            <span class="knob__name">${name}</span>
+            <span class="knob__value" data-knob-v>0.50</span>
+          </div>
+          <div class="knob__track" data-knob-track role="slider"
+               aria-label="${name}" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.5" tabindex="0">
+            <div class="knob__rail"></div>
+            <span class="knob__fill" data-knob-f></span>
+            <span class="knob__handle" data-knob-h></span>
+          </div>
+        `;
+        knobsPanel.appendChild(row);
+        const track = row.querySelector("[data-knob-track]");
+        knobEls.set(name, {
+          row,
+          value: row.querySelector("[data-knob-v]"),
+          fill: row.querySelector("[data-knob-f]"),
+          handle: row.querySelector("[data-knob-h]"),
+          track,
+        });
+        wireKnobDrag(track, name);
+      }
+    }
+    function wireKnobDrag(track, name) {
+      function setFromPointer(ev) {
+        const rect = track.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) / rect.width;
+        const v = Math.max(0, Math.min(1, x));
+        knobBus.setManual(name, v);
+      }
+      track.addEventListener("pointerdown", (e) => {
+        track.setPointerCapture(e.pointerId);
+        setFromPointer(e);
+      });
+      track.addEventListener("pointermove", (e) => {
+        if (e.buttons & 1) setFromPointer(e);
+      });
+      track.addEventListener("keydown", (e) => {
+        const step = e.shiftKey ? 0.1 : 0.04;
+        const cur = knobBus.getTarget(name) || 0.5;
+        let v = cur;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") v = Math.min(1, cur + step);
+        else if (e.key === "ArrowLeft" || e.key === "ArrowDown") v = Math.max(0, cur - step);
+        else if (e.key === "Home") v = 0;
+        else if (e.key === "End") v = 1;
+        else return;
+        e.preventDefault();
+        knobBus.setManual(name, v);
+      });
+    }
+    renderKnobPanel();
+
+    function paintKnob(name, v) {
+      const el = knobEls.get(name);
+      if (!el) return;
+      el.value.textContent = v.toFixed(2);
+      el.fill.style.width = (v * 100) + "%";
+      el.handle.style.left = (v * 100) + "%";
+      el.track.setAttribute("aria-valuenow", v.toFixed(2));
+    }
 
     // ---------- axis bus + panel ----------
     const axisBus = createAxisBus(DEFAULT_AXES);
@@ -296,22 +384,42 @@
       statusBar.classList.add("active");
     }
 
-    const PRESETS = {
-      drift: () => window.loadDrift && window.loadDrift(),
-      pulse: () => window.loadPulse && window.loadPulse(),
-    };
-    let currentPreset = localStorage.getItem("ss.preset") || "pulse";
+    // Knob bus — single source of truth for all continuous primitives.
+    const knobBus = createKnobBus(DEFAULT_KNOBS);
 
-    function loadPreset(name) {
-      if (!PRESETS[name]) return;
+    // Preset buttons = named knob target sets. No chain teardown, just a
+    // smooth glide through knob space.
+    let currentPreset = localStorage.getItem("ss.preset") || "drift";
+    function applyKnobPreset(name) {
+      const targets = KNOB_PRESETS[name];
+      if (!targets) return;
       currentPreset = name;
       localStorage.setItem("ss.preset", name);
-      PRESETS[name]();
-      // highlight active button
+      knobBus.setTargets(targets);
       document.querySelectorAll("#preset-buttons [data-preset]").forEach((b) => {
         b.classList.toggle("btn--filled", b.dataset.preset === name);
       });
     }
+    document.getElementById("preset-buttons").addEventListener("click", (e) => {
+      const name = e.target?.dataset?.preset;
+      if (name) applyKnobPreset(name);
+    });
+
+    // Transition mode dropdown
+    const transitionSel = $("transition-sel");
+    transitionSel.innerHTML = Object.entries(TRANSITION_MODES)
+      .map(
+        ([key, m]) =>
+          `<option value="${key}">${m.label}${m.approxMs ? ` · ~${m.approxMs}ms` : " · instant"}</option>`,
+      )
+      .join("");
+    const storedTrans = localStorage.getItem("ss.transition") || DEFAULT_TRANSITION;
+    transitionSel.value = storedTrans;
+    knobBus.setTransition(storedTrans);
+    transitionSel.addEventListener("change", () => {
+      knobBus.setTransition(transitionSel.value);
+      localStorage.setItem("ss.transition", transitionSel.value);
+    });
 
     function initHydra() {
       const canvas = $("hydra-canvas");
@@ -322,13 +430,10 @@
       sizeCanvas();
       window.addEventListener("resize", sizeCanvas);
       new Hydra({ canvas, detectAudio: false, enableStreamCapture: false });
-      loadPreset(currentPreset);
+      // One engine, loaded once. All visual change happens through knobs.
+      window.loadEngine();
+      applyKnobPreset(currentPreset);
     }
-
-    document.getElementById("preset-buttons").addEventListener("click", (e) => {
-      const name = e.target?.dataset?.preset;
-      if (name) loadPreset(name);
-    });
 
     // ---------- runtime refs (set once started) ----------
     let audioHandle = null;  // returned by startAudio
@@ -479,19 +584,22 @@
       // Palette plumbs through to presets via viz.paletteRGB
       if (Array.isArray(config.palette)) setPalette(config.palette);
 
-      // Preset hint: surface as a suggestion, do NOT auto-switch. The user
-      // picked a preset intentionally — flipping it out from under them
-      // breaks flow. Stage 4 adds an explicit "lock preset" toggle; for now
-      // the hint is displayed and the user can click the preset button.
-      const hint = config.preset_hint;
-      const hintNote =
-        hint && hint !== currentPreset
-          ? ` · hint: ${hint} (click preset to switch)`
-          : "";
+      // Knobs: push the LLM's primitive values as new targets. The bus
+      // eases each one toward its target at the currently selected
+      // transition rate — smooth glide, no cuts. Manual-override holds
+      // are respected so user drags don't get stomped.
+      if (config.knobs) {
+        knobBus.setTargets(config.knobs);
+        // Clear any active "preset button" highlight since LLM is now in
+        // charge of the knob values.
+        document.querySelectorAll("#preset-buttons [data-preset]").forEach((b) => {
+          b.classList.remove("btn--filled");
+        });
+      }
 
       promptStatus.textContent =
         `axes: ${config.axes.map((a) => a.name).join(", ")} · ` +
-        `palette: ${(config.palette || []).length} colors${hintNote} · ` +
+        `palette: ${(config.palette || []).length} colors · ` +
         `${meta._cacheHit ? "cached" : meta.model || "live"}`;
     }
 
@@ -584,6 +692,9 @@
         hud.innerHTML =
           `<div class="hud__row"><span class="hud__k">energy</span><span class="hud__v">${fmt(v.energy)}</span>${bar(v.energy)}</div>` +
           `<div class="hud__row"><span class="hud__k">transient</span><span class="hud__v">${fmt(v.transient)}</span>${bar(v.transient)}</div>` +
+          `<div class="hud__row"><span class="hud__k">low</span><span class="hud__v">${fmt(v.low ?? 0)}</span>${bar(v.low ?? 0)}</div>` +
+          `<div class="hud__row"><span class="hud__k">mid</span><span class="hud__v">${fmt(v.mid ?? 0)}</span>${bar(v.mid ?? 0)}</div>` +
+          `<div class="hud__row"><span class="hud__k">high</span><span class="hud__v">${fmt(v.high ?? 0)}</span>${bar(v.high ?? 0)}</div>` +
           `<div class="hud__row"><span class="hud__k">beat_phase</span><span class="hud__v">${fmt(v.beat_phase)}</span>${bar(v.beat_phase)}</div>` +
           `<div class="hud__row"><span class="hud__k">brightness</span><span class="hud__v">${fmt(v.brightness)}</span>${bar(v.brightness)}</div>` +
           `<div class="hud__row"><span class="hud__k">bpm</span><span class="hud__v">${fmt(v.bpm, 1)}</span></div>` +
@@ -591,8 +702,13 @@
           clapRows +
           `<hr class="hud__hr"><div class="hud__row"><span class="hud__k">fps</span><span class="hud__v">${fmt(fps, 1)}</span></div>`;
       }
-      // also update the sidebar axis meters at rAF rate (values change slowly)
+      // Tick knob bus — every frame eases current knob values toward their
+      // targets at the active transition rate. This is what makes every
+      // visual change a glide instead of a cut.
+      knobBus.tick();
+      // Repaint sidebar meters (axes + knobs) at rAF rate.
       for (const [name, v] of Object.entries(window.viz.axis || {})) paintAxis(name, v);
+      for (const [name, v] of Object.entries(window.viz.knob || {})) paintKnob(name, v);
       requestAnimationFrame(updateHud);
     }
     requestAnimationFrame(updateHud);

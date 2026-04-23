@@ -4,41 +4,38 @@ Prompt-steerable, audio-reactive visuals. Live at **[ctrl.rodeo/soundscape-v3](h
 
 Source: [github.com/fikei/soundscape](https://github.com/fikei/soundscape)
 
-## What works without any setup
+## Architecture in one paragraph
 
-- Fast-path audio features (mic/line-in → energy, transient, beat, brightness) via Web Audio API
-- Hydra visuals (two presets: Drift + Pulse)
-- Stage 2 CLAP semantic axes (~170 MB model downloads on first run, cached by the browser)
-- Draggable axis sliders for manual override
-- Source picker with live device switching
+Browser-native: Web Audio API → fast features (energy, transient, beat, brightness, low/mid/high bands) → rAF → a single Hydra engine driven by a bus of **continuous knobs** (speed, response, density, symmetry, softness, noise, scale, saturation, contrast, feedback). Every visual change — LLM compile, preset click, slider drag — is a smooth glide through knob space at a user-selected transition rate. CLAP (`Xenova/clap-htsat-unfused`, ~170 MB) runs in-browser via transformers.js for semantic axes. Stage 3 prompt compiler calls Claude via a small local proxy.
 
-## What needs a backend
+## Works without backend
 
-Stage 3 **prompt compiler** (text + image → axes + palette) calls the Anthropic API, which requires a key — so it can't run fully client-side. Options:
+- Fast-path audio (mic / BlackHole / synthetic test signal)
+- Single Hydra engine, smooth transitions between knob presets (Drift / Pulse / Minimal)
+- Low / mid / high freq-band energy — see the HUD (`d`)
+- Draggable primitive sliders
+- Draggable semantic axis sliders
+- CLAP semantic axes (downloads once, cached by the browser)
 
-### Local dev
+## Needs the local proxy
 
-Run the proxy on your machine:
+Stage 3 **prompt compiler** (text + image → knobs + palette + axes + style) calls the Anthropic API, which requires a key. Run the proxy on your own machine:
 
 ```bash
 cd soundscape
 ANTHROPIC_API_KEY=sk-ant-... node server/proxy.js
 ```
 
-Then click **Compile** in the sidebar. Proxy defaults to `http://localhost:8787`.
+Then click **Compile** in the sidebar. Default points at `http://127.0.0.1:8787`.
 
-### Hosted
-
-Point the page at a hosted compile endpoint (Cloudflare Worker / Vercel function wrapping the same `/compile` contract). Once per browser:
+To point at a hosted proxy instead (Cloudflare Worker, Vercel function with the same `/compile` contract):
 
 ```js
 localStorage.setItem("ss.proxyUrl", "https://your-worker.workers.dev/compile");
 ```
 
-Or pass `?proxy=https://...` in the URL.
-
-If no proxy is reachable, Compile shows a descriptive error; everything else keeps working.
+Or pass `?proxy=https://...` in the URL. If no proxy is reachable, Compile shows a descriptive error; everything else keeps working.
 
 ## CTRL design system
 
-UI uses tokens from `design-system/tokens.css`. Local `css/app.css` adds component styles following the same language (Space Grotesk + JetBrains Mono, 1px white borders, square corners, black background).
+UI uses Space Grotesk + JetBrains Mono, 1px white borders, square corners, black background. Component styles in `css/app.css`, tokens mirrored from the CTRL design system.

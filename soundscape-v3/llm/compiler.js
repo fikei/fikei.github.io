@@ -5,10 +5,13 @@
 // identical prompts don't re-spend tokens.
 
 // Proxy URL discovery in priority order:
-//   1. localStorage.ss.proxyUrl      — user override in prod (e.g. Cloudflare Worker)
-//   2. window.SS_PROXY_URL            — baked-in override (set in a <script> tag)
-//   3. URL query ?proxy=...           — one-shot override for testing
-//   4. http://<hostname>:8787/compile — local dev default
+//   1. ?proxy=...                     — one-shot override for testing
+//   2. localStorage.ss.proxyUrl       — user override in prod
+//   3. window.SS_PROXY_URL            — baked-in override
+//   4. If served from localhost       → http://localhost:8787/compile
+//   5. Otherwise (e.g. ctrl.rodeo)    → http://127.0.0.1:8787/compile
+//      (the local proxy lives on the viewer's machine; chrome permits
+//       http://127.0.0.1 / http://localhost from https pages)
 function resolveProxyUrl() {
   try {
     const q = new URLSearchParams(location.search).get("proxy");
@@ -19,7 +22,10 @@ function resolveProxyUrl() {
     if (stored) return stored;
   } catch (e) {}
   if (typeof window !== "undefined" && window.SS_PROXY_URL) return window.SS_PROXY_URL;
-  return `http://${location.hostname || "localhost"}:8787/compile`;
+  const isLocal =
+    location.hostname === "localhost" || location.hostname === "127.0.0.1";
+  const host = isLocal ? location.hostname : "127.0.0.1";
+  return `http://${host}:8787/compile`;
 }
 const DEFAULT_PROXY = resolveProxyUrl();
 const CACHE_PREFIX = "ss.compile.v1.";
