@@ -30,14 +30,17 @@ window.loadEngine = function loadEngine() {
 
   // ----- shape parameters ---------------------------------------------------
 
-  // Sides range 3..60 with softness. Exponential mapping so the low end
-  // (angular polygons) has more resolution than the high end (circle).
+  // Sides range 3..60 with softness. **Integer-quantized** because Hydra's
+  // `shape(sides)` bakes sides into the fragment shader; feeding it a
+  // rapidly-varying float causes the shader to recompile every frame,
+  // which stalls the GPU. Stepping it in integer jumps during knob glides
+  // is invisible visually but removes the churn.
   const sides = () => {
     const s = k("softness");
-    return 3 + Math.pow(s, 2) * 57;
+    return Math.round(3 + Math.pow(s, 2) * 57);
   };
-  // Repeat tiles 1..6 (continuous, non-integer values work fine with .repeat)
-  const tileCount = () => 1 + k("density") * 5;
+  // Repeat tiles 1..6 — Hydra expects integers for repeat too.
+  const tileCount = () => Math.max(1, Math.round(1 + k("density") * 5));
   // Kaleid stacks 2..8
   const kaleidN = () => Math.max(2, Math.round(2 + k("symmetry") * 6));
   // Pattern size
@@ -120,17 +123,19 @@ window.loadEngine = function loadEngine() {
   // blend. Every term reads a knob, an axis, or a music value. No branches,
   // no swaps.
 
+  // Single noise source feeding both modulate and modulateScale. Rendering
+  // noise twice per frame was doubling a full-screen pass. Sharing one
+  // noise texture as input to both halves the noise-sampling work.
+  const sharedNoise = noise(noiseFreqF, noiseSpeedF);
+
   shape(sides, patternScale, edgeBlur)
     .repeat(tileCount, tileCount)
     .rotate(0, rotSpeed)
     .scrollX(0, scrollXSpeed)
     .scrollY(0, scrollYSpeed)
-    .modulate(
-      noise(noiseFreqF, noiseSpeedF),
-      modAmount,
-    )
+    .modulate(sharedNoise, modAmount)
     .modulateScale(
-      noise(() => 1.2 + k("noise") * 1.5, () => 0.03 + speedK() * 0.04),
+      sharedNoise,
       () => k("noise") * 0.1 * alive() + pulseAmt() * 0.12 * responseK(),
     )
     .color(colorR, colorG, colorB)
