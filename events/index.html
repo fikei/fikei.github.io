@@ -1610,7 +1610,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.7.0';
+  const VERSION = '1.7.1';
   console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
 
   // ============================================
@@ -2020,21 +2020,17 @@ body {
   }
 
   // --- Supabase L2 Cache ---
-  const SUPABASE_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
-
   async function loadSupabaseCachedEvents() {
     if (!supabaseClient) { log('L2 cache: client not available'); return null; }
     try {
       const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id);
       if (enabledIds.length === 0) return null;
-      const cutoff = new Date(Date.now() - SUPABASE_CACHE_TTL).toISOString();
       const today = new Date().toISOString().split('T')[0];
       log(`L2 cache: querying ${enabledIds.length} source(s)`);
       const { data, error } = await supabaseClient
         .from('events')
         .select('*')
         .in('source_id', enabledIds)
-        .gte('scraped_at', cutoff)
         .gte('date', today)
         .order('date', { ascending: true });
       if (error) { log('L2 cache: query error — ' + error.message); return null; }
