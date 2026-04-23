@@ -125,6 +125,7 @@ async function pushToCache(
     promoter: ev.promoter || undefined,
     url: ev.url,
     contentType: ev.contentType || undefined,
+    description: ev.description || undefined,
   }))
 
   // Send in batches of 400 (cache-events limit is 500)

@@ -25,12 +25,17 @@ function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
     const loc = parseLocationString(get('LOCATION'))
 
     // URL: prefer URL field, else first https link in DESCRIPTION (Luma, etc.)
+    const descRaw = get('DESCRIPTION')
     let url = get('URL')
     if (!url) {
-      const desc = get('DESCRIPTION')
-      const m = desc.match(/https?:\/\/[^\s\\]+/)
+      const m = descRaw.match(/https?:\/\/[^\s\\]+/)
       if (m) url = m[0]
     }
+    // Strip the stock "Get up-to-date information at: <url>" preamble for cleaner text
+    const description = descRaw
+      .replace(/^Get up-to-date information at:\s*https?:\/\/\S+\s*/i, '')
+      .trim()
+      .slice(0, 1500)
 
     events.push({
       date: dtstart ? parseIcalDate(dtstart) : '',
@@ -41,6 +46,7 @@ function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
       city: loc.city,
       genre: '', price: '', ages: '',
       url: url || '',
+      description,
       source: sourceId,
     })
   }
