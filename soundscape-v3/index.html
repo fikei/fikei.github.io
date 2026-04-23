@@ -88,7 +88,10 @@
     </section>
 
     <section class="section">
-      <h3 class="section__title">Primitives</h3>
+      <div class="section__head">
+        <h3 class="section__title">Primitives</h3>
+        <button class="btn btn--sm btn--ghost" id="knobs-lock-all" title="Lock / unlock all primitives">lock all</button>
+      </div>
       <div id="knobs-panel"></div>
     </section>
 
@@ -185,9 +188,15 @@
       for (const name of KNOB_NAMES) {
         const row = document.createElement("div");
         row.className = "knob";
+        if (knobBus.isLocked(name)) row.classList.add("is-locked");
         row.innerHTML = `
           <div class="knob__header">
-            <span class="knob__name">${name}</span>
+            <span class="knob__name">
+              <button class="knob__lock" data-knob-lock aria-label="lock ${name}" title="lock ${name}">
+                <span class="knob__lock-icon">${knobBus.isLocked(name) ? "●" : "○"}</span>
+              </button>
+              ${name}
+            </span>
             <span class="knob__value" data-knob-v>0.50</span>
           </div>
           <div class="knob__track" data-knob-track role="slider"
@@ -199,16 +208,50 @@
         `;
         knobsPanel.appendChild(row);
         const track = row.querySelector("[data-knob-track]");
+        const lockBtn = row.querySelector("[data-knob-lock]");
+        const lockIcon = row.querySelector(".knob__lock-icon");
         knobEls.set(name, {
           row,
           value: row.querySelector("[data-knob-v]"),
           fill: row.querySelector("[data-knob-f]"),
           handle: row.querySelector("[data-knob-h]"),
           track,
+          lockBtn,
+          lockIcon,
+        });
+        lockBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isNowLocked = knobBus.toggleLock(name);
+          row.classList.toggle("is-locked", isNowLocked);
+          lockIcon.textContent = isNowLocked ? "●" : "○";
+          updateLockAllButton();
         });
         wireKnobDrag(track, name);
       }
+      updateLockAllButton();
     }
+
+    // Bulk lock/unlock affordance in the section header. Label reflects
+    // the current state: "lock all" when everything's unlocked or mixed,
+    // "unlock all" when everything's locked.
+    const lockAllBtn = $("knobs-lock-all");
+    function updateLockAllButton() {
+      const all = KNOB_NAMES.every((n) => knobBus.isLocked(n));
+      lockAllBtn.textContent = all ? "unlock all" : "lock all";
+    }
+    lockAllBtn.addEventListener("click", () => {
+      const all = KNOB_NAMES.every((n) => knobBus.isLocked(n));
+      knobBus.setAllLocked(!all);
+      // Sync every row's UI
+      for (const name of KNOB_NAMES) {
+        const el = knobEls.get(name);
+        if (!el) continue;
+        const isNowLocked = knobBus.isLocked(name);
+        el.row.classList.toggle("is-locked", isNowLocked);
+        el.lockIcon.textContent = isNowLocked ? "●" : "○";
+      }
+      updateLockAllButton();
+    });
     function wireKnobDrag(track, name) {
       function setFromPointer(ev) {
         const rect = track.getBoundingClientRect();
