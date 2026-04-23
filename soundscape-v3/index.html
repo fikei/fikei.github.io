@@ -561,20 +561,45 @@
       localStorage.setItem("ss.transition", transitionSel.value);
     });
 
+    let hydraInstance = null;
     function initHydra() {
       const canvas = $("hydra-canvas");
+      // Size the canvas to the viewport, tell Hydra to resize its internal
+      // framebuffers, and reinstall the engine chain (Hydra drops the
+      // chain when resolution changes — buffer size changes are destructive).
       function sizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.width = w;
+        canvas.height = h;
+        if (hydraInstance) {
+          try {
+            // Hydra exposes setResolution for buffer resize. We pass the
+            // CSS pixel size; pixelDensity is baked in.
+            if (typeof hydraInstance.setResolution === "function") {
+              hydraInstance.setResolution(w, h);
+            } else if (hydraInstance.synth && hydraInstance.synth.setResolution) {
+              hydraInstance.synth.setResolution(w, h);
+            }
+            // Reinstall the chain so the new resolution takes effect.
+            if (typeof window.loadEngine === "function") window.loadEngine();
+          } catch (e) {
+            console.warn("[resize] hydra resize failed:", e);
+          }
+        }
       }
       sizeCanvas();
       window.addEventListener("resize", sizeCanvas);
+      // fullscreenchange doesn't always trigger resize on every browser —
+      // wire it explicitly so entering/leaving fullscreen updates the canvas.
+      document.addEventListener("fullscreenchange", sizeCanvas);
+      document.addEventListener("webkitfullscreenchange", sizeCanvas);
+
       // pixelDensity 0.6 renders the Hydra chain at ~36% of the native
-      // pixel count, then CSS upscales. That's a 2.8× GPU speedup — huge
-      // on large canvases (1440×756 = 1.1M px) — and invisible for the
-      // abstract visuals we're producing. Bump up if the image looks too
-      // blurry on a specific machine (up to 1.0).
-      new Hydra({
+      // pixel count, then CSS upscales. ~2.8× GPU speedup; invisible for
+      // the abstract visuals we're producing. Bump to 1.0 if sharpness
+      // matters on a specific machine.
+      hydraInstance = new Hydra({
         canvas,
         detectAudio: false,
         enableStreamCapture: false,
