@@ -1332,6 +1332,9 @@ body {
       <select class="input select" id="filterCity">
         <option value="">All Cities</option>
       </select>
+      <select class="input select" id="filterSource">
+        <option value="">All Sources</option>
+      </select>
       <input type="date" class="input input--date" id="filterDateFrom" title="From date">
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
@@ -1610,7 +1613,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.8.2';
+  const VERSION = '1.9.0';
   console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
 
   // ============================================
@@ -1666,6 +1669,26 @@ body {
     'exhibition': 'Exhibition',
     'other': 'Other',
   };
+
+  // Map granular contentType → top-level category (for primary tab grouping)
+  const CONTENT_TYPE_CATEGORY = {
+    'music': 'music', 'dj-set': 'music', 'live-music': 'music', 'festival': 'music',
+    'film': 'film',
+    'comedy': 'comedy',
+    'theater': 'theater',
+    'tech': 'tech',
+    'social': 'social',
+    'art': 'art', 'exhibition': 'art', 'design': 'art',
+    'literary': 'literary',
+    'wellness': 'wellness',
+  };
+  const CATEGORY_LABELS = {
+    'music': 'Music', 'film': 'Film', 'art': 'Art', 'comedy': 'Comedy',
+    'theater': 'Theater', 'tech': 'Tech', 'social': 'Social',
+    'literary': 'Literary', 'wellness': 'Wellness', 'other': 'Other',
+  };
+  const CATEGORY_ORDER = ['music', 'film', 'art', 'comedy', 'theater', 'tech', 'social', 'literary', 'wellness', 'other'];
+  function getEventCategory(contentType) { return CONTENT_TYPE_CATEGORY[contentType] || 'other'; }
 
   // ============================================
   // Auth — powered by /auth/ctrl-auth.js
@@ -1728,7 +1751,7 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' },
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '' },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
     calMonth: new Date().getMonth(),
@@ -2816,29 +2839,34 @@ body {
     return `<span style="color:${colors[health.status]};font-size:8px;margin-left:3px;vertical-align:middle;" title="${titles[health.status]}">${symbols[health.status]}</span>`;
   }
 
+  // Primary tabs: event-type category (Music, Film, Art, Tech, etc.)
   function renderSourceChips() {
     const container = document.getElementById('sourceChips');
-    const activeSource = state.filters.source;
-    const allActive = !activeSource;
+    const activeCategory = state.filters.category;
+    const allActive = !activeCategory;
 
-    // Build "All" chip + source chips
-    let html = `<button class="token ${allActive ? 'token--active' : ''}" data-source-id="">All</button>`;
-    html += state.sources.filter(s => s.enabled).map(s => {
-      const count = state.events.filter(e => e.source === s.id || (e.sources && e.sources.includes(s.id))).length;
-      const isActive = activeSource === s.id;
-      const health = state.sourceHealth[s.id];
-      const isBroken = health && health.status === 'broken';
-      const isDegraded = health && health.status === 'degraded';
-      const errorClass = isBroken ? ' token--error' : (isDegraded ? ' token--warning' : '');
-      const healthDot = getHealthDot(s.id);
-      return `<button class="token ${isActive ? 'token--active' : ''}${errorClass}" data-source-id="${escHtml(s.id)}">${escHtml(s.name)}<span class="source-chip__count">${count}</span>${healthDot}</button>`;
+    // Count events per category (only categories present in current events)
+    const counts = {};
+    state.events.forEach(e => {
+      const c = getEventCategory(e.contentType);
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    const present = CATEGORY_ORDER.filter(c => counts[c] > 0);
+
+    let html = `<button class="token ${allActive ? 'token--active' : ''}" data-category="">All<span class="source-chip__count">${state.events.length}</span></button>`;
+    html += present.map(c => {
+      const active = activeCategory === c;
+      return `<button class="token ${active ? 'token--active' : ''}" data-category="${escHtml(c)}">${escHtml(CATEGORY_LABELS[c] || c)}<span class="source-chip__count">${counts[c]}</span></button>`;
     }).join('');
     container.innerHTML = html;
 
     container.querySelectorAll('.token').forEach(chip => {
       chip.addEventListener('click', () => {
-        const sourceId = chip.dataset.sourceId;
-        state.filters.source = sourceId;
+        const cat = chip.dataset.category;
+        // Toggle off if clicking active; clear contentType sub-filter on category switch
+        state.filters.category = state.filters.category === cat ? '' : cat;
+        state.filters.contentType = '';
+        updateContentTypeFilter();
         render();
       });
     });
@@ -2847,10 +2875,11 @@ body {
   // --- Filtering ---
   function getFilteredEvents() {
     return state.events.filter(ev => {
-      const { search, city, source, dateFrom, dateTo, contentType } = state.filters;
+      const { search, city, source, dateFrom, dateTo, category, contentType } = state.filters;
       if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
       if (city && ev.city !== city) return false;
       if (source && ev.source !== source && !(ev.sources && ev.sources.includes(source))) return false;
+      if (category && getEventCategory(ev.contentType) !== category) return false;
       if (contentType && ev.contentType !== contentType) return false;
       // Date range filter: multi-day events pass if any part overlaps the filter range
       const evEnd = ev.endDate || ev.date;
@@ -2861,21 +2890,31 @@ body {
   }
 
   function clearAllFilters() {
-    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', contentType: '' };
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '' };
     document.getElementById('filterSearch').value = '';
     document.getElementById('filterCity').value = '';
+    const fs = document.getElementById('filterSource'); if (fs) fs.value = '';
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
     updateContentTypeFilter();
     render();
   }
 
-  // --- Content Type Filter ---
+  // --- Content Type Filter (sub-nav: granular types within selected category) ---
   function updateContentTypeFilter() {
     const container = document.getElementById('typeFilter');
-    const types = [...new Set(state.events.map(e => e.contentType).filter(Boolean))];
+    const activeCategory = state.filters.category;
 
-    // Hide if 0 or 1 type
+    // Only show sub-nav when a category is selected
+    if (!activeCategory) {
+      container.style.display = 'none';
+      return;
+    }
+
+    // Types whose category matches the active primary tab
+    const scoped = state.events.filter(e => getEventCategory(e.contentType) === activeCategory);
+    const types = [...new Set(scoped.map(e => e.contentType).filter(Boolean))];
+
     if (types.length <= 1) {
       container.style.display = 'none';
       return;
@@ -2886,7 +2925,7 @@ body {
     let html = `<button class="type-filter__chip ${allActive ? 'active' : ''}" data-type="">All</button>`;
     types.sort().forEach(t => {
       const label = CONTENT_TYPES[t] || t;
-      const count = state.events.filter(e => e.contentType === t).length;
+      const count = scoped.filter(e => e.contentType === t).length;
       const active = state.filters.contentType === t;
       html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-type="${escHtml(t)}">${escHtml(label)} <span style="opacity:0.6">${count}</span></button>`;
     });
@@ -2906,6 +2945,17 @@ body {
     const citySelect = document.getElementById('filterCity');
     const cc = citySelect.value;
     citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${escHtml(c)}" ${c === cc ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+
+    // Source select (moved from primary tabs)
+    const sourceSelect = document.getElementById('filterSource');
+    if (sourceSelect) {
+      const sc = state.filters.source || '';
+      const opts = state.sources.filter(s => s.enabled).map(s => {
+        const count = state.events.filter(e => e.source === s.id || (e.sources && e.sources.includes(s.id))).length;
+        return `<option value="${escHtml(s.id)}" ${s.id === sc ? 'selected' : ''}>${escHtml(s.name)} (${count})</option>`;
+      }).join('');
+      sourceSelect.innerHTML = '<option value="">All Sources</option>' + opts;
+    }
   }
 
   // --- Sorting ---
@@ -3184,6 +3234,7 @@ body {
     let debounceTimer;
     filterSearch.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { state.filters.search = filterSearch.value; render(); }, 150); });
     document.getElementById('filterCity').addEventListener('change', (e) => { state.filters.city = e.target.value; render(); });
+    document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
     document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
     document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
     document.getElementById('filterClear').addEventListener('click', () => {
