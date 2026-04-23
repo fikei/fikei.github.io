@@ -1610,7 +1610,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.8.1';
+  const VERSION = '1.8.2';
   console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
 
   // ============================================
@@ -1864,8 +1864,16 @@ body {
         log('Cloud sync: no saved sources found' + (error ? ' (' + error.message + ')' : ''));
         return false;
       }
-      const cloudSources = data.sources;
+      let cloudSources = data.sources;
       if (!Array.isArray(cloudSources) || cloudSources.length === 0) return false;
+
+      // Reconcile: drop sources removed from the stock registry.
+      const REMOVED_STOCK_IDS = new Set(['bonobo-sf', 'commonwealthclub-sf', 'sfmoma-events', 'sfmoma-exhibitions', 'famsf-events', 'sfpl-events']);
+      const before = cloudSources.length;
+      cloudSources = cloudSources.filter(s => !REMOVED_STOCK_IDS.has(s.id));
+      if (cloudSources.length !== before) {
+        log(`Cloud sync: dropped ${before - cloudSources.length} removed stock source(s)`);
+      }
 
       // Use cloud sources as the source of truth
       state.sources = cloudSources;

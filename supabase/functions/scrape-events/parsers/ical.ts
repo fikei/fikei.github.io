@@ -24,6 +24,14 @@ function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
     const dtstart = get('DTSTART')
     const loc = parseLocationString(get('LOCATION'))
 
+    // URL: prefer URL field, else first https link in DESCRIPTION (Luma, etc.)
+    let url = get('URL')
+    if (!url) {
+      const desc = get('DESCRIPTION')
+      const m = desc.match(/https?:\/\/[^\s\\]+/)
+      if (m) url = m[0]
+    }
+
     events.push({
       date: dtstart ? parseIcalDate(dtstart) : '',
       time: '',
@@ -32,7 +40,7 @@ function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
       address: loc.address,
       city: loc.city,
       genre: '', price: '', ages: '',
-      url: get('URL') || '',
+      url: url || '',
       source: sourceId,
     })
   }
