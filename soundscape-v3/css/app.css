@@ -260,6 +260,23 @@ html, body {
   letter-spacing: var(--tracking-wide);
 }
 
+/* Section header with an action button on the right */
+.section__head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--space-3);
+}
+.section__head .section__title { margin-bottom: 0; }
+.btn--ghost {
+  background: transparent;
+  border-color: var(--gray-500);
+  color: var(--gray-600);
+}
+.btn--ghost:hover {
+  background: transparent;
+  color: var(--color-white);
+  border-color: var(--color-white);
+}
+
 /* Knob sliders (Stage 3.5) — 0..1 one-sided version of the axis track */
 .knob { margin-bottom: var(--space-3); }
 .knob__header {
@@ -271,7 +288,25 @@ html, body {
   color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
+  display: inline-flex; align-items: center; gap: var(--space-2);
 }
+/* Per-knob lock toggle — circle glyph, fills when locked */
+.knob__lock {
+  background: transparent;
+  border: none;
+  color: var(--gray-500);
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: color var(--duration-normal) var(--ease-default);
+}
+.knob__lock:hover { color: var(--color-white); }
+.knob.is-locked .knob__lock { color: var(--accent-amber); }
+.knob.is-locked .knob__lock:hover { color: var(--color-white); }
+/* Locked handle takes on the amber accent so it's unmistakable at a glance */
+.knob.is-locked .knob__handle { background: var(--accent-amber); }
+.knob.is-locked .knob__fill { background: var(--accent-amber); }
 .knob__value {
   font-family: var(--font-mono);
   font-size: var(--text-xs);

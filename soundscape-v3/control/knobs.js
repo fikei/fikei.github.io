@@ -71,10 +71,30 @@ export const DEFAULT_TRANSITION = "smooth";
 // Manual override: while active, ignore LLM/preset writes to this knob.
 const OVERRIDE_HOLD_MS = 2500;
 
+const LOCK_STORAGE_KEY = "ss.knobLocks.v1";
+const TRANS_STORAGE_KEY = "ss.transition";
+
+function loadLocks() {
+  try {
+    const raw = localStorage.getItem(LOCK_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+function persistLocks(set) {
+  try {
+    localStorage.setItem(LOCK_STORAGE_KEY, JSON.stringify([...set]));
+  } catch (e) {}
+}
+
 export function createKnobBus(initial = DEFAULT_KNOBS) {
   const current = {};
   const target = {};
   const overrideUntil = {};
+  const locked = loadLocks();        // Set<knobName>
   let transitionMode = DEFAULT_TRANSITION;
 
   window.viz = window.viz || {};
@@ -86,17 +106,22 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
     window.viz.knob[name] = current[name];
   }
 
-  // LLM / preset button path — respects manual override hold.
+  // LLM / preset button path. A write is rejected if:
+  //   - the knob is explicitly locked, OR
+  //   - the user manually dragged it within the override window.
   function setTargets(next) {
     const now = performance.now();
     for (const [name, v] of Object.entries(next || {})) {
       if (!(name in current)) continue;
+      if (locked.has(name)) continue;
       if (overrideUntil[name] && overrideUntil[name] > now) continue;
       target[name] = Math.max(0, Math.min(1, v));
     }
   }
 
-  // Manual slider path — snaps current to the value and holds.
+  // Manual slider path — always applies, even for locked knobs (a lock
+  // without manual control would be useless). Dragging is how you set
+  // the held value.
   function setManual(name, v) {
     if (!(name in current)) return;
     const clamped = Math.max(0, Math.min(1, v));
@@ -104,6 +129,30 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
     target[name] = clamped;
     overrideUntil[name] = performance.now() + OVERRIDE_HOLD_MS;
     window.viz.knob[name] = clamped;
+  }
+
+  // Lock / unlock individual primitives. Locks persist to localStorage.
+  function lock(name) {
+    if (!(name in current)) return;
+    locked.add(name);
+    persistLocks(locked);
+  }
+  function unlock(name) {
+    locked.delete(name);
+    persistLocks(locked);
+  }
+  function toggleLock(name) {
+    if (locked.has(name)) locked.delete(name);
+    else if (name in current) locked.add(name);
+    persistLocks(locked);
+    return locked.has(name);
+  }
+  function isLocked(name) { return locked.has(name); }
+  function lockedNames() { return [...locked]; }
+  function setAllLocked(shouldLock) {
+    if (shouldLock) for (const n of KNOB_NAMES) locked.add(n);
+    else locked.clear();
+    persistLocks(locked);
   }
 
   // Call once per animation frame. Eases every knob toward its target
@@ -134,5 +183,6 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
   return {
     setTargets, setManual, tick, get, getTarget, snapshot,
     setTransition, getTransition,
+    lock, unlock, toggleLock, isLocked, lockedNames, setAllLocked,
   };
 }
