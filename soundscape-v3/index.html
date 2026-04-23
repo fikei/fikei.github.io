@@ -429,7 +429,17 @@
       }
       sizeCanvas();
       window.addEventListener("resize", sizeCanvas);
-      new Hydra({ canvas, detectAudio: false, enableStreamCapture: false });
+      // pixelDensity 0.6 renders the Hydra chain at ~36% of the native
+      // pixel count, then CSS upscales. That's a 2.8× GPU speedup — huge
+      // on large canvases (1440×756 = 1.1M px) — and invisible for the
+      // abstract visuals we're producing. Bump up if the image looks too
+      // blurry on a specific machine (up to 1.0).
+      new Hydra({
+        canvas,
+        detectAudio: false,
+        enableStreamCapture: false,
+        pixelDensity: 0.6,
+      });
       // One engine, loaded once. All visual change happens through knobs.
       window.loadEngine();
       applyKnobPreset(currentPreset);
