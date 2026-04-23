@@ -146,6 +146,15 @@ export async function startAudio({
   for (let i = 0; i < bins; i++) freqs[i] = (i / bins) * nyq;
   const logNyq = Math.log1p(nyq);
 
+  // Frequency-band indices — computed once, used every frame.
+  // Low:  20 Hz – 250 Hz  (kick, bass, sub)
+  // Mid:  250 Hz – 4 kHz  (vocals, body, chords)
+  // High: 4 kHz – Nyquist (hats, shimmer, air)
+  const binForHz = (hz) => Math.max(0, Math.min(bins - 1, Math.round(hz * bins / nyq)));
+  const LOW_LO = binForHz(20), LOW_HI = binForHz(250);
+  const MID_LO = binForHz(250), MID_HI = binForHz(4000);
+  const HIGH_LO = binForHz(4000), HIGH_HI = bins - 1;
+
   const state = {
     energy: 0,
     energy_slow: 0,
@@ -154,6 +163,9 @@ export async function startAudio({
     brightness: 0.3,
     brightness_slow: 0.3,
     bpm: 120,
+    // Per-band energies (fast EMAs). Normalized 0..1 by per-band running max.
+    low: 0, mid: 0, high: 0,
+    lowMax: 1e-6, midMax: 1e-6, highMax: 1e-6,
     lastOnsetTime: 0,
     lastBeatTime: performance.now() / 1000,
     beatInterval: 0.5,
@@ -186,10 +198,11 @@ export async function startAudio({
       ? 0
       : Math.min(1, (rms - SILENCE_RMS) / (state.energyRunningMax + 1e-9));
 
-    // --- Spectral centroid + flux ----------------------------------------
+    // --- Spectral centroid, flux, and band energies ----------------------
     let total = 0;
     let centroidAcc = 0;
     let flux = 0;
+    let lowSum = 0, midSum = 0, highSum = 0;
     for (let i = 0; i < bins; i++) {
       // dB → linear
       const m = Math.pow(10, freqBuf[i] / 20);
@@ -199,9 +212,27 @@ export async function startAudio({
       const d = m - prevMag[i];
       if (d > 0) flux += d;
       prevMag[i] = m;
+      // Band accumulators — branchless by comparing against precomputed bin indices
+      if (i >= LOW_LO && i <= LOW_HI) lowSum += m;
+      if (i >= MID_LO && i <= MID_HI) midSum += m;
+      if (i >= HIGH_LO && i <= HIGH_HI) highSum += m;
     }
     const centroid = total > 1e-9 ? centroidAcc / total : 0;
     const bright = Math.max(0, Math.min(1, Math.log1p(centroid) / logNyq));
+
+    // Band energies — normalize each by its own decaying running max so
+    // any band can independently reach 1.0 on its loudest content.
+    const lowDecay = 0.9995, minBand = 0.02;
+    state.lowMax = Math.max(minBand, Math.max(state.lowMax * lowDecay, lowSum));
+    state.midMax = Math.max(minBand, Math.max(state.midMax * lowDecay, midSum));
+    state.highMax = Math.max(minBand, Math.max(state.highMax * lowDecay, highSum));
+    const lowNorm = isSilent ? 0 : Math.min(1, lowSum / state.lowMax);
+    const midNorm = isSilent ? 0 : Math.min(1, midSum / state.midMax);
+    const highNorm = isSilent ? 0 : Math.min(1, highSum / state.highMax);
+    // fast EMA on the published values
+    state.low = (1 - ALPHA_FAST) * state.low + ALPHA_FAST * lowNorm;
+    state.mid = (1 - ALPHA_FAST) * state.mid + ALPHA_FAST * midNorm;
+    state.high = (1 - ALPHA_FAST) * state.high + ALPHA_FAST * highNorm;
 
     state.fluxRunningMax = Math.max(
       MIN_FLUX_MAX,
@@ -270,6 +301,9 @@ export async function startAudio({
     viz.beat_phase = state.beat_phase;
     viz.brightness = state.brightness;
     viz.bpm = state.bpm;
+    viz.low = state.low;
+    viz.mid = state.mid;
+    viz.high = state.high;
 
     requestAnimationFrame(tick);
   }
