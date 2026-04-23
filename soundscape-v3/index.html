@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SoundScape</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Prompt-steerable audio-reactive visuals, in the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <canvas id="hydra-canvas"></canvas>
+
+  <!-- Start / loading screen -->
+  <div class="start" id="start">
+    <div class="start__title">SoundScape</div>
+    <div class="start__subtitle">audio-reactive visuals · click start and allow mic</div>
+    <div class="start__controls">
+      <div class="start__source">
+        <label for="source-sel" class="start__source-label">Source</label>
+        <select class="select" id="source-sel">
+          <option value="__default">system default</option>
+          <option value="__synthetic">synthetic (no mic)</option>
+        </select>
+      </div>
+      <button class="btn" id="start-btn">Start</button>
+      <div class="start__options">
+        <label><input type="checkbox" id="clap-chk" checked> semantic axes</label>
+      </div>
+    </div>
+    <div class="start__progress" id="progress"></div>
+    <div class="start__err" id="err"></div>
+  </div>
+
+  <!-- Live controls -->
+  <div class="status-bar" id="status-bar">
+    <span class="status-bar__indicator" id="status-dot"></span>
+    <span id="status-text">ready</span>
+  </div>
+
+  <button class="corner-btn corner-btn--sidebar" id="sidebar-toggle" title="Controls" aria-label="Toggle controls">
+    <span id="sidebar-caret">‹</span>
+  </button>
+  <button class="corner-btn corner-btn--hud" id="hud-toggle" title="Debug HUD (d)" aria-label="Toggle debug HUD">D</button>
+  <button class="corner-btn corner-btn--fullscreen" id="fs-toggle" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__title">Controls</div>
+
+    <section class="section">
+      <h3 class="section__title">Prompt</h3>
+      <textarea class="prompt__text" id="prompt-text" rows="3" placeholder="e.g. foggy forest at dawn, meditative drift"></textarea>
+      <div class="prompt__drop" id="prompt-drop">
+        <input type="file" id="prompt-file" accept="image/*" multiple hidden>
+        <div class="prompt__drop-hint" id="prompt-drop-hint">drop 1–5 images · or click</div>
+        <div class="prompt__thumbs" id="prompt-thumbs"></div>
+      </div>
+      <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
+        <button class="btn" id="compile-btn">Compile</button>
+        <button class="btn" id="refine-btn" title="Regenerate with same inputs">Refine</button>
+      </div>
+      <div class="prompt__status" id="prompt-status"></div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Source</h3>
+      <select class="select" id="source-sel-live" style="width:100%"></select>
+      <div style="margin-top:var(--space-2);font-size:var(--text-xs);color:var(--gray-600);text-transform:uppercase;letter-spacing:var(--tracking-wide)" id="source-info"></div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Semantic axes</h3>
+      <div id="axes-panel"></div>
+    </section>
+
+    <section class="section">
+      <h3 class="section__title">Preset</h3>
+      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap" id="preset-buttons">
+        <button class="btn" data-preset="drift">Drift</button>
+        <button class="btn" data-preset="pulse">Pulse</button>
+      </div>
+    </section>
+  </aside>
+
+  <div class="hud" id="hud"></div>
+
+  <!-- Runtime -->
+  <script src="https://unpkg.com/hydra-synth@1.3.29/dist/hydra-synth.js"></script>
+  <script src="visuals/drift.js"></script>
+  <script src="visuals/pulse.js"></script>
+
+  <script type="module">
+    import { startAudio, listInputDevices } from "./audio/features.js";
+    import { startClap } from "./audio/clap.js";
+    import { DEFAULT_AXES, createAxisBus } from "./control/axes.js";
+    import { compilePrompt, fileToImage, hexToNormRGB } from "./llm/compiler.js";
+
+    // ---------- shared /viz/ state ----------
+    window.viz = {
+      energy: 0, transient: 0, beat_phase: 0, brightness: 0.3, bpm: 120,
+      axis: {},
+      palette: [],       // raw hex strings from Stage 3 LLM
+      paletteRGB: [],    // parallel array of [r,g,b] in [0,1]
+    };
+    function setPalette(hexes) {
+      if (!Array.isArray(hexes)) return;
+      window.viz.palette = hexes.slice();
+      window.viz.paletteRGB = hexes.map(hexToNormRGB);
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const startEl = $("start");
+    const startBtn = $("start-btn");
+    const sourceSel = $("source-sel");
+    const sourceSelLive = $("source-sel-live");
+    const sourceInfo = $("source-info");
+    const clapChk = $("clap-chk");
+    const errEl = $("err");
+    const progEl = $("progress");
+    const statusBar = $("status-bar");
+    const statusDot = $("status-dot");
+    const statusText = $("status-text");
+    const axesPanel = $("axes-panel");
+    const sidebar = $("sidebar");
+    const sidebarToggle = $("sidebar-toggle");
+    const sidebarCaret = $("sidebar-caret");
+    const hudToggle = $("hud-toggle");
+    const fsToggle = $("fs-toggle");
+    const hud = $("hud");
+
+    // URL flags
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get("loopback") === "1") sourceSel.value = "__synthetic";
+    if (urlParams.get("clap") === "0") clapChk.checked = false;
+
+    // Populate device list at page load (labels will be masked until the
+    // first mic-permission grant; after that a reload will show full labels).
+    async function refreshDevices(selectedId = null) {
+      const devs = await listInputDevices();
+      // Rebuild the start-screen dropdown while preserving the special entries.
+      const startSpecial = ['__default', '__synthetic'];
+      sourceSel.innerHTML =
+        `<option value="__default">system default</option>` +
+        `<option value="__synthetic">synthetic (no mic)</option>` +
+        devs.map((d) => `<option value="${d.deviceId}">${d.label || 'unnamed input'}</option>`).join('');
+      sourceSelLive.innerHTML =
+        `<option value="__default">system default</option>` +
+        devs.map((d) => `<option value="${d.deviceId}">${d.label || 'unnamed input'}</option>`).join('');
+      // Preserve selection if possible
+      const stored = localStorage.getItem('ss.source');
+      if (selectedId) sourceSel.value = selectedId;
+      else if (stored) sourceSel.value = stored;
+      return devs;
+    }
+    refreshDevices();
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => refreshDevices(sourceSel.value));
+
+    // ---------- axis bus + panel ----------
+    const axisBus = createAxisBus(DEFAULT_AXES);
+    const axisEls = new Map();
+
+    function renderAxisPanel() {
+      axesPanel.innerHTML = "";
+      axisEls.clear();
+      for (const ax of axisBus.axes) {
+        const root = document.createElement("div");
+        root.className = "axis";
+        root.innerHTML = `
+          <div class="axis__header">
+            <span class="axis__name">${ax.name}<span class="axis__manual-dot" title="manual override"></span></span>
+            <span class="axis__value" data-axis-v>+0.00</span>
+          </div>
+          <div class="axis__track" data-axis-track role="slider" aria-label="${ax.name}" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
+            <div class="axis__track-rail"></div>
+            <div class="axis__track-tick"></div>
+            <span class="axis__fill" data-axis-f></span>
+            <span class="axis__handle" data-axis-h></span>
+          </div>
+          <div class="axis__prompts">
+            <input data-pole="positive" value="${ax.positive.replace(/"/g, "&quot;")}" aria-label="${ax.name} positive pole">
+            <input data-pole="negative" value="${ax.negative.replace(/"/g, "&quot;")}" aria-label="${ax.name} negative pole">
+          </div>
+        `;
+        axesPanel.appendChild(root);
+        const track = root.querySelector("[data-axis-track]");
+        axisEls.set(ax.name, {
+          root,
+          value: root.querySelector("[data-axis-v]"),
+          fill: root.querySelector("[data-axis-f]"),
+          handle: root.querySelector("[data-axis-h]"),
+          track,
+        });
+        wireDrag(track, ax.name, root);
+      }
+    }
+
+    // Pointer-driven manual override. Dragging writes through axisBus.setManual
+    // which pins the value for a couple seconds before CLAP resumes. The
+    // dot + handle color flip signals "manual override active".
+    function wireDrag(track, name, root) {
+      let hold = null;
+      function setFromPointer(ev) {
+        const rect = track.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) / rect.width;
+        const v = Math.max(-1, Math.min(1, (x - 0.5) * 2));
+        axisBus.setManual(name, v);
+        track.setAttribute("aria-valuenow", v.toFixed(2));
+        track.classList.add("is-manual");
+        root.classList.add("is-manual");
+        if (hold) clearTimeout(hold);
+        hold = setTimeout(() => {
+          track.classList.remove("is-manual");
+          root.classList.remove("is-manual");
+        }, 2800);
+      }
+      track.addEventListener("pointerdown", (e) => {
+        track.setPointerCapture(e.pointerId);
+        setFromPointer(e);
+      });
+      track.addEventListener("pointermove", (e) => {
+        if (e.buttons & 1) setFromPointer(e);
+      });
+      // Keyboard: arrow keys nudge by 0.1, shift for 0.25.
+      track.addEventListener("keydown", (e) => {
+        const step = e.shiftKey ? 0.25 : 0.1;
+        const cur = parseFloat(track.getAttribute("aria-valuenow")) || 0;
+        let v = cur;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") v = Math.min(1, cur + step);
+        else if (e.key === "ArrowLeft" || e.key === "ArrowDown") v = Math.max(-1, cur - step);
+        else if (e.key === "Home") v = -1;
+        else if (e.key === "End") v = 1;
+        else if (e.key === "0" || e.key === " ") v = 0;
+        else return;
+        e.preventDefault();
+        axisBus.setManual(name, v);
+        track.setAttribute("aria-valuenow", v.toFixed(2));
+        track.classList.add("is-manual");
+        root.classList.add("is-manual");
+        if (hold) clearTimeout(hold);
+        hold = setTimeout(() => {
+          track.classList.remove("is-manual");
+          root.classList.remove("is-manual");
+        }, 2800);
+      });
+    }
+    renderAxisPanel();
+
+    function paintAxis(name, v) {
+      const el = axisEls.get(name);
+      if (!el) return;
+      el.value.textContent = (v >= 0 ? "+" : "") + v.toFixed(2);
+      // Fill goes from center (50%) outward. Positive → right, negative → left.
+      const half = Math.abs(v) * 50;
+      if (v >= 0) {
+        el.fill.style.left = "50%";
+        el.fill.style.width = half + "%";
+      } else {
+        el.fill.style.left = (50 - half) + "%";
+        el.fill.style.width = half + "%";
+      }
+      el.handle.style.left = (50 + v * 50) + "%";
+    }
+
+    // ---------- UI wiring ----------
+    function openSidebar(open) {
+      sidebar.classList.toggle("open", open);
+      sidebarToggle.classList.toggle("sidebar-is-open", open);
+      sidebarCaret.textContent = open ? "›" : "‹";
+    }
+    sidebarToggle.addEventListener("click", () => openSidebar(!sidebar.classList.contains("open")));
+
+    let hudOn = false;
+    function toggleHud() {
+      hudOn = !hudOn;
+      hud.classList.toggle("show", hudOn);
+    }
+    hudToggle.addEventListener("click", toggleHud);
+    document.addEventListener("keydown", (e) => {
+      if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+      if (e.key === "d" || e.key === "D") toggleHud();
+      if (e.key === "c" || e.key === "C") openSidebar(!sidebar.classList.contains("open"));
+    });
+
+    fsToggle.addEventListener("click", () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    });
+
+    function setStatus(text, ok = true) {
+      statusText.textContent = text;
+      statusDot.classList.toggle("status-bar__indicator--error", !ok);
+      statusBar.classList.add("active");
+    }
+
+    const PRESETS = {
+      drift: () => window.loadDrift && window.loadDrift(),
+      pulse: () => window.loadPulse && window.loadPulse(),
+    };
+    let currentPreset = localStorage.getItem("ss.preset") || "pulse";
+
+    function loadPreset(name) {
+      if (!PRESETS[name]) return;
+      currentPreset = name;
+      localStorage.setItem("ss.preset", name);
+      PRESETS[name]();
+      // highlight active button
+      document.querySelectorAll("#preset-buttons [data-preset]").forEach((b) => {
+        b.classList.toggle("btn--filled", b.dataset.preset === name);
+      });
+    }
+
+    function initHydra() {
+      const canvas = $("hydra-canvas");
+      function sizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      sizeCanvas();
+      window.addEventListener("resize", sizeCanvas);
+      new Hydra({ canvas, detectAudio: false, enableStreamCapture: false });
+      loadPreset(currentPreset);
+    }
+
+    document.getElementById("preset-buttons").addEventListener("click", (e) => {
+      const name = e.target?.dataset?.preset;
+      if (name) loadPreset(name);
+    });
+
+    // ---------- runtime refs (set once started) ----------
+    let audioHandle = null;  // returned by startAudio
+    let clapHandle = null;   // returned by startClap
+
+    // ---------- start handler ----------
+    startBtn.addEventListener("click", async () => {
+      errEl.textContent = "";
+      progEl.textContent = "";
+      startBtn.disabled = true;
+      startBtn.textContent = "starting…";
+      try {
+        initHydra();
+        const sel = sourceSel.value;
+        const loopback = sel === "__synthetic";
+        const deviceId = (sel === "__default" || loopback) ? null : sel;
+        if (!loopback) localStorage.setItem("ss.source", sel);
+
+        audioHandle = await startAudio({
+          loopback, deviceId,
+          onStatus: (s) => setStatus(s),
+        });
+        // refresh labels now that permission was granted
+        if (!loopback) {
+          await refreshDevices(sel === "__default" ? "__default" : sel);
+          sourceSelLive.value = sel === "__default" ? "__default" : sel;
+          sourceInfo.textContent = `sr ${audioHandle.ctx.sampleRate} Hz`;
+        } else {
+          sourceSelLive.innerHTML = `<option>synthetic</option>`;
+          sourceSelLive.disabled = true;
+          sourceInfo.textContent = `synthetic · ${audioHandle.ctx.sampleRate} Hz`;
+        }
+
+        startEl.style.display = "none";
+
+        if (clapChk.checked) {
+          setStatus("loading CLAP…");
+          progEl.textContent = "";
+          clapHandle = await startClap({
+            ctx: audioHandle.ctx,
+            source: audioHandle.getSource(),
+            axes: axisBus.axes,
+            onAxis: (name, v) => axisBus.onAxis(name, v),
+            onStatus: (s) => setStatus(s),
+            onProgress: (p) => {
+              if (p && p.status === "progress" && p.progress != null) {
+                const pct = Math.round(p.progress);
+                const name = (p.file || "").split("/").pop() || "";
+                progEl.textContent = `${name} ${pct}%`;
+              } else if (p && p.status === "done") {
+                progEl.textContent = "";
+              }
+            },
+          }).catch((e) => {
+            console.warn("[clap] disabled:", e);
+            setStatus("CLAP disabled — fast path only", false);
+            return null;
+          });
+        }
+      } catch (e) {
+        console.error(e);
+        errEl.textContent = (e && e.message) || String(e);
+        startBtn.disabled = false;
+        startBtn.textContent = "retry";
+      }
+    });
+
+    // ---------- Stage 3: prompt compiler UI ----------
+    const promptText = $("prompt-text");
+    const promptDrop = $("prompt-drop");
+    const promptDropHint = $("prompt-drop-hint");
+    const promptFile = $("prompt-file");
+    const promptThumbs = $("prompt-thumbs");
+    const promptStatus = $("prompt-status");
+    const compileBtn = $("compile-btn");
+    const refineBtn = $("refine-btn");
+
+    let pendingImages = [];  // [{name, media_type, size, data}]
+
+    function renderThumbs() {
+      promptThumbs.innerHTML = "";
+      pendingImages.forEach((img, i) => {
+        const div = document.createElement("div");
+        div.className = "prompt__thumb";
+        div.innerHTML =
+          `<img src="data:${img.media_type};base64,${img.data}" alt="${img.name}">` +
+          `<button class="prompt__thumb-x" data-i="${i}" aria-label="remove">×</button>`;
+        promptThumbs.appendChild(div);
+      });
+      promptDropHint.style.display = pendingImages.length ? "none" : "block";
+    }
+    promptThumbs.addEventListener("click", (e) => {
+      const i = e.target?.dataset?.i;
+      if (i != null) {
+        pendingImages.splice(Number(i), 1);
+        renderThumbs();
+      }
+    });
+
+    async function addFiles(files) {
+      for (const f of files) {
+        if (!f.type.startsWith("image/")) continue;
+        if (pendingImages.length >= 5) break;
+        try {
+          pendingImages.push(await fileToImage(f));
+        } catch (e) {
+          console.warn("[prompt] skip", f.name, e);
+        }
+      }
+      renderThumbs();
+    }
+    promptDrop.addEventListener("click", (e) => {
+      if (e.target === promptFile) return;
+      promptFile.click();
+    });
+    promptFile.addEventListener("change", (e) => {
+      addFiles(e.target.files || []);
+      e.target.value = "";
+    });
+    ["dragenter", "dragover"].forEach((ev) =>
+      promptDrop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        promptDrop.classList.add("is-dragging");
+      }),
+    );
+    ["dragleave", "drop"].forEach((ev) =>
+      promptDrop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        promptDrop.classList.remove("is-dragging");
+      }),
+    );
+    promptDrop.addEventListener("drop", (e) => {
+      addFiles(e.dataTransfer?.files || []);
+    });
+
+    function applyConfig(config, meta = {}) {
+      // Swap axes — CLAP's ensureTextEmbeddings() will invalidate its cache
+      // on name/prompt change automatically.
+      const nextAxes = config.axes.map((a) => ({
+        name: a.name,
+        positive: a.positive,
+        negative: a.negative,
+      }));
+      axisBus.setAxes(nextAxes);
+      if (clapHandle?.setAxes) clapHandle.setAxes(axisBus.axes);
+      renderAxisPanel();
+
+      // Palette plumbs through to presets via viz.paletteRGB
+      if (Array.isArray(config.palette)) setPalette(config.palette);
+
+      // Preset hint: surface as a suggestion, do NOT auto-switch. The user
+      // picked a preset intentionally — flipping it out from under them
+      // breaks flow. Stage 4 adds an explicit "lock preset" toggle; for now
+      // the hint is displayed and the user can click the preset button.
+      const hint = config.preset_hint;
+      const hintNote =
+        hint && hint !== currentPreset
+          ? ` · hint: ${hint} (click preset to switch)`
+          : "";
+
+      promptStatus.textContent =
+        `axes: ${config.axes.map((a) => a.name).join(", ")} · ` +
+        `palette: ${(config.palette || []).length} colors${hintNote} · ` +
+        `${meta._cacheHit ? "cached" : meta.model || "live"}`;
+    }
+
+    async function runCompile({ nonce = null } = {}) {
+      const text = promptText.value.trim();
+      if (!text && pendingImages.length === 0) {
+        promptStatus.textContent = "type a prompt or drop an image";
+        return;
+      }
+      compileBtn.disabled = true;
+      refineBtn.disabled = true;
+      promptStatus.textContent = "compiling…";
+      try {
+        const result = await compilePrompt({
+          text,
+          images: pendingImages,
+          nonce,
+        });
+        applyConfig(result.config, result);
+      } catch (e) {
+        console.error("[compile]", e);
+        promptStatus.textContent = "error: " + (e.message || String(e));
+      } finally {
+        compileBtn.disabled = false;
+        refineBtn.disabled = false;
+      }
+    }
+    compileBtn.addEventListener("click", () => runCompile());
+    refineBtn.addEventListener("click", () =>
+      runCompile({ nonce: String(Math.random()).slice(2, 10) }),
+    );
+
+    // ---------- Live device switch from the sidebar dropdown. ----------
+    sourceSelLive.addEventListener("change", async () => {
+      if (!audioHandle || !audioHandle.switchDevice) return;
+      const next = sourceSelLive.value;
+      localStorage.setItem("ss.source", next);
+      try {
+        setStatus("switching source…");
+        const newSource = await audioHandle.switchDevice(next);
+        if (clapHandle && clapHandle.rewireSource) clapHandle.rewireSource(newSource);
+        sourceInfo.textContent = `sr ${audioHandle.ctx.sampleRate} Hz`;
+      } catch (e) {
+        console.error("[source] switch failed:", e);
+        setStatus("switch failed: " + (e.message || e), false);
+      }
+    });
+
+    // ---------- Debug HUD render loop ----------
+    function bar(v) {
+      const pct = Math.max(0, Math.min(1, v)) * 100;
+      return `<span class="hud__bar"><span style="width:${pct.toFixed(0)}%"></span></span>`;
+    }
+    function sbar(v) {
+      const pct = Math.max(-1, Math.min(1, v));
+      const half = Math.abs(pct) * 50;
+      const left = pct >= 0 ? 50 : (50 - half);
+      return `<span class="hud__bar hud__bar--signed"><span style="width:${half}%;margin-left:${left}%;background:#fff"></span></span>`;
+    }
+    function fmt(n, d = 3) {
+      return (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d);
+    }
+    let frames = 0, fpsLast = performance.now(), fps = 0;
+
+    function updateHud() {
+      frames++;
+      const now = performance.now();
+      if (now - fpsLast > 500) {
+        fps = (frames * 1000) / (now - fpsLast);
+        frames = 0; fpsLast = now;
+      }
+      if (hudOn) {
+        const v = window.viz;
+        const axes = v.axis || {};
+        let axRows = "";
+        for (const [name, val] of Object.entries(axes)) {
+          axRows += `<div class="hud__row"><span class="hud__k">${name}</span><span class="hud__v">${(val >= 0 ? "+" : "") + fmt(val, 2)}</span>${sbar(val)}</div>`;
+        }
+        const clap = (window.clapDiag && window.clapDiag()) || null;
+        let clapRows = "";
+        if (clap) {
+          const secIn = (clap.samplesSeen / 48000);  // approximate
+          clapRows =
+            `<hr class="hud__hr">` +
+            `<div class="hud__row"><span class="hud__k">clap · infers</span><span class="hud__v">${clap.inferenceCount}</span></div>` +
+            `<div class="hud__row"><span class="hud__k">clap · last</span><span class="hud__v">${Math.round(clap.lastInferenceMs || 0)}ms</span></div>` +
+            `<div class="hud__row"><span class="hud__k">clap · ring rms</span><span class="hud__v">${(clap.ringRms || 0).toFixed(4)}</span></div>` +
+            `<div class="hud__row"><span class="hud__k">clap · samples in</span><span class="hud__v">${secIn.toFixed(1)}s</span></div>`;
+        }
+        hud.innerHTML =
+          `<div class="hud__row"><span class="hud__k">energy</span><span class="hud__v">${fmt(v.energy)}</span>${bar(v.energy)}</div>` +
+          `<div class="hud__row"><span class="hud__k">transient</span><span class="hud__v">${fmt(v.transient)}</span>${bar(v.transient)}</div>` +
+          `<div class="hud__row"><span class="hud__k">beat_phase</span><span class="hud__v">${fmt(v.beat_phase)}</span>${bar(v.beat_phase)}</div>` +
+          `<div class="hud__row"><span class="hud__k">brightness</span><span class="hud__v">${fmt(v.brightness)}</span>${bar(v.brightness)}</div>` +
+          `<div class="hud__row"><span class="hud__k">bpm</span><span class="hud__v">${fmt(v.bpm, 1)}</span></div>` +
+          (axRows ? `<hr class="hud__hr">${axRows}` : "") +
+          clapRows +
+          `<hr class="hud__hr"><div class="hud__row"><span class="hud__k">fps</span><span class="hud__v">${fmt(fps, 1)}</span></div>`;
+      }
+      // also update the sidebar axis meters at rAF rate (values change slowly)
+      for (const [name, v] of Object.entries(window.viz.axis || {})) paintAxis(name, v);
+      requestAnimationFrame(updateHud);
+    }
+    requestAnimationFrame(updateHud);
+  </script>
+</body>
+</html>
