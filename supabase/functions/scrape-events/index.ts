@@ -101,8 +101,15 @@ async function pushToCache(
   events: ScrapedEvent[],
   sourceOutcomes: SourceOutcome[],
   supabaseUrl: string,
-  serviceKey: string,
+  _serviceKey: string,
 ): Promise<{ cached: number; updated: number; enrichQueued: number }> {
+  // The Supabase edge platform validates Authorization: Bearer <token> at the
+  // gateway and requires a valid JWT. Env service/anon keys may be in the new
+  // non-JWT "sb_secret_" format, so we hardcode the public anon JWT for
+  // internal function-to-function calls. cache-events uses its own service
+  // role for DB writes, so no permission escalation is needed.
+  const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI'
+  void _serviceKey
   // Format events to match ScrapedEvent interface expected by cache-events
   const formatted = events.map(ev => ({
     source: ev.source,
