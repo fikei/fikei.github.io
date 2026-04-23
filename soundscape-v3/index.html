@@ -62,6 +62,9 @@
       <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
         <button class="btn" id="compile-btn">Compile</button>
         <button class="btn" id="refine-btn" title="Regenerate with same inputs">Refine</button>
+        <label class="prompt__auto" title="re-compile every 45s with slight variation">
+          <input type="checkbox" id="auto-compile-chk"> auto
+        </label>
       </div>
       <div class="prompt__status" id="prompt-status"></div>
     </section>
@@ -73,7 +76,10 @@
     </section>
 
     <section class="section">
-      <h3 class="section__title">Starting point</h3>
+      <div class="section__head">
+        <h3 class="section__title">Starting point</h3>
+        <button class="btn btn--sm btn--ghost" id="save-preset" title="Snapshot current knobs as a preset">save</button>
+      </div>
       <div style="display:flex;gap:var(--space-2);flex-wrap:wrap" id="preset-buttons">
         <button class="btn btn--sm" data-preset="drift">Drift</button>
         <button class="btn btn--sm" data-preset="pulse">Pulse</button>
@@ -240,6 +246,10 @@
             <div class="knob__rail"></div>
             <span class="knob__fill" data-knob-f></span>
             <span class="knob__handle" data-knob-h></span>
+            <!-- Ghost handle shows the live audio-routed value so you can
+                 see how much the source is pushing the knob around its
+                 baseline. Hidden when source=none or intensity=0. -->
+            <span class="knob__ghost" data-knob-ghost></span>
           </div>
           <div class="knob__route">
             <select class="knob__source" data-knob-source aria-label="${name} audio source">
@@ -268,6 +278,7 @@
           value: row.querySelector("[data-knob-v]"),
           fill: row.querySelector("[data-knob-f]"),
           handle: row.querySelector("[data-knob-h]"),
+          ghost: row.querySelector("[data-knob-ghost]"),
           track,
           lockBtn,
           lockIcon,
@@ -383,6 +394,18 @@
       el.fill.style.width = (v * 100) + "%";
       el.handle.style.left = (v * 100) + "%";
       el.track.setAttribute("aria-valuenow", v.toFixed(2));
+      // Ghost indicator: show the currently-rendered (routed) value so the
+      // user can see how far the audio source is pushing this knob off the
+      // baseline. Hide when routing is effectively inactive.
+      const routed = window.viz?.knob?.[name];
+      const intensity = knobBus.getIntensity(name);
+      const source = knobBus.getSource(name);
+      if (routed != null && intensity > 0.01 && source !== "none") {
+        el.ghost.style.display = "block";
+        el.ghost.style.left = (Math.max(0, Math.min(1, routed)) * 100) + "%";
+      } else {
+        el.ghost.style.display = "none";
+      }
     }
 
     // ---------- axis bus + panel ----------
@@ -526,23 +549,85 @@
       statusBar.classList.add("active");
     }
 
-    // Preset buttons = named knob target sets. No chain teardown, just a
-    // smooth glide through knob space. (knobBus is declared earlier so
-    // renderKnobPanel can see it at module evaluation time.)
+    // Preset buttons = named knob target sets. Smooth glide, no teardown.
+    // Built-in presets live in KNOB_PRESETS; user presets persist to
+    // localStorage and are rendered alongside.
+    const USER_PRESETS_KEY = "ss.userPresets.v1";
+    function loadUserPresets() {
+      try {
+        const raw = localStorage.getItem(USER_PRESETS_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) { return {}; }
+    }
+    function saveUserPresets(p) {
+      try { localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+    let userPresets = loadUserPresets();
+
+    const presetButtonsEl = document.getElementById("preset-buttons");
+    function renderPresetButtons() {
+      presetButtonsEl.innerHTML = "";
+      // Built-ins first
+      for (const name of Object.keys(KNOB_PRESETS)) {
+        const b = document.createElement("button");
+        b.className = "btn btn--sm";
+        b.dataset.preset = name;
+        b.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        if (name === currentPreset) b.classList.add("btn--filled");
+        presetButtonsEl.appendChild(b);
+      }
+      // User presets with a delete affordance on long-press / right-click
+      for (const name of Object.keys(userPresets)) {
+        const b = document.createElement("button");
+        b.className = "btn btn--sm";
+        b.dataset.preset = name;
+        b.dataset.userPreset = "1";
+        b.textContent = name;
+        b.title = "click to apply · shift-click to delete";
+        if (name === currentPreset) b.classList.add("btn--filled");
+        presetButtonsEl.appendChild(b);
+      }
+    }
+
     let currentPreset = localStorage.getItem("ss.preset") || "drift";
     function applyKnobPreset(name) {
-      const targets = KNOB_PRESETS[name];
+      const targets = KNOB_PRESETS[name] || userPresets[name];
       if (!targets) return;
       currentPreset = name;
       localStorage.setItem("ss.preset", name);
       knobBus.setTargets(targets);
-      document.querySelectorAll("#preset-buttons [data-preset]").forEach((b) => {
-        b.classList.toggle("btn--filled", b.dataset.preset === name);
-      });
+      renderPresetButtons();
     }
-    document.getElementById("preset-buttons").addEventListener("click", (e) => {
-      const name = e.target?.dataset?.preset;
-      if (name) applyKnobPreset(name);
+    presetButtonsEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-preset]");
+      if (!btn) return;
+      const name = btn.dataset.preset;
+      if (e.shiftKey && btn.dataset.userPreset === "1") {
+        // delete
+        if (confirm(`delete preset "${name}"?`)) {
+          delete userPresets[name];
+          saveUserPresets(userPresets);
+          if (currentPreset === name) currentPreset = "drift";
+          renderPresetButtons();
+        }
+        return;
+      }
+      applyKnobPreset(name);
+    });
+    renderPresetButtons();
+
+    // Save current knob baselines as a named user preset.
+    document.getElementById("save-preset").addEventListener("click", () => {
+      const suggested = `custom-${Object.keys(userPresets).length + 1}`;
+      const name = prompt("name this preset:", suggested);
+      if (!name) return;
+      const snap = {};
+      for (const k of KNOB_NAMES) snap[k] = knobBus.getBaseline(k);
+      userPresets[name] = snap;
+      saveUserPresets(userPresets);
+      currentPreset = name;
+      localStorage.setItem("ss.preset", name);
+      renderPresetButtons();
     });
 
     // Transition mode dropdown
@@ -765,11 +850,27 @@
       // are respected so user drags don't get stomped.
       if (config.knobs) {
         knobBus.setTargets(config.knobs);
-        // Clear any active "preset button" highlight since LLM is now in
-        // charge of the knob values.
         document.querySelectorAll("#preset-buttons [data-preset]").forEach((b) => {
           b.classList.remove("btn--filled");
         });
+      }
+      // Routing: Claude can also specify which audio source drives each
+      // knob and how strongly. Apply any that arrived, leaving others
+      // at whatever the user/default set.
+      if (config.routing && typeof config.routing === "object") {
+        for (const [name, r] of Object.entries(config.routing)) {
+          if (!r || typeof r !== "object") continue;
+          if (typeof r.source === "string") knobBus.setSource(name, r.source);
+          if (typeof r.intensity === "number") knobBus.setIntensity(name, r.intensity);
+          // Reflect in the UI row if it's rendered
+          const el = knobEls.get(name);
+          if (el) {
+            if (typeof r.source === "string") el.sourceSel.value = r.source;
+            if (typeof r.intensity === "number") {
+              el.intensityFill.style.width = (Math.max(0, Math.min(1, r.intensity)) * 100) + "%";
+            }
+          }
+        }
       }
 
       promptStatus.textContent =
@@ -806,6 +907,37 @@
     refineBtn.addEventListener("click", () =>
       runCompile({ nonce: String(Math.random()).slice(2, 10) }),
     );
+
+    // Auto-compile (Stage 4 seed): every 45s re-run compile with a fresh
+    // nonce so Claude produces stochastic variation on the same prompt.
+    // Knobs glide to the new targets. Respects locks (knobs won't drift
+    // unless user unlocks them). Toggleable.
+    const AUTO_COMPILE_MS = 45000;
+    let autoTimer = null;
+    const autoChk = $("auto-compile-chk");
+    function startAutoCompile() {
+      stopAutoCompile();
+      autoTimer = setInterval(() => {
+        if (!promptText.value.trim() && pendingImages.length === 0) return;
+        runCompile({ nonce: String(Math.random()).slice(2, 10) });
+      }, AUTO_COMPILE_MS);
+    }
+    function stopAutoCompile() {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    }
+    autoChk.addEventListener("change", () => {
+      if (autoChk.checked) {
+        localStorage.setItem("ss.autoCompile", "1");
+        startAutoCompile();
+      } else {
+        localStorage.removeItem("ss.autoCompile");
+        stopAutoCompile();
+      }
+    });
+    if (localStorage.getItem("ss.autoCompile") === "1") {
+      autoChk.checked = true;
+      startAutoCompile();
+    }
 
     // ---------- Live device switch from the sidebar dropdown. ----------
     sourceSelLive.addEventListener("change", async () => {
