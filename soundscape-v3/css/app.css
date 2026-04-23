@@ -307,6 +307,50 @@ html, body {
 /* Locked handle takes on the amber accent so it's unmistakable at a glance */
 .knob.is-locked .knob__handle { background: var(--accent-amber); }
 .knob.is-locked .knob__fill { background: var(--accent-amber); }
+
+/* Per-knob audio routing: source dropdown + intensity mini-slider */
+.knob__route {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.knob__source {
+  flex: 0 0 auto;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: 1px solid var(--gray-400);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 2px var(--space-2);
+  appearance: none;
+  -webkit-appearance: none;
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: 110px;
+  cursor: pointer;
+}
+.knob__source:hover { border-color: var(--color-white); }
+.knob__source:focus { outline: none; box-shadow: 0 0 0 1px var(--color-white); }
+.knob__intensity {
+  flex: 1 1 auto;
+  position: relative;
+  height: 12px;
+  cursor: ew-resize;
+  touch-action: none;
+  display: flex; align-items: center;
+}
+.knob__intensity-rail {
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 1px; transform: translateY(-50%);
+  background: var(--gray-400);
+  pointer-events: none;
+}
+.knob__intensity-fill {
+  position: absolute; top: 50%; left: 0;
+  height: 1px; width: 0;
+  transform: translateY(-50%);
+  background: var(--color-white);
+  pointer-events: none;
+}
 .knob__value {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
