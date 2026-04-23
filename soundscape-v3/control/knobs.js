@@ -71,8 +71,11 @@ export const DEFAULT_TRANSITION = "smooth";
 // Manual override: while active, ignore LLM/preset writes to this knob.
 const OVERRIDE_HOLD_MS = 2500;
 
+import { sampleSource, DEFAULT_ROUTING, AUDIO_SOURCES } from "./sources.js";
+
 const LOCK_STORAGE_KEY = "ss.knobLocks.v1";
 const TRANS_STORAGE_KEY = "ss.transition";
+const ROUTING_STORAGE_KEY = "ss.knobRouting.v1";
 
 function loadLocks() {
   try {
@@ -90,20 +93,60 @@ function persistLocks(set) {
   } catch (e) {}
 }
 
+function loadRouting() {
+  try {
+    const raw = localStorage.getItem(ROUTING_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+function persistRouting(routing) {
+  try {
+    localStorage.setItem(ROUTING_STORAGE_KEY, JSON.stringify(routing));
+  } catch (e) {}
+}
+
 export function createKnobBus(initial = DEFAULT_KNOBS) {
-  const current = {};
+  const current = {};        // final routed value (what engine reads)
+  const baseline = {};       // eased-toward-target static value before routing
   const target = {};
   const overrideUntil = {};
   const locked = loadLocks();        // Set<knobName>
+  // Per-knob audio-source routing. Each entry is { source, intensity }.
+  // Loaded from localStorage if present, else the built-in defaults that
+  // mirror the hardcoded reactivity engine.js used to have.
+  const routing = Object.fromEntries(
+    KNOB_NAMES.map((n) => {
+      const d = DEFAULT_ROUTING[n] || { source: "none", intensity: 0 };
+      return [n, { source: d.source, intensity: d.intensity }];
+    }),
+  );
+  const stored = loadRouting();
+  if (stored) {
+    for (const n of KNOB_NAMES) {
+      if (!stored[n]) continue;
+      if (typeof stored[n].source === "string" && AUDIO_SOURCES[stored[n].source]) {
+        routing[n].source = stored[n].source;
+      }
+      if (typeof stored[n].intensity === "number") {
+        routing[n].intensity = Math.max(0, Math.min(1, stored[n].intensity));
+      }
+    }
+  }
   let transitionMode = DEFAULT_TRANSITION;
 
   window.viz = window.viz || {};
   window.viz.knob = window.viz.knob || {};
 
   for (const name of KNOB_NAMES) {
-    current[name] = initial[name] ?? 0.5;
-    target[name] = initial[name] ?? 0.5;
-    window.viz.knob[name] = current[name];
+    const v = initial[name] ?? 0.5;
+    current[name] = v;
+    baseline[name] = v;
+    target[name] = v;
+    window.viz.knob[name] = v;
   }
 
   // LLM / preset button path. A write is rejected if:
@@ -121,15 +164,22 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
 
   // Manual slider path — always applies, even for locked knobs (a lock
   // without manual control would be useless). Dragging is how you set
-  // the held value.
+  // the held value. Snaps baseline + target so routing wraps around the
+  // new set-point on the next tick.
   function setManual(name, v) {
     if (!(name in current)) return;
     const clamped = Math.max(0, Math.min(1, v));
+    baseline[name] = clamped;
     current[name] = clamped;
     target[name] = clamped;
     overrideUntil[name] = performance.now() + OVERRIDE_HOLD_MS;
     window.viz.knob[name] = clamped;
   }
+
+  // Baseline = static set-point after target easing but before audio
+  // routing. This is what the sidebar slider should display, so the
+  // handle reflects "what's set" without jiggling with every kick.
+  function getBaseline(name) { return baseline[name] ?? 0; }
 
   // Lock / unlock individual primitives. Locks persist to localStorage.
   function lock(name) {
@@ -155,19 +205,32 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
     persistLocks(locked);
   }
 
-  // Call once per animation frame. Eases every knob toward its target
-  // at the currently selected transition rate.
+  // Call once per animation frame. Two-stage update:
+  //   1. baseline eases toward target at the user-selected transition rate
+  //      (this is the slow, intent-driven layer — LLM, preset, drag).
+  //   2. final = clamp(baseline + audioSource * intensity, 0, 1)
+  //      (fast, music-reactive layer — no easing so music response is live).
+  // The engine reads window.viz.knob which always contains the final value.
   function tick() {
     const ease = TRANSITION_MODES[transitionMode]?.ease ?? 0.04;
     for (const name of KNOB_NAMES) {
-      const c = current[name];
+      // Stage 1: baseline
+      const b = baseline[name];
       const t = target[name];
-      if (Math.abs(t - c) < 1e-4 || ease >= 1) {
-        current[name] = t;
+      if (Math.abs(t - b) < 1e-4 || ease >= 1) {
+        baseline[name] = t;
       } else {
-        current[name] = c + (t - c) * ease;
+        baseline[name] = b + (t - b) * ease;
       }
-      window.viz.knob[name] = current[name];
+      // Stage 2: apply audio-source routing on top
+      const r = routing[name] || { source: "none", intensity: 0 };
+      const sig = r.intensity > 0 ? sampleSource(r.source) : 0;
+      const final = Math.max(
+        0,
+        Math.min(1, baseline[name] + sig * r.intensity),
+      );
+      current[name] = final;
+      window.viz.knob[name] = final;
     }
   }
 
@@ -175,6 +238,20 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
     if (TRANSITION_MODES[mode]) transitionMode = mode;
   }
   function getTransition() { return transitionMode; }
+
+  function setSource(name, sourceKey) {
+    if (!(name in routing)) return;
+    if (!AUDIO_SOURCES[sourceKey]) return;
+    routing[name].source = sourceKey;
+    persistRouting(routing);
+  }
+  function setIntensity(name, v) {
+    if (!(name in routing)) return;
+    routing[name].intensity = Math.max(0, Math.min(1, v));
+    persistRouting(routing);
+  }
+  function getSource(name) { return routing[name]?.source ?? "none"; }
+  function getIntensity(name) { return routing[name]?.intensity ?? 0; }
 
   function get(name) { return current[name] ?? 0; }
   function getTarget(name) { return target[name] ?? 0; }
@@ -184,5 +261,7 @@ export function createKnobBus(initial = DEFAULT_KNOBS) {
     setTargets, setManual, tick, get, getTarget, snapshot,
     setTransition, getTransition,
     lock, unlock, toggleLock, isLocked, lockedNames, setAllLocked,
+    setSource, setIntensity, getSource, getIntensity,
+    getBaseline,
   };
 }

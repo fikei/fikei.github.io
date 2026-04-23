@@ -117,6 +117,7 @@
       createKnobBus, DEFAULT_KNOBS, KNOB_NAMES, KNOB_PRESETS,
       TRANSITION_MODES, DEFAULT_TRANSITION,
     } from "./control/knobs.js";
+    import { AUDIO_SOURCES, SOURCE_GROUPS } from "./control/sources.js";
     import { compilePrompt, fileToImage, hexToNormRGB } from "./llm/compiler.js";
 
     // ---------- shared /viz/ state ----------
@@ -188,6 +189,33 @@
     const knobBus = createKnobBus(DEFAULT_KNOBS);
     const knobsPanel = $("knobs-panel");
     const knobEls = new Map();
+    // Build grouped <option> tags once — same for every knob row.
+    function buildSourceOptionsHtml() {
+      const byGroup = {};
+      for (const [key, s] of Object.entries(AUDIO_SOURCES)) {
+        (byGroup[s.group] ||= []).push({ key, ...s });
+      }
+      let html = "";
+      for (const g of SOURCE_GROUPS) {
+        const items = byGroup[g.id];
+        if (!items || items.length === 0) continue;
+        if (g.id === "basic") {
+          // "none" at top with no group label
+          html += items
+            .map((s) => `<option value="${s.key}">${s.label}</option>`)
+            .join("");
+        } else {
+          html += `<optgroup label="${g.label}">`;
+          html += items
+            .map((s) => `<option value="${s.key}">${s.label}</option>`)
+            .join("");
+          html += `</optgroup>`;
+        }
+      }
+      return html;
+    }
+    const sourceOptionsHtml = buildSourceOptionsHtml();
+
     function renderKnobPanel() {
       knobsPanel.innerHTML = "";
       knobEls.clear();
@@ -195,6 +223,8 @@
         const row = document.createElement("div");
         row.className = "knob";
         if (knobBus.isLocked(name)) row.classList.add("is-locked");
+        const curSource = knobBus.getSource(name);
+        const curIntensity = knobBus.getIntensity(name);
         row.innerHTML = `
           <div class="knob__header">
             <span class="knob__name">
@@ -211,11 +241,28 @@
             <span class="knob__fill" data-knob-f></span>
             <span class="knob__handle" data-knob-h></span>
           </div>
+          <div class="knob__route">
+            <select class="knob__source" data-knob-source aria-label="${name} audio source">
+              ${sourceOptionsHtml}
+            </select>
+            <div class="knob__intensity" data-knob-intensity-track role="slider"
+                 aria-label="${name} intensity" aria-valuemin="0" aria-valuemax="1"
+                 aria-valuenow="${curIntensity.toFixed(2)}" tabindex="0"
+                 title="how strongly '${curSource}' modulates ${name}">
+              <div class="knob__intensity-rail"></div>
+              <span class="knob__intensity-fill" data-knob-intensity-fill></span>
+            </div>
+          </div>
         `;
         knobsPanel.appendChild(row);
         const track = row.querySelector("[data-knob-track]");
         const lockBtn = row.querySelector("[data-knob-lock]");
         const lockIcon = row.querySelector(".knob__lock-icon");
+        const sourceSel = row.querySelector("[data-knob-source]");
+        const intensityTrack = row.querySelector("[data-knob-intensity-track]");
+        const intensityFill = row.querySelector("[data-knob-intensity-fill]");
+        sourceSel.value = curSource;
+        intensityFill.style.width = (curIntensity * 100) + "%";
         knobEls.set(name, {
           row,
           value: row.querySelector("[data-knob-v]"),
@@ -224,6 +271,9 @@
           track,
           lockBtn,
           lockIcon,
+          sourceSel,
+          intensityTrack,
+          intensityFill,
         });
         lockBtn.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -232,7 +282,13 @@
           lockIcon.textContent = isNowLocked ? "●" : "○";
           updateLockAllButton();
         });
+        sourceSel.addEventListener("change", () => {
+          knobBus.setSource(name, sourceSel.value);
+          intensityTrack.title =
+            `how strongly '${sourceSel.value}' modulates ${name}`;
+        });
         wireKnobDrag(track, name);
+        wireIntensityDrag(intensityTrack, intensityFill, name);
       }
       updateLockAllButton();
     }
@@ -283,6 +339,39 @@
         else return;
         e.preventDefault();
         knobBus.setManual(name, v);
+      });
+    }
+
+    // Intensity mini-slider: 0..1, clicked+dragged inline. Writes straight
+    // through to knobBus.setIntensity which persists to localStorage.
+    function wireIntensityDrag(track, fill, name) {
+      function setFromPointer(ev) {
+        const rect = track.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) / rect.width;
+        const v = Math.max(0, Math.min(1, x));
+        knobBus.setIntensity(name, v);
+        fill.style.width = (v * 100) + "%";
+        track.setAttribute("aria-valuenow", v.toFixed(2));
+      }
+      track.addEventListener("pointerdown", (e) => {
+        track.setPointerCapture(e.pointerId);
+        setFromPointer(e);
+      });
+      track.addEventListener("pointermove", (e) => {
+        if (e.buttons & 1) setFromPointer(e);
+      });
+      track.addEventListener("keydown", (e) => {
+        const step = e.shiftKey ? 0.1 : 0.04;
+        const cur = knobBus.getIntensity(name);
+        let v = cur;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") v = Math.min(1, cur + step);
+        else if (e.key === "ArrowLeft" || e.key === "ArrowDown") v = Math.max(0, cur - step);
+        else if (e.key === "Home") v = 0;
+        else if (e.key === "End") v = 1;
+        else return;
+        e.preventDefault();
+        knobBus.setIntensity(name, v);
+        fill.style.width = (v * 100) + "%";
       });
     }
     renderKnobPanel();
@@ -763,13 +852,16 @@
           clapRows +
           `<hr class="hud__hr"><div class="hud__row"><span class="hud__k">fps</span><span class="hud__v">${fmt(fps, 1)}</span></div>`;
       }
-      // Tick knob bus — every frame eases current knob values toward their
-      // targets at the active transition rate. This is what makes every
-      // visual change a glide instead of a cut.
+      // Tick knob bus — every frame eases baseline toward target and
+      // applies audio-source routing. window.viz.knob holds the final
+      // routed values the engine actually reads.
       knobBus.tick();
-      // Repaint sidebar meters (axes + knobs) at rAF rate.
+      // Repaint sidebar meters: axes use their smoothed values. Knob
+      // sliders show BASELINE (the user/LLM set-point) so the handle
+      // doesn't jiggle with music routing — routing moves the visual,
+      // not the UI.
       for (const [name, v] of Object.entries(window.viz.axis || {})) paintAxis(name, v);
-      for (const [name, v] of Object.entries(window.viz.knob || {})) paintKnob(name, v);
+      for (const name of Object.keys(window.viz.knob || {})) paintKnob(name, knobBus.getBaseline(name));
       requestAnimationFrame(updateHud);
     }
     requestAnimationFrame(updateHud);

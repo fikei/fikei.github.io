@@ -61,21 +61,17 @@ window.loadEngine = function loadEngine() {
     alive() * (speedK() * 0.03 + Math.sin(viz.beat_phase * Math.PI * 2) * 0.01 * responseK());
   const scrollYSpeed = () => alive() * speedK() * 0.025;
 
-  // Frequency-band response: bass drives low-freq modulation, highs drive
-  // texture detail. Each weighted by `response` so the LLM can turn down
-  // music-reactivity without zeroing out the musical information.
-  const lowDrive = () => (viz.low ?? 0) * responseK();
-  const midDrive = () => (viz.mid ?? 0) * responseK();
-  const highDrive = () => (viz.high ?? 0) * responseK();
+  // Per-band routing is no longer hardcoded — users (and eventually the
+  // LLM) route audio sources to specific knobs via the Primitives panel.
+  // Each knob's `viz.knob[name]` already reflects baseline + routing,
+  // so here we just read k(...) and trust the routing layer. The engine
+  // still reads energy / transient / beat_phase directly because they're
+  // inherent to the visual language (alive-gate on silence, onset flash).
 
-  // Noise parameters: `noise` knob sets depth; bass modulates speed (slow
-  // bass → slow wobble), highs add fine texture.
-  const noiseSpeedF = () => 0.04 + speedK() * 0.15 + highDrive() * 0.3;
-  const noiseFreqF = () => 1 + k("noise") * 2.5 + lowDrive() * 1.5;
+  const noiseSpeedF = () => 0.04 + speedK() * 0.2;
+  const noiseFreqF = () => 1 + k("noise") * 3.5;
   const modAmount = () =>
-    k("noise") * 0.35 * alive() +
-    pulseAmt() * 0.25 * responseK() +
-    midDrive() * 0.08;
+    k("noise") * 0.4 * alive() + pulseAmt() * 0.25 * responseK();
 
   // ----- color --------------------------------------------------------------
 
