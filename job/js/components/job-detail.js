@@ -59,9 +59,11 @@ export class JobDetail extends LitElement {
     this._maybeLoad();
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
+    document.addEventListener('job:auth:ready', this._onAuth);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
+    document.removeEventListener('job:auth:ready', this._onAuth);
     super.disconnectedCallback();
   }
 

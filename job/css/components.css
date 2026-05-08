@@ -355,9 +355,11 @@
 /* --- Status select + apply cell --- */
 .status-cell { display: flex; align-items: center; gap: var(--space-2); }
 .status-select {
+  /* Wise small-component size: 32px height, body-small typography. */
   font: inherit;
   font-size: var(--font-size-small);
-  padding: 6px var(--space-3);
+  height: 32px;
+  padding: 0 var(--space-5) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--bg);
@@ -365,21 +367,26 @@
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%236A6C6A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  /* Chevron uses a CSS mask so it picks up the current text colour and
+     stays correct across light + dark themes. */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(-45deg, transparent 50%, currentColor 50%);
+  background-position: calc(100% - 14px) calc(50% + 2px),
+                       calc(100% - 10px) calc(50% + 2px);
+  background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 26px;
 }
+.status-select:hover { border-color: var(--border-strong); }
 .status-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
 .status-select.is-saving { opacity: 0.6; }
 .status-cell__err {
   display: inline-grid;
   place-items: center;
-  width: 18px; height: 18px;
+  width: 20px; height: 20px;
   border-radius: var(--radius-pill);
   background: rgba(168,32,13,0.14);
   color: var(--error);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: var(--fw-semibold);
   cursor: help;
 }
@@ -458,10 +465,10 @@
   border: 0;
   background: transparent;
   color: var(--fg-muted);
-  font-size: 28px;
+  font-size: var(--font-size-title-2);
   line-height: 1;
-  width: 32px;
-  height: 32px;
+  width: var(--space-6);
+  height: var(--space-6);
   border-radius: var(--radius-pill);
   cursor: pointer;
 }
