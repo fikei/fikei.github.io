@@ -1,6 +1,6 @@
 // app.js — boot auth, gate the page, mount the rail.
-const VERSION = '0.3.0';
-console.log(`[job] v${VERSION} - kb-read + history resume`);
+const VERSION = '0.4.0';
+console.log(`[job] v${VERSION} - history full-width cards`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
