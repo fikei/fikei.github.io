@@ -1,57 +1,59 @@
 // gen-asset — generate a resume or cover letter for a pipeline role using
-// Ian's career KB + Anthropic Claude, then commit the result to fikei/job.
+// Ian's career KB + Anthropic Claude, then commit the result to Postgres
+// (job.role_assets). KB is read from job.* tables (cutover from GitHub).
 //
-// POST { rowNumber: int, kind: 'resume' | 'cover-letter' }
-//   → { slug, path, sha, content }
+// POST { slug?, rowNumber?, kind: 'resume' | 'cover-letter' }
+//   → { slug, kind, content }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { verifyJobUser, jsonResp, err, corsHeaders, roleSlug } from '../_shared/job-auth.ts';
-import { ghReadFile, ghTree, ghWriteFile } from '../_shared/job-github.ts';
-import { readSheetValues } from '../jobs-pipe/sheets.ts';
+import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
+import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.1.0';
-console.log(`[gen-asset] v${VERSION} - initial`);
+const VERSION = '0.2.0';
+console.log(`[gen-asset] v${VERSION} - Postgres cutover`);
 
-const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const KB_DIRS = ['01-job-history/', '02-goals-intents/'];
 
-interface SheetRole {
-  rowNumber: number;
-  company: string;
-  title: string;
-  url: string;
-  sector: string;
-  salary: string;
-}
-
-async function fetchRole(rowNumber: number): Promise<SheetRole | null> {
-  const values = await readSheetValues(SHEET_ID, `Roles!A${rowNumber}:M${rowNumber}`);
-  const row = values[0];
-  if (!row) return null;
-  return {
-    rowNumber,
-    company: (row[3] || '').trim(),
-    title: (row[4] || '').trim(),
-    url: (row[5] || '').trim(),
-    salary: (row[8] || '').trim(),
-    sector: (row[9] || '').trim(),
-  };
+async function loadRole(slug: string | null, rowNumber: number | null) {
+  const sql = db();
+  const rows = await sql`
+    select slug, source_row, company_name as company, title, url, sector, salary_range as salary
+    from job.pipeline_roles
+    where (${slug}::text is not null and slug = ${slug})
+       or (${rowNumber}::int is not null and source_row = ${rowNumber})
+    limit 1;
+  `;
+  return rows[0] || null;
 }
 
 async function loadKb(): Promise<string> {
-  const tree = await ghTree();
-  const files = tree.filter(t => /\.md$/.test(t.path) && KB_DIRS.some(d => t.path.startsWith(d)));
-  // Cap to a reasonable size — total KB shouldn't blow past 200KB.
-  const fetched = await Promise.all(files.map(async f => {
-    try {
-      const r = await ghReadFile(f.path);
-      return r ? `## ${f.path}\n\n${r.content}` : null;
-    } catch { return null; }
-  }));
-  return fetched.filter(Boolean).join('\n\n---\n\n');
+  const sql = db();
+  const [companies, projects, skills, wins, vision] = await Promise.all([
+    sql`select slug, name, sector, stage_at_time, location, body_md from job.companies`,
+    sql`select slug, company_slug, title, role, body_md, metric_value from job.projects`,
+    sql`select slug, name, type, level, years_practiced, body_md, cover_letter_blurb from job.skills`,
+    sql`select slug, company_slug, project_slug, headline, body_md, metric_value from job.wins`,
+    sql`select narrative_arc, voice_rules_md, raw_md from job.vision where id = 1`,
+  ]);
+
+  const sections: string[] = [];
+
+  if (vision[0]?.raw_md) sections.push(`## Vision\n\n${vision[0].raw_md}`);
+  for (const c of companies) {
+    sections.push(`## Company: ${c.name} (${c.slug})\n\n${c.body_md || ''}`);
+  }
+  for (const p of projects) {
+    sections.push(`## Project: ${p.title} (${p.slug}) — company=${p.company_slug || 'n/a'}\n\n${p.body_md || ''}`);
+  }
+  for (const s of skills) {
+    sections.push(`## Skill: ${s.name} (${s.slug}) — ${s.type || ''} ${s.level || ''}\n\n${s.body_md || ''}`);
+  }
+  for (const w of wins) {
+    sections.push(`## Win: ${w.headline} (${w.slug}) — metric=${w.metric_value || 'n/a'}\n\n${w.body_md || ''}`);
+  }
+  return sections.join('\n\n---\n\n');
 }
 
 async function callClaude(system: string, user: string): Promise<string> {
@@ -94,31 +96,39 @@ serve(async (req) => {
     if (!email) return err('unauthorized', 401);
 
     const body = await req.json().catch(() => ({}));
-    const rowNumber = Number(body.rowNumber);
+    const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
+    const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kind = body.kind === 'cover-letter' ? 'cover-letter' : (body.kind === 'resume' ? 'resume' : null);
-    if (!Number.isInteger(rowNumber) || rowNumber < 2 || rowNumber > 5000) return err('rowNumber must be int 2..5000', 400);
+    if (!slugIn && !rowIn) return err('slug or rowNumber required', 400);
     if (!kind) return err('kind must be "resume" or "cover-letter"', 400);
 
-    const role = await fetchRole(rowNumber);
-    if (!role || !role.company) return err('role not found at that row', 404);
+    const role = await loadRole(slugIn, rowIn);
+    if (!role) return err('role not found', 404);
 
-    const slug = roleSlug(role.company, role.title);
-    if (!slug) return err('could not derive slug for role', 400);
-
-    const [kb] = await Promise.all([loadKb()]);
+    const kb = await loadKb();
     const system = buildSystemPrompt(kind);
-    const user = buildUserMessage(kind, kb, role);
+    const user = buildUserMessage(kind, kb, {
+      company: role.company,
+      title: role.title,
+      sector: role.sector,
+      salary: role.salary,
+      url: role.url,
+    });
 
     const content = await callClaude(system, user);
 
-    const path = `03-jobs/${slug}/${kind}.md`;
-    const written = await ghWriteFile(
-      path,
-      content,
-      `chore: generate ${kind} for ${role.company} ${role.title} via /job`,
-    );
+    const sql = db();
+    await sql`
+      insert into job.role_assets (role_slug, kind, content_md, generated_by, generated_at)
+      values (${role.slug}, ${kind}, ${content}, ${ANTHROPIC_MODEL}, now())
+      on conflict (role_slug, kind) do update set
+        content_md = excluded.content_md,
+        generated_by = excluded.generated_by,
+        generated_at = excluded.generated_at,
+        updated_at = now();
+    `;
 
-    return jsonResp({ ok: true, slug, path: written.path, sha: written.sha, content });
+    return jsonResp({ ok: true, slug: role.slug, kind, content });
   } catch (e) {
     console.error('[gen-asset] error', e);
     return err((e as Error).message || 'server error', 500);

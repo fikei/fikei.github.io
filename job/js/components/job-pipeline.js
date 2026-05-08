@@ -65,15 +65,23 @@ export class JobPipeline extends LitElement {
   async _maybeLoad() {
     if (document.body.dataset.authState !== 'in') return;
     if (this.state === 'loading' || this.state === 'loaded') return;
+    await this._load(false);
+  }
+
+  async _load(sync) {
     this.state = 'loading';
     try {
-      const data = await fetchPipeline();
-      this.roles = (data.roles || []).slice().sort((a, b) => b.score - a.score);
+      const data = await fetchPipeline({ sync });
+      this.roles = (data.roles || []).slice();
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
     }
+  }
+
+  async _onSync() {
+    await this._load(true);
   }
 
   _toggleSet(set, value, prop) {
@@ -157,7 +165,7 @@ export class JobPipeline extends LitElement {
     r._saving = true;
     this.requestUpdate();
     try {
-      await setStatus(r.rowNumber, status);
+      await setStatus({ slug: r.slug, rowNumber: r.rowNumber }, status);
       r._saving = false;
       r._error = '';
     } catch (e) {
@@ -182,7 +190,7 @@ export class JobPipeline extends LitElement {
     r[flag] = true;
     this.requestUpdate();
     try {
-      await generateAsset(r.rowNumber, kind);
+      await generateAsset(r.slug, kind);
       if (kind === 'resume') r.hasResume = true;
       else r.hasCoverLetter = true;
     } catch (e) {
@@ -194,7 +202,7 @@ export class JobPipeline extends LitElement {
   }
 
   _detailHref(r, tab) {
-    return `/job/jobs/${r.slug}/?row=${r.rowNumber}&tab=${tab}`;
+    return `/job/jobs/${r.slug}/?tab=${tab}`;
   }
   _onBackdropClick(e) {
     if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal();
@@ -347,6 +355,9 @@ export class JobPipeline extends LitElement {
       ${this._renderFilters()}
       <div class="pipeline-meta">
         Showing <strong>${rows.length}</strong> of ${this.roles.length} roles, sorted by fit score.
+        <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._onSync()}>
+          Sync from sheet
+        </button>
       </div>
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
