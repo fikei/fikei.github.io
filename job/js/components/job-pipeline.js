@@ -1,5 +1,5 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
-// rows sorted by Fit Score desc. Per-column filters live in the header row.
+// rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, setStatus, generateAsset } = await import('../pipeline.js' + V);
@@ -18,17 +18,20 @@ const DIM_LABELS = {
   network: { label: 'Network',       max: 5,  hint: 'A named contact in the row gets +5.' },
 };
 
-const EMPTY_FILTERS = () => ({
-  minFit: 0,
-  status: '',         // '' = any
-  company: '',
-  title: '',
-  source: '',
-  sector: '',
-  salary: '',
-  hasResume: 'any',   // 'any' | 'has' | 'missing'
-  hasCover: 'any',
-});
+// Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
+// sortKey null → header isn't clickable.
+const COLUMNS = [
+  { id: 'fit',     label: 'Fit',     sortKey: 'score',          type: 'num',  defaultDir: 'desc' },
+  { id: 'status',  label: 'Status',  sortKey: 'status',         type: 'text' },
+  { id: 'company', label: 'Company', sortKey: 'company',        type: 'text' },
+  { id: 'role',    label: 'Role',    sortKey: 'title',          type: 'text' },
+  { id: 'apply',   label: 'Apply',   sortKey: null },
+  { id: 'resume',  label: 'Resume',  sortKey: 'hasResume',      type: 'bool', defaultDir: 'desc' },
+  { id: 'cover',   label: 'Cover',   sortKey: 'hasCoverLetter', type: 'bool', defaultDir: 'desc' },
+  { id: 'sector',  label: 'Sector',  sortKey: 'sector',         type: 'text' },
+  { id: 'salary',  label: 'Salary',  sortKey: 'salary_high',    type: 'num',  defaultDir: 'desc' },
+  { id: 'source',  label: 'Source',  sortKey: 'source',         type: 'text' },
+];
 
 export class JobPipeline extends LitElement {
   createRenderRoot() { return this; }
@@ -37,7 +40,8 @@ export class JobPipeline extends LitElement {
     state: { state: true },
     error: { state: true },
     roles: { state: true },
-    filters: { state: true },
+    sortKey: { state: true },
+    sortDir: { state: true },
     selectedRow: { state: true },
   };
 
@@ -46,7 +50,8 @@ export class JobPipeline extends LitElement {
     this.state = 'idle';
     this.error = '';
     this.roles = [];
-    this.filters = EMPTY_FILTERS();
+    this.sortKey = 'score';
+    this.sortDir = 'desc';
     this.selectedRow = null;
   }
 
@@ -86,49 +91,38 @@ export class JobPipeline extends LitElement {
 
   async _onSync() { await this._load(true); }
 
-  _setFilter(key, value) {
-    this.filters = { ...this.filters, [key]: value };
-  }
-  _clearFilters() { this.filters = EMPTY_FILTERS(); }
-  _activeFilterCount() {
-    const f = this.filters;
-    let n = 0;
-    if (f.minFit) n++;
-    if (f.status) n++;
-    if (f.company) n++;
-    if (f.title) n++;
-    if (f.source) n++;
-    if (f.sector) n++;
-    if (f.salary) n++;
-    if (f.hasResume !== 'any') n++;
-    if (f.hasCover !== 'any') n++;
-    return n;
+  _onSortClick(col) {
+    if (!col.sortKey) return;
+    if (this.sortKey !== col.sortKey) {
+      this.sortKey = col.sortKey;
+      this.sortDir = col.defaultDir || (col.type === 'num' || col.type === 'bool' ? 'desc' : 'asc');
+      return;
+    }
+    // 3-state cycle: asc → desc → none.
+    if (this.sortDir === 'asc') {
+      this.sortDir = 'desc';
+    } else if (this.sortDir === 'desc') {
+      this.sortKey = 'score';     // reset to default
+      this.sortDir = 'desc';
+    }
   }
 
-  _filtered() {
-    const f = this.filters;
-    const lc = (s) => (s || '').toLowerCase();
-    const has = (haystack, needle) => !needle || lc(haystack).includes(lc(needle));
-    return this.roles.filter(r => {
-      if (f.minFit && (r.score == null || r.score < f.minFit)) return false;
-      if (f.status && (r.status || '') !== f.status) return false;
-      if (f.source && (r.source || '') !== f.source) return false;
-      if (!has(r.company, f.company)) return false;
-      if (!has(r.title, f.title)) return false;
-      if (!has(r.sector, f.sector)) return false;
-      if (!has(r.salary, f.salary)) return false;
-      if (f.hasResume === 'has' && !r.hasResume) return false;
-      if (f.hasResume === 'missing' && r.hasResume) return false;
-      if (f.hasCover === 'has' && !r.hasCoverLetter) return false;
-      if (f.hasCover === 'missing' && r.hasCoverLetter) return false;
-      return true;
+  _sorted() {
+    const key = this.sortKey;
+    const dir = this.sortDir === 'desc' ? -1 : 1;
+    const arr = this.roles.slice();
+    arr.sort((a, b) => {
+      const av = a[key];
+      const bv = b[key];
+      // null/undefined always sorted to bottom regardless of direction.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'number' || typeof bv === 'number') return (av - bv) * dir;
+      if (typeof av === 'boolean' || typeof bv === 'boolean') return ((av ? 1 : 0) - (bv ? 1 : 0)) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
     });
-  }
-
-  _uniques(field) {
-    const set = new Set();
-    this.roles.forEach(r => set.add(r[field] || ''));
-    return Array.from(set).filter(Boolean).sort();
+    return arr;
   }
 
   _scoreClass(s) {
@@ -209,9 +203,7 @@ export class JobPipeline extends LitElement {
     const has = kind === 'resume' ? r.hasResume : r.hasCoverLetter;
     const generating = kind === 'resume' ? r._genResume : r._genCover;
     if (has) {
-      return html`
-        <a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">View / Edit</a>
-      `;
+      return html`<a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">View / Edit</a>`;
     }
     return html`
       <button class="btn btn--sm" ?disabled=${generating} @click=${() => this._onGenerate(r, kind)}>
@@ -220,48 +212,22 @@ export class JobPipeline extends LitElement {
     `;
   }
 
-  _renderFilterRow() {
-    const f = this.filters;
-    const set = (k) => (e) => this._setFilter(k, e.target.value);
+  _renderHeader() {
     return html`
-      <tr class="pipeline-table__filters">
-        <th>
-          <input type="number" min="0" max="100" placeholder="min"
-            class="col-filter col-filter--num"
-            .value=${f.minFit ? String(f.minFit) : ''}
-            @input=${(e) => this._setFilter('minFit', parseInt(e.target.value, 10) || 0)}>
-        </th>
-        <th>
-          <select class="col-filter" .value=${f.status} @change=${set('status')}>
-            <option value="">Any</option>
-            ${this._uniques('status').map(s => html`<option value=${s} ?selected=${f.status===s}>${s}</option>`)}
-          </select>
-        </th>
-        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.company} @input=${set('company')}></th>
-        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.title} @input=${set('title')}></th>
-        <th></th>
-        <th>
-          <select class="col-filter" .value=${f.hasResume} @change=${set('hasResume')}>
-            <option value="any">Any</option>
-            <option value="has" ?selected=${f.hasResume==='has'}>Has</option>
-            <option value="missing" ?selected=${f.hasResume==='missing'}>Missing</option>
-          </select>
-        </th>
-        <th>
-          <select class="col-filter" .value=${f.hasCover} @change=${set('hasCover')}>
-            <option value="any">Any</option>
-            <option value="has" ?selected=${f.hasCover==='has'}>Has</option>
-            <option value="missing" ?selected=${f.hasCover==='missing'}>Missing</option>
-          </select>
-        </th>
-        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.sector} @input=${set('sector')}></th>
-        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.salary} @input=${set('salary')}></th>
-        <th>
-          <select class="col-filter" .value=${f.source} @change=${set('source')}>
-            <option value="">Any</option>
-            ${this._uniques('source').map(s => html`<option value=${s} ?selected=${f.source===s}>${s}</option>`)}
-          </select>
-        </th>
+      <tr>
+        ${COLUMNS.map(c => {
+          if (!c.sortKey) return html`<th>${c.label}</th>`;
+          const active = this.sortKey === c.sortKey;
+          const arrow = active ? (this.sortDir === 'asc' ? '↑' : '↓') : '↕';
+          return html`
+            <th>
+              <button class="th-sort ${active ? 'is-active' : ''}" @click=${() => this._onSortClick(c)}>
+                <span>${c.label}</span>
+                <span class="th-sort__arrow">${arrow}</span>
+              </button>
+            </th>
+          `;
+        })}
       </tr>
     `;
   }
@@ -356,37 +322,17 @@ export class JobPipeline extends LitElement {
         <p style="font-family:var(--font-mono);font-size:13px;">${this.error}</p>
       </div>`;
     }
-    const rows = this._filtered();
-    const nFilters = this._activeFilterCount();
+    const rows = this._sorted();
     return html`
       <div class="pipeline-meta">
-        Showing <strong>${rows.length}</strong> of ${this.roles.length} roles, sorted by fit score.
-        ${nFilters > 0 ? html`
-          <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._clearFilters()}>
-            Clear ${nFilters} filter${nFilters > 1 ? 's' : ''}
-          </button>
-        ` : nothing}
+        <strong>${rows.length}</strong> roles, sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.
         <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._onSync()}>
           Sync from sheet
         </button>
       </div>
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
-          <thead>
-            <tr>
-              <th>Fit</th>
-              <th>Status</th>
-              <th>Company</th>
-              <th>Role</th>
-              <th>Apply</th>
-              <th>Resume</th>
-              <th>Cover</th>
-              <th>Sector</th>
-              <th>Salary</th>
-              <th>Source</th>
-            </tr>
-            ${this._renderFilterRow()}
-          </thead>
+          <thead>${this._renderHeader()}</thead>
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>
       </div>
