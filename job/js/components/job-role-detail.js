@@ -1,18 +1,18 @@
 // job-role-detail — per-role detail page with Resume / Cover Letter tabs.
-// Reads /job/jobs/{slug}/?row=&tab= and renders both assets from
-// 03-jobs/{slug}/{kind}.md via kb-read; saves edits via kb-write.
+// Reads /job/jobs/{slug}/?tab= and renders/edits assets from job.role_assets
+// via the role-asset endpoint.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset }, { writeFile }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
-  import('../kbwrite.js' + V),
+  import('../roleAsset.js' + V),
 ]);
 
 const TABS = [
-  { id: 'resume', label: 'Resume', file: 'resume.md' },
-  { id: 'cover-letter', label: 'Cover letter', file: 'cover-letter.md' },
+  { id: 'resume', label: 'Resume' },
+  { id: 'cover-letter', label: 'Cover letter' },
 ];
 
 export class JobRoleDetail extends LitElement {
@@ -87,14 +87,11 @@ export class JobRoleDetail extends LitElement {
   }
 
   async _loadAsset(kind) {
-    const file = TABS.find(t => t.id === kind).file;
-    const path = `03-jobs/${this.slug}/${file}`;
-    try {
-      const r = await window.JobKB.readFile(path);
-      return { path, content: r.content, sha: r.sha, draft: r.content, mode: 'view', saving: false, dirty: false, error: '' };
-    } catch (e) {
-      return { path, content: '', sha: '', draft: '', mode: 'empty', saving: false, dirty: false, error: '' };
+    const r = await readRoleAsset(this.slug, kind);
+    if (!r) {
+      return { content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: '' };
     }
+    return { content: r.content_md, draft: r.content_md, mode: 'view', saving: false, dirty: false, error: '' };
   }
 
   _switchTab(id) {
@@ -103,24 +100,16 @@ export class JobRoleDetail extends LitElement {
   }
 
   async _onGenerate(kind) {
-    if (!this.rowNumber) {
-      this._setAssetError(kind, 'Missing row reference. Open this page from the pipeline.');
-      return;
-    }
     const a = this.assets[kind] || {};
     a.saving = true;
     a.error = '';
     this.assets = { ...this.assets, [kind]: { ...a } };
     try {
-      const res = await generateAsset(this.rowNumber, kind);
-      const file = TABS.find(t => t.id === kind).file;
-      const path = `03-jobs/${this.slug}/${file}`;
+      const res = await generateAsset(this.slug, kind);
       this.assets = {
         ...this.assets,
         [kind]: {
-          path,
           content: res.content,
-          sha: res.sha,
           draft: res.content,
           mode: 'view',
           saving: false,
@@ -158,10 +147,10 @@ export class JobRoleDetail extends LitElement {
     if (!a.dirty) return;
     this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
     try {
-      const res = await writeFile(a.path, a.draft, a.sha);
+      await writeRoleAsset(this.slug, kind, a.draft);
       this.assets = {
         ...this.assets,
-        [kind]: { ...a, content: a.draft, sha: res.sha, mode: 'view', saving: false, dirty: false },
+        [kind]: { ...a, content: a.draft, mode: 'view', saving: false, dirty: false },
       };
     } catch (e) {
       this._setAssetError(kind, String(e));
