@@ -5,20 +5,57 @@ import { renderMarkdown } from '../markdown.js';
 
 const COMPANIES_DIR = '01-job-history/companies/';
 
-// Pull a small set of fields from the markdown front-block.
-// The KB convention: H1 then a list of "**Field:** value" lines.
-function parseHeader(md) {
-  const out = { title: '', fields: {} };
+// Strip wiki-link / markdown link / bold syntax for plain-text snippets.
+function plainify(s) {
+  return s
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+}
+
+// Pull title, "**Field:** value" header, and a 1-2 sentence summary
+// (first prose paragraph; prefers the body of "## Context" if present).
+function parseDoc(md) {
+  const out = { title: '', fields: {}, summary: '' };
   const lines = md.split(/\r?\n/);
-  for (const line of lines) {
+  let i = 0;
+  for (; i < lines.length; i++) {
+    const line = lines[i];
     if (!out.title) {
       const h1 = line.match(/^#\s+(.+)$/);
       if (h1) { out.title = h1[1].trim(); continue; }
     }
     const m = line.match(/^\*\*([^*:]+):\*\*\s*(.+)$/);
-    if (m) out.fields[m[1].trim()] = m[2].trim();
-    if (line.startsWith('## ')) break; // first section starts → stop scanning
+    if (m) { out.fields[m[1].trim()] = m[2].trim(); continue; }
+    if (line.startsWith('## ')) break;
   }
+
+  // Find "## Context" first, otherwise first non-heading paragraph after metadata.
+  let bodyStart = -1;
+  for (let j = i; j < lines.length; j++) {
+    if (/^##\s+Context\b/i.test(lines[j])) { bodyStart = j + 1; break; }
+  }
+  if (bodyStart === -1) bodyStart = i;
+
+  const para = [];
+  for (let j = bodyStart; j < lines.length; j++) {
+    const line = lines[j].trim();
+    if (!line) {
+      if (para.length) break;
+      continue;
+    }
+    if (line.startsWith('#')) {
+      if (para.length) break;
+      continue;
+    }
+    if (/^\*\*[^*]+:\*\*/.test(line)) continue;
+    para.push(line);
+  }
+  out.summary = plainify(para.join(' '));
   return out;
 }
 
@@ -60,9 +97,9 @@ export class JobHistoryResume extends LitElement {
       const loaded = await Promise.all(files.map(async f => {
         try {
           const { content } = await window.JobKB.readFile(f.path);
-          return { ...f, ...parseHeader(content), content };
+          return { ...f, ...parseDoc(content), content };
         } catch (e) {
-          return { ...f, title: f.name.replace(/\.md$/, ''), fields: {}, content: '', error: String(e) };
+          return { ...f, title: f.name.replace(/\.md$/, ''), fields: {}, summary: '', content: '', error: String(e) };
         }
       }));
       // Sort: those with a tenure-end of 'Present' first, then by tenure-start desc, then by name.
@@ -86,17 +123,29 @@ export class JobHistoryResume extends LitElement {
     const sector = c.fields['Sector'] || '';
     const stage = c.fields['Stage at the time of joining'] || c.fields['Stage of clients'] || c.fields['Stage at the time'] || '';
     const location = c.fields['Location'] || '';
+    const operating = c.fields['Operating mode'] || '';
+    const rolesHeld = c.fields['Roles held'] || '';
+    const subline = operating || rolesHeld
+      ? plainify(operating || rolesHeld)
+      : '';
+
+    const chips = [sector, stage, location].filter(Boolean);
+
     return html`
       <a class="company-card" href="/job/history/companies/${slug}/">
-        <div class="company-card__head">
-          <h3>${c.title}</h3>
+        <div class="company-card__top">
+          <div class="company-card__title">
+            <h3>${c.title}</h3>
+            ${subline ? html`<p class="company-card__sub">${subline}</p>` : nothing}
+          </div>
           ${tenure ? html`<span class="company-card__tenure">${tenure}</span>` : nothing}
         </div>
-        <dl class="company-card__meta">
-          ${sector ? html`<div><dt>Sector</dt><dd>${sector}</dd></div>` : nothing}
-          ${stage ? html`<div><dt>Stage</dt><dd>${stage}</dd></div>` : nothing}
-          ${location ? html`<div><dt>Location</dt><dd>${location}</dd></div>` : nothing}
-        </dl>
+        ${c.summary ? html`<p class="company-card__summary">${c.summary}</p>` : nothing}
+        ${chips.length ? html`
+          <ul class="company-card__chips">
+            ${chips.map(t => html`<li>${t}</li>`)}
+          </ul>
+        ` : nothing}
       </a>
     `;
   }
