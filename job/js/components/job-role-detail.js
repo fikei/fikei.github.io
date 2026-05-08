@@ -3,9 +3,12 @@
 // 03-jobs/{slug}/{kind}.md via kb-read; saves edits via kb-write.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
-import { renderMarkdown } from '../markdown.js';
-import { generateAsset } from '../pipeline.js';
-import { writeFile } from '../kbwrite.js';
+const V = (new URL(import.meta.url)).search;
+const [{ renderMarkdown }, { generateAsset }, { writeFile }] = await Promise.all([
+  import('../markdown.js' + V),
+  import('../pipeline.js' + V),
+  import('../kbwrite.js' + V),
+]);
 
 const TABS = [
   { id: 'resume', label: 'Resume', file: 'resume.md' },

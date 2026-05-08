@@ -1,7 +1,6 @@
 // job-history-resume — top-level resume view: list of companies pulled from
 // fikei/job/01-job-history/companies/ via kb-read.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-import { renderMarkdown } from '../markdown.js';
 
 const COMPANIES_DIR = '01-job-history/companies/';
 
