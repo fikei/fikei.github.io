@@ -60,16 +60,40 @@ VOICE RULES (same as cover letter):
 
 Output ONLY the markdown. No preamble. No "Here is your resume." Start with "# Ian Fike".`;
 
-export function buildSystemPrompt(kind: 'resume' | 'cover-letter'): string {
-  const voice = kind === 'cover-letter' ? COVER_LETTER_VOICE : RESUME_VOICE;
-  return `You are drafting a ${kind === 'cover-letter' ? 'cover letter' : 'resume'} for Ian Fike, a senior PM. Your job: produce final-quality markdown that Ian could submit without further editing.
+export const ANALYSIS_VOICE = `You are advising Ian on a specific role. Output ONLY a JSON object with these keys, each value a markdown string:
+
+{
+  "description":         "2-3 sentence plain summary of the role and what the team is trying to ship.",
+  "whyFits":             "3-5 bullets in markdown explaining why this role plays to Ian's strengths. Reference specific past projects/skills by name. Don't editorialize.",
+  "risks":               "2-4 bullets in markdown calling out the real concerns: ICP/seniority mismatch, sector adjacency, comp gap, geo, gaps in evidence. Be honest, not encouraging.",
+  "candidateStrength":   "1-2 sentences in markdown rating Ian's relative strength as a candidate (strong / mid / stretch) with the single strongest piece of evidence.",
+  "suggestedAngle":      "1-2 sentences in markdown suggesting the framing he should lead with in the cover letter."
+}
+
+Rules:
+- Output ONLY the JSON object. No prose before or after. No code fence. No commentary.
+- Markdown values are short. Bullets use "- " prefix.
+- No em dashes. No "passionate about" / "excited to". No try-hard cleverness.
+- Reference real projects/skills/wins by their slug-like name when relevant (livongo-platform-scaling, eligibility-engine, growth-experimentation, etc).`;
+
+export function buildSystemPrompt(kind: 'resume' | 'cover-letter' | 'analysis'): string {
+  const voice =
+    kind === 'cover-letter' ? COVER_LETTER_VOICE :
+    kind === 'analysis'     ? ANALYSIS_VOICE :
+                              RESUME_VOICE;
+  const intro =
+    kind === 'analysis'
+      ? `You are reviewing a job posting for Ian Fike (senior PM) and producing a structured assessment.`
+      : `You are drafting a ${kind === 'cover-letter' ? 'cover letter' : 'resume'} for Ian Fike, a senior PM. Your job: produce final-quality markdown that Ian could submit without further editing.`;
+
+  return `${intro}
 
 ${voice}
 
 Below is Ian's career knowledge base — companies, projects, skills, wins, and goals/intents. Use it as the source of truth for facts. Do not invent.`;
 }
 
-export function buildUserMessage(kind: 'resume' | 'cover-letter', kbContext: string, role: { company: string; title: string; sector?: string; salary?: string; url?: string }): string {
+export function buildUserMessage(kind: 'resume' | 'cover-letter' | 'analysis', kbContext: string, role: { company: string; title: string; sector?: string; salary?: string; url?: string }): string {
   const meta = [
     `Company: ${role.company}`,
     `Title: ${role.title}`,
@@ -78,9 +102,10 @@ export function buildUserMessage(kind: 'resume' | 'cover-letter', kbContext: str
     role.url ? `Posting: ${role.url}` : '',
   ].filter(Boolean).join('\n');
 
-  const ask = kind === 'cover-letter'
-    ? 'Draft the cover letter as markdown. ~350 words, one page. Address it to the company by name.'
-    : 'Draft the resume as markdown. One page. Tailored emphasis for this role.';
+  const ask =
+    kind === 'cover-letter' ? 'Draft the cover letter as markdown. ~350 words, one page. Address it to the company by name.'
+    : kind === 'analysis'   ? 'Produce the JSON object now. JSON only.'
+    :                         'Draft the resume as markdown. One page. Tailored emphasis for this role.';
 
   return `# Career knowledge base
 

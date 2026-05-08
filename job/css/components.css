@@ -687,3 +687,97 @@
 .asset-editor:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
 
 .asset-doc { max-width: 720px; }
+
+/* --- Role detail (drill page) --- */
+.role-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+.role-header__title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-1);
+  letter-spacing: -0.02em;
+  line-height: var(--lh-title);
+}
+.role-header__sub {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-body-lg);
+  color: var(--fg-muted);
+}
+.role-header__actions { flex-shrink: 0; padding-top: var(--space-2); }
+
+.role-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  margin-bottom: var(--space-5);
+}
+.role-meta__item dt {
+  margin: 0 0 4px;
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle);
+  text-transform: none;
+  font-weight: var(--fw-medium);
+}
+.role-meta__item dd {
+  margin: 0;
+  font-size: var(--font-size-body);
+  color: var(--fg);
+  font-weight: var(--fw-medium);
+}
+
+.role-summary {
+  margin-bottom: var(--space-5);
+  font-size: var(--font-size-body-lg);
+  color: var(--fg);
+}
+.role-summary .kb-doc { font-size: var(--font-size-body-lg); }
+
+.role-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.role-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  padding: var(--space-5);
+}
+.role-card__head h3 {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  letter-spacing: -0.01em;
+}
+.role-card__body .kb-doc {
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+.role-card__body .kb-doc p:last-child,
+.role-card__body .kb-doc ul:last-child { margin-bottom: 0; }
+
+.role-callout {
+  border-left: 3px solid var(--accent-strong);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-bottom: var(--space-5);
+}
+.role-callout h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-muted);
+}
