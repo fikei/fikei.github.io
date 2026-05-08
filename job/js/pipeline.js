@@ -28,4 +28,17 @@ export async function setStatus(rowNumber, status) {
   return res.json();
 }
 
-window.JobPipeline = { fetchPipeline, setStatus };
+const GEN_ASSET_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gen-asset';
+
+export async function generateAsset(rowNumber, kind) {
+  const headers = await authHeader();
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rowNumber, kind }),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  return res.json(); // { slug, path, sha, content }
+}
+
+window.JobPipeline = { fetchPipeline, setStatus, generateAsset };

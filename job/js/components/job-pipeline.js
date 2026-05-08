@@ -1,7 +1,7 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
 // rows sorted by Fit Score desc. Click a fit pill to see the breakdown.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-import { fetchPipeline, setStatus } from '../pipeline.js';
+import { fetchPipeline, setStatus, generateAsset } from '../pipeline.js';
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -172,6 +172,27 @@ export class JobPipeline extends LitElement {
       await this._changeStatus(r, 'Applied');
     }
   }
+
+  async _onGenerate(r, kind) {
+    const flag = kind === 'resume' ? '_genResume' : '_genCover';
+    if (r[flag]) return;
+    r[flag] = true;
+    this.requestUpdate();
+    try {
+      await generateAsset(r.rowNumber, kind);
+      if (kind === 'resume') r.hasResume = true;
+      else r.hasCoverLetter = true;
+    } catch (e) {
+      r._error = String(e);
+    } finally {
+      r[flag] = false;
+      this.requestUpdate();
+    }
+  }
+
+  _detailHref(r, tab) {
+    return `/job/jobs/${r.slug}/?row=${r.rowNumber}&tab=${tab}`;
+  }
   _onBackdropClick(e) {
     if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal();
   }
@@ -194,6 +215,23 @@ export class JobPipeline extends LitElement {
     return html`
       <button class="btn btn--sm btn--accent" @click=${() => this._onApplyClick(r)}>
         Apply ↗
+      </button>
+    `;
+  }
+
+  _renderAssetCell(r, kind) {
+    const has = kind === 'resume' ? r.hasResume : r.hasCoverLetter;
+    const generating = kind === 'resume' ? r._genResume : r._genCover;
+    if (has) {
+      return html`
+        <a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">
+          View / Edit
+        </a>
+      `;
+    }
+    return html`
+      <button class="btn btn--sm" ?disabled=${generating} @click=${() => this._onGenerate(r, kind)}>
+        ${generating ? 'Generating…' : 'Create'}
       </button>
     `;
   }
@@ -224,6 +262,8 @@ export class JobPipeline extends LitElement {
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
         <td>${this._renderApplyCell(r)}</td>
+        <td>${this._renderAssetCell(r, 'resume')}</td>
+        <td>${this._renderAssetCell(r, 'cover-letter')}</td>
         <td><span class="muted">${r.sector || ''}</span></td>
         <td><span class="muted">${r.salary || ''}</span></td>
         <td><span class="muted">${r.source || ''}</span></td>
@@ -314,6 +354,8 @@ export class JobPipeline extends LitElement {
               <th>Company</th>
               <th>Role</th>
               <th>Apply</th>
+              <th>Resume</th>
+              <th>Cover</th>
               <th>Sector</th>
               <th>Salary</th>
               <th>Source</th>
