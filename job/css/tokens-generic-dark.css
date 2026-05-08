@@ -1,35 +1,36 @@
 /* Wise design system — dark theme tokens.
-   Forest Green base with Bright Green as the active accent. */
+   Backgrounds and surfaces are greyscale; the brand keeps its green only on
+   active accents (status pills, View button, fit-score "strong" pill). */
 [data-theme="generic-dark"] {
-  /* Backgrounds — Forest Green family */
-  --bg: #102600;
-  --bg-surface: #163300;                            /* Forest Green */
-  --bg-elevated: #1F4400;
-  --bg-overlay: rgba(159, 232, 112, 0.08);
+  /* Backgrounds — neutral greyscale */
+  --bg: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1f2630;
+  --bg-overlay: rgba(255, 255, 255, 0.06);
 
   /* Content */
-  --fg: #FFFFFF;                                    /* Base Light */
-  --fg-muted: rgba(255, 255, 255, 0.72);
-  --fg-subtle: rgba(255, 255, 255, 0.50);
+  --fg: #f0f6fc;
+  --fg-muted: rgba(240, 246, 252, 0.72);
+  --fg-subtle: rgba(240, 246, 252, 0.50);
   --fg-link: #9FE870;
 
-  /* Interactive — Bright Green leads in dark */
-  --accent: #9FE870;                                /* Bright Green */
-  --accent-fg: #163300;                             /* Forest Green for text on accent */
+  /* Interactive — Bright Green still leads as the active accent */
+  --accent: #9FE870;
+  --accent-fg: #0d1117;
   --accent-muted: rgba(159, 232, 112, 0.16);
   --accent-strong: #9FE870;
-  --accent-strong-fg: #163300;
+  --accent-strong-fg: #0d1117;
 
   /* Borders */
-  --border: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.24);
+  --border: rgba(240, 246, 252, 0.12);
+  --border-strong: rgba(240, 246, 252, 0.24);
 
   /* Sentiment */
   --success: #9FE870;
   --error: #FF7A6E;
   --warning: #FFEB69;
 
-  /* Typography (same scale; weights match light) */
+  /* Typography */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -60,7 +61,7 @@
   --radius-2xl: 60px;
   --radius-pill: 999px;
 
-  /* Shadows — softer in dark */
+  /* Shadows */
   --shadow-sm: 0 2px 6px rgba(0,0,0,0.30);
   --shadow-md: 0 8px 24px rgba(0,0,0,0.40);
   --shadow-lg: 0 16px 48px rgba(0,0,0,0.55);

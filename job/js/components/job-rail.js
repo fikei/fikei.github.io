@@ -11,8 +11,8 @@ const ROUTES = [
 const THEMES = [
   { value: 'generic-light', label: 'Generic · Light' },
   { value: 'generic-dark',  label: 'Generic · Dark' },
-  { value: 'ctrl-light',    label: 'CTRL · Light (soon)', disabled: true },
-  { value: 'ctrl-dark',     label: 'CTRL · Dark (soon)',  disabled: true }
+  { value: 'ctrl-light',    label: 'CTRL · Light' },
+  { value: 'ctrl-dark',     label: 'CTRL · Dark' }
 ];
 
 export class JobRail extends LitElement {
