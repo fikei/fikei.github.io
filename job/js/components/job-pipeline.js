@@ -1,9 +1,17 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
-// rows sorted by Fit Score desc.
+// rows sorted by Fit Score desc. Click a fit pill to see the breakdown.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { fetchPipeline } from '../pipeline.js';
 
-const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
+const DIM_LABELS = {
+  title:   { label: 'Title match',   max: 25, hint: 'Founding/Senior/Staff PM scores higher; below seniority hard-fails.' },
+  stage:   { label: 'Stage',         max: 20, hint: 'Inferred from investors. Pre-seed → C scores high; public/mega-cap hard-fails.' },
+  sector:  { label: 'Sector',        max: 20, hint: 'Health and EdTech are top; AI-native / SaaS / Fintech middle.' },
+  geo:     { label: 'Geography',     max: 15, hint: 'Sheet has no geo column — neutral default for now.' },
+  comp:    { label: 'Compensation',  max: 10, hint: 'Top of range ≥ $200k = full marks.' },
+  source:  { label: 'Source',        max: 5,  hint: 'Network > LinkedIn Saved > LinkedIn Recommended > Company Pages > Manual.' },
+  network: { label: 'Network',       max: 5,  hint: 'A named contact in the row gets +5.' },
+};
 
 export class JobPipeline extends LitElement {
   createRenderRoot() { return this; }
@@ -16,6 +24,7 @@ export class JobPipeline extends LitElement {
     sourceFilter: { state: true },
     minFit: { state: true },
     sectorQuery: { state: true },
+    selectedRow: { state: true },
   };
 
   constructor() {
@@ -27,6 +36,7 @@ export class JobPipeline extends LitElement {
     this.sourceFilter = new Set();
     this.minFit = 0;
     this.sectorQuery = '';
+    this.selectedRow = null;
   }
 
   connectedCallback() {
@@ -34,9 +44,12 @@ export class JobPipeline extends LitElement {
     this._maybeLoad();
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
+    this._onKey = (e) => { if (e.key === 'Escape') this._closeFitModal(); };
+    document.addEventListener('keydown', this._onKey);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
+    document.removeEventListener('keydown', this._onKey);
     super.disconnectedCallback();
   }
 
@@ -104,7 +117,7 @@ export class JobPipeline extends LitElement {
           </div>
         </div>
         <div class="pipeline-filters__group">
-          <label>Min Fit ${this.minFit}</label>
+          <label>Min fit ${this.minFit}</label>
           <input type="range" min="0" max="100" .value=${String(this.minFit)}
             @input=${(e) => { this.minFit = parseInt(e.target.value, 10); }}>
         </div>
@@ -125,10 +138,23 @@ export class JobPipeline extends LitElement {
     return 'fit-pill fit-pill--poor';
   }
 
+  _openFitModal(r) { this.selectedRow = r; }
+  _closeFitModal() { this.selectedRow = null; }
+  _onBackdropClick(e) {
+    if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal();
+  }
+
   _renderRow(r) {
     return html`
       <tr>
-        <td><span class=${this._scoreClass(r.score)} title=${r.hardFails.length ? 'Hard fails: ' + r.hardFails.join(', ') : ''}>${r.score}</span></td>
+        <td>
+          <button
+            class=${this._scoreClass(r.score) + ' fit-pill--button'}
+            title="Tap to see the breakdown"
+            @click=${() => this._openFitModal(r)}>
+            ${r.score}
+          </button>
+        </td>
         <td>${r.status || html`<span class="muted">—</span>`}</td>
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
@@ -139,6 +165,64 @@ export class JobPipeline extends LitElement {
           ${r.url ? html`<a href=${r.url} target="_blank" rel="noopener noreferrer">↗</a>` : nothing}
         </td>
       </tr>
+    `;
+  }
+
+  _renderFitModal() {
+    const r = this.selectedRow;
+    if (!r) return nothing;
+    const dims = Object.keys(DIM_LABELS);
+    return html`
+      <div class="fit-modal__backdrop" @click=${this._onBackdropClick}>
+        <div class="fit-modal" role="dialog" aria-modal="true" aria-label="Fit score breakdown">
+          <header class="fit-modal__head">
+            <div>
+              <p class="fit-modal__eyebrow">${r.company}</p>
+              <h2>${r.title || 'Untitled role'}</h2>
+            </div>
+            <button class="fit-modal__close" @click=${this._closeFitModal} aria-label="Close">×</button>
+          </header>
+
+          <div class="fit-modal__score">
+            <span class=${this._scoreClass(r.score)}>${r.score}</span>
+            <div>
+              <p class="fit-modal__score-label">Fit score</p>
+              <p class="fit-modal__score-sub">Out of 100. Sum of seven weighted dimensions; hard fails cap at 30.</p>
+            </div>
+          </div>
+
+          ${r.hardFails && r.hardFails.length ? html`
+            <div class="fit-modal__fails">
+              <strong>Hard fail${r.hardFails.length > 1 ? 's' : ''}:</strong>
+              ${r.hardFails.join(', ')}. Score capped at 30.
+            </div>
+          ` : nothing}
+
+          <ul class="fit-breakdown">
+            ${dims.map(k => {
+              const meta = DIM_LABELS[k];
+              const v = (r.breakdown && r.breakdown[k]) || 0;
+              const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
+              return html`
+                <li class="fit-breakdown__row">
+                  <div class="fit-breakdown__head">
+                    <span class="fit-breakdown__label">${meta.label}</span>
+                    <span class="fit-breakdown__value">${v} / ${meta.max}</span>
+                  </div>
+                  <div class="fit-breakdown__bar">
+                    <span style=${`width:${pct}%`}></span>
+                  </div>
+                  <p class="fit-breakdown__hint">${meta.hint}</p>
+                </li>
+              `;
+            })}
+          </ul>
+
+          <footer class="fit-modal__foot">
+            <p class="muted">Weights are fixed in v1. Tunable in v2 once Vision integration lands.</p>
+          </footer>
+        </div>
+      </div>
     `;
   }
 
@@ -156,7 +240,7 @@ export class JobPipeline extends LitElement {
     return html`
       ${this._renderFilters()}
       <div class="pipeline-meta">
-        Showing <strong>${rows.length}</strong> of ${this.roles.length} roles, sorted by Fit Score.
+        Showing <strong>${rows.length}</strong> of ${this.roles.length} roles, sorted by fit score.
       </div>
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
@@ -175,6 +259,7 @@ export class JobPipeline extends LitElement {
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>
       </div>
+      ${this._renderFitModal()}
     `;
   }
 }
