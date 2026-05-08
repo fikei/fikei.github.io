@@ -5,10 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Jobs — /job</title>
   <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
   <link rel="stylesheet" href="/job/css/base.css">
   <script src="/job/js/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+  <script src="/auth/ctrl-auth.js"></script>
 </head>
-<body>
+<body data-auth-state="loading">
+
+  <section id="signin-gate" class="gate">
+    <div class="gate__card">
+      <h1>/job</h1>
+      <p>Ian's career knowledge base and pipeline. Sign in to continue.</p>
+      <button class="btn btn--primary" id="signin-btn">Sign in</button>
+      <div id="ctrl-auth-root"></div>
+    </div>
+  </section>
+
   <div class="app">
     <job-rail></job-rail>
     <main class="app__main">
@@ -22,6 +35,7 @@
       </div>
     </main>
   </div>
+
   <script type="module" src="/job/js/app.js"></script>
 </body>
 </html>
