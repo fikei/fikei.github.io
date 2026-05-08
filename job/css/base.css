@@ -23,6 +23,15 @@ button {
   cursor: pointer;
 }
 
+/* Auth gating: signin card visible until allowlisted user is signed in. */
+body[data-auth-state="in"] #signin-gate { display: none; }
+body:not([data-auth-state="in"]) .app { display: none; }
+
+/* Hide the floating CtrlAuth top-right Login button when not signed in —
+   we own the sign-in CTA inside the gate card. Keep the bar visible once
+   signed in so the user has a sign-out path. */
+body:not([data-auth-state="in"]) #ctrlAuthBar { display: none !important; }
+
 .app {
   display: grid;
   grid-template-columns: 240px 1fr;
