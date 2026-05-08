@@ -3,19 +3,22 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
-import { readSheetValues } from './sheets.ts';
+import { readSheetValues, writeSheetCell } from './sheets.ts';
 import { computeFit, RoleRow } from './fit.ts';
 
-const VERSION = '0.1.0';
-console.log(`[jobs-pipe] v${VERSION} - sheet read + fit score`);
+const VERSION = '0.2.0';
+console.log(`[jobs-pipe] v${VERSION} - status writeback`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const ALLOWLIST = ['fike101@gmail.com'];
+const STATUS_ENUM = new Set([
+  '', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network',
+]);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 function json(body: unknown, status = 200) {
@@ -68,27 +71,40 @@ function rowToRole(row: string[], rowNumber: number): { role: RoleRow; rowNumber
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'GET') return err('GET only', 405);
 
   try {
     const email = await verifyAllowlistedUser(req);
     if (!email) return err('unauthorized', 401);
 
-    const values = await readSheetValues(SHEET_ID, 'Roles!A2:M1000');
-    const enriched = values
-      .map((row, idx) => rowToRole(row, idx + 2))
-      .filter(({ role }) => role.company || role.title)
-      .map(({ role, rowNumber }) => ({
-        rowNumber,
-        ...role,
-        ...computeFit(role),
-      }));
+    if (req.method === 'GET') {
+      const values = await readSheetValues(SHEET_ID, 'Roles!A2:M1000');
+      const enriched = values
+        .map((row, idx) => rowToRole(row, idx + 2))
+        .filter(({ role }) => role.company || role.title)
+        .map(({ role, rowNumber }) => ({
+          rowNumber,
+          ...role,
+          ...computeFit(role),
+        }));
+      return json({ version: VERSION, count: enriched.length, roles: enriched });
+    }
 
-    return json({
-      version: VERSION,
-      count: enriched.length,
-      roles: enriched,
-    });
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const rowNumber = Number(body.rowNumber);
+      const status = String(body.status ?? '');
+      if (!Number.isInteger(rowNumber) || rowNumber < 2 || rowNumber > 5000) {
+        return err('rowNumber must be int 2..5000', 400);
+      }
+      if (!STATUS_ENUM.has(status)) {
+        return err(`status must be one of: ${Array.from(STATUS_ENUM).filter(Boolean).join(', ')}`, 400);
+      }
+      // Status lives in column C of the Roles tab.
+      await writeSheetCell(SHEET_ID, `Roles!C${rowNumber}`, status);
+      return json({ ok: true, rowNumber, status });
+    }
+
+    return err('GET or POST only', 405);
   } catch (e) {
     console.error('[jobs-pipe] error', e);
     return err((e as Error).message || 'server error', 500);
