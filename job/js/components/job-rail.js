@@ -69,7 +69,7 @@ export class JobRail extends LitElement {
               `)}
             </select>
           </label>
-          <div style="font-size:12px;color:var(--fg-subtle);">v0.1.0 · skeleton</div>
+          <div style="font-size:var(--font-size-caption);color:var(--fg-subtle);">${window.JOB_VERSION || ''}</div>
         </div>
       </aside>
     `;
