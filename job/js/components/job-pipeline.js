@@ -1,8 +1,6 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
-// rows sorted by Fit Score desc. Click a fit pill to see the breakdown.
+// rows sorted by Fit Score desc. Per-column filters live in the header row.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-// Carry the cache-bust query from this module's own URL through to siblings;
-// otherwise static imports below would hit the 10-min Pages cache.
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, setStatus, generateAsset } = await import('../pipeline.js' + V);
 
@@ -20,6 +18,18 @@ const DIM_LABELS = {
   network: { label: 'Network',       max: 5,  hint: 'A named contact in the row gets +5.' },
 };
 
+const EMPTY_FILTERS = () => ({
+  minFit: 0,
+  status: '',         // '' = any
+  company: '',
+  title: '',
+  source: '',
+  sector: '',
+  salary: '',
+  hasResume: 'any',   // 'any' | 'has' | 'missing'
+  hasCover: 'any',
+});
+
 export class JobPipeline extends LitElement {
   createRenderRoot() { return this; }
 
@@ -27,10 +37,7 @@ export class JobPipeline extends LitElement {
     state: { state: true },
     error: { state: true },
     roles: { state: true },
-    statusFilter: { state: true },
-    sourceFilter: { state: true },
-    minFit: { state: true },
-    sectorQuery: { state: true },
+    filters: { state: true },
     selectedRow: { state: true },
   };
 
@@ -39,10 +46,7 @@ export class JobPipeline extends LitElement {
     this.state = 'idle';
     this.error = '';
     this.roles = [];
-    this.statusFilter = new Set();
-    this.sourceFilter = new Set();
-    this.minFit = 0;
-    this.sectorQuery = '';
+    this.filters = EMPTY_FILTERS();
     this.selectedRow = null;
   }
 
@@ -80,75 +84,55 @@ export class JobPipeline extends LitElement {
     }
   }
 
-  async _onSync() {
-    await this._load(true);
-  }
+  async _onSync() { await this._load(true); }
 
-  _toggleSet(set, value, prop) {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value); else next.add(value);
-    this[prop] = next;
-    this.requestUpdate();
+  _setFilter(key, value) {
+    this.filters = { ...this.filters, [key]: value };
+  }
+  _clearFilters() { this.filters = EMPTY_FILTERS(); }
+  _activeFilterCount() {
+    const f = this.filters;
+    let n = 0;
+    if (f.minFit) n++;
+    if (f.status) n++;
+    if (f.company) n++;
+    if (f.title) n++;
+    if (f.source) n++;
+    if (f.sector) n++;
+    if (f.salary) n++;
+    if (f.hasResume !== 'any') n++;
+    if (f.hasCover !== 'any') n++;
+    return n;
   }
 
   _filtered() {
+    const f = this.filters;
+    const lc = (s) => (s || '').toLowerCase();
+    const has = (haystack, needle) => !needle || lc(haystack).includes(lc(needle));
     return this.roles.filter(r => {
-      if (this.statusFilter.size && !this.statusFilter.has(r.status || '(blank)')) return false;
-      if (this.sourceFilter.size && !this.sourceFilter.has(r.source || '(blank)')) return false;
-      if (this.minFit && r.score < this.minFit) return false;
-      if (this.sectorQuery && !(r.sector || '').toLowerCase().includes(this.sectorQuery.toLowerCase())) return false;
+      if (f.minFit && (r.score == null || r.score < f.minFit)) return false;
+      if (f.status && (r.status || '') !== f.status) return false;
+      if (f.source && (r.source || '') !== f.source) return false;
+      if (!has(r.company, f.company)) return false;
+      if (!has(r.title, f.title)) return false;
+      if (!has(r.sector, f.sector)) return false;
+      if (!has(r.salary, f.salary)) return false;
+      if (f.hasResume === 'has' && !r.hasResume) return false;
+      if (f.hasResume === 'missing' && r.hasResume) return false;
+      if (f.hasCover === 'has' && !r.hasCoverLetter) return false;
+      if (f.hasCover === 'missing' && r.hasCoverLetter) return false;
       return true;
     });
   }
 
-  _statuses() {
-    const s = new Set();
-    this.roles.forEach(r => s.add(r.status || '(blank)'));
-    return Array.from(s).sort();
-  }
-  _sources() {
-    const s = new Set();
-    this.roles.forEach(r => s.add(r.source || '(blank)'));
-    return Array.from(s).sort();
-  }
-
-  _renderFilters() {
-    return html`
-      <div class="pipeline-filters">
-        <div class="pipeline-filters__group">
-          <label>Status</label>
-          <div class="chip-row">
-            ${this._statuses().map(s => html`
-              <button class="chip ${this.statusFilter.has(s) ? 'chip--on' : ''}"
-                @click=${() => this._toggleSet(this.statusFilter, s, 'statusFilter')}>${s}</button>
-            `)}
-          </div>
-        </div>
-        <div class="pipeline-filters__group">
-          <label>Source</label>
-          <div class="chip-row">
-            ${this._sources().map(s => html`
-              <button class="chip ${this.sourceFilter.has(s) ? 'chip--on' : ''}"
-                @click=${() => this._toggleSet(this.sourceFilter, s, 'sourceFilter')}>${s}</button>
-            `)}
-          </div>
-        </div>
-        <div class="pipeline-filters__group">
-          <label>Min fit ${this.minFit}</label>
-          <input type="range" min="0" max="100" .value=${String(this.minFit)}
-            @input=${(e) => { this.minFit = parseInt(e.target.value, 10); }}>
-        </div>
-        <div class="pipeline-filters__group">
-          <label>Sector</label>
-          <input type="text" placeholder="e.g. health, fintech"
-            .value=${this.sectorQuery}
-            @input=${(e) => { this.sectorQuery = e.target.value; }}>
-        </div>
-      </div>
-    `;
+  _uniques(field) {
+    const set = new Set();
+    this.roles.forEach(r => set.add(r[field] || ''));
+    return Array.from(set).filter(Boolean).sort();
   }
 
   _scoreClass(s) {
+    if (s == null) return 'fit-pill fit-pill--poor';
     if (s >= 70) return 'fit-pill fit-pill--strong';
     if (s >= 50) return 'fit-pill fit-pill--ok';
     if (s >= 30) return 'fit-pill fit-pill--weak';
@@ -177,7 +161,6 @@ export class JobPipeline extends LitElement {
   }
 
   async _onApplyClick(r) {
-    // Open the posting in a new tab even if status update fails.
     if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer');
     if (!APPLIED_STATUSES.has(r.status) && !TERMINAL_STATUSES.has(r.status)) {
       await this._changeStatus(r, 'Applied');
@@ -201,12 +184,8 @@ export class JobPipeline extends LitElement {
     }
   }
 
-  _detailHref(r, tab) {
-    return `/job/jobs/${r.slug}/?tab=${tab}`;
-  }
-  _onBackdropClick(e) {
-    if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal();
-  }
+  _detailHref(r, tab) { return `/job/jobs/${r.slug}/?tab=${tab}`; }
+  _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
   _renderApplyCell(r) {
     if (TERMINAL_STATUSES.has(r.status)) {
@@ -223,11 +202,7 @@ export class JobPipeline extends LitElement {
       `;
     }
     if (!r.url) return html`<span class="muted">—</span>`;
-    return html`
-      <button class="btn btn--sm btn--accent" @click=${() => this._onApplyClick(r)}>
-        Apply ↗
-      </button>
-    `;
+    return html`<button class="btn btn--sm btn--accent" @click=${() => this._onApplyClick(r)}>Apply ↗</button>`;
   }
 
   _renderAssetCell(r, kind) {
@@ -235,9 +210,7 @@ export class JobPipeline extends LitElement {
     const generating = kind === 'resume' ? r._genResume : r._genCover;
     if (has) {
       return html`
-        <a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">
-          View / Edit
-        </a>
+        <a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">View / Edit</a>
       `;
     }
     return html`
@@ -247,26 +220,65 @@ export class JobPipeline extends LitElement {
     `;
   }
 
+  _renderFilterRow() {
+    const f = this.filters;
+    const set = (k) => (e) => this._setFilter(k, e.target.value);
+    return html`
+      <tr class="pipeline-table__filters">
+        <th>
+          <input type="number" min="0" max="100" placeholder="min"
+            class="col-filter col-filter--num"
+            .value=${f.minFit ? String(f.minFit) : ''}
+            @input=${(e) => this._setFilter('minFit', parseInt(e.target.value, 10) || 0)}>
+        </th>
+        <th>
+          <select class="col-filter" .value=${f.status} @change=${set('status')}>
+            <option value="">Any</option>
+            ${this._uniques('status').map(s => html`<option value=${s} ?selected=${f.status===s}>${s}</option>`)}
+          </select>
+        </th>
+        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.company} @input=${set('company')}></th>
+        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.title} @input=${set('title')}></th>
+        <th></th>
+        <th>
+          <select class="col-filter" .value=${f.hasResume} @change=${set('hasResume')}>
+            <option value="any">Any</option>
+            <option value="has" ?selected=${f.hasResume==='has'}>Has</option>
+            <option value="missing" ?selected=${f.hasResume==='missing'}>Missing</option>
+          </select>
+        </th>
+        <th>
+          <select class="col-filter" .value=${f.hasCover} @change=${set('hasCover')}>
+            <option value="any">Any</option>
+            <option value="has" ?selected=${f.hasCover==='has'}>Has</option>
+            <option value="missing" ?selected=${f.hasCover==='missing'}>Missing</option>
+          </select>
+        </th>
+        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.sector} @input=${set('sector')}></th>
+        <th><input type="text" placeholder="filter…" class="col-filter" .value=${f.salary} @input=${set('salary')}></th>
+        <th>
+          <select class="col-filter" .value=${f.source} @change=${set('source')}>
+            <option value="">Any</option>
+            ${this._uniques('source').map(s => html`<option value=${s} ?selected=${f.source===s}>${s}</option>`)}
+          </select>
+        </th>
+      </tr>
+    `;
+  }
+
   _renderRow(r) {
     return html`
       <tr>
         <td>
-          <button
-            class=${this._scoreClass(r.score) + ' fit-pill--button'}
-            title="Tap to see the breakdown"
-            @click=${() => this._openFitModal(r)}>
-            ${r.score}
+          <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
+            title="Tap to see the breakdown" @click=${() => this._openFitModal(r)}>
+            ${r.score == null ? '—' : r.score}
           </button>
         </td>
         <td class="status-cell">
-          <select
-            class="status-select ${r._saving ? 'is-saving' : ''}"
-            ?disabled=${r._saving}
-            .value=${r.status || ''}
-            @change=${(e) => this._changeStatus(r, e.target.value)}>
-            ${STATUS_OPTIONS.map(s => html`
-              <option value=${s} ?selected=${(r.status || '') === s}>${s || '—'}</option>
-            `)}
+          <select class="status-select ${r._saving ? 'is-saving' : ''}" ?disabled=${r._saving}
+            .value=${r.status || ''} @change=${(e) => this._changeStatus(r, e.target.value)}>
+            ${STATUS_OPTIONS.map(s => html`<option value=${s} ?selected=${(r.status || '') === s}>${s || '—'}</option>`)}
           </select>
           ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
         </td>
@@ -294,24 +306,21 @@ export class JobPipeline extends LitElement {
               <p class="fit-modal__eyebrow">${r.company}</p>
               <h2>${r.title || 'Untitled role'}</h2>
             </div>
-            <button class="fit-modal__close" @click=${this._closeFitModal} aria-label="Close">×</button>
+            <button class="fit-modal__close" @click=${() => this._closeFitModal()} aria-label="Close">×</button>
           </header>
-
           <div class="fit-modal__score">
-            <span class=${this._scoreClass(r.score)}>${r.score}</span>
+            <span class=${this._scoreClass(r.score)}>${r.score == null ? '—' : r.score}</span>
             <div>
               <p class="fit-modal__score-label">Fit score</p>
               <p class="fit-modal__score-sub">Out of 100. Sum of seven weighted dimensions; hard fails cap at 30.</p>
             </div>
           </div>
-
           ${r.hardFails && r.hardFails.length ? html`
             <div class="fit-modal__fails">
               <strong>Hard fail${r.hardFails.length > 1 ? 's' : ''}:</strong>
               ${r.hardFails.join(', ')}. Score capped at 30.
             </div>
           ` : nothing}
-
           <ul class="fit-breakdown">
             ${dims.map(k => {
               const meta = DIM_LABELS[k];
@@ -323,15 +332,12 @@ export class JobPipeline extends LitElement {
                     <span class="fit-breakdown__label">${meta.label}</span>
                     <span class="fit-breakdown__value">${v} / ${meta.max}</span>
                   </div>
-                  <div class="fit-breakdown__bar">
-                    <span style=${`width:${pct}%`}></span>
-                  </div>
+                  <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
                   <p class="fit-breakdown__hint">${meta.hint}</p>
                 </li>
               `;
             })}
           </ul>
-
           <footer class="fit-modal__foot">
             <p class="muted">Weights are fixed in v1. Tunable in v2 once Vision integration lands.</p>
           </footer>
@@ -351,10 +357,15 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._filtered();
+    const nFilters = this._activeFilterCount();
     return html`
-      ${this._renderFilters()}
       <div class="pipeline-meta">
         Showing <strong>${rows.length}</strong> of ${this.roles.length} roles, sorted by fit score.
+        ${nFilters > 0 ? html`
+          <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._clearFilters()}>
+            Clear ${nFilters} filter${nFilters > 1 ? 's' : ''}
+          </button>
+        ` : nothing}
         <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._onSync()}>
           Sync from sheet
         </button>
@@ -374,6 +385,7 @@ export class JobPipeline extends LitElement {
               <th>Salary</th>
               <th>Source</th>
             </tr>
+            ${this._renderFilterRow()}
           </thead>
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>

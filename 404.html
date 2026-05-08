@@ -44,15 +44,18 @@ permalink: /404.html
       }
 
       // /job/history/{kind}/{slug}/ — drilldown route handled by /job/history/_drill/
-      var jobMatch = path.match(/^\/job\/history\/(companies|projects|skills|wins|roles)\/([a-z0-9_-]+)\/?$/);
+      var jobMatch = path.match(/^\/job\/history\/(companies|projects|skills|wins|roles)\/([a-z0-9-]+)\/?$/);
       if (jobMatch) {
         sessionStorage.setItem('job:prettyPath', path);
         window.location.replace('/job/history/_drill/?kind=' + jobMatch[1] + '&slug=' + jobMatch[2]);
         return;
       }
 
-      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/_drill/
-      var roleMatch = path.match(/^\/job\/jobs\/([a-z0-9_-]+)\/?$/);
+      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/_drill/.
+      // Slugs are produced by slugify() which never includes underscores;
+      // requiring [a-z0-9-]+ (no underscore) prevents the router from
+      // matching `_drill` itself and entering a redirect loop.
+      var roleMatch = path.match(/^\/job\/jobs\/([a-z0-9-]+)\/?$/);
       if (roleMatch) {
         sessionStorage.setItem('job:prettyPath', path);
         var qs = window.location.search.replace(/^\?/, '');

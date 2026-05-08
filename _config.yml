@@ -1,2 +1,8 @@
 theme: jekyll-theme-minimal
-include: [".well-known"]
+# Jekyll excludes any directory starting with `_` by default. The /job
+# product uses _drill subdirectories as SPA-routed targets, so they must
+# be explicitly included for GitHub Pages to serve them.
+include:
+  - .well-known
+  - "job/jobs/_drill"
+  - "job/history/_drill"
