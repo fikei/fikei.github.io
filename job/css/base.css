@@ -1,7 +1,10 @@
 @import url("./tokens-generic-light.css");
 @import url("./tokens-generic-dark.css");
+@import url("./tokens-ctrl-light.css");
+@import url("./tokens-ctrl-dark.css");
 @import url("./components.css");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 * { box-sizing: border-box; }
 
