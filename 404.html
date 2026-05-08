@@ -43,24 +43,23 @@ permalink: /404.html
         return;
       }
 
-      // /job/history/{kind}/{slug}/ — drilldown route handled by /job/history/_drill/
-      var jobMatch = path.match(/^\/job\/history\/(companies|projects|skills|wins|roles)\/([a-z0-9-]+)\/?$/);
+      // /job/history/{kind}/{slug}/ — drilldown handled by /job/history/drill/.
+      // Negative lookahead skips the literal /drill/ target so the router
+      // never matches its own destination.
+      var jobMatch = path.match(/^\/job\/history\/(companies|projects|skills|wins|roles)\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
       if (jobMatch) {
         sessionStorage.setItem('job:prettyPath', path);
-        window.location.replace('/job/history/_drill/?kind=' + jobMatch[1] + '&slug=' + jobMatch[2]);
+        window.location.replace('/job/history/drill/?kind=' + jobMatch[1] + '&slug=' + jobMatch[2]);
         return;
       }
 
-      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/_drill/.
-      // Slugs are produced by slugify() which never includes underscores;
-      // requiring [a-z0-9-]+ (no underscore) prevents the router from
-      // matching `_drill` itself and entering a redirect loop.
-      var roleMatch = path.match(/^\/job\/jobs\/([a-z0-9-]+)\/?$/);
+      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/drill/.
+      var roleMatch = path.match(/^\/job\/jobs\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
       if (roleMatch) {
         sessionStorage.setItem('job:prettyPath', path);
         var qs = window.location.search.replace(/^\?/, '');
         var sep = qs ? '&' : '';
-        window.location.replace('/job/jobs/_drill/?slug=' + roleMatch[1] + sep + qs);
+        window.location.replace('/job/jobs/drill/?slug=' + roleMatch[1] + sep + qs);
         return;
       }
 

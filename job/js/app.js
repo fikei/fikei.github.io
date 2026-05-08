@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.14.0';
-console.log(`[job] v${VERSION} - jekyll _drill fix + column filters`);
+const VERSION = '0.15.0';
+console.log(`[job] v${VERSION} - drill rename + column-shift tolerance`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -14,12 +14,12 @@ const ALLOWED_EMAIL = 'fike101@gmail.com';
 import('./components/job-rail.js' + V);
 import('./kb.js' + V);
 // Route-specific components.
-if (location.pathname.startsWith('/job/history/_drill')) {
+if (location.pathname.startsWith('/job/history/drill')) {
   import('./components/job-detail.js' + V);
 } else if (location.pathname.startsWith('/job/history')) {
   import('./components/job-history-resume.js' + V);
 }
-if (location.pathname.startsWith('/job/jobs/_drill')) {
+if (location.pathname.startsWith('/job/jobs/drill')) {
   import('./components/job-role-detail.js' + V);
 } else if (location.pathname.startsWith('/job/jobs')) {
   import('./components/job-pipeline.js' + V);
