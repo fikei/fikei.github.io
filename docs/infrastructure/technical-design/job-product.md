@@ -462,11 +462,14 @@ Effort assumes solo + AI-assisted; adjust accordingly.
 
 ---
 
-## Decision log (to be filled)
+## Decision log
 
 | Date | Decision | Rationale |
 |---|---|---|
 | 2026-05-08 | Default theme = Wise; CTRL as alternate. | Wise is more product-feeling for a job-search tool; CTRL is the house style and worth previewing. |
-| 2026-05-08 | Edge Functions live on the existing Boards Supabase project for v1. | Reuse auth + simpler ops. Promote to dedicated project if scaling needs warrant. |
+| 2026-05-08 | Edge Functions live on the existing Boards Supabase project for v1+v2. | Reuse auth + simpler ops. Promote to dedicated project only if scaling needs warrant. |
 | 2026-05-08 | Phase 1 Jobs reads directly from Google Sheet. | Fastest path to value; no migration cost; the sheet is already authoritative. |
 | 2026-05-08 | Editing model = markdown textarea, not structured form. | Preserves voice; lower build cost; aligns with how Ian already writes. |
+| 2026-05-08 | Service account = reuse `claude-sheets@claude-jobs-494219` JSON. | Already shared with the Job Search sheet; no new GCP setup. Stored as Edge Function secret `SHEETS_SERVICE_ACCOUNT_JSON`. |
+| 2026-05-08 | GitHub auth for `kb-write` = PAT scoped to `fikei/job` only. | Simplest path for a single-user product. GitHub App overkill at this scope. Stored as `GITHUB_PAT`. |
+| 2026-05-08 | Fit-score weights = fixed in v1; tuning surface deferred to v2. | Ship a sane default + iterate from real use rather than over-design upfront. |

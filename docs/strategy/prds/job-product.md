@@ -258,30 +258,15 @@ Single-column on mobile with bottom-nav.
 
 ---
 
-## Open questions
+## Decisions locked in (2026-05-08)
 
-1. **Editing UX — markdown textarea vs. structured form?**
-   - Textarea is faster to build, preserves voice quirks, lets Ian edit in his own pattern.
-   - Structured form (per template field) is friendlier on mobile, harder to mis-format, but constrains voice.
-   - Recommendation: textarea for v1, evaluate structured for v2 if mobile editing becomes a need.
+These were the open questions in v1.0 — resolved before build kickoff so the next session can focus on implementation.
 
-2. **Which Supabase project hosts the Edge Functions?**
-   - Boards (`yfhudwakpgzswiylhfbh`) — already has auth wiring, simplest reuse.
-   - New project (`job` or `career`) — cleaner separation, more work to set up.
-   - Recommendation: Boards for v1; promote to its own project in v2 if scale or auth scoping warrants.
-
-3. **Service account for Sheets — local file vs. Edge Function secret?**
-   - For v1 the Edge Function needs to read the sheet. Service account JSON should live as a Supabase Edge Function secret (`SHEETS_SERVICE_ACCOUNT_JSON`), not committed.
-
-4. **GitHub commit on edit — PAT vs. GitHub App?**
-   - PAT (Ian's personal access token) is simplest. Stored as Edge Function secret.
-   - GitHub App is more correct (scoped, revocable, per-org). Overkill for a single-user product.
-   - Recommendation: PAT for v1.
-
-5. **Fit Score weights — fixed vs. user-tunable?**
-   - Fixed: ship a sane default, iterate as Ian uses it.
-   - User-tunable: a "tune your fit-score" section in Job Vision.
-   - Recommendation: fixed for v1, expose tuning in v2.
+1. **Editing UX:** **Markdown textarea** for v1+v2. Preserves voice quirks. Re-evaluate structured forms only if mobile editing becomes a real need.
+2. **Supabase project home:** **Boards (`yfhudwakpgzswiylhfbh`)**. Reuses auth wiring. Promote to a dedicated project only if scale demands it.
+3. **Service account for Sheets:** **Reuse the existing `claude-sheets@claude-jobs-494219` JSON** that's already shared with the Job Search sheet. Stored as Edge Function secret `SHEETS_SERVICE_ACCOUNT_JSON`. No new GCP setup needed.
+4. **GitHub commit on edit:** **Personal Access Token** scoped read+write on `fikei/job` only. Stored as Edge Function secret `GITHUB_PAT`.
+5. **Fit-score weights:** **Fixed in v1.** Tunable knobs in Job Vision deferred to v2.
 
 ---
 
