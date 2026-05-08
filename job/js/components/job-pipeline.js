@@ -48,11 +48,13 @@ export class JobPipeline extends LitElement {
     this._maybeLoad();
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
+    document.addEventListener('job:auth:ready', this._onAuth);
     this._onKey = (e) => { if (e.key === 'Escape') this._closeFitModal(); };
     document.addEventListener('keydown', this._onKey);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
+    document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('keydown', this._onKey);
     super.disconnectedCallback();
   }

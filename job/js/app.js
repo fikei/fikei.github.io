@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.10.0';
-console.log(`[job] v${VERSION} - editable status + apply flow`);
+const VERSION = '0.11.0';
+console.log(`[job] v${VERSION} - auth race fix + design polish`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -23,6 +23,26 @@ if (location.pathname.startsWith('/job/jobs')) {
   import('./components/job-pipeline.js' + V);
 }
 
+function applySignedInState(email) {
+  if (email !== ALLOWED_EMAIL) {
+    location.replace('/job/not-authorized.html');
+    return;
+  }
+  document.body.dataset.authState = 'in';
+  // Notify components that may have mounted before the event arrived.
+  document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
+}
+
+// Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when
+// it restores an existing session, so we must already be subscribed.
+document.addEventListener('ctrl:auth:signedin', (e) => {
+  const email = e.detail?.user?.email || '';
+  applySignedInState(email);
+});
+document.addEventListener('ctrl:auth:signedout', () => {
+  document.body.dataset.authState = 'out';
+});
+
 // CtrlAuth mounts magic-link + Google sign-in into #ctrl-auth-root.
 window.CtrlAuth.init({
   supabaseUrl: SUPABASE_URL,
@@ -32,20 +52,16 @@ window.CtrlAuth.init({
   mountTo: '#ctrl-auth-root'
 });
 
-document.addEventListener('ctrl:auth:signedin', (e) => {
-  const email = e.detail?.user?.email || '';
-  if (email !== ALLOWED_EMAIL) {
-    location.replace('/job/not-authorized.html');
-    return;
+// Belt-and-braces: even with the listener attached early, some CtrlAuth code
+// paths can settle a restored session without dispatching to a fresh listener.
+// Reconcile from the canonical source after a tick.
+setTimeout(() => {
+  const u = window.CtrlAuth?.getUser?.();
+  if (u?.email && document.body.dataset.authState !== 'in') {
+    applySignedInState(u.email);
   }
-  document.body.dataset.authState = 'in';
-});
+}, 0);
 
-document.addEventListener('ctrl:auth:signedout', () => {
-  document.body.dataset.authState = 'out';
-});
-
-// Wire the gate-card sign-in button + auto-open the modal on first arrival.
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('signin-btn');
   if (btn) btn.addEventListener('click', () => window.CtrlAuth.openLoginModal());
