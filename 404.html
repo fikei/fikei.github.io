@@ -51,6 +51,16 @@ permalink: /404.html
         return;
       }
 
+      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/_drill/
+      var roleMatch = path.match(/^\/job\/jobs\/([a-z0-9_-]+)\/?$/);
+      if (roleMatch) {
+        sessionStorage.setItem('job:prettyPath', path);
+        var qs = window.location.search.replace(/^\?/, '');
+        var sep = qs ? '&' : '';
+        window.location.replace('/job/jobs/_drill/?slug=' + roleMatch[1] + sep + qs);
+        return;
+      }
+
       // Pin short link: /p/{short_code} -> fetch pin URL from Supabase, redirect
       var pinMatch = path.match(/^\/p\/([a-zA-Z0-9]{6,12})\/?$/);
       if (pinMatch) {

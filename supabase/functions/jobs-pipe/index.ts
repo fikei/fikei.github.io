@@ -5,9 +5,11 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
 import { readSheetValues, writeSheetCell } from './sheets.ts';
 import { computeFit, RoleRow } from './fit.ts';
+import { ghTree } from '../_shared/job-github.ts';
+import { roleSlug } from '../_shared/job-auth.ts';
 
-const VERSION = '0.2.0';
-console.log(`[jobs-pipe] v${VERSION} - status writeback`);
+const VERSION = '0.3.0';
+console.log(`[jobs-pipe] v${VERSION} - asset flags`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const ALLOWLIST = ['fike101@gmail.com'];
@@ -77,15 +79,34 @@ serve(async (req) => {
     if (!email) return err('unauthorized', 401);
 
     if (req.method === 'GET') {
-      const values = await readSheetValues(SHEET_ID, 'Roles!A2:M1000');
+      const [values, tree] = await Promise.all([
+        readSheetValues(SHEET_ID, 'Roles!A2:M1000'),
+        ghTree('03-jobs/').catch(() => []),
+      ]);
+      // Build slug → asset-flags map.
+      const assets = new Map<string, { hasResume: boolean; hasCoverLetter: boolean }>();
+      for (const t of tree) {
+        const m = t.path.match(/^03-jobs\/([^/]+)\/(resume|cover-letter)\.md$/);
+        if (!m) continue;
+        const cur = assets.get(m[1]) || { hasResume: false, hasCoverLetter: false };
+        if (m[2] === 'resume') cur.hasResume = true;
+        else cur.hasCoverLetter = true;
+        assets.set(m[1], cur);
+      }
       const enriched = values
         .map((row, idx) => rowToRole(row, idx + 2))
         .filter(({ role }) => role.company || role.title)
-        .map(({ role, rowNumber }) => ({
-          rowNumber,
-          ...role,
-          ...computeFit(role),
-        }));
+        .map(({ role, rowNumber }) => {
+          const slug = roleSlug(role.company, role.title);
+          const flags = assets.get(slug) || { hasResume: false, hasCoverLetter: false };
+          return {
+            rowNumber,
+            slug,
+            ...role,
+            ...computeFit(role),
+            ...flags,
+          };
+        });
       return json({ version: VERSION, count: enriched.length, roles: enriched });
     }
 
