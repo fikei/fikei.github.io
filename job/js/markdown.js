@@ -21,9 +21,19 @@ export function resolveSlug(slug) {
   return `/job/history/companies/${s}/`;
 }
 
+// Coerce non-string inputs to a markdown string. Claude sometimes returns
+// arrays of bullets where we asked for a single markdown string.
+function toMd(input) {
+  if (input == null) return '';
+  if (typeof input === 'string') return input;
+  if (Array.isArray(input)) return input.map(toMd).map(s => s.startsWith('-') ? s : '- ' + s).join('\n');
+  if (typeof input === 'object') return JSON.stringify(input, null, 2);
+  return String(input);
+}
+
 // Pre-process [[slug]] and [[slug|label]] before marked sees the text.
 function expandWikiLinks(md) {
-  return md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, slug, label) => {
+  return toMd(md).replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, slug, label) => {
     const href = resolveSlug(slug);
     const text = (label || slug).trim();
     return `[${text}](${href})`;
