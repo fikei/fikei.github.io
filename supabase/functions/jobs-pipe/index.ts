@@ -19,8 +19,16 @@ const STATUS_ENUM = new Set([
   '', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network',
 ]);
 
+// Heuristics for the column-shift workaround below.
+const SALARY_RE = /^\$?\s*\d[\d.,kK]*\s*[-–]\s*\$?\s*\d/;        // "$140k - $200k", "$128,945 - $157,850"
+const URL_RE    = /^https?:\/\//i;
+const SOURCE_VOCAB = new Set([
+  'Manual', 'Network', 'LinkedIn Saved', 'LinkedIn Recommended',
+  'From Company Pages', 'Imported',
+]);
+
 function rowToRole(row: string[]): RoleRow {
-  return {
+  const role: RoleRow = {
     status: (row[2] || '').trim(),
     rank: (row[1] || '').trim(),
     company: (row[3] || '').trim(),
@@ -34,6 +42,35 @@ function rowToRole(row: string[]): RoleRow {
     website: (row[11] || '').trim(),
     crunchbase: (row[12] || '').trim(),
   };
+
+  // Tolerance for sheet rows where values were pasted into the wrong columns.
+  // Observed in the live sheet: ~5 rows have col F (URL) empty and the URL
+  // sitting in col L (Website). Those same rows have shifted-by-one data:
+  //   col G (Source)  → actually salary or empty
+  //   col H (Contact) → actually sector
+  // Detect the shift via the URL signature, then re-map.
+  const looksShifted = !role.url && URL_RE.test(role.website || '');
+  if (looksShifted) {
+    role.url = role.website;
+    role.website = '';
+    if (role.source && !role.salary && !SOURCE_VOCAB.has(role.source)) {
+      role.salary = role.source;
+      role.source = '';
+    }
+    if (role.contact && !role.sector) {
+      role.sector = role.contact;
+      role.contact = '';
+    }
+  }
+
+  // Belt-and-braces: even if the row didn't pass the URL signature, salary
+  // text in the Source column is always a misplacement.
+  if (role.source && SALARY_RE.test(role.source) && !role.salary) {
+    role.salary = role.source;
+    role.source = '';
+  }
+
+  return role;
 }
 
 function parseSalary(s: string | undefined): { low: number | null; high: number | null } {
