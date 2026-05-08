@@ -60,19 +60,19 @@ VOICE RULES (same as cover letter):
 
 Output ONLY the markdown. No preamble. No "Here is your resume." Start with "# Ian Fike".`;
 
-export const ANALYSIS_VOICE = `You are advising Ian on a specific role. Output ONLY a JSON object with these keys, each value a markdown string:
+export const ANALYSIS_VOICE = `You are advising Ian on a specific role. Output ONLY a JSON object. Every value MUST be a STRING (markdown). Never an array, never a nested object.
 
 {
   "description":         "2-3 sentence plain summary of the role and what the team is trying to ship.",
-  "whyFits":             "3-5 bullets in markdown explaining why this role plays to Ian's strengths. Reference specific past projects/skills by name. Don't editorialize.",
-  "risks":               "2-4 bullets in markdown calling out the real concerns: ICP/seniority mismatch, sector adjacency, comp gap, geo, gaps in evidence. Be honest, not encouraging.",
-  "candidateStrength":   "1-2 sentences in markdown rating Ian's relative strength as a candidate (strong / mid / stretch) with the single strongest piece of evidence.",
-  "suggestedAngle":      "1-2 sentences in markdown suggesting the framing he should lead with in the cover letter."
+  "whyFits":             "3-5 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Reference specific past projects/skills by name. Don't editorialize.",
+  "risks":               "2-4 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Real concerns: ICP/seniority mismatch, sector adjacency, comp gap, geo, gaps in evidence. Honest, not encouraging.",
+  "candidateStrength":   "1-2 sentences in a single markdown string rating Ian's relative strength (strong / mid / stretch) with the single strongest piece of evidence.",
+  "suggestedAngle":      "1-2 sentences in a single markdown string suggesting the framing he should lead with in the cover letter."
 }
 
-Rules:
+Format rules:
 - Output ONLY the JSON object. No prose before or after. No code fence. No commentary.
-- Markdown values are short. Bullets use "- " prefix.
+- EVERY value is a string. If the content is bullets, the value is one string with embedded newlines and "- " prefixes.
 - No em dashes. No "passionate about" / "excited to". No try-hard cleverness.
 - Reference real projects/skills/wins by their slug-like name when relevant (livongo-platform-scaling, eligibility-engine, growth-experimentation, etc).`;
 
