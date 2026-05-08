@@ -525,3 +525,67 @@ Advanced content discovery features requiring ML infrastructure.
 |-------|--------|
 | **Visual similarity search** (#17) — "Find more like this" using CLIP/image embeddings to surface visually similar pins | Pending |
 | **Grid gap rounding fix** (#70) — Fix sub-pixel rounding inconsistencies at grid edges | Pending |
+
+---
+
+## /job — Pipeline & Career KB
+
+Improvements flagged while shipping the /job product (PRs #633–#645). Tracked here until promoted into Phase 1+ work.
+
+> See: [Job product PRD](../../strategy/prds/job-product.md), [Tech design](../../infrastructure/technical-design/job-product.md).
+
+### Performance & caching
+
+| Story | Status |
+|-------|--------|
+| **gen-asset KB caching** — Cache the 01-job-history + 02-goals-intents KB load per Edge Function instance (5-min TTL). Currently ~30 GitHub blob fetches on every generate call adds ~3-5s. | Pending |
+| **gen-asset selective context** — Send only the companies / projects / skills relevant to the target role (matched by sector + role title) instead of the entire KB. Cuts prompt tokens by ~70%. | Pending |
+| **jobs-pipe response cache** — 5-min in-memory cache so back-to-back `/job/jobs/` loads don't re-pull the sheet + GitHub tree on every navigation. | Pending |
+| **kb-read response cache** — Per-path 60s LRU cache (deferred from #635 to avoid stale-after-edit issues; revisit with shared KV store). | Pending |
+| **kb-manifest endpoint** — Single endpoint that returns `{ slug → route }` so the wiki-link resolver in markdown.js can drop its prefix-based heuristic. | Pending |
+
+### Voice rules + sync
+
+| Story | Status |
+|-------|--------|
+| **Auto-sync cover-letter rules** — `gen-asset/prompts.ts` mirrors `~/.claude/projects/.../memory/cover_letter_rules.md` by hand. Either pull at runtime via a public URL, or commit the rules into fikei/job and read via kb-read. | Pending |
+| **Auto-sync resume voice rules** — Same problem, less acute (resume rules are shorter and changed less often). | Pending |
+| **Vision-driven RELEVANCE.md sync** — When Vision is edited in /job, propagate the changes back to `~/.claude/skills/jobs/RELEVANCE.md` so the /jobs scan skill stays in sync. (Tech-design open question #2.) | Pending |
+
+### Slug + sheet schema
+
+| Story | Status |
+|-------|--------|
+| **Stable slug column** — Slugs derive from `{company}-{first-3-words-of-title}`. Renaming a role in the sheet orphans the previously-generated 03-jobs/{slug}/ files. Add an explicit `Slug` column or a stable role ID. | Pending |
+| **Geo column** — Sheet has no geo signal; fit-score Geo dimension defaults neutral. Add a Location/Remote column and update fit.ts. | Pending |
+| **Stage column** — Stage is currently inferred from investor names. Add an explicit Stage column for accuracy. | Pending |
+| **Last-seen / first-seen columns** — PRD called for these; current sheet doesn't have them. Add so /jobs skill can detect "Not Listed" reliably. | Pending |
+| **Header-driven column mapping** — jobs-pipe hardcodes the column layout (A=Status header, B=Rank, C=Status, …). Read row 1 and look up by header so the function survives a column reshuffle. | Pending |
+
+### Per-role workflow
+
+| Story | Status |
+|-------|--------|
+| **Status next-step prompts** — When a role moves to Talking, surface a small checklist (interview prep, send thank-you, decision date). When Applied, show a "follow up in N days" reminder. | Pending |
+| **PDF export** — Resume + cover letter as Calibri 11pt PDFs matching the format rules in cover_letter_rules.md. Calls a typst/wkhtmltopdf-style service or generates client-side. | Pending |
+| **Asset diff on regenerate** — Show a diff between current and regenerated asset before saving so the user can keep edits they already made. | Pending |
+| **Per-role notes** — A free-text notes tab on the per-role detail page, stored at 03-jobs/{slug}/notes.md. | Pending |
+| **Multi-vision support** — Save multiple Vision configurations (e.g. "fractional only", "founding PM only") and switch the active one to see how the pipeline reranks. | Pending |
+| **Fit-score tuning UI** — Sliders to adjust the seven dimension weights, persisted in Vision. Deferred from v1. | Pending |
+
+### Drilldown polish
+
+| Story | Status |
+|-------|--------|
+| **Backlinks on company / project / skill pages** — Show incoming `[[wiki-links]]` so a project page lists the skills + wins that reference it. | Pending |
+| **Edit affordance on history drilldown** — Same kb-write flow as the role detail page — Edit / Save / Cancel on company / project / skill pages. | Pending |
+| **Vision view + edit** — Currently a placeholder. Reads 02-goals-intents/, sectioned editor (narrative-arc, deal-breakers, voice rules). Milestone (h) of Phase 1. | Pending |
+
+### Operational
+
+| Story | Status |
+|-------|--------|
+| **Supabase URL allow-list** (one-time config) — Add `https://ctrl.rodeo/job/**` to the Boards project's Auth → URL Configuration → Redirect URLs so sign-in returns to /job/, not /boards/. | Pending |
+| **Rotate GITHUB_PAT to fine-grained PAT** — Currently using the broadly-scoped `gh auth token`. Generate a fine-grained PAT scoped to `fikei/job` only and `supabase secrets set GITHUB_PAT=<token>`. | Pending |
+| **CTRL theme alternate** (Phase 1 milestone i) — Author tokens-ctrl-{light,dark}.css against the abstract token contract; enable in the rail's theme picker. | Pending |
+| **Asset existence detection scaling** — jobs-pipe currently fetches the entire repo tree on every GET to compute hasResume/hasCoverLetter flags. Cache or scope to 03-jobs/. | Pending |
