@@ -352,13 +352,16 @@
 .fit-pill--weak   { background: rgba(237,200,67,0.20); color: #6E5400; }
 .fit-pill--poor   { background: rgba(168,32,13,0.12); color: var(--error); }
 
-/* --- Status select + apply cell --- */
+/* --- Status select (color-coded by current value) --- */
 .status-cell { display: flex; align-items: center; gap: var(--space-2); }
 .status-select {
-  /* Wise small-component size: 32px height, body-small typography. */
   font: inherit;
   font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
   height: 32px;
+  width: auto;
+  min-width: 110px;
+  max-width: 160px;
   padding: 0 var(--space-5) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -367,8 +370,6 @@
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  /* Chevron uses a CSS mask so it picks up the current text colour and
-     stays correct across light + dark themes. */
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
                     linear-gradient(-45deg, transparent 50%, currentColor 50%);
   background-position: calc(100% - 14px) calc(50% + 2px),
@@ -377,8 +378,23 @@
   background-repeat: no-repeat;
 }
 .status-select:hover { border-color: var(--border-strong); }
-.status-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.status-select:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-muted); }
 .status-select.is-saving { opacity: 0.6; }
+
+/* Color variants by current status. Soft tinted backgrounds + matching
+   text. Each pairs with a specific lifecycle stage. */
+.status-select[data-status="New"]              { background-color: var(--accent-muted); color: var(--accent); border-color: transparent; }
+.status-select[data-status="Apply"]            { background-color: rgba(237,200,67,0.22); color: #6E5400; border-color: transparent; }
+.status-select[data-status="Talking"]          { background-color: var(--accent-strong); color: var(--accent-strong-fg); border-color: transparent; }
+.status-select[data-status="Applied"]          { background-color: rgba(47,87,17,0.16); color: var(--success); border-color: transparent; }
+.status-select[data-status="Pass"]             { background-color: var(--bg-surface); color: var(--fg-subtle); border-color: var(--border); }
+.status-select[data-status="Rejected"]         { background-color: rgba(168,32,13,0.12); color: var(--error); border-color: transparent; }
+.status-select[data-status="Closed"]           { background-color: var(--bg-surface); color: var(--fg-subtle); border-color: var(--border); }
+.status-select[data-status="Not Listed"]       { background-color: var(--bg-surface); color: var(--fg-subtle); border-color: var(--border); }
+.status-select[data-status="Nudge / Network"]  { background-color: rgba(159,232,112,0.18); color: var(--success); border-color: transparent; }
+/* Dark theme adjustments where needed */
+[data-theme="generic-dark"] .status-select[data-status="Apply"] { color: var(--warning); }
+[data-theme="generic-dark"] .status-select[data-status="Applied"] { color: var(--accent-strong); }
 .status-cell__err {
   display: inline-grid;
   place-items: center;
@@ -396,8 +412,6 @@
   padding: 0 var(--space-3);
   font-size: var(--font-size-small);
 }
-.apply-cell { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
-.apply-cell .link-subtle { font-size: var(--font-size-caption); }
 
 .link-subtle { color: var(--fg-muted); }
 .link-subtle:hover { color: var(--fg); text-decoration: underline; }
