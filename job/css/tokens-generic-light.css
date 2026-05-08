@@ -1,37 +1,72 @@
-/* Generic design system tokens — light variant.
-   Default theme for /job. CTRL alternate lives in tokens-ctrl-*.css. */
+/* Wise design system — light theme tokens.
+   File name kept as "generic" per the contract; values map 1:1 to the
+   Wise Foundations color, spacing, and radius pages. */
 [data-theme="generic-light"] {
-  --bg: #ffffff;
-  --bg-surface: #f7f8fa;
-  --bg-elevated: #ffffff;
+  /* Backgrounds */
+  --bg: #FFFFFF;                                   /* Background Screen */
+  --bg-surface: #F5F7F4;                           /* tinted neutral lift */
+  --bg-elevated: #FFFFFF;                          /* Background Elevated */
+  --bg-overlay: rgba(22, 51, 0, 0.08);             /* Background Overlay */
 
-  --fg: #0e1116;
-  --fg-muted: #57606a;
-  --fg-subtle: #8c959f;
+  /* Content */
+  --fg: #0E0F0C;                                   /* Content Primary */
+  --fg-muted: #454745;                             /* Content Secondary */
+  --fg-subtle: #6A6C6A;                            /* Content Tertiary */
+  --fg-link: #163300;                              /* Content Link */
 
-  --accent: #2563eb;
-  --accent-fg: #ffffff;
-  --accent-muted: #dbeafe;
+  /* Interactive */
+  --accent: #163300;                               /* Interactive Primary — Forest Green */
+  --accent-fg: #FFFFFF;                            /* Base Light */
+  --accent-muted: rgba(159, 232, 112, 0.20);       /* tinted Bright Green */
+  --accent-strong: #9FE870;                        /* Interactive Accent — Bright Green */
+  --accent-strong-fg: #163300;
 
-  --border: #d0d7de;
-  --border-strong: #afb8c1;
+  /* Borders */
+  --border: rgba(14, 15, 12, 0.12);                /* Border Neutral */
+  --border-strong: rgba(14, 15, 12, 0.24);
 
-  --success: #1a7f37;
-  --error: #cf222e;
-  --warning: #9a6700;
+  /* Sentiment */
+  --success: #2F5711;                              /* Sentiment Positive */
+  --error: #A8200D;                                /* Sentiment Negative */
+  --warning: #EDC843;                              /* Sentiment Warning */
 
-  --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-display: var(--font-body);
+  /* Typography */
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --font-size-display: 56px;
+  --font-size-title-1: 36px;
+  --font-size-title-2: 28px;
+  --font-size-title-3: 22px;
+  --font-size-title-4: 18px;
+  --font-size-body-lg: 18px;
+  --font-size-body: 16px;
+  --font-size-small: 14px;
+  --font-size-caption: 12px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+  --lh-display: 1.1;
+  --lh-title: 1.25;
+  --lh-body: 1.55;
+  --lh-tight: 1.35;
 
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* Radius — Wise desktop scale (rounded-by-default look) */
+  --radius-sm: 16px;
+  --radius-md: 20px;
+  --radius-lg: 30px;
+  --radius-xl: 40px;
+  --radius-2xl: 60px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(14,15,12,0.05);
+  --shadow-md: 0 8px 24px rgba(14,15,12,0.07);
+  --shadow-lg: 0 16px 48px rgba(14,15,12,0.10);
+
+  /* Spacing — Wise 4px base scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -40,4 +75,6 @@
   --space-6: 32px;
   --space-7: 48px;
   --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
 }
