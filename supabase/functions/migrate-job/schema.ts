@@ -1,6 +1,5 @@
-// Auto-generated mirror of supabase/migrations/047_job_product_schema.sql.
-// Bundled as a TS export because the Supabase CLI doesn't ship .sql files
-// to the function runtime.
+// Bundled schema for migrate-job. Mirrors 047 + 048 from supabase/migrations.
+// Backticks stripped from inline SQL since this is a template literal.
 export const SCHEMA_SQL = String.raw`
 -- /job product schema (Phase 2 migration foundation).
 -- Tables live in their own schema to avoid colliding with Boards.
@@ -199,4 +198,11 @@ begin
     execute format('alter table job.%I enable row level security;', t);
   end loop;
 end $$;
+
+-- 048 ----------------------------------------------------------------
+-- Allow analysis as a role_assets kind. The detail page stores Claude's
+-- structured analysis (brief, why-fits, risks, candidate-strength) here.
+alter table job.role_assets drop constraint if exists role_assets_kind_check;
+alter table job.role_assets add constraint role_assets_kind_check
+  check (kind in ('resume', 'cover-letter', 'notes', 'analysis'));
 `;

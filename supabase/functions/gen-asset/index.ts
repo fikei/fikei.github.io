@@ -98,9 +98,14 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
-    const kind = body.kind === 'cover-letter' ? 'cover-letter' : (body.kind === 'resume' ? 'resume' : null);
+    const kindIn = body.kind;
+    const kind: 'resume' | 'cover-letter' | 'analysis' | null =
+      kindIn === 'cover-letter' ? 'cover-letter'
+      : kindIn === 'resume'     ? 'resume'
+      : kindIn === 'analysis'   ? 'analysis'
+      : null;
     if (!slugIn && !rowIn) return err('slug or rowNumber required', 400);
-    if (!kind) return err('kind must be "resume" or "cover-letter"', 400);
+    if (!kind) return err('kind must be "resume", "cover-letter", or "analysis"', 400);
 
     const role = await loadRole(slugIn, rowIn);
     if (!role) return err('role not found', 404);

@@ -12,7 +12,7 @@ import { db } from '../_shared/job-db.ts';
 const VERSION = '0.1.0';
 console.log(`[role-asset] v${VERSION}`);
 
-const KIND_RE = /^(resume|cover-letter|notes)$/;
+const KIND_RE = /^(resume|cover-letter|notes|analysis)$/;
 const SLUG_RE = /^[a-z0-9_-]+$/;
 const MAX_BYTES = 64 * 1024;
 

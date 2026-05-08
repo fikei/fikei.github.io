@@ -1,19 +1,44 @@
-// job-role-detail — per-role detail page with Resume / Cover Letter tabs.
-// Reads /job/jobs/{slug}/?tab= and renders/edits assets from job.role_assets
-// via the role-asset endpoint.
+// job-role-detail — per-role detail page with Details / Resume / Cover Letter
+// tabs. The Details tab is the default landing and shows AI-generated cards
+// (Why it fits / Risks / Candidate strength) plus role metadata. Apply button
+// in the top-right opens the posting in a new tab.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
 ]);
 
 const TABS = [
-  { id: 'resume', label: 'Resume' },
+  { id: 'details',      label: 'Details' },
+  { id: 'resume',       label: 'Resume' },
   { id: 'cover-letter', label: 'Cover letter' },
 ];
+
+const KIND_BY_TAB = {
+  details: 'analysis',
+  resume: 'resume',
+  'cover-letter': 'cover-letter',
+};
+
+function fmtDate(s) {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch { return '—'; }
+}
+
+function fitClass(s) {
+  if (s == null) return 'fit-pill fit-pill--poor';
+  if (s >= 70) return 'fit-pill fit-pill--strong';
+  if (s >= 50) return 'fit-pill fit-pill--ok';
+  if (s >= 30) return 'fit-pill fit-pill--weak';
+  return 'fit-pill fit-pill--poor';
+}
 
 export class JobRoleDetail extends LitElement {
   createRenderRoot() { return this; }
@@ -22,10 +47,9 @@ export class JobRoleDetail extends LitElement {
     state: { state: true },
     error: { state: true },
     slug: { state: true },
-    rowNumber: { state: true },
     activeTab: { state: true },
-    assets: { state: true },        // { 'resume': { content, sha, draft, mode, saving, dirty } }
     role: { state: true },
+    assets: { state: true },         // { resume, cover-letter, analysis } each: {content, draft, mode, saving, dirty, error}
   };
 
   constructor() {
@@ -34,18 +58,19 @@ export class JobRoleDetail extends LitElement {
     this.error = '';
     const params = new URLSearchParams(location.search);
     this.slug = (params.get('slug') || '').toLowerCase();
-    this.rowNumber = Number(params.get('row')) || null;
     const tab = params.get('tab');
-    this.activeTab = TABS.find(t => t.id === tab)?.id || 'resume';
-    this.assets = { 'resume': null, 'cover-letter': null };
+    this.activeTab = TABS.find(t => t.id === tab)?.id || 'details';
     this.role = null;
+    this.assets = { 'resume': null, 'cover-letter': null, 'analysis': null };
 
     const pretty = sessionStorage.getItem('job:prettyPath');
-    if (pretty && /^\/job\/jobs\/[a-z0-9_-]+\/?$/.test(pretty)) {
+    if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
       sessionStorage.removeItem('job:prettyPath');
-      history.replaceState(null, '', pretty + (this.activeTab !== 'resume' ? `?tab=${this.activeTab}` : ''));
+      const qs = this.activeTab !== 'details' ? `?tab=${this.activeTab}` : '';
+      history.replaceState(null, '', pretty.replace(/\/?$/, '/') + qs);
     } else if (this.slug) {
-      history.replaceState(null, '', `/job/jobs/${this.slug}/${this.activeTab !== 'resume' ? `?tab=${this.activeTab}` : ''}`);
+      const qs = this.activeTab !== 'details' ? `?tab=${this.activeTab}` : '';
+      history.replaceState(null, '', `/job/jobs/${this.slug}/${qs}`);
     }
   }
 
@@ -65,21 +90,24 @@ export class JobRoleDetail extends LitElement {
   async _maybeLoad() {
     if (document.body.dataset.authState !== 'in') return;
     if (this.state === 'loading' || this.state === 'loaded') return;
-    if (!this.slug) {
-      this.state = 'error';
-      this.error = 'Missing slug';
-      return;
-    }
+    if (!this.slug) { this.state = 'error'; this.error = 'Missing slug'; return; }
     this.state = 'loading';
     try {
-      // Load both assets in parallel; tolerate 404 (asset not yet generated).
-      const [resume, cover] = await Promise.all([
+      // Load the role row + all three asset rows in parallel.
+      const [pipeline, resume, cover, analysis] = await Promise.all([
+        fetchPipeline(),
         this._loadAsset('resume'),
         this._loadAsset('cover-letter'),
+        this._loadAsset('analysis'),
       ]);
-      this.assets = { 'resume': resume, 'cover-letter': cover };
+      this.role = (pipeline.roles || []).find(r => r.slug === this.slug) || null;
+      this.assets = { 'resume': resume, 'cover-letter': cover, 'analysis': analysis };
       this.state = 'loaded';
-      document.title = `${this.slug} — /job`;
+      document.title = this.role
+        ? `${this.role.company} — ${this.role.title} — /job`
+        : `${this.slug} — /job`;
+      // Auto-generate any missing asset.
+      this._autoGenerateMissing();
     } catch (e) {
       this.state = 'error';
       this.error = String(e);
@@ -87,86 +115,192 @@ export class JobRoleDetail extends LitElement {
   }
 
   async _loadAsset(kind) {
-    const r = await readRoleAsset(this.slug, kind);
-    if (!r) {
-      return { content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: '' };
+    try {
+      const r = await readRoleAsset(this.slug, kind);
+      if (!r) return { kind, content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: '' };
+      return { kind, content: r.content_md, draft: r.content_md, mode: 'view', saving: false, dirty: false, error: '' };
+    } catch (e) {
+      return { kind, content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: String(e) };
     }
-    return { content: r.content_md, draft: r.content_md, mode: 'view', saving: false, dirty: false, error: '' };
+  }
+
+  _autoGenerateMissing() {
+    for (const kind of ['analysis', 'resume', 'cover-letter']) {
+      const a = this.assets[kind];
+      if (a && a.mode === 'empty' && !a.saving) this._onGenerate(kind);
+    }
   }
 
   _switchTab(id) {
     this.activeTab = id;
-    history.replaceState(null, '', `/job/jobs/${this.slug}/${id !== 'resume' ? `?tab=${id}` : ''}`);
+    const qs = id !== 'details' ? `?tab=${id}` : '';
+    history.replaceState(null, '', `/job/jobs/${this.slug}/${qs}`);
   }
 
   async _onGenerate(kind) {
-    const a = this.assets[kind] || {};
-    a.saving = true;
-    a.error = '';
-    this.assets = { ...this.assets, [kind]: { ...a } };
+    const a = this.assets[kind] || { kind };
+    this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
     try {
       const res = await generateAsset(this.slug, kind);
       this.assets = {
         ...this.assets,
-        [kind]: {
-          content: res.content,
-          draft: res.content,
-          mode: 'view',
-          saving: false,
-          dirty: false,
-          error: '',
-        },
+        [kind]: { kind, content: res.content, draft: res.content, mode: 'view', saving: false, dirty: false, error: '' },
       };
     } catch (e) {
-      this._setAssetError(kind, String(e));
+      this.assets = { ...this.assets, [kind]: { ...this.assets[kind], saving: false, error: String(e) } };
     }
-  }
-
-  _setAssetError(kind, msg) {
-    const a = this.assets[kind] || {};
-    this.assets = { ...this.assets, [kind]: { ...a, saving: false, error: msg } };
   }
 
   _enterEdit(kind) {
     const a = this.assets[kind];
     this.assets = { ...this.assets, [kind]: { ...a, mode: 'edit', draft: a.content } };
   }
-
   _cancelEdit(kind) {
     const a = this.assets[kind];
     this.assets = { ...this.assets, [kind]: { ...a, mode: 'view', draft: a.content, dirty: false, error: '' } };
   }
-
   _onDraftInput(kind, e) {
     const a = this.assets[kind];
     this.assets = { ...this.assets, [kind]: { ...a, draft: e.target.value, dirty: e.target.value !== a.content } };
   }
-
   async _saveEdit(kind) {
     const a = this.assets[kind];
     if (!a.dirty) return;
     this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
     try {
       await writeRoleAsset(this.slug, kind, a.draft);
-      this.assets = {
-        ...this.assets,
-        [kind]: { ...a, content: a.draft, mode: 'view', saving: false, dirty: false },
-      };
+      this.assets = { ...this.assets, [kind]: { ...a, content: a.draft, mode: 'view', saving: false, dirty: false } };
     } catch (e) {
-      this._setAssetError(kind, String(e));
+      this.assets = { ...this.assets, [kind]: { ...a, saving: false, error: String(e) } };
     }
   }
 
-  _renderTabBody(kind) {
+  // --- Details tab ---------------------------------------------------------
+
+  _parseAnalysis(content) {
+    if (!content) return null;
+    // Tolerate: bare JSON, JSON inside ```json fences, or markdown with ## sections.
+    const stripped = content.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+    try {
+      const obj = JSON.parse(stripped);
+      if (obj && typeof obj === 'object') return obj;
+    } catch { /* fall through to section parse */ }
+
+    const sections = {};
+    const lines = content.split(/\r?\n/);
+    let cur = null;
+    let buf = [];
+    const flush = () => { if (cur) sections[cur] = buf.join('\n').trim(); buf = []; };
+    for (const line of lines) {
+      const m = line.match(/^##\s+(.+)$/);
+      if (m) {
+        flush();
+        cur = m[1].toLowerCase().replace(/\s+/g, '');
+      } else {
+        buf.push(line);
+      }
+    }
+    flush();
+    return {
+      description: sections['briefdescription'] || sections['description'] || content,
+      whyFits: sections['whyitfits'] || sections['whyfits'] || '',
+      risks: sections['risks'] || '',
+      candidateStrength: sections['candidatestrength'] || sections['strength'] || '',
+      suggestedAngle: sections['suggestedangle'] || sections['angle'] || '',
+    };
+  }
+
+  _renderMetaRow() {
+    const r = this.role;
+    if (!r) return nothing;
+    const items = [
+      ['Fit', html`<span class=${fitClass(r.score)} style="padding:2px var(--space-2);font-size:var(--font-size-small);">${r.score == null ? '—' : r.score}</span>`],
+      ['Status', r.status || '—'],
+      ['Sector', r.sector || '—'],
+      ['Compensation', r.salary || '—'],
+      ['Source', r.source || '—'],
+      ['Added', fmtDate(r.first_seen || r.applied_at)],
+      ['Last seen', fmtDate(r.last_seen || r.status_changed_at)],
+    ];
+    return html`
+      <dl class="role-meta">
+        ${items.map(([k, v]) => html`
+          <div class="role-meta__item">
+            <dt>${k}</dt>
+            <dd>${v}</dd>
+          </div>
+        `)}
+      </dl>
+    `;
+  }
+
+  _renderCard(title, body, status) {
+    return html`
+      <article class="role-card">
+        <header class="role-card__head">
+          <h3>${title}</h3>
+        </header>
+        <div class="role-card__body">
+          ${status === 'loading' ? html`<p class="muted">Generating…</p>`
+            : status === 'error'  ? html`<p class="muted" style="color:var(--error);">Couldn't load</p>`
+            : !body                ? html`<p class="muted">—</p>`
+            : html`<div class="kb-doc">${unsafeHTML(renderMarkdown(body))}</div>`}
+        </div>
+      </article>
+    `;
+  }
+
+  _renderDetails() {
+    const a = this.assets['analysis'];
+    const status = !a ? 'loading' : a.saving ? 'loading' : a.error ? 'error' : a.mode === 'empty' ? 'loading' : 'ok';
+    const parsed = a && a.mode === 'view' ? this._parseAnalysis(a.content) : null;
+    return html`
+      ${this._renderMetaRow()}
+      ${parsed?.description ? html`
+        <section class="role-summary">
+          <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.description))}</div>
+        </section>
+      ` : status === 'loading' ? html`<p class="muted">Drafting summary…</p>` : nothing}
+
+      <div class="role-cards">
+        ${this._renderCard('Why it fits',         parsed?.whyFits, status)}
+        ${this._renderCard('Risks',               parsed?.risks, status)}
+        ${this._renderCard('Candidate strength',  parsed?.candidateStrength, status)}
+      </div>
+
+      ${parsed?.suggestedAngle ? html`
+        <aside class="role-callout">
+          <h4>Suggested angle for the cover letter</h4>
+          <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.suggestedAngle))}</div>
+        </aside>
+      ` : nothing}
+
+      ${a?.error ? html`<p class="muted" style="color:var(--error);">${a.error}</p>` : nothing}
+      <div class="asset-toolbar" style="margin-top:var(--space-5);">
+        <button class="btn btn--sm" ?disabled=${a?.saving} @click=${() => this._onGenerate('analysis')}>
+          ${a?.saving ? 'Regenerating…' : 'Regenerate analysis'}
+        </button>
+      </div>
+    `;
+  }
+
+  // --- Resume / Cover-letter tab body -------------------------------------
+
+  _renderAssetTab(kind) {
     const a = this.assets[kind];
     if (!a) return html`<div class="placeholder"><h2>Loading…</h2></div>`;
-
+    if (a.saving && !a.content) {
+      return html`<div class="placeholder">
+        <h2>Generating ${kind === 'resume' ? 'resume' : 'cover letter'}…</h2>
+        <p>Pulling Ian's KB + voice rules. ~10–20s.</p>
+      </div>`;
+    }
     if (a.mode === 'empty') {
       return html`
         <div class="placeholder">
           <h2>No ${kind === 'resume' ? 'resume' : 'cover letter'} yet</h2>
-          <p>Generate one tailored to this role using your career KB and voice rules.</p>
-          <div style="margin-top:var(--space-4);display:flex;justify-content:center;gap:var(--space-3);">
+          <p>Generate one tailored to this role using the career KB and voice rules.</p>
+          <div style="margin-top:var(--space-4);display:flex;justify-content:center;">
             <button class="btn btn--primary" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
               ${a.saving ? 'Generating…' : `Generate ${kind === 'resume' ? 'resume' : 'cover letter'}`}
             </button>
@@ -175,7 +309,6 @@ export class JobRoleDetail extends LitElement {
         </div>
       `;
     }
-
     return html`
       <div class="asset-toolbar">
         ${a.mode === 'view' ? html`
@@ -191,11 +324,9 @@ export class JobRoleDetail extends LitElement {
         `}
         ${a.error ? html`<span class="muted" style="color:var(--error);">${a.error}</span>` : nothing}
       </div>
-
       ${a.mode === 'edit'
         ? html`<textarea class="asset-editor" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)}></textarea>`
-        : html`<article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(a.content))}</article>`
-      }
+        : html`<article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(a.content))}</article>`}
     `;
   }
 
@@ -209,17 +340,26 @@ export class JobRoleDetail extends LitElement {
         <p style="font-family:var(--font-mono);font-size:13px;">${this.error}</p>
       </div>`;
     }
-
+    const r = this.role;
     return html`
       <nav class="breadcrumb">
         <a href="/job/jobs/">Jobs</a>
         <span>›</span>
-        <span>${this.slug}</span>
+        <span>${r?.company || this.slug}</span>
       </nav>
 
-      <header class="page-header">
-        <h1>${this.slug}</h1>
-        <p>Resume and cover letter for this role. Each draft is committed to fikei/job/03-jobs/${this.slug}/.</p>
+      <header class="role-header">
+        <div class="role-header__title">
+          <h1>${r?.title || this.slug}</h1>
+          <p class="role-header__sub">${r?.company || ''}${r?.sector ? ` · ${r.sector}` : ''}</p>
+        </div>
+        <div class="role-header__actions">
+          ${r?.url ? html`
+            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer">
+              Apply ↗
+            </a>
+          ` : nothing}
+        </div>
       </header>
 
       <div class="asset-tabs">
@@ -232,7 +372,7 @@ export class JobRoleDetail extends LitElement {
       </div>
 
       <section class="asset-panel">
-        ${this._renderTabBody(this.activeTab)}
+        ${this.activeTab === 'details' ? this._renderDetails() : this._renderAssetTab(this.activeTab)}
       </section>
     `;
   }
