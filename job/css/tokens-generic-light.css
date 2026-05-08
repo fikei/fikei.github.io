@@ -1,0 +1,43 @@
+/* Generic design system tokens — light variant.
+   Default theme for /job. CTRL alternate lives in tokens-ctrl-*.css. */
+[data-theme="generic-light"] {
+  --bg: #ffffff;
+  --bg-surface: #f7f8fa;
+  --bg-elevated: #ffffff;
+
+  --fg: #0e1116;
+  --fg-muted: #57606a;
+  --fg-subtle: #8c959f;
+
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --accent-muted: #dbeafe;
+
+  --border: #d0d7de;
+  --border-strong: #afb8c1;
+
+  --success: #1a7f37;
+  --error: #cf222e;
+  --warning: #9a6700;
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: var(--font-body);
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+}
