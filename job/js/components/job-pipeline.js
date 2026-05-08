@@ -1,7 +1,10 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
 // rows sorted by Fit Score desc. Click a fit pill to see the breakdown.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-import { fetchPipeline, setStatus, generateAsset } from '../pipeline.js';
+// Carry the cache-bust query from this module's own URL through to siblings;
+// otherwise static imports below would hit the 10-min Pages cache.
+const V = (new URL(import.meta.url)).search;
+const { fetchPipeline, setStatus, generateAsset } = await import('../pipeline.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);

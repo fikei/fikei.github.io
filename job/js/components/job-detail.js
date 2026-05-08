@@ -4,7 +4,8 @@
 // the pretty URL via history.replaceState.
 import { LitElement, html } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
-import { renderMarkdown } from '../markdown.js';
+const V = (new URL(import.meta.url)).search;
+const { renderMarkdown } = await import('../markdown.js' + V);
 
 const KIND_DIR = {
   companies: '01-job-history/companies',
