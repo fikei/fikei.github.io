@@ -1,7 +1,11 @@
 // job-pipeline — pipeline table view. Reads from jobs-pipe and renders
 // rows sorted by Fit Score desc. Click a fit pill to see the breakdown.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-import { fetchPipeline } from '../pipeline.js';
+import { fetchPipeline, setStatus } from '../pipeline.js';
+
+const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
+const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
+const APPLIED_STATUSES = new Set(['Applied', 'Talking']);
 
 const DIM_LABELS = {
   title:   { label: 'Title match',   max: 25, hint: 'Founding/Senior/Staff PM scores higher; below seniority hard-fails.' },
@@ -140,8 +144,56 @@ export class JobPipeline extends LitElement {
 
   _openFitModal(r) { this.selectedRow = r; }
   _closeFitModal() { this.selectedRow = null; }
+
+  async _changeStatus(r, status) {
+    if (status === r.status) return;
+    const prev = r.status;
+    r.status = status;
+    r._saving = true;
+    this.requestUpdate();
+    try {
+      await setStatus(r.rowNumber, status);
+      r._saving = false;
+      r._error = '';
+    } catch (e) {
+      r.status = prev;
+      r._saving = false;
+      r._error = String(e);
+    }
+    this.requestUpdate();
+  }
+
+  async _onApplyClick(r) {
+    // Open the posting in a new tab even if status update fails.
+    if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer');
+    if (!APPLIED_STATUSES.has(r.status) && !TERMINAL_STATUSES.has(r.status)) {
+      await this._changeStatus(r, 'Applied');
+    }
+  }
   _onBackdropClick(e) {
     if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal();
+  }
+
+  _renderApplyCell(r) {
+    if (TERMINAL_STATUSES.has(r.status)) {
+      return r.url
+        ? html`<a class="link-subtle" href=${r.url} target="_blank" rel="noopener noreferrer">Posting ↗</a>`
+        : html`<span class="muted">—</span>`;
+    }
+    if (APPLIED_STATUSES.has(r.status)) {
+      return html`
+        <div class="apply-cell apply-cell--applied">
+          <span class="muted">Applied</span>
+          ${r.url ? html`<a class="link-subtle" href=${r.url} target="_blank" rel="noopener noreferrer">Posting ↗</a>` : nothing}
+        </div>
+      `;
+    }
+    if (!r.url) return html`<span class="muted">—</span>`;
+    return html`
+      <button class="btn btn--sm btn--accent" @click=${() => this._onApplyClick(r)}>
+        Apply ↗
+      </button>
+    `;
   }
 
   _renderRow(r) {
@@ -155,15 +207,24 @@ export class JobPipeline extends LitElement {
             ${r.score}
           </button>
         </td>
-        <td>${r.status || html`<span class="muted">—</span>`}</td>
+        <td class="status-cell">
+          <select
+            class="status-select ${r._saving ? 'is-saving' : ''}"
+            ?disabled=${r._saving}
+            .value=${r.status || ''}
+            @change=${(e) => this._changeStatus(r, e.target.value)}>
+            ${STATUS_OPTIONS.map(s => html`
+              <option value=${s} ?selected=${(r.status || '') === s}>${s || '—'}</option>
+            `)}
+          </select>
+          ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
+        </td>
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
+        <td>${this._renderApplyCell(r)}</td>
         <td><span class="muted">${r.sector || ''}</span></td>
         <td><span class="muted">${r.salary || ''}</span></td>
         <td><span class="muted">${r.source || ''}</span></td>
-        <td>
-          ${r.url ? html`<a href=${r.url} target="_blank" rel="noopener noreferrer">↗</a>` : nothing}
-        </td>
       </tr>
     `;
   }
@@ -250,10 +311,10 @@ export class JobPipeline extends LitElement {
               <th>Status</th>
               <th>Company</th>
               <th>Role</th>
+              <th>Apply</th>
               <th>Sector</th>
               <th>Salary</th>
               <th>Source</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>

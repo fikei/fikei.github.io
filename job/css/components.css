@@ -352,6 +352,49 @@
 .fit-pill--weak   { background: rgba(237,200,67,0.20); color: #6E5400; }
 .fit-pill--poor   { background: rgba(168,32,13,0.12); color: var(--error); }
 
+/* --- Status select + apply cell --- */
+.status-cell { display: flex; align-items: center; gap: var(--space-2); }
+.status-select {
+  font: inherit;
+  font-size: var(--font-size-small);
+  padding: 6px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%236A6C6A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 26px;
+}
+.status-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.status-select.is-saving { opacity: 0.6; }
+.status-cell__err {
+  display: inline-grid;
+  place-items: center;
+  width: 18px; height: 18px;
+  border-radius: var(--radius-pill);
+  background: rgba(168,32,13,0.14);
+  color: var(--error);
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  cursor: help;
+}
+
+.btn--sm {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-small);
+}
+.apply-cell { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; }
+.apply-cell .link-subtle { font-size: var(--font-size-caption); }
+
+.link-subtle { color: var(--fg-muted); }
+.link-subtle:hover { color: var(--fg); text-decoration: underline; }
+
 .fit-pill--button {
   border: 0;
   cursor: pointer;

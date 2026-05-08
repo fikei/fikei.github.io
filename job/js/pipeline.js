@@ -17,4 +17,15 @@ export async function fetchPipeline() {
   return res.json();
 }
 
-window.JobPipeline = { fetchPipeline };
+export async function setStatus(rowNumber, status) {
+  const headers = await authHeader();
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rowNumber, status }),
+  });
+  if (!res.ok) throw new Error(`set-status ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+window.JobPipeline = { fetchPipeline, setStatus };

@@ -83,11 +83,13 @@ async function getAccessToken(scope: string): Promise<string> {
   return data.access_token;
 }
 
+const RW_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+
 export async function readSheetValues(
   spreadsheetId: string,
   range: string,
 ): Promise<string[][]> {
-  const token = await getAccessToken('https://www.googleapis.com/auth/spreadsheets.readonly');
+  const token = await getAccessToken(RW_SCOPE);
   const url = `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
@@ -96,4 +98,25 @@ export async function readSheetValues(
   }
   const data = await res.json() as { values?: string[][] };
   return data.values || [];
+}
+
+export async function writeSheetCell(
+  spreadsheetId: string,
+  range: string,
+  value: string,
+): Promise<void> {
+  const token = await getAccessToken(RW_SCOPE);
+  const url = `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ range, values: [[value]] }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`sheets write failed ${res.status}: ${text.slice(0, 300)}`);
+  }
 }
