@@ -25,13 +25,22 @@ const COLUMNS = [
   { id: 'status',  label: 'Status',  sortKey: 'status',         type: 'text' },
   { id: 'company', label: 'Company', sortKey: 'company',        type: 'text' },
   { id: 'role',    label: 'Role',    sortKey: 'title',          type: 'text' },
-  { id: 'apply',   label: 'Apply',   sortKey: null },
   { id: 'resume',  label: 'Resume',  sortKey: 'hasResume',      type: 'bool', defaultDir: 'desc' },
   { id: 'cover',   label: 'Cover',   sortKey: 'hasCoverLetter', type: 'bool', defaultDir: 'desc' },
   { id: 'sector',  label: 'Sector',  sortKey: 'sector',         type: 'text' },
   { id: 'salary',  label: 'Salary',  sortKey: 'salary_high',    type: 'num',  defaultDir: 'desc' },
   { id: 'source',  label: 'Source',  sortKey: 'source',         type: 'text' },
+  { id: 'view',    label: '',        sortKey: null },
 ];
+
+// Drop rows without an apply link, and any Strava postings (out of scope).
+function isVisibleRole(r) {
+  if (!r.url) return false;
+  const company = (r.company || '').toLowerCase();
+  if (company === 'strava') return false;
+  if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
+  return true;
+}
 
 export class JobPipeline extends LitElement {
   createRenderRoot() { return this; }
@@ -110,7 +119,7 @@ export class JobPipeline extends LitElement {
   _sorted() {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
-    const arr = this.roles.slice();
+    const arr = this.roles.filter(isVisibleRole);
     arr.sort((a, b) => {
       const av = a[key];
       const bv = b[key];
@@ -154,13 +163,6 @@ export class JobPipeline extends LitElement {
     this.requestUpdate();
   }
 
-  async _onApplyClick(r) {
-    if (r.url) window.open(r.url, '_blank', 'noopener,noreferrer');
-    if (!APPLIED_STATUSES.has(r.status) && !TERMINAL_STATUSES.has(r.status)) {
-      await this._changeStatus(r, 'Applied');
-    }
-  }
-
   async _onGenerate(r, kind) {
     const flag = kind === 'resume' ? '_genResume' : '_genCover';
     if (r[flag]) return;
@@ -178,25 +180,15 @@ export class JobPipeline extends LitElement {
     }
   }
 
-  _detailHref(r, tab) { return `/job/jobs/${r.slug}/?tab=${tab}`; }
+  _detailHref(r, tab) { return tab ? `/job/jobs/${r.slug}/?tab=${tab}` : `/job/jobs/${r.slug}/`; }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
-  _renderApplyCell(r) {
-    if (TERMINAL_STATUSES.has(r.status)) {
-      return r.url
-        ? html`<a class="link-subtle" href=${r.url} target="_blank" rel="noopener noreferrer">Posting ↗</a>`
-        : html`<span class="muted">—</span>`;
-    }
-    if (APPLIED_STATUSES.has(r.status)) {
-      return html`
-        <div class="apply-cell apply-cell--applied">
-          <span class="muted">Applied</span>
-          ${r.url ? html`<a class="link-subtle" href=${r.url} target="_blank" rel="noopener noreferrer">Posting ↗</a>` : nothing}
-        </div>
-      `;
-    }
-    if (!r.url) return html`<span class="muted">—</span>`;
-    return html`<button class="btn btn--sm btn--accent" @click=${() => this._onApplyClick(r)}>Apply ↗</button>`;
+  _renderViewCell(r) {
+    return html`
+      <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener">
+        View
+      </a>
+    `;
   }
 
   _renderAssetCell(r, kind) {
@@ -242,7 +234,9 @@ export class JobPipeline extends LitElement {
           </button>
         </td>
         <td class="status-cell">
-          <select class="status-select ${r._saving ? 'is-saving' : ''}" ?disabled=${r._saving}
+          <select class="status-select ${r._saving ? 'is-saving' : ''}"
+            data-status=${r.status || 'New'}
+            ?disabled=${r._saving}
             .value=${r.status || ''} @change=${(e) => this._changeStatus(r, e.target.value)}>
             ${STATUS_OPTIONS.map(s => html`<option value=${s} ?selected=${(r.status || '') === s}>${s || '—'}</option>`)}
           </select>
@@ -250,12 +244,12 @@ export class JobPipeline extends LitElement {
         </td>
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
-        <td>${this._renderApplyCell(r)}</td>
         <td>${this._renderAssetCell(r, 'resume')}</td>
         <td>${this._renderAssetCell(r, 'cover-letter')}</td>
         <td><span class="muted">${r.sector || ''}</span></td>
         <td><span class="muted">${r.salary || ''}</span></td>
         <td><span class="muted">${r.source || ''}</span></td>
+        <td>${this._renderViewCell(r)}</td>
       </tr>
     `;
   }
