@@ -1595,3 +1595,26 @@
   font-style: italic;
 }
 
+
+/* --- Zocdoc theme: yellow buttons only, fully rounded ---
+   Tokens otherwise mirror the generic system. */
+[data-theme="zocdoc-light"] .btn,
+[data-theme="zocdoc-dark"] .btn {
+  border-radius: var(--radius-pill);
+}
+[data-theme="zocdoc-light"] .btn--primary,
+[data-theme="zocdoc-dark"] .btn--primary,
+[data-theme="zocdoc-light"] .btn--accent,
+[data-theme="zocdoc-dark"] .btn--accent {
+  background: #FFCD3F;
+  color: #0E0F0C;
+  border-color: #FFCD3F;
+}
+[data-theme="zocdoc-light"] .btn--primary:hover,
+[data-theme="zocdoc-dark"] .btn--primary:hover,
+[data-theme="zocdoc-light"] .btn--accent:hover,
+[data-theme="zocdoc-dark"] .btn--accent:hover {
+  background: #F2BD2A;
+  border-color: #F2BD2A;
+  filter: none;
+}
