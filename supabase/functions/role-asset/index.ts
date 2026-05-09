@@ -9,8 +9,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[role-asset] v${VERSION} - route __base__ slug to job.global_assets`);
+const VERSION = '0.2.1';
+console.log(`[role-asset] v${VERSION} - route __base__ slug to job.global_assets (redeploy)`);
 
 const KIND_RE = /^(resume|cover-letter|notes|analysis)$/;
 const SLUG_RE = /^[a-z0-9_-]+$/;
