@@ -13,7 +13,7 @@ const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { 
 ]);
 
 const TABS = [
-  { id: 'details',      label: 'Details' },
+  { id: 'details',      label: 'Role details' },
   { id: 'resume',       label: 'Resume' },
   { id: 'cover-letter', label: 'Cover letter' },
 ];
@@ -211,7 +211,8 @@ export class JobRoleDetail extends LitElement {
         risks: sections['risks'] || '',
         strengths: sections['strengths'] || sections['candidatestrength'] || '',
         gaps: sections['gaps'] || '',
-        suggestedAngle: sections['suggestedangle'] || sections['angle'] || '',
+        suggestedAngle: sections['suggestedangle'] || sections['coverletterangle'] || sections['angle'] || '',
+        resumeAngle: sections['resumeangle'] || sections['suggestedresumeangle'] || '',
       };
     }
 
@@ -328,13 +329,6 @@ export class JobRoleDetail extends LitElement {
         })}
       </div>
 
-      ${parsed?.suggestedAngle ? html`
-        <aside class="role-callout">
-          <h4>Suggested angle for the cover letter</h4>
-          <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.suggestedAngle))}</div>
-        </aside>
-      ` : nothing}
-
       ${a?.error ? html`<p class="muted" style="color:var(--error);">${a.error}</p>` : nothing}
       <div class="asset-toolbar" style="margin-top:var(--space-5);">
         <button class="btn btn--sm" ?disabled=${a?.saving} @click=${() => this._onGenerate('analysis')}>
@@ -342,6 +336,115 @@ export class JobRoleDetail extends LitElement {
         </button>
       </div>
     `;
+  }
+
+  // --- Tailoring callout + change log -------------------------------------
+  // For Cover letter: pull the analysis JSON's `suggestedAngle`.
+  // For Resume:      derive a tailoring focus from `strengths` (what to lead
+  //                  with given this role's emphasis). Falls back to a generic
+  //                  prompt if the analysis hasn't generated yet.
+  _renderTailoringCallout(kind) {
+    const ana = this.assets['analysis'];
+    const parsed = ana && ana.mode === 'view' ? this._parseAnalysis(ana.content) : null;
+    let title, body;
+    if (kind === 'cover-letter') {
+      title = 'Suggested angle for the cover letter';
+      body = parsed?.suggestedAngle || '';
+    } else if (kind === 'resume') {
+      title = 'Suggested angle for the resume';
+      body = parsed?.resumeAngle || parsed?.strengths || '';
+    } else {
+      return nothing;
+    }
+    if (!body) {
+      return html`
+        <aside class="tailoring-callout">
+          <header class="tailoring-callout__head">
+            <h4 class="tailoring-callout__title">${title}</h4>
+            <span class="tailoring-callout__pill">AI</span>
+          </header>
+          <p class="tailoring-empty">Generate the role analysis first to see a tailoring angle.</p>
+        </aside>
+      `;
+    }
+    return html`
+      <aside class="tailoring-callout">
+        <header class="tailoring-callout__head">
+          <h4 class="tailoring-callout__title">${title}</h4>
+          <span class="tailoring-callout__pill">AI</span>
+        </header>
+        <div class="kb-doc">${unsafeHTML(renderMarkdown(body))}</div>
+      </aside>
+    `;
+  }
+
+  // Derive a list of tailoring "comments" — what the AI emphasised when it
+  // wrote this asset for this role. We bucket the analysis fields into a
+  // change log: matched strengths, gaps to soften, and the role-specific
+  // angle. User edits are layered on top via a localStorage diff (lightweight,
+  // best-effort — keeps this client-side until we add a proper revisions table).
+  _changeLogKey(kind) { return `job:changes:${this.slug}:${kind}`; }
+
+  _readChangeLog(kind) {
+    try {
+      const raw = localStorage.getItem(this._changeLogKey(kind));
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  _renderChangeLog(kind) {
+    const ana = this.assets['analysis'];
+    const parsed = ana && ana.mode === 'view' ? this._parseAnalysis(ana.content) : null;
+
+    const items = [];
+    if (parsed?.strengths) {
+      items.push(`Led with strengths that map to this role: ${this._firstSentence(parsed.strengths)}`);
+    }
+    if (parsed?.whyFits) {
+      items.push(`Framed the opening around why this fits: ${this._firstSentence(parsed.whyFits)}`);
+    }
+    if (parsed?.gaps && kind === 'cover-letter') {
+      items.push(`Acknowledged gaps directly: ${this._firstSentence(parsed.gaps)}`);
+    }
+    if (kind === 'cover-letter' && parsed?.suggestedAngle) {
+      items.push(`Used the suggested angle: ${this._firstSentence(parsed.suggestedAngle)}`);
+    }
+    if (kind === 'resume' && (parsed?.resumeAngle || parsed?.strengths)) {
+      items.push(`Reordered bullets to surface ${this._firstSentence(parsed.resumeAngle || parsed.strengths)}`);
+    }
+
+    const userEdits = this._readChangeLog(kind);
+    for (const e of userEdits) items.push(`Manual edit (${e.at}): ${e.note}`);
+
+    if (!items.length) {
+      return html`
+        <aside class="tailoring-callout">
+          <header class="tailoring-callout__head">
+            <h4 class="tailoring-callout__title">What changed for this role</h4>
+            <span class="tailoring-callout__pill">${userEdits.length} edits</span>
+          </header>
+          <p class="tailoring-empty">No tailoring notes yet — regenerate to populate.</p>
+        </aside>
+      `;
+    }
+    return html`
+      <aside class="tailoring-callout">
+        <header class="tailoring-callout__head">
+          <h4 class="tailoring-callout__title">What changed for this role</h4>
+          <span class="tailoring-callout__pill">${items.length}</span>
+        </header>
+        <ul class="tailoring-list">
+          ${items.map(i => html`<li>${i}</li>`)}
+        </ul>
+      </aside>
+    `;
+  }
+
+  _firstSentence(s) {
+    if (!s) return '';
+    const cleaned = s.replace(/[#*`_>\[\]]/g, '').trim();
+    const m = cleaned.match(/^(.{20,200}?[\.\!\?])\s/);
+    return (m ? m[1] : cleaned.split('\n')[0]).slice(0, 200).trim();
   }
 
   // --- Resume / Cover-letter tab body -------------------------------------
@@ -370,6 +473,8 @@ export class JobRoleDetail extends LitElement {
       `;
     }
     return html`
+      ${(kind === 'resume' || kind === 'cover-letter') ? this._renderTailoringCallout(kind) : nothing}
+      ${(kind === 'resume' || kind === 'cover-letter') ? this._renderChangeLog(kind) : nothing}
       <div class="asset-toolbar">
         ${a.mode === 'view' ? html`
           <button class="btn btn--sm" @click=${() => this._enterEdit(kind)}>Edit</button>
