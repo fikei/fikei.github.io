@@ -325,22 +325,22 @@ with derived as (
   select distinct on (pr.company_slug)
     pr.company_slug,
     case
-      when pr.url ~* 'boards\\.greenhouse\\.io/[^/]+'                  then 'Greenhouse'
-      when pr.url ~* 'jobs\\.lever\\.co/[^/]+'                         then 'Lever'
-      when pr.url ~* 'jobs\\.ashbyhq\\.com/[^/]+'                      then 'Ashby'
+      when pr.url ~* 'boards\.greenhouse\.io/[^/]+'                  then 'Greenhouse'
+      when pr.url ~* 'jobs\.lever\.co/[^/]+'                         then 'Lever'
+      when pr.url ~* 'jobs\.ashbyhq\.com/[^/]+'                      then 'Ashby'
     end as ats,
     case
-      when pr.url ~* 'boards\\.greenhouse\\.io/([^/?#]+)'
-        then substring(pr.url from 'boards\\.greenhouse\\.io/([^/?#]+)')
-      when pr.url ~* 'jobs\\.lever\\.co/([^/?#]+)'
-        then substring(pr.url from 'jobs\\.lever\\.co/([^/?#]+)')
-      when pr.url ~* 'jobs\\.ashbyhq\\.com/([^/?#]+)'
-        then substring(pr.url from 'jobs\\.ashbyhq\\.com/([^/?#]+)')
+      when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
+        then substring(pr.url from 'boards\.greenhouse\.io/([^/?#]+)')
+      when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
+        then substring(pr.url from 'jobs\.lever\.co/([^/?#]+)')
+      when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
+        then substring(pr.url from 'jobs\.ashbyhq\.com/([^/?#]+)')
     end as ats_slug
   from job.pipeline_roles pr
   where pr.company_slug is not null
     and pr.url is not null
-    and pr.url ~* '(boards\\.greenhouse\\.io|jobs\\.lever\\.co|jobs\\.ashbyhq\\.com)/'
+    and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)/'
 )
 update job.tracked_companies tc
    set ats      = coalesce(tc.ats, d.ats),
