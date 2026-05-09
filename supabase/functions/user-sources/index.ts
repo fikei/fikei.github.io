@@ -42,6 +42,25 @@ serve(async (req) => {
         await sql`delete from job.user_sources where id = ${id} and user_email = ${email}`;
         return jsonResp({ ok: true, id, deleted: true });
       }
+      if (body.action === 'inspect_rows') {
+        // Diagnostic: return raw rows from recommended_roles for a given
+        // source value, ignoring all surface filters. Lets us figure out
+        // why a row isn't appearing in the widget.
+        const src = String(body.source || '').trim();
+        if (!src) return err('source required', 400);
+        const rows = await sql`
+          select id, company, title, location, fit_score as "fitScore",
+                 hard_fails as "hardFails", dismissed_at as "dismissedAt",
+                 added_to_pipeline_slug as "addedToPipelineSlug",
+                 (select 1 from job.pipeline_roles p
+                   where lower(p.company_name) = lower(recommended_roles.company)
+                     and lower(p.title) = lower(recommended_roles.title)
+                   limit 1) as "matchesPipeline"
+            from job.recommended_roles
+           where source = ${src}
+           limit 10`;
+        return jsonResp({ ok: true, rows });
+      }
       if (body.action === 'probe_url') {
         // Diagnostic: fetch any URL with a browser UA and return status +
         // the first 500 chars. Useful for figuring out which RSS feeds
