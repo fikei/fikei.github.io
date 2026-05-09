@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.32.0';
-console.log(`[job] v${VERSION} - fit pill on recommendation cards`);
+const VERSION = '0.33.1';
+console.log(`[job] v${VERSION} - Zocdoc theme reduced to yellow + radius (no other overrides)`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -12,6 +12,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const ALLOWED_EMAIL = 'fike101@gmail.com';
 
 import('./components/job-rail.js' + V);
+import('./components/job-footer.js' + V);
 import('./kb.js' + V);
 // Route-specific components.
 if (location.pathname.startsWith('/job/history/drill')) {
@@ -36,25 +37,14 @@ function applySignedInState(email) {
   injectFooter();
 }
 
-// Add a single shared footer to every /job page on first signed-in render.
-// Stays out of the route HTML so we don't have to edit five files for copy.
+// Inject the global footer (theme toggle + version + links) into the .app
+// grid so it spans both columns. Avoids editing every route HTML file.
 function injectFooter() {
-  if (document.querySelector('.app__foot')) return;
-  const main = document.querySelector('.app__main');
-  if (!main) return;
-  const foot = document.createElement('footer');
-  foot.className = 'app__foot';
-  foot.innerHTML = `
-    <div class="app__foot__inner">
-      <span class="muted">/job · v${VERSION} · ctrl.rodeo</span>
-      <span class="muted">
-        <a href="/" class="link-subtle">ctrl.rodeo</a>
-        <span aria-hidden="true"> · </span>
-        <a href="https://github.com/fikei/job" target="_blank" rel="noopener" class="link-subtle">fikei/job</a>
-      </span>
-    </div>
-  `;
-  main.appendChild(foot);
+  if (document.querySelector('job-footer')) return;
+  const app = document.querySelector('.app');
+  if (!app) return;
+  const el = document.createElement('job-footer');
+  app.appendChild(el);
 }
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when

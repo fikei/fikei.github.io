@@ -1,0 +1,79 @@
+/* Zocdoc theme — dark. Mirrors generic-dark with green swapped for yellow
+   and a tighter corner-radius scale. */
+[data-theme="zocdoc-dark"] {
+  /* Backgrounds — neutral greyscale */
+  --bg: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1f2630;
+  --bg-overlay: rgba(255, 255, 255, 0.06);
+
+  /* Content */
+  --fg: #f0f6fc;
+  --fg-muted: rgba(240, 246, 252, 0.72);
+  --fg-subtle: rgba(240, 246, 252, 0.50);
+  --fg-link: #FFCD3F;
+
+  /* Interactive — Zocdoc yellow leads as the active accent */
+  --accent: #FFCD3F;
+  --accent-fg: #0d1117;
+  --accent-muted: rgba(255, 205, 63, 0.16);
+  --accent-strong: #FFCD3F;
+  --accent-strong-fg: #0d1117;
+
+  /* Borders */
+  --border: rgba(240, 246, 252, 0.12);
+  --border-strong: rgba(240, 246, 252, 0.24);
+
+  /* Sentiment */
+  --success: #9FE870;
+  --error: #FF7A6E;
+  --warning: #FFEB69;
+
+  /* Typography */
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --font-size-display: 56px;
+  --font-size-title-1: 36px;
+  --font-size-title-2: 28px;
+  --font-size-title-3: 22px;
+  --font-size-title-4: 18px;
+  --font-size-body-lg: 18px;
+  --font-size-body: 16px;
+  --font-size-small: 14px;
+  --font-size-caption: 12px;
+
+  --lh-display: 1.1;
+  --lh-title: 1.25;
+  --lh-body: 1.55;
+  --lh-tight: 1.35;
+
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* Radius — Zocdoc scale (tighter than Wise) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 40px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.30);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.40);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.55);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+}

@@ -1,0 +1,80 @@
+/* Zocdoc theme — light. Identical to the generic (Wise) design system,
+   with green swapped for yellow and a slightly tighter corner-radius scale.
+   Everything else (typography, spacing, sentiment, neutrals) stays generic. */
+[data-theme="zocdoc-light"] {
+  /* Backgrounds */
+  --bg: #FFFFFF;
+  --bg-surface: #FBF6E8;                           /* tinted neutral lift, yellow cast */
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(122, 88, 0, 0.08);
+
+  /* Content */
+  --fg: #0E0F0C;
+  --fg-muted: #454745;
+  --fg-subtle: #6A6C6A;
+  --fg-link: #7A5800;                              /* deep yellow/ochre (was forest green) */
+
+  /* Interactive — green replaced with yellow */
+  --accent: #7A5800;                               /* dark yellow / ochre — primary text & button bg */
+  --accent-fg: #FFFFFF;
+  --accent-muted: rgba(255, 205, 63, 0.20);        /* tinted Zocdoc yellow */
+  --accent-strong: #FFCD3F;                        /* Zocdoc yellow — accent highlight */
+  --accent-strong-fg: #0E0F0C;                     /* dark text on yellow */
+
+  /* Borders */
+  --border: rgba(14, 15, 12, 0.12);
+  --border-strong: rgba(14, 15, 12, 0.24);
+
+  /* Sentiment */
+  --success: #2F5711;
+  --error: #A8200D;
+  --warning: #EDC843;
+
+  /* Typography */
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --font-size-display: 56px;
+  --font-size-title-1: 36px;
+  --font-size-title-2: 28px;
+  --font-size-title-3: 22px;
+  --font-size-title-4: 18px;
+  --font-size-body-lg: 18px;
+  --font-size-body: 16px;
+  --font-size-small: 14px;
+  --font-size-caption: 12px;
+
+  --lh-display: 1.1;
+  --lh-title: 1.25;
+  --lh-body: 1.55;
+  --lh-tight: 1.35;
+
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* Radius — Zocdoc scale (tighter than Wise) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 40px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(14,15,12,0.05);
+  --shadow-md: 0 8px 24px rgba(14,15,12,0.07);
+  --shadow-lg: 0 16px 48px rgba(14,15,12,0.10);
+
+  /* Spacing — Wise 4px base scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+}
