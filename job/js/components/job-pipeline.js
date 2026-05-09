@@ -2,7 +2,7 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus, generateAsset } = await import('../pipeline.js' + V);
+const { fetchPipeline, setStatus } = await import('../pipeline.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -20,16 +20,15 @@ const DIM_LABELS = {
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
+// Resume + Cover assets live on the detail page now, not the main table.
 const COLUMNS = [
-  { id: 'fit',     label: 'Fit',     sortKey: 'score',          type: 'num',  defaultDir: 'desc' },
-  { id: 'status',  label: 'Status',  sortKey: 'status',         type: 'text' },
-  { id: 'company', label: 'Company', sortKey: 'company',        type: 'text' },
-  { id: 'role',    label: 'Role',    sortKey: 'title',          type: 'text' },
-  { id: 'resume',  label: 'Resume',  sortKey: 'hasResume',      type: 'bool', defaultDir: 'desc' },
-  { id: 'cover',   label: 'Cover',   sortKey: 'hasCoverLetter', type: 'bool', defaultDir: 'desc' },
-  { id: 'sector',  label: 'Sector',  sortKey: 'sector',         type: 'text' },
-  { id: 'salary',  label: 'Salary',  sortKey: 'salary_high',    type: 'num',  defaultDir: 'desc' },
-  { id: 'source',  label: 'Source',  sortKey: 'source',         type: 'text' },
+  { id: 'fit',     label: 'Fit',     sortKey: 'score',       type: 'num',  defaultDir: 'desc' },
+  { id: 'status',  label: 'Status',  sortKey: 'status',      type: 'text' },
+  { id: 'company', label: 'Company', sortKey: 'company',     type: 'text' },
+  { id: 'role',    label: 'Role',    sortKey: 'title',       type: 'text' },
+  { id: 'sector',  label: 'Sector',  sortKey: 'sector',      type: 'text' },
+  { id: 'salary',  label: 'Salary',  sortKey: 'salary_high', type: 'num',  defaultDir: 'desc' },
+  { id: 'source',  label: 'Source',  sortKey: 'source',      type: 'text' },
   { id: 'view',    label: '',        sortKey: null },
 ];
 
@@ -163,24 +162,7 @@ export class JobPipeline extends LitElement {
     this.requestUpdate();
   }
 
-  async _onGenerate(r, kind) {
-    const flag = kind === 'resume' ? '_genResume' : '_genCover';
-    if (r[flag]) return;
-    r[flag] = true;
-    this.requestUpdate();
-    try {
-      await generateAsset(r.slug, kind);
-      if (kind === 'resume') r.hasResume = true;
-      else r.hasCoverLetter = true;
-    } catch (e) {
-      r._error = String(e);
-    } finally {
-      r[flag] = false;
-      this.requestUpdate();
-    }
-  }
-
-  _detailHref(r, tab) { return tab ? `/job/jobs/${r.slug}/?tab=${tab}` : `/job/jobs/${r.slug}/`; }
+  _detailHref(r) { return `/job/jobs/${r.slug}/`; }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
   _renderViewCell(r) {
@@ -188,19 +170,6 @@ export class JobPipeline extends LitElement {
       <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener">
         View
       </a>
-    `;
-  }
-
-  _renderAssetCell(r, kind) {
-    const has = kind === 'resume' ? r.hasResume : r.hasCoverLetter;
-    const generating = kind === 'resume' ? r._genResume : r._genCover;
-    if (has) {
-      return html`<a class="link-subtle" href=${this._detailHref(r, kind)} target="_blank" rel="noopener">View / Edit</a>`;
-    }
-    return html`
-      <button class="btn btn--sm" ?disabled=${generating} @click=${() => this._onGenerate(r, kind)}>
-        ${generating ? 'Generating…' : 'Create'}
-      </button>
     `;
   }
 
@@ -244,8 +213,6 @@ export class JobPipeline extends LitElement {
         </td>
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
-        <td>${this._renderAssetCell(r, 'resume')}</td>
-        <td>${this._renderAssetCell(r, 'cover-letter')}</td>
         <td><span class="muted">${r.sector || ''}</span></td>
         <td><span class="muted">${r.salary || ''}</span></td>
         <td><span class="muted">${r.source || ''}</span></td>
