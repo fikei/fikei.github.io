@@ -1,0 +1,7 @@
+project_id = "yfhudwakpgzswiylhfbh"
+
+# pull-recommendations is invoked by pg_cron and by the user-sources
+# wrapper using a shared X-Cron-Secret header (function-level auth).
+# Disable platform JWT verification so cron can hit it.
+[functions.pull-recommendations]
+verify_jwt = false
