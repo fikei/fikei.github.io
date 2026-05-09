@@ -16,6 +16,7 @@
 // Docs: https://theirstack.com/en/docs/api-reference
 
 import type { Source, RecommendedRoleInput } from './types.ts';
+import { db } from '../job-db.ts';
 
 interface TheirStackConfig {
   job_title_or?:           string[];
@@ -69,20 +70,47 @@ export const theirstackSource: Source<TheirStackConfig> = {
       ...(cfg.extra || {}),
     };
 
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Accept':        'application/json',
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`theirstack ${res.status}: ${text.slice(0, 240)}`);
+    // Daily cache: per (source, config_hash, today) we hit the API once.
+    // Subsequent runs the same day use the cached raw response — lets us
+    // re-score / re-bullet without re-billing TheirStack.
+    const sql = db();
+    const configHash = await sha1(JSON.stringify(body));
+    const cached = await sql<{ raw: { data?: TheirStackJob[]; jobs?: TheirStackJob[] } }[]>`
+      select raw
+        from job.source_cache
+       where source = 'theirstack'
+         and config_hash = ${configHash}
+         and fetched_on = current_date
+       limit 1
+    `;
+    let json: { data?: TheirStackJob[]; jobs?: TheirStackJob[] };
+    if (cached.length) {
+      json = cached[0].raw;
+      console.log(`[theirstack] cache HIT for ${configHash.slice(0, 12)}`);
+    } else {
+      console.log(`[theirstack] cache MISS for ${configHash.slice(0, 12)} — calling API`);
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Accept':        'application/json',
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`theirstack ${res.status}: ${text.slice(0, 240)}`);
+      }
+      json = await res.json() as { data?: TheirStackJob[]; jobs?: TheirStackJob[] };
+      const count = (json.data || json.jobs || []).length;
+      await sql`
+        insert into job.source_cache (source, config_hash, raw, fetched_count)
+        values ('theirstack', ${configHash}, ${sql.json(json as unknown as Record<string, unknown>)}, ${count})
+        on conflict (source, config_hash, fetched_on)
+        do update set raw = excluded.raw, fetched_count = excluded.fetched_count, fetched_at = now()
+      `;
     }
-    const json = await res.json() as { data?: TheirStackJob[]; jobs?: TheirStackJob[] };
     const jobs = json.data || json.jobs || [];
 
     return jobs.map(j => {
@@ -121,4 +149,9 @@ function hashKey(s: string): string {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
   return Math.abs(h).toString(36).slice(0, 12);
+}
+
+async function sha1(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }

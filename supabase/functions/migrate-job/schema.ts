@@ -318,6 +318,19 @@ create table if not exists job.user_sources (
 );
 alter table job.user_sources enable row level security;
 
+-- Daily cache for paid source plugins (see migration 055).
+create table if not exists job.source_cache (
+  source        text not null,
+  config_hash   text not null,
+  fetched_on    date not null default current_date,
+  raw           jsonb not null,
+  fetched_count int,
+  fetched_at    timestamptz not null default now(),
+  primary key (source, config_hash, fetched_on)
+);
+create index if not exists source_cache_recent_idx on job.source_cache (source, fetched_on desc);
+alter table job.source_cache enable row level security;
+
 -- Backfill ats / ats_slug on tracked_companies from any pipeline_roles
 -- URL we already have. Idempotent: only updates rows where the field
 -- is still null. Safe to re-run on every schema apply.
@@ -333,13 +346,10 @@ update job.tracked_companies tc
              when pr.url ~* 'ashbyhq\.com'   then 'Ashby'
            end as ats,
            case
-<<<<<<< HEAD
              when pr.url ~* '(boards|job-boards)\.greenhouse\.io/([^/?#]+)'
                then (regexp_match(pr.url, '(?:boards|job-boards)\.greenhouse\.io/([^/?#]+)'))[1]
-=======
              when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
                then (regexp_match(pr.url, 'boards\.greenhouse\.io/([^/?#]+)'))[1]
->>>>>>> origin/master
              when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
                then (regexp_match(pr.url, 'jobs\.lever\.co/([^/?#]+)'))[1]
              when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
@@ -348,11 +358,8 @@ update job.tracked_companies tc
            row_number() over (partition by pr.company_slug order by pr.created_at desc) as rn
       from job.pipeline_roles pr
      where pr.company_slug is not null
-<<<<<<< HEAD
        and pr.url ~* '((boards|job-boards)\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)'
-=======
        and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)'
->>>>>>> origin/master
   ) d
  where d.company_slug = tc.slug
    and d.rn = 1
