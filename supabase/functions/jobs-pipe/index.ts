@@ -10,9 +10,10 @@ import { readSheetValues, writeSheetCell } from './sheets.ts';
 import { computeFit, RoleRow } from './fit.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
+import { parseSectorTags } from '../_shared/sector-tags.ts';
 
-const VERSION = '0.5.0';
-console.log(`[jobs-pipe] v${VERSION} - archive support`);
+const VERSION = '0.6.0';
+console.log(`[jobs-pipe] v${VERSION} - sector tag tokens`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const STATUS_ENUM = new Set([
@@ -122,6 +123,22 @@ async function syncFromSheet() {
         hard_fails = excluded.hard_fails,
         updated_at = now();
     `;
+
+    // Refresh role↔sector_tags from the latest sector text.
+    const tags = parseSectorTags(role.sector);
+    await sql`delete from job.role_sector_tags where role_slug = ${slug}`;
+    for (const t of tags) {
+      await sql`
+        insert into job.sector_tags (slug, name) values (${t.slug}, ${t.name})
+        on conflict (slug) do nothing;
+      `;
+      await sql`
+        insert into job.role_sector_tags (role_slug, tag_slug)
+        values (${slug}, ${t.slug})
+        on conflict do nothing;
+      `;
+    }
+
     upserted += 1;
   }
   return upserted;
@@ -139,7 +156,13 @@ async function listRoles() {
       r.first_seen, r.last_seen,
       r.archived_at as "archivedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
-      coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter"
+      coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter",
+      coalesce((
+        select array_agg(json_build_object('slug', t.slug, 'name', t.name) order by t.name)
+        from job.role_sector_tags rt
+        join job.sector_tags t on t.slug = rt.tag_slug
+        where rt.role_slug = r.slug
+      ), array[]::json[]) as "sectorTags"
     from job.pipeline_roles r
     left join job.role_assets ra_resume on ra_resume.role_slug = r.slug and ra_resume.kind = 'resume'
     left join job.role_assets ra_cover  on ra_cover.role_slug = r.slug and ra_cover.kind = 'cover-letter'

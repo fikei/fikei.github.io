@@ -973,3 +973,25 @@
 .pipeline-row { cursor: pointer; }
 .pipeline-row:hover td { background: var(--bg-surface); }
 .pipeline-row.is-archived { cursor: pointer; }
+
+/* --- Sector tag chips (pipeline cell) --- */
+.tag-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tag-chip {
+  font-size: var(--font-size-caption);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+[data-theme="generic-dark"] .tag-chip { color: var(--accent-strong); }
+[data-theme="ctrl-light"]   .tag-chip { color: var(--accent-strong); background: rgba(0,168,160,0.12); }
+[data-theme="ctrl-dark"]    .tag-chip { color: var(--accent-strong); background: rgba(0,255,247,0.14); }

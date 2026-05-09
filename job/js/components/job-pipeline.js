@@ -274,9 +274,21 @@ export class JobPipeline extends LitElement {
         </td>
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
-        <td><span class="muted">${r.sector || ''}</span></td>
+        <td>${this._renderSectorCell(r)}</td>
         <td>${this._renderViewCell(r)}</td>
       </tr>
+    `;
+  }
+
+  _renderSectorCell(r) {
+    const tags = Array.isArray(r.sectorTags) ? r.sectorTags : [];
+    if (!tags.length) {
+      return r.sector ? html`<span class="muted">${r.sector}</span>` : html`<span class="muted">—</span>`;
+    }
+    return html`
+      <ul class="tag-chips">
+        ${tags.map(t => html`<li class="tag-chip">${t.name}</li>`)}
+      </ul>
     `;
   }
 
