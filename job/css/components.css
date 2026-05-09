@@ -1595,26 +1595,117 @@
   font-style: italic;
 }
 
+/* --- Sub-nav under an active rail item (e.g. Jobs > Leads/Active/Archive) --- */
+.nav-sublist {
+  list-style: none;
+  margin: var(--space-1) 0 var(--space-2) var(--space-4);
+  padding: 0 0 0 var(--space-3);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-sublist a {
+  display: block;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-medium);
+}
+.nav-sublist a:hover { background: var(--bg-elevated); color: var(--fg); text-decoration: none; }
+.nav-sublist a[aria-current="page"] {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
 
-/* --- Zocdoc theme: yellow buttons only, fully rounded ---
-   Tokens otherwise mirror the generic system. */
-[data-theme="zocdoc-light"] .btn,
-[data-theme="zocdoc-dark"] .btn {
+/* --- Bucket tabs (in-page Leads / Active / Archive) --- */
+.bucket-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  margin-bottom: var(--space-4);
 }
-[data-theme="zocdoc-light"] .btn--primary,
-[data-theme="zocdoc-dark"] .btn--primary,
-[data-theme="zocdoc-light"] .btn--accent,
-[data-theme="zocdoc-dark"] .btn--accent {
-  background: #FFCD3F;
-  color: #0E0F0C;
-  border-color: #FFCD3F;
+.bucket-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
 }
-[data-theme="zocdoc-light"] .btn--primary:hover,
-[data-theme="zocdoc-dark"] .btn--primary:hover,
-[data-theme="zocdoc-light"] .btn--accent:hover,
-[data-theme="zocdoc-dark"] .btn--accent:hover {
-  background: #F2BD2A;
-  border-color: #F2BD2A;
-  filter: none;
+.bucket-tab:hover { background: var(--bg-elevated); color: var(--fg); text-decoration: none; }
+.bucket-tab.is-active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.bucket-tab__count {
+  font-size: var(--font-size-caption);
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-overlay);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+  text-align: center;
+}
+.bucket-tab.is-active .bucket-tab__count { background: rgba(255,255,255,0.18); color: inherit; }
+
+/* --- Status pill (read-only label in the row) --- */
+.status-pill {
+  display: inline-block;
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.status-pill.is-saving { opacity: 0.6; }
+.status-pill--new          { background: var(--accent-muted); color: var(--accent); border-color: transparent; }
+.status-pill--apply        { background: rgba(159, 232, 112, 0.30); color: var(--accent); border-color: transparent; }
+.status-pill--applied,
+.status-pill--talking      { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.status-pill--pass,
+.status-pill--rejected,
+.status-pill--closed,
+.status-pill--not-listed   { background: rgba(168,32,13,0.10); color: var(--error); border-color: transparent; }
+.status-pill--nudge-network { background: rgba(237,200,67,0.20); color: #6E5400; border-color: transparent; }
+
+/* --- Triple-dot menu: wider panel with a status submenu --- */
+.row-menu__panel--wide { min-width: 220px; }
+.row-menu__group-label {
+  padding: 8px var(--space-4) 4px;
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+  font-weight: var(--fw-semibold);
+}
+.row-menu__item--status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+}
+.row-menu__item--status.is-current { background: var(--bg-surface); }
+.row-menu__check {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: var(--fw-semibold);
+}
+.row-menu__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }

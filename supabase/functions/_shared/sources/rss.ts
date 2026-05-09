@@ -158,8 +158,6 @@ export const rssSource: Source<RssConfig> = {
         diag.push(`${f.label || f.url.slice(0, 30)}=ERR ${(e as Error).message.slice(0, 80)}`);
       }
     }
-    // Stash per-feed diag on the first item's payload so the worker
-    // can include it in the run summary without us editing the worker.
     console.log(`[rss] ${diag.join(' | ')}`);
     if (!out.length) throw new Error(diag.join(' | ').slice(0, 500));
     if (out[0]?.payload) (out[0].payload as Record<string, unknown>)._diag = diag.join(' | ');
