@@ -9,12 +9,17 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[role-asset] v${VERSION}`);
+const VERSION = '0.2.0';
+console.log(`[role-asset] v${VERSION} - route __base__ slug to job.global_assets`);
 
 const KIND_RE = /^(resume|cover-letter|notes|analysis)$/;
 const SLUG_RE = /^[a-z0-9_-]+$/;
 const MAX_BYTES = 64 * 1024;
+
+// Sentinel slug used by the frontend to address the global, untargeted base
+// resume. Persisted in job.global_assets (no FK to pipeline_roles).
+const BASE_SLUG = '__base__';
+const BASE_GLOBAL_KIND = 'base-resume';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -31,6 +36,20 @@ serve(async (req) => {
       const kind = (url.searchParams.get('kind') || '').toLowerCase();
       if (!SLUG_RE.test(slug)) return err('invalid slug', 400);
       if (!KIND_RE.test(kind)) return err('invalid kind', 400);
+
+      if (slug === BASE_SLUG) {
+        // Only resume is supported as a global asset today.
+        if (kind !== 'resume') return err('not found', 404);
+        const rows = await sql`
+          select 'resume' as kind, content_md, generated_by, generated_at, edited_at, updated_at
+          from job.global_assets
+          where kind = ${BASE_GLOBAL_KIND}
+          limit 1;
+        `;
+        if (rows.length === 0) return err('not found', 404);
+        return jsonResp({ slug: BASE_SLUG, ...rows[0] });
+      }
+
       const rows = await sql`
         select role_slug as slug, kind, content_md, source_path, generated_by,
                generated_at, edited_at, updated_at
@@ -51,6 +70,20 @@ serve(async (req) => {
       if (!SLUG_RE.test(slug)) return err('invalid slug', 400);
       if (!KIND_RE.test(kind)) return err('invalid kind', 400);
       if (content_md.length > MAX_BYTES) return err(`content exceeds ${MAX_BYTES} bytes`, 413);
+
+      if (slug === BASE_SLUG) {
+        if (kind !== 'resume') return err('only resume kind is supported for __base__', 400);
+        const result = await sql`
+          insert into job.global_assets (kind, content_md, generated_by, edited_at)
+          values (${BASE_GLOBAL_KIND}, ${content_md}, 'manual', now())
+          on conflict (kind) do update set
+            content_md = excluded.content_md,
+            edited_at = now(),
+            updated_at = now()
+          returning kind, updated_at, edited_at;
+        `;
+        return jsonResp({ ok: true, ...result[0] });
+      }
 
       // Confirm the role exists; we don't auto-create here.
       const role = await sql`select 1 from job.pipeline_roles where slug = ${slug} limit 1`;

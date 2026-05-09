@@ -80,7 +80,9 @@ Format rules:
 - No em dashes. No "passionate about" / "excited to". No try-hard cleverness.
 - Reference real projects/skills/wins by their slug-like name when relevant.`;
 
-export function buildSystemPrompt(kind: 'resume' | 'cover-letter' | 'analysis'): string {
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume';
+
+export function buildSystemPrompt(kind: GenKind): string {
   const voice =
     kind === 'cover-letter' ? COVER_LETTER_VOICE :
     kind === 'analysis'     ? ANALYSIS_VOICE :
@@ -88,6 +90,8 @@ export function buildSystemPrompt(kind: 'resume' | 'cover-letter' | 'analysis'):
   const intro =
     kind === 'analysis'
       ? `You are reviewing a job posting for Ian Fike (senior PM) and producing a structured assessment.`
+      : kind === 'base-resume'
+      ? `You are drafting Ian Fike's canonical, untargeted base resume. This is the "before" version that future per-role tailoring will diff against. Write the strongest single-resume he could send to a generalist senior-PM role. Do not target any specific company or sector. Produce final-quality markdown.`
       : `You are drafting a ${kind === 'cover-letter' ? 'cover letter' : 'resume'} for Ian Fike, a senior PM. Your job: produce final-quality markdown that Ian could submit without further editing.`;
 
   return `${intro}
@@ -97,13 +101,24 @@ ${voice}
 Below is Ian's career knowledge base — companies, projects, skills, wins, and goals/intents. Use it as the source of truth for facts. Do not invent.`;
 }
 
-export function buildUserMessage(kind: 'resume' | 'cover-letter' | 'analysis', kbContext: string, role: { company: string; title: string; sector?: string; salary?: string; url?: string }): string {
+export function buildUserMessage(kind: GenKind, kbContext: string, role: { company: string; title: string; sector?: string; salary?: string; url?: string } | null): string {
+  if (kind === 'base-resume') {
+    return `# Career knowledge base
+
+${kbContext}
+
+# Ask
+
+Draft Ian's canonical base resume as markdown. One page. No company-specific tailoring — write the strongest generalist senior-PM resume the KB supports.`;
+  }
+
+  const r = role!;
   const meta = [
-    `Company: ${role.company}`,
-    `Title: ${role.title}`,
-    role.sector ? `Sector: ${role.sector}` : '',
-    role.salary ? `Salary: ${role.salary}` : '',
-    role.url ? `Posting: ${role.url}` : '',
+    `Company: ${r.company}`,
+    `Title: ${r.title}`,
+    r.sector ? `Sector: ${r.sector}` : '',
+    r.salary ? `Salary: ${r.salary}` : '',
+    r.url ? `Posting: ${r.url}` : '',
   ].filter(Boolean).join('\n');
 
   const ask =

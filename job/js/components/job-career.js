@@ -6,10 +6,13 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, generateAsset }, { readRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
+  import('../roleAsset.js' + V),
 ]);
+
+const BASE_RESUME_SLUG = '__base__';
 
 // Lazy-load the resume sub-component so the Work History tab doesn't
 // pull markdown deps when only the Narratives tab is active.
@@ -18,6 +21,7 @@ import('./job-history-resume.js' + V);
 const TABS = [
   { id: 'work',       label: 'Work history' },
   { id: 'narratives', label: 'Narratives' },
+  { id: 'base',       label: 'Base resume' },
 ];
 
 // Minimal seed of skill prompts. Real version derives prompts from JD
@@ -40,15 +44,18 @@ export class JobCareer extends LitElement {
     activeTab: { state: true },
     vision: { state: true },
     promptTags: { state: true },
+    baseResume: { state: true },     // { content, missing, generating, error }
   };
 
   constructor() {
     super();
     this.state = 'idle';
     this.error = '';
-    this.activeTab = (new URLSearchParams(location.search).get('tab') === 'narratives') ? 'narratives' : 'work';
+    const tabParam = new URLSearchParams(location.search).get('tab');
+    this.activeTab = TABS.find(t => t.id === tabParam)?.id || 'work';
     this.vision = null;
     this.promptTags = [];
+    this.baseResume = { content: '', missing: true, generating: false, error: '' };
   }
 
   connectedCallback() {
@@ -82,6 +89,11 @@ export class JobCareer extends LitElement {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
         .map(([name, count]) => ({ name, count }));
+      // Best-effort load of the base resume — fine if absent.
+      try {
+        const r = await readRoleAsset(BASE_RESUME_SLUG, 'resume');
+        if (r?.content_md) this.baseResume = { content: r.content_md, missing: false, generating: false, error: '' };
+      } catch { /* leave missing=true */ }
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
@@ -91,8 +103,48 @@ export class JobCareer extends LitElement {
 
   _switchTab(id) {
     this.activeTab = id;
-    const qs = id === 'narratives' ? '?tab=narratives' : '';
+    const qs = id === 'work' ? '' : `?tab=${id}`;
     history.replaceState(null, '', `/job/history/${qs}`);
+  }
+
+  async _generateBaseResume() {
+    this.baseResume = { ...this.baseResume, generating: true, error: '' };
+    try {
+      const res = await generateAsset(null, 'base-resume');
+      this.baseResume = { content: res.content, missing: false, generating: false, error: '' };
+    } catch (e) {
+      this.baseResume = { ...this.baseResume, generating: false, error: String(e) };
+    }
+  }
+
+  _renderBase() {
+    const b = this.baseResume;
+    if (this.state === 'loading') {
+      return html`
+        <div class="skeleton" style="width:100%;height:14px;display:block;margin-bottom:8px;"></div>
+        <div class="skeleton" style="width:96%;height:14px;display:block;margin-bottom:8px;"></div>
+        <div class="skeleton" style="width:80%;height:14px;display:block;"></div>
+      `;
+    }
+    return html`
+      <section class="narrative-block">
+        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);">
+          <div>
+            <h2 style="margin:0;">Base resume</h2>
+            <p class="muted" style="margin:0;font-size:var(--font-size-small);">
+              The canonical, untargeted resume — generated from your KB. Each per-role tailoring diffs against this.
+            </p>
+          </div>
+          <button class="btn btn--sm ${b.missing ? 'btn--primary' : ''}" ?disabled=${b.generating} @click=${() => this._generateBaseResume()}>
+            ${b.generating ? 'Generating…' : (b.missing ? 'Generate from KB' : 'Regenerate from KB')}
+          </button>
+        </header>
+        ${b.error ? html`<p class="muted" style="color:var(--error);">${b.error}</p>` : nothing}
+        ${b.content
+          ? html`<article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(b.content))}</article>`
+          : html`<p class="muted">No base resume yet. Generate one to enable diff highlighting on per-role resumes.</p>`}
+      </section>
+    `;
   }
 
   _renderTabs() {
@@ -158,7 +210,9 @@ export class JobCareer extends LitElement {
   render() {
     return html`
       ${this._renderTabs()}
-      ${this.activeTab === 'work' ? this._renderWork() : this._renderNarratives()}
+      ${this.activeTab === 'work' ? this._renderWork()
+        : this.activeTab === 'narratives' ? this._renderNarratives()
+        : this._renderBase()}
     `;
   }
 }

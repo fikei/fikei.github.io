@@ -128,10 +128,11 @@ const GEN_ASSET_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gen
 
 export async function generateAsset(slug, kind) {
   const headers = await authHeader();
+  const body = kind === 'base-resume' ? { kind } : { slug, kind };
   const res = await fetch(GEN_ASSET_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slug, kind }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
   return res.json(); // { slug, kind, content }
