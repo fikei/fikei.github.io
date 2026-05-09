@@ -115,7 +115,6 @@ export const trackedAtsSource: Source = {
       from job.tracked_companies
       where ats is not null and ats_slug is not null
     `;
-    console.log(`[tracked-ats] tracked rows: ${tracked.length}`);
 
     // 2) Fallback: scan existing pipeline rows for ATS URLs and derive
     //    company-board pairs we haven't seen yet. Means you don't have
@@ -129,7 +128,6 @@ export const trackedAtsSource: Source = {
         and url is not null
         and url ~* '(greenhouse|lever|ashbyhq)'
     `;
-    console.log(`[tracked-ats] pipeline rows with ATS url: ${pipelineRows.length}`);
     const seen = new Set(tracked.map(c => `${(c.ats || '').toLowerCase()}:${(c.ats_slug || '').toLowerCase()}`));
     const companies: TrackedCompany[] = [...tracked];
     for (const r of pipelineRows) {
@@ -150,7 +148,7 @@ export const trackedAtsSource: Source = {
     const out: RecommendedRoleInput[] = [];
     for (const c of companies) {
       const adapter = ADAPTERS[(c.ats || '').toLowerCase()];
-      if (!adapter) { debug.push(`noAdapter:${c.ats}/${c.ats_slug}`); continue; }
+      if (!adapter) continue;
       try {
         const rawRows = await adapter(c);
         // Stamp the company's sector onto every posting so the worker's
