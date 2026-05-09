@@ -3,8 +3,10 @@
 import type { Source } from './types.ts';
 import { fixtureSource } from './fixture.ts';
 import { trackedAtsSource } from './tracked-ats.ts';
+import { linkedinRssSource } from './linkedin-rss.ts';
 
 export const SOURCES: Record<string, Source> = {
   [fixtureSource.type]:     fixtureSource,
   [trackedAtsSource.type]:  trackedAtsSource,
+  [linkedinRssSource.type]: linkedinRssSource as unknown as Source,
 };

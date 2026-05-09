@@ -86,15 +86,21 @@ serve(async (req) => {
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
-      // Drop anything whose title doesn't match the user's target titles
-      // BEFORE scoring, so we don't bullet-generate for irrelevant roles
-      // and don't store them at all.
+      // Drop anything whose title doesn't match the user's target titles.
       const targetTitles = await loadTargetTitles(sql);
       const onTarget = targetTitles.length
         ? pulled.filter(r => titleMatches(r.title || '', targetTitles))
         : pulled;
       const droppedOffTarget = pulled.length - onTarget.length;
-      const { kept, dropped } = scoreAndFilter(onTarget, src.min_score);
+      // Drop anything whose location isn't one the user wants. Postings
+      // with no location (rare on ATS; common on RSS) get the benefit of
+      // the doubt — kept and flagged for the user via the bullet.
+      const targetGeos = await loadTargetGeographies(sql);
+      const inGeo = targetGeos.length
+        ? onTarget.filter(r => geoMatches(r.location || '', targetGeos))
+        : onTarget;
+      const droppedOffGeo = onTarget.length - inGeo.length;
+      const { kept, dropped } = scoreAndFilter(inGeo, src.min_score);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -128,8 +134,8 @@ serve(async (req) => {
         const ctx = await loadUserContext(sql);
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
-      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
+      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget + droppedOffGeo, error: null });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, droppedOffGeo, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
@@ -163,6 +169,41 @@ const DEFAULT_TARGET_TITLES = [
   'director, product', 'director of product',
 ];
 
+<<<<<<< HEAD
+// Geography filter — read vision.target_geographies; fall back to the
+// usual PM hubs + remote so empty vision still gives sane defaults.
+const DEFAULT_TARGET_GEOGRAPHIES = [
+  'remote', 'san francisco', 'sf bay', 'bay area', 'oakland', 'berkeley',
+  'new york', 'nyc', 'brooklyn', 'manhattan',
+  'us', 'united states',
+];
+
+let _geoCache: { rows: string[]; at: number } | null = null;
+
+async function loadTargetGeographies(sql: ReturnType<typeof db>): Promise<string[]> {
+  if (_geoCache && Date.now() - _geoCache.at < TITLE_CACHE_MS) return _geoCache.rows;
+  const rows = await sql<{ geos: string[] | null }[]>`
+    select target_geographies as geos from job.vision order by updated_at desc limit 1
+  `;
+  const fromVision = ((rows[0]?.geos as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const geos = fromVision.length ? fromVision : DEFAULT_TARGET_GEOGRAPHIES;
+  _geoCache = { rows: geos, at: Date.now() };
+  return geos;
+}
+
+// Posting "location" strings are wildly varied: "San Francisco, CA",
+// "Remote · United States", "New York, NY (Hybrid)", "EMEA - Remote",
+// just "" for some Ashby postings. We match by substring, lowercased,
+// against any target keyword. Empty location = keep (give benefit of
+// doubt; let the user resolve via the bullet's "verify location" line).
+function geoMatches(loc: string, targets: string[]): boolean {
+  const l = loc.toLowerCase();
+  if (!l.trim()) return true;
+  return targets.some(t => l.includes(t));
+}
+
+=======
+>>>>>>> origin/master
 async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_titleCache && Date.now() - _titleCache.at < TITLE_CACHE_MS) return _titleCache.rows;
   const rows = await sql<{ titles: string[] | null }[]>`
@@ -303,13 +344,16 @@ async function generateBullets(
 ): Promise<void> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return;       // no key → leave bullets null, widget falls back to description
-  const system = `Write exactly 3 markdown bullets, each <= 18 words, plain language.
-Use **bold** for the 1–3 key phrases per bullet. No headers, no lead-ins, no platitudes.
+  const system = `Write exactly 3 markdown bullets. HARD LIMIT: 12 words per bullet.
+Use **bold** for the single most important phrase in each bullet. No headers, no lead-ins.
 
-Bullet 1 — what the company does + the role in one sentence.
-Bullet 2 — why it MATCHES the user's stated job needs (sector / stage / comp / location / scope / culture).
-Bullet 3 — the open question to confirm before applying (location, scope, comp, autonomy, etc.).
+Every bullet MUST reference something specific from the candidate's vision (their sector / stage / comp / location / scope preferences) — never generic statements about the company.
 
+Bullet 1 — one-line snapshot of company + role.
+Bullet 2 — why this matches the candidate's stated needs (cite the exact preference from vision).
+Bullet 3 — the single thing to verify before applying.
+
+Each bullet ≤12 words. Reject any bullet over the limit.
 Return only the 3 bullets, nothing else.`;
   const userPrompt = [
     `# Role`,
@@ -317,8 +361,7 @@ Return only the 3 bullets, nothing else.`;
     `Company: ${row.company}`,
     `Fit score: ${row.fitScore} (${Object.entries(row.breakdown).map(([k, v]) => `${k}=${v}`).join(', ')})`,
     `URL: ${row.url}`,
-    `\n# Candidate's job-search needs (vision)\n${user.vision || '(none)'}`,
-    `\n# Skills (background only — don't list them, just check fit)\n${user.skills || '(none)'}`,
+    `\n# Candidate's job-search needs (vision — this is what they care about)\n${user.vision || '(none)'}`,
   ].join('\n');
   try {
     const res = await fetch(ANTHROPIC_URL, {
