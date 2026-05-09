@@ -388,10 +388,15 @@ export class JobPipeline extends LitElement {
     `;
   }
 
+  _visibleColumns() {
+    // Status column is meaningless on Leads (it's always New/empty there).
+    return COLUMNS.filter(c => !(c.id === 'status' && this.bucket === 'leads'));
+  }
+
   _renderHeader() {
     return html`
       <tr>
-        ${COLUMNS.map(c => {
+        ${this._visibleColumns().map(c => {
           if (!c.sortKey) return html`<th>${c.label}</th>`;
           const active = this.sortKey === c.sortKey;
           const arrow = active ? (this.sortDir === 'asc' ? '↑' : '↓') : '↕';
@@ -417,6 +422,7 @@ export class JobPipeline extends LitElement {
   }
 
   _renderRow(r) {
+    const showStatus = this.bucket !== 'leads';
     return html`
       <tr class=${'pipeline-row' + (isArchived(r) ? ' is-archived' : '')}
           @click=${(e) => this._onRowClick(r, e)}>
@@ -426,7 +432,7 @@ export class JobPipeline extends LitElement {
             ${r.score == null ? '—' : r.score}
           </button>
         </td>
-        <td class="status-cell">${this._renderStatusCell(r)}</td>
+        ${showStatus ? html`<td class="status-cell">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="role-cell">
           <div class="role-cell__inner">
             ${this._renderLogo(r, 'sm')}
@@ -475,10 +481,11 @@ export class JobPipeline extends LitElement {
   }
 
   _renderSkeletonRow() {
+    const showStatus = this.bucket !== 'leads';
     return html`
       <tr class="skeleton-row">
         <td><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
-        <td><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>
+        ${showStatus ? html`<td><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td>
           <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
@@ -565,14 +572,9 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._sorted();
-    const counts = this.roles.reduce((acc, r) => {
-      if (!isVisibleRole(r)) return acc;
-      acc[bucketFor(r)] = (acc[bucketFor(r)] || 0) + 1;
-      return acc;
-    }, { leads: 0, active: 0, archive: 0 });
     const bucketLabel = { leads: 'Leads', active: 'Active', archive: 'Archive' }[this.bucket];
     return html`
-      <job-recommendations></job-recommendations>
+      ${this.bucket === 'leads' ? html`<job-recommendations></job-recommendations>` : nothing}
 
       ${this.livenessResult && !this.livenessResultDismissed ? html`
         <div class="liveness-banner ${this.livenessResult.closed.length ? 'liveness-banner--closed' : 'liveness-banner--clean'}" role="status">
@@ -605,18 +607,6 @@ export class JobPipeline extends LitElement {
         </div>
       ` : nothing}
 
-      <div class="bucket-tabs" role="tablist" aria-label="Jobs view">
-        ${['leads','active','archive'].map(b => html`
-          <a class=${'bucket-tab' + (this.bucket === b ? ' is-active' : '')}
-             role="tab"
-             aria-selected=${this.bucket === b ? 'true' : 'false'}
-             href=${`/job/jobs/?bucket=${b}`}
-             @click=${(e) => this._switchBucket(b, e)}>
-            ${{leads:'Leads',active:'Active',archive:'Archive'}[b]}
-            <span class="bucket-tab__count">${counts[b]}</span>
-          </a>
-        `)}
-      </div>
       <div class="pipeline-meta">
         <strong>${rows.length}</strong> ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'}, sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.
         <button class="btn btn--sm" ?disabled=${this.livenessChecking}
