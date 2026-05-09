@@ -153,7 +153,26 @@ export class JobHistoryResume extends LitElement {
 
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
-      return html`<div class="placeholder"><h2>Loading resume…</h2><p>Reading from fikei/job via kb-read.</p></div>`;
+      return html`
+        <section class="company-grid">
+          ${Array.from({ length: 3 }).map(() => html`
+            <div class="company-card" style="cursor:default;">
+              <div class="company-card__top">
+                <div class="company-card__title">
+                  <div class="skeleton" style="width:60%;height:22px;display:block;margin-bottom:var(--space-2);"></div>
+                  <div class="skeleton" style="width:80%;height:14px;display:block;"></div>
+                </div>
+                <div class="skeleton" style="width:90px;height:14px;"></div>
+              </div>
+              <div class="skeleton" style="width:100%;height:14px;display:block;margin-bottom:8px;"></div>
+              <div class="skeleton" style="width:92%;height:14px;display:block;margin-bottom:8px;"></div>
+              <div class="skeleton" style="width:75%;height:14px;display:block;margin-bottom:var(--space-4);"></div>
+              <div class="skeleton skeleton--pill" style="width:60px;height:20px;display:inline-block;margin-right:8px;"></div>
+              <div class="skeleton skeleton--pill" style="width:80px;height:20px;display:inline-block;"></div>
+            </div>
+          `)}
+        </section>
+      `;
     }
     if (this.state === 'error') {
       return html`<div class="placeholder" style="border-color:var(--error);color:var(--error);">

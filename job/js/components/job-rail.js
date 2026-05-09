@@ -3,9 +3,9 @@
 import { LitElement, html } from 'https://esm.run/lit@3';
 
 const ROUTES = [
-  { href: '/job/jobs/',    label: 'Jobs',    match: /^\/job\/jobs\/?/ },
-  { href: '/job/history/', label: 'History', match: /^\/job\/history\/?/ },
-  { href: '/job/vision/',  label: 'Vision',  match: /^\/job\/vision\/?/ }
+  { href: '/job/jobs/',    label: 'Jobs',        match: /^\/job\/jobs\/?/ },
+  { href: '/job/history/', label: 'Your career', match: /^\/job\/history\/?/ },
+  { href: '/job/vision/',  label: 'Vision',      match: /^\/job\/vision\/?/ }
 ];
 
 const THEMES = [

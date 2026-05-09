@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.25.0';
-console.log(`[job] v${VERSION} - delete + detail shimmer + prefill`);
+const VERSION = '0.26.0';
+console.log(`[job] v${VERSION} - Your Career: tabs + narratives + shimmer`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -17,7 +17,7 @@ import('./kb.js' + V);
 if (location.pathname.startsWith('/job/history/drill')) {
   import('./components/job-detail.js' + V);
 } else if (location.pathname.startsWith('/job/history')) {
-  import('./components/job-history-resume.js' + V);
+  import('./components/job-career.js' + V);
 }
 if (location.pathname.startsWith('/job/jobs/drill')) {
   import('./components/job-role-detail.js' + V);
