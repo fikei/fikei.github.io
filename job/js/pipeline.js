@@ -1,5 +1,6 @@
 // pipeline.js — thin client for the jobs-pipe Edge Function.
 const FN_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/jobs-pipe';
+const LIVENESS_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/check-liveness';
 
 async function authHeader() {
   const supabase = window.CtrlAuth?.getSupabaseClient?.();
@@ -48,6 +49,17 @@ export async function deleteRole(slug) {
     body: JSON.stringify({ slug, action: 'delete' }),
   });
   if (!res.ok) throw new Error(`delete-role ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function checkLiveness({ slug } = {}) {
+  const headers = await authHeader();
+  const res = await fetch(LIVENESS_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(slug ? { slug } : {}),
+  });
+  if (!res.ok) throw new Error(`check-liveness ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
