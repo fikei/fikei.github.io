@@ -20,15 +20,13 @@ const DIM_LABELS = {
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
-// Resume + Cover assets live on the detail page now, not the main table.
+// Resume + Cover, Source + Salary all live on the detail page now.
 const COLUMNS = [
-  { id: 'fit',     label: 'Fit',     sortKey: 'score',       type: 'num',  defaultDir: 'desc' },
-  { id: 'status',  label: 'Status',  sortKey: 'status',      type: 'text' },
-  { id: 'company', label: 'Company', sortKey: 'company',     type: 'text' },
-  { id: 'role',    label: 'Role',    sortKey: 'title',       type: 'text' },
-  { id: 'sector',  label: 'Sector',  sortKey: 'sector',      type: 'text' },
-  { id: 'salary',  label: 'Salary',  sortKey: 'salary_high', type: 'num',  defaultDir: 'desc' },
-  { id: 'source',  label: 'Source',  sortKey: 'source',      type: 'text' },
+  { id: 'fit',     label: 'Fit',     sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
+  { id: 'status',  label: 'Status',  sortKey: 'status',  type: 'text' },
+  { id: 'company', label: 'Company', sortKey: 'company', type: 'text' },
+  { id: 'role',    label: 'Role',    sortKey: 'title',   type: 'text' },
+  { id: 'sector',  label: 'Sector',  sortKey: 'sector',  type: 'text' },
   { id: 'view',    label: '',        sortKey: null },
 ];
 
@@ -214,9 +212,20 @@ export class JobPipeline extends LitElement {
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
         <td><span class="muted">${r.sector || ''}</span></td>
-        <td><span class="muted">${r.salary || ''}</span></td>
-        <td><span class="muted">${r.source || ''}</span></td>
         <td>${this._renderViewCell(r)}</td>
+      </tr>
+    `;
+  }
+
+  _renderSkeletonRow() {
+    return html`
+      <tr class="skeleton-row">
+        <td><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
+        <td><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>
+        <td><span class="skeleton" style="width:100px;height:16px;"></span></td>
+        <td><span class="skeleton" style="width:60%;height:16px;"></span></td>
+        <td><span class="skeleton" style="width:80px;height:16px;"></span></td>
+        <td><span class="skeleton skeleton--pill" style="width:64px;height:32px;"></span></td>
       </tr>
     `;
   }
@@ -275,7 +284,20 @@ export class JobPipeline extends LitElement {
 
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
-      return html`<div class="placeholder"><h2>Loading pipeline…</h2><p>Reading the Job Search sheet.</p></div>`;
+      // Render the same shell that the loaded view will use, with skeleton
+      // rows in place of real content so the table doesn't visually jolt
+      // into existence on load.
+      return html`
+        <div class="pipeline-meta">
+          <span class="skeleton" style="width:160px;height:14px;display:inline-block;"></span>
+        </div>
+        <div class="pipeline-table-wrap">
+          <table class="pipeline-table">
+            <thead>${this._renderHeader()}</thead>
+            <tbody>${Array.from({ length: 8 }).map(() => this._renderSkeletonRow())}</tbody>
+          </table>
+        </div>
+      `;
     }
     if (this.state === 'error') {
       return html`<div class="placeholder" style="border-color:var(--error);color:var(--error);">

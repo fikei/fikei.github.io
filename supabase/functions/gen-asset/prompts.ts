@@ -60,21 +60,25 @@ VOICE RULES (same as cover letter):
 
 Output ONLY the markdown. No preamble. No "Here is your resume." Start with "# Ian Fike".`;
 
-export const ANALYSIS_VOICE = `You are advising Ian on a specific role. Output ONLY a JSON object. Every value MUST be a STRING (markdown). Never an array, never a nested object.
+export const ANALYSIS_VOICE = `You are advising Ian on a specific role. Output ONLY a JSON object. Every value MUST be a STRING. Never an array, never a nested object.
 
 {
-  "description":         "2-3 sentence plain summary of the role and what the team is trying to ship.",
-  "whyFits":             "3-5 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Reference specific past projects/skills by name. Don't editorialize.",
-  "risks":               "2-4 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Real concerns: ICP/seniority mismatch, sector adjacency, comp gap, geo, gaps in evidence. Honest, not encouraging.",
-  "candidateStrength":   "1-2 sentences in a single markdown string rating Ian's relative strength (strong / mid / stretch) with the single strongest piece of evidence.",
-  "suggestedAngle":      "1-2 sentences in a single markdown string suggesting the framing he should lead with in the cover letter."
+  "description":      "2-3 sentence plain summary of the role and what the team is trying to ship.",
+  "roleFitScore":     "EXACTLY one of: strong | mixed | weak. Pick honestly. 'strong' = high alignment on title/sector/stage; 'mixed' = real fit but with concerns; 'weak' = adjacent or stretch with hard fails.",
+  "whyFits":          "3-5 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Reference specific past projects/skills by name (livongo-platform-scaling, eligibility-engine, growth-experimentation, etc). Don't editorialize.",
+  "risks":            "2-4 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Real concerns: ICP/seniority mismatch, sector adjacency, comp gap, geo, gaps in evidence. Honest, not encouraging.",
+  "candidateScore":   "EXACTLY one of: strong | mid | stretch. 'strong' = top 30% of likely applicants; 'mid' = solid contender; 'stretch' = on-paper-weak, will need a strong cover-letter angle.",
+  "strengths":        "3-5 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Specific, evidence-backed strengths Ian brings to THIS role. Reference projects/wins by name.",
+  "gaps":             "2-4 bullets in a SINGLE markdown string (each bullet on its own line, prefixed with - ). Honest gaps where his evidence is thin or his background diverges from the JD.",
+  "suggestedAngle":   "1-2 sentences in a single markdown string suggesting the framing he should lead with in the cover letter."
 }
 
 Format rules:
 - Output ONLY the JSON object. No prose before or after. No code fence. No commentary.
-- EVERY value is a string. If the content is bullets, the value is one string with embedded newlines and "- " prefixes.
+- EVERY value is a string. Bullets are one string with embedded newlines and "- " prefixes.
+- roleFitScore + candidateScore are exactly one lowercase token from their allowed set.
 - No em dashes. No "passionate about" / "excited to". No try-hard cleverness.
-- Reference real projects/skills/wins by their slug-like name when relevant (livongo-platform-scaling, eligibility-engine, growth-experimentation, etc).`;
+- Reference real projects/skills/wins by their slug-like name when relevant.`;
 
 export function buildSystemPrompt(kind: 'resume' | 'cover-letter' | 'analysis'): string {
   const voice =

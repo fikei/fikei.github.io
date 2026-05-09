@@ -179,35 +179,52 @@ export class JobRoleDetail extends LitElement {
 
   _parseAnalysis(content) {
     if (!content) return null;
-    // Tolerate: bare JSON, JSON inside ```json fences, or markdown with ## sections.
+    // Tolerate bare JSON or JSON inside ```json fences. Backwards-compatible
+    // with the v0.18 shape (no roleFitScore/candidateScore/strengths/gaps).
     const stripped = content.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+    let obj = null;
     try {
-      const obj = JSON.parse(stripped);
-      if (obj && typeof obj === 'object') return obj;
-    } catch { /* fall through to section parse */ }
+      const parsed = JSON.parse(stripped);
+      if (parsed && typeof parsed === 'object') obj = parsed;
+    } catch { /* fall back below */ }
 
-    const sections = {};
-    const lines = content.split(/\r?\n/);
-    let cur = null;
-    let buf = [];
-    const flush = () => { if (cur) sections[cur] = buf.join('\n').trim(); buf = []; };
-    for (const line of lines) {
-      const m = line.match(/^##\s+(.+)$/);
-      if (m) {
-        flush();
-        cur = m[1].toLowerCase().replace(/\s+/g, '');
-      } else {
-        buf.push(line);
+    if (!obj) {
+      // Old "## Section" markdown fallback.
+      const sections = {};
+      const lines = content.split(/\r?\n/);
+      let cur = null;
+      let buf = [];
+      const flush = () => { if (cur) sections[cur] = buf.join('\n').trim(); buf = []; };
+      for (const line of lines) {
+        const m = line.match(/^##\s+(.+)$/);
+        if (m) { flush(); cur = m[1].toLowerCase().replace(/\s+/g, ''); }
+        else buf.push(line);
       }
+      flush();
+      obj = {
+        description: sections['briefdescription'] || sections['description'] || content,
+        whyFits: sections['whyitfits'] || sections['whyfits'] || '',
+        risks: sections['risks'] || '',
+        strengths: sections['strengths'] || sections['candidatestrength'] || '',
+        gaps: sections['gaps'] || '',
+        suggestedAngle: sections['suggestedangle'] || sections['angle'] || '',
+      };
     }
-    flush();
-    return {
-      description: sections['briefdescription'] || sections['description'] || content,
-      whyFits: sections['whyitfits'] || sections['whyfits'] || '',
-      risks: sections['risks'] || '',
-      candidateStrength: sections['candidatestrength'] || sections['strength'] || '',
-      suggestedAngle: sections['suggestedangle'] || sections['angle'] || '',
-    };
+
+    // Normalize: in the previous shape, `candidateStrength` carried strengths
+    // text. Promote it into `strengths` if `strengths` is empty.
+    if (!obj.strengths && obj.candidateStrength) obj.strengths = obj.candidateStrength;
+
+    return obj;
+  }
+
+  _scoreFromAnalysis(parsed, key) {
+    const v = (parsed && parsed[key] || '').toString().toLowerCase().trim();
+    if (!v) return null;
+    if (/^(strong|strong fit|high)/.test(v)) return 'strong';
+    if (/^(mid|mixed|medium|moderate|ok)/.test(v)) return 'mid';
+    if (/^(weak|stretch|low|poor)/.test(v)) return 'weak';
+    return v.includes('strong') ? 'strong' : v.includes('weak') || v.includes('stretch') ? 'weak' : 'mid';
   }
 
   _renderMetaRow() {
@@ -234,17 +251,39 @@ export class JobRoleDetail extends LitElement {
     `;
   }
 
-  _renderCard(title, body, status) {
+  _renderStoplight(score) {
+    if (!score) return nothing;
+    const labels = { strong: 'Strong fit', mid: 'Mixed fit', weak: 'Weak fit' };
+    return html`<span class="stoplight stoplight--${score}">${labels[score] || score}</span>`;
+  }
+  _renderCandidateStoplight(score) {
+    if (!score) return nothing;
+    const labels = { strong: 'Strong candidate', mid: 'Mid candidate', weak: 'Stretch candidate' };
+    return html`<span class="stoplight stoplight--${score}">${labels[score] || score}</span>`;
+  }
+
+  _renderTwoColCard({ title, headerExtra, sections, status }) {
     return html`
       <article class="role-card">
-        <header class="role-card__head">
+        <header class="role-card__head role-card__head--with-extra">
           <h3>${title}</h3>
+          ${headerExtra || nothing}
         </header>
         <div class="role-card__body">
           ${status === 'loading' ? html`<p class="muted">Generating…</p>`
             : status === 'error'  ? html`<p class="muted" style="color:var(--error);">Couldn't load</p>`
-            : !body                ? html`<p class="muted">—</p>`
-            : html`<div class="kb-doc">${unsafeHTML(renderMarkdown(body))}</div>`}
+            : html`
+              <div class="role-card__split">
+                ${sections.map(([heading, body]) => html`
+                  <section class="role-card__section">
+                    <h4>${heading}</h4>
+                    ${body
+                      ? html`<div class="kb-doc">${unsafeHTML(renderMarkdown(body))}</div>`
+                      : html`<p class="muted">—</p>`}
+                  </section>
+                `)}
+              </div>
+            `}
         </div>
       </article>
     `;
@@ -254,6 +293,8 @@ export class JobRoleDetail extends LitElement {
     const a = this.assets['analysis'];
     const status = !a ? 'loading' : a.saving ? 'loading' : a.error ? 'error' : a.mode === 'empty' ? 'loading' : 'ok';
     const parsed = a && a.mode === 'view' ? this._parseAnalysis(a.content) : null;
+    const roleFit = this._scoreFromAnalysis(parsed, 'roleFitScore');
+    const candidate = this._scoreFromAnalysis(parsed, 'candidateScore');
     return html`
       ${this._renderMetaRow()}
       ${parsed?.description ? html`
@@ -263,9 +304,24 @@ export class JobRoleDetail extends LitElement {
       ` : status === 'loading' ? html`<p class="muted">Drafting summary…</p>` : nothing}
 
       <div class="role-cards">
-        ${this._renderCard('Why it fits',         parsed?.whyFits, status)}
-        ${this._renderCard('Risks',               parsed?.risks, status)}
-        ${this._renderCard('Candidate strength',  parsed?.candidateStrength, status)}
+        ${this._renderTwoColCard({
+          title: 'Role fit',
+          headerExtra: this._renderStoplight(roleFit),
+          sections: [
+            ['Why it fits', parsed?.whyFits],
+            ['Risks',       parsed?.risks],
+          ],
+          status,
+        })}
+        ${this._renderTwoColCard({
+          title: 'Candidate strength',
+          headerExtra: this._renderCandidateStoplight(candidate),
+          sections: [
+            ['Strengths', parsed?.strengths],
+            ['Gaps',      parsed?.gaps],
+          ],
+          status,
+        })}
       </div>
 
       ${parsed?.suggestedAngle ? html`
