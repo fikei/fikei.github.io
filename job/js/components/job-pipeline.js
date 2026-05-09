@@ -3,6 +3,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
+const { logoSrc, logoInitial } = await import('../logo.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
 
@@ -373,12 +374,37 @@ export class JobPipeline extends LitElement {
           ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
         </td>
         <td class="role-cell">
-          <div class="role-cell__title">${r.title || '(untitled)'}</div>
-          <div class="role-cell__company">${r.company || ''}</div>
+          <div class="role-cell__inner">
+            ${this._renderLogo(r, 'sm')}
+            <div>
+              <div class="role-cell__title">${r.title || '(untitled)'}</div>
+              <div class="role-cell__company">${r.company || ''}</div>
+            </div>
+          </div>
         </td>
         <td>${this._renderSectorCell(r)}</td>
         <td>${this._renderMenuCell(r)}</td>
       </tr>
+    `;
+  }
+
+  _renderLogo(r, size = 'sm') {
+    const src = logoSrc(r);
+    const cls = `company-logo company-logo--${size}`;
+    if (!src) {
+      return html`<span class=${cls + ' company-logo--placeholder'} aria-hidden="true">${logoInitial(r.company)}</span>`;
+    }
+    return html`
+      <img class=${cls} src=${src} alt=""
+           loading="lazy" decoding="async"
+           @error=${(e) => {
+             // Swap to placeholder when Clearbit returns 404.
+             const span = document.createElement('span');
+             span.className = cls + ' company-logo--placeholder';
+             span.setAttribute('aria-hidden', 'true');
+             span.textContent = logoInitial(r.company);
+             e.target.replaceWith(span);
+           }}/>
     `;
   }
 
