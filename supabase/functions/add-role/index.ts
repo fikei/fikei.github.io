@@ -10,8 +10,8 @@ import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 
-const VERSION = '0.1.5';
-console.log(`[add-role] v${VERSION} - tighten sector regex (no false-positive EdTech on "learning")`);
+const VERSION = '0.1.6';
+console.log(`[add-role] v${VERSION} - JSON-LD JobPosting + careerspage.io + URL clean + company case + cleanTitle 'job in X'`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -23,10 +23,36 @@ const OG_SITE_RE = /<meta[^>]+property=["']og:site_name["'][^>]*content=["']([^"
 // kept as-is.
 function detectSource(url: string): { source: string; sourceLabel: string } {
   if (/(^|\.)linkedin\.com\b/i.test(url)) return { source: 'LinkedIn Saved', sourceLabel: 'LinkedIn Saved' };
-  if (/ashby(hq)?\.com|greenhouse|lever\.co|workday|smartrecruiters/i.test(url)) {
+  if (/ashby(hq)?\.com|greenhouse|lever\.co|workday|smartrecruiters|careerspage\.io|workable\.com|breezy\.hr|recruitee\.com|jobvite\.com|paylocity\.com|icims\.com|teamtailor\.com|bamboohr\.com|rippling\.com\/careers|notion\.so\/[^/]+\/[^/]+\/jobs/i.test(url)) {
     return { source: 'From Company Pages', sourceLabel: 'From Company Pages' };
   }
   return { source: 'Manual', sourceLabel: 'Manual' };
+}
+
+// Drop tracking params so two pastes of the same role don't diverge.
+function cleanUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    const drop = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'gh_src', 'gh_jid', 'gh_aid', 'fbclid', 'gclid', 'mc_cid', 'mc_eid', 'ref', 'src'];
+    for (const k of drop) u.searchParams.delete(k);
+    return u.toString();
+  } catch { return raw; }
+}
+
+// Title-case companies that arrive in lazy lower-case ("luro health" → "Luro Health").
+// Single-cased acronyms (AWS, SaaS, AI) stay intact via the explicit re-case set.
+function fixCompanyCase(s: string): string {
+  if (!s) return s;
+  const trimmed = s.trim();
+  // Keep already-mixed-case names ("DoorDash", "GitHub") untouched.
+  if (/[a-z][A-Z]|[A-Z]{2,}/.test(trimmed)) return trimmed;
+  // All-lower or first-cap-rest-lower: title-case each word.
+  return trimmed.split(/\s+/).map(w => {
+    if (w.length <= 1) return w.toUpperCase();
+    if (/^(ai|ml|hq|llc|inc|gmbh|ltd|co|fka|aka|ny|sf)$/i.test(w)) return w.toUpperCase();
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(' ');
 }
 
 function decodeEntities(s: string): string {
@@ -41,10 +67,49 @@ function decodeEntities(s: string): string {
     .trim();
 }
 
-// Returns title (og:title preferred), siteName, and a plain-text body
-// distilled from og:description / meta-description / inner text. Used to
-// detect salary range + sector hints without needing a real DOM parser.
-async function fetchPageMeta(url: string): Promise<{ title: string | null; siteName: string | null; body: string }> {
+// Returns the structured JobPosting JSON-LD if the page ships one. Most
+// modern ATSes (careerspage.io, Greenhouse, Workable, Ashby) embed it.
+function parseJobPostingLd(html: string): { title?: string; company?: string; description?: string; salaryLow?: number; salaryHigh?: number; datePosted?: string } | null {
+  const blocks = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const m of blocks) {
+    try {
+      const raw = m[1].trim();
+      const obj = JSON.parse(raw);
+      const candidates = Array.isArray(obj) ? obj : [obj];
+      for (const c of candidates) {
+        const type = c?.['@type'];
+        const isPosting = type === 'JobPosting' || (Array.isArray(type) && type.includes('JobPosting'));
+        if (!isPosting) continue;
+        const out: any = {};
+        if (typeof c.title === 'string') out.title = c.title.trim();
+        const org = c.hiringOrganization;
+        if (typeof org === 'string') out.company = org.trim();
+        else if (org && typeof org.name === 'string') out.company = org.name.trim();
+        if (typeof c.description === 'string') out.description = c.description;
+        if (typeof c.datePosted === 'string') out.datePosted = c.datePosted;
+        const bs = c.baseSalary?.value;
+        if (bs) {
+          const lo = Number(bs.minValue ?? bs.value);
+          const hi = Number(bs.maxValue ?? bs.value);
+          if (Number.isFinite(lo)) out.salaryLow = lo;
+          if (Number.isFinite(hi)) out.salaryHigh = hi;
+        }
+        if (out.title || out.company || out.description) return out;
+      }
+    } catch { /* malformed JSON-LD; try next block */ }
+  }
+  return null;
+}
+
+// Returns title, siteName, plain-text body, JSON-LD JobPosting (if any),
+// and an ISO datePosted (if any). Order of preference for title/company is
+// (1) caller-supplied → (2) JSON-LD → (3) og:title → (4) <title> → (5) URL host.
+async function fetchPageMeta(url: string): Promise<{
+  title: string | null;
+  siteName: string | null;
+  body: string;
+  ld: ReturnType<typeof parseJobPostingLd>;
+}> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
@@ -54,8 +119,10 @@ async function fetchPageMeta(url: string): Promise<{ title: string | null; siteN
       signal: ctrl.signal,
     });
     clearTimeout(t);
-    if (!res.ok) return { title: null, siteName: null, body: '' };
+    if (!res.ok) return { title: null, siteName: null, body: '', ld: null };
     const html = await res.text();
+
+    const ld = parseJobPostingLd(html);
 
     let title: string | null = null;
     const og = html.match(OG_TITLE_RE) || html.match(OG_TITLE_RE2);
@@ -68,13 +135,15 @@ async function fetchPageMeta(url: string): Promise<{ title: string | null; siteN
     const siteMatch = html.match(OG_SITE_RE);
     const siteName = siteMatch ? (decodeEntities(siteMatch[1]) || null) : null;
 
-    // Body text: prefer og:description (Workday, Greenhouse, Ashby all set
-    // this with the full JD). Fall back to meta description, then a crude
-    // tag strip.
+    // Body text: prefer JSON-LD description (full JD), then og:description,
+    // then meta-description, then a crude tag strip.
     let body = '';
-    const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']+)["']/i)
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
-    if (ogDesc) body = decodeEntities(ogDesc[1]);
+    if (ld?.description) body = decodeEntities(ld.description);
+    if (!body) {
+      const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
+      if (ogDesc) body = decodeEntities(ogDesc[1]);
+    }
     if (!body) {
       const md = html.match(/<meta[^>]+name=["']description["'][^>]*content=["']([^"']+)["']/i);
       if (md) body = decodeEntities(md[1]);
@@ -83,8 +152,8 @@ async function fetchPageMeta(url: string): Promise<{ title: string | null; siteN
       body = decodeEntities(html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' '));
     }
 
-    return { title, siteName, body: body.slice(0, 12000) };
-  } catch { return { title: null, siteName: null, body: '' }; }
+    return { title, siteName, body: body.slice(0, 12000), ld };
+  } catch { return { title: null, siteName: null, body: '', ld: null }; }
 }
 
 // Pull a salary range out of free-text JD body. Looks for "$NNN,NNN - $NNN,NNN"
@@ -165,6 +234,18 @@ function companyFromHost(urlStr: string): string | null {
       const seg = u.pathname.split('/').filter(Boolean)[0];
       if (seg) return spacedTitleCase(seg);
     }
+    // careerspage.io: /<slug>/<role>
+    if (/(^|\.)careerspage\.io$/.test(host)) {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg) return spacedTitleCase(seg);
+    }
+    // Workable: <slug>.workable.com or apply.workable.com/<slug>/...
+    const workableSub = host.match(/^([a-z0-9-]+)\.workable\.com$/);
+    if (workableSub && workableSub[1] !== 'apply' && workableSub[1] !== 'www') return spacedTitleCase(workableSub[1]);
+    if (host === 'apply.workable.com') {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg) return spacedTitleCase(seg);
+    }
     return null;
   } catch { return null; }
 }
@@ -177,11 +258,20 @@ function spacedTitleCase(s: string): string {
   return split.split(/\s+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-// "Senior Product Manager — R-1466 — Cityblock" → strip trailing job IDs.
+// Strip trailing job IDs and noise suffixes:
+//   "Senior PM - R-1466 - Cityblock"  → "Senior PM"
+//   "Head of Product job in US"       → "Head of Product"
+//   "Senior PM - Remote (US)"         → "Senior PM"
+//   "Senior PM | Acme - Careers Page" → "Senior PM"
 function cleanTitle(t: string): string {
   return t
-    .replace(/[\s\-–—_]*R-?\d{2,}\s*$/i, '')
-    .replace(/[\s\-–—_]*Job\s*ID:?\s*\S+\s*$/i, '')
+    .replace(/\s+\(([^)]+)\)\s*$/i, '')                          // trailing "(Remote, US)"
+    .replace(/[\s\-–—_·|,]+(careers?\s*page|careers?)\s*$/i, '') // " - Careers Page"
+    .replace(/[\s\-–—_·|,]+R-?\d{2,}\s*$/i, '')
+    .replace(/[\s\-–—_·|,]+Job\s*ID:?\s*\S+\s*$/i, '')
+    .replace(/\s+job\s+in\s+[A-Z][\w\s,/&-]+$/i, '')             // " job in US" / "job in San Francisco"
+    .replace(/\s+(in|at)\s+[A-Z][\w\s,/&-]+$/i, '')              // " in US"
+    .replace(/[\s\-–—_·|,]+(remote|hybrid|on-?site)\s*$/i, '')
     .trim();
 }
 
@@ -220,8 +310,9 @@ serve(async (req) => {
     if (!email) return err('unauthorized', 401);
 
     const body = await req.json().catch(() => ({}));
-    const url = String(body.url || '').trim();
-    if (!url || !URL_RE.test(url)) return err('valid http(s) url required', 400);
+    const rawUrl = String(body.url || '').trim();
+    if (!rawUrl || !URL_RE.test(rawUrl)) return err('valid http(s) url required', 400);
+    const url = cleanUrl(rawUrl);
 
     let title = String(body.title || '').trim();
     let company = String(body.company || '').trim();
@@ -229,6 +320,12 @@ serve(async (req) => {
     // Always pull the page so we have the JD body for salary + sector
     // detection, even if title/company were passed in by the caller.
     const meta = await fetchPageMeta(url);
+
+    // 1) Prefer JSON-LD JobPosting — canonical, no marketing chrome.
+    if (!title && meta.ld?.title) title = meta.ld.title;
+    if (!company && meta.ld?.company) company = meta.ld.company;
+
+    // 2) Fall back to og:title / <title> with " | " / " - " split.
     if (!title) {
       const guess = splitTitleCompany(meta.title);
       if (guess.title) title = guess.title;
@@ -238,15 +335,21 @@ serve(async (req) => {
       if (guess.company) company = guess.company;
       if (!company && meta.siteName) company = meta.siteName;
     }
+
+    // 3) Host-based fallback for company.
     if (!company) {
       const fromHost = companyFromHost(url);
       if (fromHost) company = fromHost;
     }
+
+    // 4) URL-path fallback for title (Workday: /job/<Title>_R-1466).
     if (!title) {
       const fromPath = titleFromUrl(url);
       if (fromPath) title = fromPath;
     }
+
     if (title) title = cleanTitle(title);
+    if (company) company = fixCompanyCase(company);
     if (!title) title = '(untitled role)';
     if (!company) company = '(unknown company)';
 
@@ -324,8 +427,14 @@ serve(async (req) => {
       }
     }
 
-    // --- Salary parsing from JD body ---
-    const sal = parseSalary(meta.body);
+    // --- Salary: JSON-LD structured data wins, body regex fallback. ---
+    let sal = { low: null as number | null, high: null as number | null, range: null as string | null };
+    if (meta.ld?.salaryLow && meta.ld?.salaryHigh && meta.ld.salaryHigh >= meta.ld.salaryLow) {
+      const lo = meta.ld.salaryLow, hi = meta.ld.salaryHigh;
+      sal = { low: lo, high: hi, range: lo === hi ? `$${Math.round(lo / 1000)}k` : `$${Math.round(lo / 1000)}k–$${Math.round(hi / 1000)}k` };
+    } else {
+      sal = parseSalary(meta.body);
+    }
     if (sal.range) {
       await sql`
         update job.pipeline_roles
@@ -337,12 +446,28 @@ serve(async (req) => {
     }
 
     // --- Liveness stamps so the row reads as "seen today" in the UI. ---
-    await sql`
-      update job.pipeline_roles
-      set first_seen = coalesce(first_seen, current_date),
-          last_seen = current_date
-      where slug = ${slug};
-    `;
+    // first_seen prefers the JSON-LD datePosted when present; otherwise
+    // it's stamped to today.
+    let firstSeen: string | null = null;
+    if (meta.ld?.datePosted) {
+      const d = new Date(meta.ld.datePosted);
+      if (!isNaN(d.getTime())) firstSeen = d.toISOString().slice(0, 10);
+    }
+    if (firstSeen) {
+      await sql`
+        update job.pipeline_roles
+        set first_seen = coalesce(first_seen, ${firstSeen}::date),
+            last_seen = current_date
+        where slug = ${slug};
+      `;
+    } else {
+      await sql`
+        update job.pipeline_roles
+        set first_seen = coalesce(first_seen, current_date),
+            last_seen = current_date
+        where slug = ${slug};
+      `;
+    }
 
     // --- Tracked-company enrichment so the logo + future crawls work. ---
     if (companySlug) {
