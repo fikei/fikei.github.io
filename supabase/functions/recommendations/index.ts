@@ -36,7 +36,7 @@ serve(async (req) => {
                and lower(p.title) = lower(r.title)
           )
         order by r.fit_score desc nulls last, r.suggested_at desc
-        limit 24;
+        limit 60;
       `;
       return jsonResp({ ok: true, version: VERSION, count: rows.length, recommendations: rows });
     }

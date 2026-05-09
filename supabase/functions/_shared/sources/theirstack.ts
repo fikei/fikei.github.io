@@ -18,13 +18,57 @@
 import type { Source, RecommendedRoleInput } from './types.ts';
 import { db } from '../job-db.ts';
 
+// Full request-body passthrough. Anything you set here lands in the
+// TheirStack body verbatim. When `auto: true`, the plugin starts from
+// the user's job.vision row and only your explicit overrides win.
 interface TheirStackConfig {
+  // Convenience presets — used as defaults under `auto`, ignored when
+  // the same field is set under `extra`.
   job_title_or?:           string[];
   job_location_or?:        Array<{ id: number }>;
   posted_at_max_age_days?: number;
   limit?:                  number;
   remote?:                 boolean;
+  // Auto-build the body from job.vision (target_titles, geographies,
+  // stages, sectors). Anything in `extra` still wins. Set this once
+  // and forget — the request stays in sync as your vision evolves.
+  auto?:                   boolean;
+  // Escape hatch: set ANY TheirStack body field directly.
   extra?:                  Record<string, unknown>;
+}
+
+// Default seniority + exclusion floor. Same intent as the title
+// keyword filter the worker applies, just pushed down to the API so
+// the 25-result page budget isn't wasted on junior roles.
+const DEFAULT_SENIORITY    = ['senior', 'staff', 'principal', 'director', 'vp', 'cxo'];
+const DEFAULT_TITLE_NOT    = ['junior', 'intern', 'associate', 'contract', 'apprentice'];
+const DEFAULT_INDUSTRY_NOT = ['Staffing and Recruiting', 'Government Administration', 'Defense & Space'];
+
+// Map common geo strings (vision.target_geographies) → ISO country codes.
+function geosToCountryCodes(geos: string[]): string[] {
+  const codes = new Set<string>();
+  for (const raw of geos) {
+    const g = raw.toLowerCase();
+    if (/\bus\b|united states|san francisco|nyc|new york|sf|bay area|brooklyn|manhattan|oakland|berkeley|austin|seattle|chicago|boston|la\b|los angeles/.test(g)) codes.add('US');
+    if (/\buk\b|britain|england|london|edinburgh/.test(g)) codes.add('GB');
+    if (/canada|toronto|vancouver|montreal/.test(g)) codes.add('CA');
+    if (/germany|berlin|munich/.test(g)) codes.add('DE');
+  }
+  return Array.from(codes);
+}
+
+// Map vision.target_stages strings → TheirStack funding_stage values.
+function stagesToFundingStages(stages: string[]): string[] {
+  const out = new Set<string>();
+  for (const s of stages.map(x => x.toLowerCase())) {
+    if (/pre[\s-]?seed|seed/.test(s))   out.add('seed');
+    if (/series[\s-]?a/.test(s))        out.add('series_a');
+    if (/series[\s-]?b/.test(s))        out.add('series_b');
+    if (/series[\s-]?c/.test(s))        out.add('series_c');
+    if (/series[\s-]?d/.test(s))        out.add('series_d');
+    if (/early|early[\s-]?stage/.test(s)) { out.add('seed'); out.add('series_a'); }
+  }
+  return Array.from(out);
 }
 
 interface TheirStackJob {
@@ -57,15 +101,46 @@ export const theirstackSource: Source<TheirStackConfig> = {
   async pull(cfg) {
     const apiKey = Deno.env.get('THEIRSTACK_API_KEY');
     if (!apiKey) throw new Error('THEIRSTACK_API_KEY env var not set');
+    const sql = db();
+
+    // Auto-build mode: start from job.vision so the request stays in
+    // sync with the user's stated preferences. Explicit fields on the
+    // source's config still win.
+    const auto: Record<string, unknown> = {};
+    if (cfg.auto) {
+      const v = await sql<{ target_titles: string[]|null; target_geographies: string[]|null; target_stages: string[]|null; target_sectors: string[]|null }[]>`
+        select target_titles, target_geographies, target_stages, target_sectors
+          from job.vision order by updated_at desc limit 1
+      `;
+      const row = v[0] || { target_titles: null, target_geographies: null, target_stages: null, target_sectors: null };
+      const titles = (row.target_titles || []).map(s => s.toLowerCase()).filter(Boolean);
+      if (titles.length) auto.job_title_or = titles;
+      const geos = geosToCountryCodes(row.target_geographies || []);
+      if (geos.length) auto.job_country_code_or = geos;
+      const stages = stagesToFundingStages(row.target_stages || []);
+      if (stages.length) auto.funding_stage_or = stages;
+      const sectors = (row.target_sectors || []).filter(Boolean);
+      if (sectors.length) auto.industry_or = sectors;
+    }
 
     const body = {
       include_total_results:   false,
-      posted_at_max_age_days:  cfg.posted_at_max_age_days ?? 15,
+      // Quality defaults — apply unless the user explicitly overrides.
+      posted_at_max_age_days:  cfg.posted_at_max_age_days ?? 7,
+      order_by:                [{ field: 'date_posted', desc: true }],
+      job_seniority_or:        DEFAULT_SENIORITY,
+      job_title_pattern_not:   DEFAULT_TITLE_NOT,
+      industry_not:            DEFAULT_INDUSTRY_NOT,
+      property_exists_or:      ['salary'],   // require comp present so scoring fires
+      // From the convenience config (or fallback).
       job_title_or:            cfg.job_title_or && cfg.job_title_or.length ? cfg.job_title_or : ['product manager'],
       ...(cfg.job_location_or?.length ? { job_location_or: cfg.job_location_or } : {}),
       ...(cfg.remote !== undefined    ? { remote: cfg.remote } : {}),
+      // Auto-derived from vision (only fields present override defaults).
+      ...auto,
+      // Final escape hatch wins everything.
       page:                    0,
-      limit:                   Math.max(1, Math.min(100, cfg.limit ?? 50)),
+      limit:                   Math.max(1, Math.min(25, cfg.limit ?? 25)),  // free-tier ceiling
       blur_company_data:       false,
       ...(cfg.extra || {}),
     };
@@ -73,7 +148,6 @@ export const theirstackSource: Source<TheirStackConfig> = {
     // Daily cache: per (source, config_hash, today) we hit the API once.
     // Subsequent runs the same day use the cached raw response — lets us
     // re-score / re-bullet without re-billing TheirStack.
-    const sql = db();
     const configHash = await sha1(JSON.stringify(body));
     const cached = await sql<{ raw: { data?: TheirStackJob[]; jobs?: TheirStackJob[] } }[]>`
       select raw
