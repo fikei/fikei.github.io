@@ -86,10 +86,6 @@ serve(async (req) => {
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> origin/master
       // Drop anything whose title doesn't match the user's target titles
       // BEFORE scoring, so we don't bullet-generate for irrelevant roles
       // and don't store them at all.
@@ -99,12 +95,6 @@ serve(async (req) => {
         : pulled;
       const droppedOffTarget = pulled.length - onTarget.length;
       const { kept, dropped } = scoreAndFilter(onTarget, src.min_score);
-<<<<<<< HEAD
-=======
-=======
-      const { kept, dropped } = scoreAndFilter(pulled, src.min_score);
->>>>>>> origin/master
->>>>>>> origin/master
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -138,18 +128,8 @@ serve(async (req) => {
         const ctx = await loadUserContext(sql);
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
-<<<<<<< HEAD
       await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget, error: null });
       summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
-=======
-<<<<<<< HEAD
-      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
-=======
-      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
->>>>>>> origin/master
->>>>>>> origin/master
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
