@@ -1,8 +1,12 @@
 // logo.js — derive a company logo URL from a role's posting URL or
 // company name. Best-effort. Pure client-side; no DB column needed.
 //
-//   logoSrc(role) → a Clearbit logo URL, or null if we can't guess.
+//   logoSrc(role) → a favicon URL (Google s2), or null if we can't guess.
 //   logoInitial(company) → first letter for the placeholder fallback.
+//
+// Uses Google's s2 favicon service. Clearbit's free Logo API was retired
+// in 2024, so an `<img src="logo.clearbit.com/…">` request never resolves
+// — that's why every row showed nothing.
 
 const ATS_HOSTS = /(ashbyhq|greenhouse(?:\.io)?|lever\.co|workday(?:jobs)?|smartrecruiters|linkedin|indeed)\.(com|co|io)$/i;
 const COMPANY_DOMAIN_OVERRIDES = {
@@ -48,7 +52,7 @@ export function logoSrc(role) {
     }
   }
   if (!domain) return null;
-  return `https://logo.clearbit.com/${domain}`;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
 }
 
 export function logoInitial(company) {
