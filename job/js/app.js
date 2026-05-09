@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.33.1';
-console.log(`[job] v${VERSION} - Zocdoc theme reduced to yellow + radius (no other overrides)`);
+const VERSION = '0.33.2';
+console.log(`[job] v${VERSION} - Zocdoc theme = generic + yellow pill buttons only`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

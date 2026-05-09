@@ -1,25 +1,25 @@
-/* Zocdoc theme — light. Identical to the generic (Wise) design system,
-   with green swapped for yellow and a slightly tighter corner-radius scale.
-   Everything else (typography, spacing, sentiment, neutrals) stays generic. */
+/* Zocdoc theme — light. Literal clone of the generic (Wise) light tokens.
+   The yellow accent and pill-rounded buttons are applied via component-level
+   overrides in components.css, scoped to [data-theme="zocdoc-*"] .btn. */
 [data-theme="zocdoc-light"] {
   /* Backgrounds */
   --bg: #FFFFFF;
-  --bg-surface: #FBF6E8;                           /* tinted neutral lift, yellow cast */
+  --bg-surface: #F5F7F4;
   --bg-elevated: #FFFFFF;
-  --bg-overlay: rgba(122, 88, 0, 0.08);
+  --bg-overlay: rgba(22, 51, 0, 0.08);
 
   /* Content */
   --fg: #0E0F0C;
   --fg-muted: #454745;
   --fg-subtle: #6A6C6A;
-  --fg-link: #7A5800;                              /* deep yellow/ochre (was forest green) */
+  --fg-link: #163300;
 
-  /* Interactive — green replaced with yellow */
-  --accent: #7A5800;                               /* dark yellow / ochre — primary text & button bg */
+  /* Interactive — generic forest/bright green; buttons get yellow via overrides */
+  --accent: #163300;
   --accent-fg: #FFFFFF;
-  --accent-muted: rgba(255, 205, 63, 0.20);        /* tinted Zocdoc yellow */
-  --accent-strong: #FFCD3F;                        /* Zocdoc yellow — accent highlight */
-  --accent-strong-fg: #0E0F0C;                     /* dark text on yellow */
+  --accent-muted: rgba(159, 232, 112, 0.20);
+  --accent-strong: #9FE870;
+  --accent-strong-fg: #163300;
 
   /* Borders */
   --border: rgba(14, 15, 12, 0.12);
@@ -53,12 +53,12 @@
   --fw-medium: 500;
   --fw-semibold: 600;
 
-  /* Radius — Zocdoc scale (tighter than Wise) */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-  --radius-2xl: 40px;
+  /* Radius — generic Wise scale */
+  --radius-sm: 16px;
+  --radius-md: 20px;
+  --radius-lg: 30px;
+  --radius-xl: 40px;
+  --radius-2xl: 60px;
   --radius-pill: 999px;
 
   /* Shadows */
