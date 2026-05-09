@@ -398,10 +398,11 @@ export class JobRoleDetail extends LitElement {
     }
     const r = this.role;
     return html`
-      <nav class="breadcrumb">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/job/jobs/">Jobs</a>
+        ${r?.company ? html`<span>›</span><span>${r.company}</span>` : nothing}
         <span>›</span>
-        <span>${r?.company || this.slug}</span>
+        <span>${r?.title || this.slug}</span>
       </nav>
 
       <header class="role-header">
