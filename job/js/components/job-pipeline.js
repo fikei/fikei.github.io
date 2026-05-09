@@ -397,11 +397,12 @@ export class JobPipeline extends LitElement {
     return html`
       <tr>
         ${this._visibleColumns().map(c => {
-          if (!c.sortKey) return html`<th>${c.label}</th>`;
+          const cls = `col col-${c.id}`;
+          if (!c.sortKey) return html`<th class=${cls}>${c.label}</th>`;
           const active = this.sortKey === c.sortKey;
           const arrow = active ? (this.sortDir === 'asc' ? '↑' : '↓') : '↕';
           return html`
-            <th>
+            <th class=${cls}>
               <button class="th-sort ${active ? 'is-active' : ''}" @click=${() => this._onSortClick(c)}>
                 <span>${c.label}</span>
                 <span class="th-sort__arrow">${arrow}</span>
@@ -426,24 +427,24 @@ export class JobPipeline extends LitElement {
     return html`
       <tr class=${'pipeline-row' + (isArchived(r) ? ' is-archived' : '')}
           @click=${(e) => this._onRowClick(r, e)}>
-        <td>
+        <td class="col col-fit" data-label="Fit">
           <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
             title="Tap to see the breakdown" @click=${(e) => { e.stopPropagation(); this._openFitModal(r); }}>
             ${r.score == null ? '—' : r.score}
           </button>
         </td>
-        ${showStatus ? html`<td class="status-cell">${this._renderStatusCell(r)}</td>` : nothing}
-        <td class="role-cell">
+        ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
+        <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
             ${this._renderLogo(r, 'sm')}
-            <div>
+            <div class="role-cell__text">
               <div class="role-cell__title">${r.title || '(untitled)'}</div>
               <div class="role-cell__company">${r.company || ''}</div>
             </div>
           </div>
         </td>
-        <td>${this._renderSectorCell(r)}</td>
-        <td>${this._renderMenuCell(r)}</td>
+        <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
+        <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
     `;
   }
@@ -484,14 +485,14 @@ export class JobPipeline extends LitElement {
     const showStatus = this.bucket !== 'leads';
     return html`
       <tr class="skeleton-row">
-        <td><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
-        ${showStatus ? html`<td><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
-        <td>
+        <td class="col col-fit"><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
+        ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
+        <td class="col col-role">
           <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
         </td>
-        <td><span class="skeleton" style="width:80px;height:16px;"></span></td>
-        <td><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
+        <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
+        <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>
     `;
   }
