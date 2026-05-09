@@ -54,6 +54,21 @@ serve(async (req) => {
            returning id`;
         return jsonResp({ ok: true, cleared: (r as unknown as unknown[]).length });
       }
+      if (body.action === 'purge_off_target') {
+        // One-off admin: dismiss rows whose title doesn't match a basic
+        // PM seniority pattern. Use after tightening the title filter so
+        // already-inserted rows don't linger in the widget.
+        const r = await sql`
+          update job.recommended_roles
+             set dismissed_at = now()
+           where dismissed_at is null
+             and added_to_pipeline_slug is null
+             and not (
+               lower(title) ~ '\\m(founding|product lead|head of product|vp product|chief product|group product manager|principal (product manager|pm)|staff (product manager|pm)|senior (product manager|pm)|sr\\.? (product manager|pm)|director,? product|director of product)\\M'
+             )
+           returning id`;
+        return jsonResp({ ok: true, dismissed: (r as unknown as unknown[]).length });
+      }
       if (id && body.action === 'run') {
         const cronSecret = Deno.env.get('CRON_SECRET') || '';
         const r = await fetch(PULL_URL, {
