@@ -42,6 +42,34 @@ serve(async (req) => {
         await sql`delete from job.user_sources where id = ${id} and user_email = ${email}`;
         return jsonResp({ ok: true, id, deleted: true });
       }
+      if (body.action === 'probe_url') {
+        // Diagnostic: fetch any URL with a browser UA and return status +
+        // the first 500 chars. Useful for figuring out which RSS feeds
+        // actually serve a usable response.
+        if (!body.url) return err('url required', 400);
+        try {
+          const r = await fetch(String(body.url), {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+              'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+            },
+          });
+          const t = await r.text();
+          return jsonResp({ ok: true, status: r.status, contentType: r.headers.get('content-type'), len: t.length, sample: t.replace(/\s+/g, ' ').slice(0, 500) });
+        } catch (e) {
+          return jsonResp({ ok: false, error: (e as Error).message });
+        }
+      }
+      if (body.action === 'purge_source') {
+        // One-off admin: hard-delete every recommended_roles row for a
+        // given source value (e.g. 'wwr', 'remotive', 'hn'). Use after
+        // changing the source plugin's parser so the fixed version
+        // re-inserts cleanly on the next run.
+        const src = String(body.source || '').trim();
+        if (!src) return err('source required', 400);
+        const r = await sql`delete from job.recommended_roles where source = ${src} returning id`;
+        return jsonResp({ ok: true, source: src, deleted: (r as unknown as unknown[]).length });
+      }
       if (body.action === 'reset_bullets') {
         // One-off admin: wipes match_bullets on every active recommendation
         // so the next worker tick(s) regenerate with the current prompt.
