@@ -54,16 +54,38 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Parse "Title at Company", "Company hiring Title in Loc", "Title — Company".
+// Parse common job-feed title formats and return { title, company, location }.
+//   "Acme: Senior Product Manager"           → WWR / Remotive
+//   "Senior Product Manager at Acme"          → LinkedIn / Wellfound
+//   "Acme hiring Senior Product Manager in SF" → LinkedIn alt
+//   "Senior Product Manager — Acme"           → some Indeed feeds
+//   bare title                                → keep as-is
 function splitTitle(raw: string): { title: string; company: string; location: string } {
   let s = (raw || '').trim();
-  let m = s.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s+in\s+(.+))?$/i);
-  if (m) return { title: m[1].trim(), company: m[2].trim(), location: (m[3] || '').trim() };
+  // "Company: Title"  (WWR canonical form)
+  let m = s.match(/^([^:]{1,80}):\s*(.+)$/);
+  if (m) return { title: m[2].trim(), company: cleanCompany(m[1]), location: '' };
+  // "Title at Company [in Location]"
+  m = s.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s+in\s+(.+))?$/i);
+  if (m) return { title: m[1].trim(), company: cleanCompany(m[2]), location: (m[3] || '').trim() };
+  // "Company hiring Title [in Location]"
   m = s.match(/^(.+?)\s+hiring\s+(.+?)(?:\s+in\s+(.+))?$/i);
-  if (m) return { title: m[2].trim(), company: m[1].trim(), location: (m[3] || '').trim() };
+  if (m) return { title: m[2].trim(), company: cleanCompany(m[1]), location: (m[3] || '').trim() };
+  // "Title — Company"  (em-dash, en-dash, hyphen, or pipe)
   m = s.match(/^(.+?)\s+[—\-–|]\s+(.+?)$/);
-  if (m) return { title: m[1].trim(), company: m[2].trim(), location: '' };
+  if (m) return { title: m[1].trim(), company: cleanCompany(m[2]), location: '' };
   return { title: s, company: '', location: '' };
+}
+
+// Strip common suffixes WWR-style feeds add to company names — they
+// only confuse the favicon lookup. "Doordash Usa" → "Doordash";
+// "Acme Inc." → "Acme"; "Foo, LLC" → "Foo".
+function cleanCompany(s: string): string {
+  return s
+    .trim()
+    .replace(/[,\s]+(?:usa|us|north america|inc\.?|llc\.?|ltd\.?|co\.?|corp\.?|gmbh|s\.a\.?)\s*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 // Stable per-item ID. Prefer <guid>, then the URL path tail, then a
@@ -126,15 +148,19 @@ export const rssSource: Source<RssConfig> = {
       : (cfg.feedUrl ? [{ url: cfg.feedUrl }] : []);
     if (!feeds.length) throw new Error('rss: config.feeds (or feedUrl) is required');
     const out: RecommendedRoleInput[] = [];
-    const errs: string[] = [];
+    const diag: string[] = [];
     for (const f of feeds) {
       try {
-        out.push(...await fetchOneFeed(f));
+        const rows = await fetchOneFeed(f);
+        out.push(...rows);
+        diag.push(`${f.label || f.url.slice(0, 30)}=${rows.length}`);
       } catch (e) {
-        errs.push(`${f.label || f.url.slice(0, 30)}: ${(e as Error).message.slice(0, 160)}`);
+        diag.push(`${f.label || f.url.slice(0, 30)}=ERR ${(e as Error).message.slice(0, 80)}`);
       }
     }
-    if (!out.length && errs.length === feeds.length) throw new Error(errs.join(' | ').slice(0, 500));
+    console.log(`[rss] ${diag.join(' | ')}`);
+    if (!out.length) throw new Error(diag.join(' | ').slice(0, 500));
+    if (out[0]?.payload) (out[0].payload as Record<string, unknown>)._diag = diag.join(' | ');
     return out;
   },
 };

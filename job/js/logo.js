@@ -8,7 +8,11 @@
 // in 2024, so an `<img src="logo.clearbit.com/…">` request never resolves
 // — that's why every row showed nothing.
 
-const ATS_HOSTS = /(ashbyhq|greenhouse(?:\.io)?|lever\.co|workday(?:jobs)?|smartrecruiters|linkedin|indeed)\.(com|co|io)$/i;
+// Hosts whose favicon would be the platform/aggregator, not the
+// employer. When the posting URL points at one of these, we ignore the
+// host and derive the favicon from the company name instead.
+const AGGREGATOR_HOSTS = /(ashbyhq|greenhouse(?:\.io)?|lever|workday(?:jobs)?|smartrecruiters|linkedin|indeed|weworkremotely|remotive|remoteok|hnrss|ycombinator|workatastartup|wellfound|angel|builtin|otta|welcometothejungle)\.(com|co|io|hr|fr|net|org)$/i;
+
 const COMPANY_DOMAIN_OVERRIDES = {
   // Hand-curated where domain-from-name doesn't work. Add as needed.
   'abridge': 'abridge.com',
@@ -24,9 +28,30 @@ const COMPANY_DOMAIN_OVERRIDES = {
   'rec technologies': 'rec.io',
   'develop health': 'develophealth.io',
   'spring health': 'springhealth.com',
+  // Tech companies the RSS source surfaces with awkward formatting.
+  'doordash': 'doordash.com',
+  'doordash usa': 'doordash.com',
+  'webpt': 'webpt.com',
+  'ethos life': 'ethos.com',
+  'ethos': 'ethos.com',
+  'okta': 'okta.com',
+  'gypsy collective': 'gypsycollective.com',
+  'silverorange': 'silverorange.com',
+  'walrus': 'walrus.com',
+  'payra': 'payra.io',
 };
 
-function looksLikeAts(host) { return ATS_HOSTS.test(host); }
+function looksLikeAts(host) { return AGGREGATOR_HOSTS.test(host); }
+
+// Strip "Inc / LLC / Co / USA" suffixes that confuse the slug → domain
+// guess. Mirror of the cleanCompany() in the rss source plugin.
+function cleanCompany(s) {
+  return String(s || '')
+    .trim()
+    .replace(/[,\s]+(?:usa|us|north america|inc\.?|llc\.?|ltd\.?|co\.?|corp\.?|gmbh|s\.a\.?)\s*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 export function logoSrc(role) {
   if (!role) return null;
@@ -43,11 +68,12 @@ export function logoSrc(role) {
 
   // Fall back to a guess from the company name.
   if (!domain && role.company) {
-    const key = role.company.trim().toLowerCase();
+    const cleaned = cleanCompany(role.company);
+    const key = cleaned.toLowerCase();
     if (COMPANY_DOMAIN_OVERRIDES[key]) {
       domain = COMPANY_DOMAIN_OVERRIDES[key];
     } else {
-      const slug = role.company.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const slug = cleaned.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (slug.length >= 2) domain = `${slug}.com`;
     }
   }
