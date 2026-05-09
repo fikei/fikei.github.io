@@ -88,9 +88,23 @@ serve(async (req) => {
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
       const { kept, dropped } = scoreAndFilter(pulled, src.min_score);
       const inserted = await insertNew(sql, src, kept);
-      if (inserted.length) {
+      // Bullets for newly-inserted rows AND any older active row that
+      // never got bullets (e.g. from a prior failed run). Capped per
+      // tick so one Anthropic outage doesn't burn the whole budget.
+      const stale = await sql`
+        select id, company, title, url, fit_score as "fitScore", fit_breakdown as "breakdown", payload
+          from job.recommended_roles
+         where (match_bullets is null or jsonb_array_length(match_bullets) = 0)
+           and dismissed_at is null
+           and added_to_pipeline_slug is null
+           and (fit_score is null or fit_score >= 50)
+         order by fit_score desc nulls last
+         limit 10
+      `;
+      const toBullet = [...inserted, ...(stale as unknown as typeof inserted).filter(s => !inserted.some(i => i.id === s.id))];
+      if (toBullet.length) {
         const ctx = await loadUserContext(sql);
-        await Promise.all(inserted.map(row => generateBullets(sql, row, ctx)));
+        await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
       await markRun(sql, src.id, { count: inserted.length, dropped, error: null });
       summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, inserted: inserted.length });
@@ -192,8 +206,8 @@ async function insertNew(
 async function loadUserContext(sql: ReturnType<typeof db>): Promise<UserContext> {
   const [skills, wins, vision] = await Promise.all([
     sql`select name, type, level, body_md from job.skills order by name`,
-    sql`select headline, metric_value, body_md from job.wins order by created_at desc limit 30`,
-    sql`select body_md from job.vision order by created_at desc limit 1`,
+    sql`select headline, metric_value, body_md from job.wins order by updated_at desc limit 30`,
+    sql`select coalesce(raw_md, narrative_arc) as body_md from job.vision order by updated_at desc limit 1`,
   ]);
   return {
     resume: '', // hook for a future "primary resume" lookup

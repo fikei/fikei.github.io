@@ -115,6 +115,7 @@ export const trackedAtsSource: Source = {
       from job.tracked_companies
       where ats is not null and ats_slug is not null
     `;
+    console.log(`[tracked-ats] tracked rows: ${tracked.length}`);
 
     // 2) Fallback: scan existing pipeline rows for ATS URLs and derive
     //    company-board pairs we haven't seen yet. Means you don't have
@@ -124,9 +125,11 @@ export const trackedAtsSource: Source = {
     const pipelineRows = await sql<{ company_name: string; url: string; sector: string | null }[]>`
       select company_name, url, sector
       from job.pipeline_roles
-      where url is not null
+      where deleted_at is null
+        and url is not null
         and url ~* '(greenhouse|lever|ashbyhq)'
     `;
+    console.log(`[tracked-ats] pipeline rows with ATS url: ${pipelineRows.length}`);
     const seen = new Set(tracked.map(c => `${(c.ats || '').toLowerCase()}:${(c.ats_slug || '').toLowerCase()}`));
     const companies: TrackedCompany[] = [...tracked];
     for (const r of pipelineRows) {
@@ -143,22 +146,20 @@ export const trackedAtsSource: Source = {
         sector:   r.sector,
       });
     }
+    console.log(`[tracked-ats] tracked=${tracked.length} pipeline=${pipelineRows.length} companies=${companies.length}`);
     const out: RecommendedRoleInput[] = [];
     for (const c of companies) {
       const adapter = ADAPTERS[(c.ats || '').toLowerCase()];
-      if (!adapter) continue;
+      if (!adapter) { debug.push(`noAdapter:${c.ats}/${c.ats_slug}`); continue; }
       try {
         const rawRows = await adapter(c);
         // Stamp the company's sector onto every posting so the worker's
-        // fit step has signal beyond just the title.
+        // fit step has signal beyond just the title. ATS endpoints
+        // return only currently-open postings, so we don't apply a
+        // `since` filter — dedup happens at insert time via the unique
+        // (source, source_id) constraint.
         const rows = rawRows.map(r => ({ ...r, sector: r.sector ?? c.sector ?? undefined }));
-        // Optional `since` filter — postedAt is sometimes missing, in
-        // which case we keep the row (better to overshoot than to lose
-        // a posting that lacks a timestamp).
-        const filtered = ctx.since
-          ? rows.filter(r => !r.postedAt || new Date(r.postedAt) >= ctx.since!)
-          : rows;
-        out.push(...filtered);
+        out.push(...rows);
       } catch (e) {
         console.warn(`[tracked-ats] ${c.ats}/${c.ats_slug}: ${(e as Error).message}`);
       }
