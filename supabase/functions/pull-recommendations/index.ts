@@ -152,12 +152,24 @@ serve(async (req) => {
 let _titleCache: { rows: string[]; at: number } | null = null;
 const TITLE_CACHE_MS = 60_000;
 
+// Sensible default for product-track searches when vision.target_titles
+// hasn't been filled in yet. Mirrors the seniority floor in computeFit.
+const DEFAULT_TARGET_TITLES = [
+  'founding pm', 'founding product',
+  'product lead', 'head of product', 'vp product', 'chief product',
+  'group product manager', 'principal product manager', 'principal pm',
+  'staff product manager', 'staff pm',
+  'senior product manager', 'senior pm', 'sr product manager',
+  'director, product', 'director of product',
+];
+
 async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_titleCache && Date.now() - _titleCache.at < TITLE_CACHE_MS) return _titleCache.rows;
   const rows = await sql<{ titles: string[] | null }[]>`
     select target_titles as titles from job.vision order by updated_at desc limit 1
   `;
-  const titles = ((rows[0]?.titles as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const fromVision = ((rows[0]?.titles as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const titles = fromVision.length ? fromVision : DEFAULT_TARGET_TITLES;
   _titleCache = { rows: titles, at: Date.now() };
   return titles;
 }
