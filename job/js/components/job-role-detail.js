@@ -273,7 +273,7 @@ export class JobRoleDetail extends LitElement {
           ${headerExtra || nothing}
         </header>
         <div class="role-card__body">
-          ${status === 'loading' ? html`<p class="muted">Generating…</p>`
+          ${status === 'loading' ? html`<p class="muted"><span class="dots-anim">Generating</span></p>`
             : status === 'error'  ? html`<p class="muted" style="color:var(--error);">Couldn't load</p>`
             : html`
               <div class="role-card__split">
@@ -350,7 +350,7 @@ export class JobRoleDetail extends LitElement {
     if (!a) return html`<div class="placeholder"><h2>Loading…</h2></div>`;
     if (a.saving && !a.content) {
       return html`<div class="placeholder">
-        <h2>Generating ${kind === 'resume' ? 'resume' : 'cover letter'}…</h2>
+        <h2><span class="dots-anim">Generating ${kind === 'resume' ? 'resume' : 'cover letter'}</span></h2>
         <p>Pulling Ian's KB + voice rules. ~10–20s.</p>
       </div>`;
     }
@@ -361,7 +361,7 @@ export class JobRoleDetail extends LitElement {
           <p>Generate one tailored to this role using the career KB and voice rules.</p>
           <div style="margin-top:var(--space-4);display:flex;justify-content:center;">
             <button class="btn btn--primary" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
-              ${a.saving ? 'Generating…' : `Generate ${kind === 'resume' ? 'resume' : 'cover letter'}`}
+              ${a.saving ? html`<span class="dots-anim">Generating</span>` : `Generate ${kind === 'resume' ? 'resume' : 'cover letter'}`}
             </button>
           </div>
           ${a.error ? html`<p class="muted" style="color:var(--error);margin-top:var(--space-3);">${a.error}</p>` : nothing}

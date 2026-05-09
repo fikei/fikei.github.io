@@ -22,15 +22,14 @@ const DIM_LABELS = {
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
-// Rows are tappable so the View button is gone; the rightmost cell now
-// holds only the triple-dot menu.
+// Role + Company collapsed into a single stacked cell: title row 1,
+// company row 2. Header sort defaults to title (alphabetical).
 const COLUMNS = [
-  { id: 'fit',     label: 'Fit',     sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
-  { id: 'status',  label: 'Status',  sortKey: 'status',  type: 'text' },
-  { id: 'company', label: 'Company', sortKey: 'company', type: 'text' },
-  { id: 'role',    label: 'Role',    sortKey: 'title',   type: 'text' },
-  { id: 'sector',  label: 'Sector',  sortKey: 'sector',  type: 'text' },
-  { id: 'menu',    label: '',        sortKey: null },
+  { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
+  { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
+  { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
+  { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
+  { id: 'menu',   label: '',       sortKey: null },
 ];
 
 // Drop rows without an apply link, and any Strava postings (out of scope).
@@ -62,6 +61,8 @@ export class JobPipeline extends LitElement {
     archivedView: { state: true },   // 'active' | 'all' | 'archived'
     openMenuSlug: { state: true },
     livenessChecking: { state: true },
+    livenessResult: { state: true },
+    livenessResultDismissed: { state: true },
     closedSinceLastVisit: { state: true },
     bannerDismissed: { state: true },
     pasteOpen: { state: true },
@@ -81,6 +82,8 @@ export class JobPipeline extends LitElement {
     this.archivedView = 'active';
     this.openMenuSlug = null;
     this.livenessChecking = false;
+    this.livenessResult = null;            // { checked, closed: [slug…] }
+    this.livenessResultDismissed = false;
     this.closedSinceLastVisit = [];
     this.bannerDismissed = false;
     this.pasteOpen = false;
@@ -173,16 +176,19 @@ export class JobPipeline extends LitElement {
   async _onCheckLiveness() {
     if (this.livenessChecking) return;
     this.livenessChecking = true;
+    this.livenessResult = null;
+    this.livenessResultDismissed = false;
     this.requestUpdate();
     try {
       const res = await checkLiveness();
-      // Refresh the pipeline so newly-closed rows appear with archive/closed flags.
       const data = await fetchPipeline();
       this.roles = (data.roles || []).slice();
       this._computeClosedSinceLastVisit();
-      if (res.closed?.length) {
-        this.bannerDismissed = false;
-      }
+      this.livenessResult = {
+        checked: res.checked || 0,
+        closed: Array.isArray(res.closed) ? res.closed : [],
+      };
+      if (this.livenessResult.closed.length) this.bannerDismissed = false;
     } catch (e) {
       this.error = String(e);
     } finally {
@@ -366,8 +372,10 @@ export class JobPipeline extends LitElement {
           </select>
           ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
         </td>
-        <td><strong>${r.company}</strong></td>
-        <td>${r.title}</td>
+        <td class="role-cell">
+          <div class="role-cell__title">${r.title || '(untitled)'}</div>
+          <div class="role-cell__company">${r.company || ''}</div>
+        </td>
         <td>${this._renderSectorCell(r)}</td>
         <td>${this._renderMenuCell(r)}</td>
       </tr>
@@ -391,10 +399,12 @@ export class JobPipeline extends LitElement {
       <tr class="skeleton-row">
         <td><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
         <td><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>
-        <td><span class="skeleton" style="width:100px;height:16px;"></span></td>
-        <td><span class="skeleton" style="width:60%;height:16px;"></span></td>
+        <td>
+          <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
+          <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
+        </td>
         <td><span class="skeleton" style="width:80px;height:16px;"></span></td>
-        <td><span class="skeleton skeleton--pill" style="width:64px;height:32px;"></span></td>
+        <td><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>
     `;
   }
@@ -478,6 +488,24 @@ export class JobPipeline extends LitElement {
     const archivedCount = this.roles.filter(r => isVisibleRole(r) && isArchived(r)).length;
     return html`
       <job-recommendations></job-recommendations>
+
+      ${this.livenessResult && !this.livenessResultDismissed ? html`
+        <div class="liveness-banner ${this.livenessResult.closed.length ? 'liveness-banner--closed' : 'liveness-banner--clean'}" role="status">
+          <div>
+            ${this.livenessResult.closed.length
+              ? html`
+                <strong>${this.livenessResult.closed.length} of ${this.livenessResult.checked} ${this.livenessResult.checked === 1 ? 'role was' : 'roles were'} closed.</strong>
+                Archived and moved to Closed. <span class="muted">Pipeline updated.</span>
+              `
+              : html`
+                <strong>✓ All ${this.livenessResult.checked} ${this.livenessResult.checked === 1 ? 'role is' : 'roles are'} still live.</strong>
+                <span class="muted">Last checked just now.</span>
+              `}
+          </div>
+          <button class="row-menu__trigger" aria-label="Dismiss"
+                  @click=${() => { this.livenessResultDismissed = true; }}>×</button>
+        </div>
+      ` : nothing}
 
       ${!this.bannerDismissed && this.closedSinceLastVisit.length ? html`
         <div class="closed-banner" role="status">
