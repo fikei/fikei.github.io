@@ -1,11 +1,18 @@
-// job-history-resume — top-level resume view: list of companies pulled from
-// fikei/job/01-job-history/companies/ via kb-read.
+// job-history-resume — LinkedIn-style work history. Each company card holds
+// company-level metadata, a summary, and a nested list of roles with key
+// achievements. Roles + achievements are parsed from the company markdown's
+// `## Roles` section (one role per `### Role title` heading) plus an optional
+// `## Key achievements` block. The page degrades gracefully when a company
+// markdown only has the legacy fields/summary shape.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 
 const COMPANIES_DIR = '01-job-history/companies/';
 
-// Strip wiki-link / markdown link / bold syntax for plain-text snippets.
+// Strip wiki-link / markdown link / bold / weird typographic chars for plain
+// text. Also normalises smart quotes, em/en dashes, and stray bullet glyphs
+// that occasionally leak in from PDF / docx pastes.
 function plainify(s) {
+  if (!s) return '';
   return s
     .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
@@ -13,49 +20,128 @@ function plainify(s) {
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
+    // Normalise typography
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/–|—/g, '–')
+    .replace(/ /g, ' ')
+    // Strip stray bullet glyphs at start of lines
+    .replace(/^[\s•●▪◦\-•·–—]+/, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-// Pull title, "**Field:** value" header, and a 1-2 sentence summary
-// (first prose paragraph; prefers the body of "## Context" if present).
+// Pull title, "**Field:** value" header, summary paragraph, nested roles, and
+// key-achievement bullets from a company markdown.
 function parseDoc(md) {
-  const out = { title: '', fields: {}, summary: '' };
+  const out = {
+    title: '',
+    fields: {},
+    summary: '',
+    roles: [],          // [{ title, dates, location, achievements: [str] }]
+    achievements: [],   // company-level fallback
+  };
   const lines = md.split(/\r?\n/);
+
+  // ---- Header (title + **Field:** values) ----
   let i = 0;
   for (; i < lines.length; i++) {
     const line = lines[i];
     if (!out.title) {
       const h1 = line.match(/^#\s+(.+)$/);
-      if (h1) { out.title = h1[1].trim(); continue; }
+      if (h1) { out.title = plainify(h1[1]); continue; }
     }
     const m = line.match(/^\*\*([^*:]+):\*\*\s*(.+)$/);
-    if (m) { out.fields[m[1].trim()] = m[2].trim(); continue; }
+    if (m) { out.fields[m[1].trim()] = plainify(m[2]); continue; }
     if (line.startsWith('## ')) break;
   }
 
-  // Find "## Context" first, otherwise first non-heading paragraph after metadata.
+  // ---- Summary: prefer "## Context" body, else first paragraph after header
   let bodyStart = -1;
   for (let j = i; j < lines.length; j++) {
     if (/^##\s+Context\b/i.test(lines[j])) { bodyStart = j + 1; break; }
   }
   if (bodyStart === -1) bodyStart = i;
-
   const para = [];
   for (let j = bodyStart; j < lines.length; j++) {
     const line = lines[j].trim();
-    if (!line) {
-      if (para.length) break;
-      continue;
-    }
-    if (line.startsWith('#')) {
-      if (para.length) break;
-      continue;
-    }
+    if (!line) { if (para.length) break; continue; }
+    if (line.startsWith('#')) { if (para.length) break; continue; }
     if (/^\*\*[^*]+:\*\*/.test(line)) continue;
     para.push(line);
   }
   out.summary = plainify(para.join(' '));
+
+  // ---- Roles (## Roles → ### Title — dates → fields + bullets) ----
+  const findSection = (re) => {
+    for (let j = 0; j < lines.length; j++) {
+      if (re.test(lines[j])) return j;
+    }
+    return -1;
+  };
+  const sectionEnd = (start) => {
+    for (let j = start + 1; j < lines.length; j++) {
+      if (/^##\s+/.test(lines[j])) return j;
+    }
+    return lines.length;
+  };
+
+  const rolesStart = findSection(/^##\s+Roles?\b/i);
+  if (rolesStart !== -1) {
+    const end = sectionEnd(rolesStart);
+    let cur = null;
+    const flush = () => { if (cur) out.roles.push(cur); };
+    for (let j = rolesStart + 1; j < end; j++) {
+      const line = lines[j];
+      const h3 = line.match(/^###\s+(.+)$/);
+      if (h3) {
+        flush();
+        // Parse "Title — dates" or "Title (dates)" patterns.
+        let raw = plainify(h3[1]);
+        let title = raw, dates = '';
+        const dash = raw.match(/^(.+?)\s+[–—–-]\s+(.+)$/);
+        const paren = raw.match(/^(.+?)\s+\(([^)]+)\)\s*$/);
+        if (dash) { title = dash[1].trim(); dates = dash[2].trim(); }
+        else if (paren) { title = paren[1].trim(); dates = paren[2].trim(); }
+        cur = { title, dates, location: '', achievements: [] };
+        continue;
+      }
+      if (!cur) continue;
+      const meta = line.match(/^\*\*([^*:]+):\*\*\s*(.+)$/);
+      if (meta) {
+        const key = meta[1].trim().toLowerCase();
+        const val = plainify(meta[2]);
+        if (key === 'location') cur.location = val;
+        else if (key === 'dates' || key === 'tenure') cur.dates = cur.dates || val;
+        else cur[key] = val;
+        continue;
+      }
+      const bullet = line.match(/^\s*[-*+]\s+(.+)$/);
+      if (bullet) { cur.achievements.push(plainify(bullet[1])); continue; }
+    }
+    flush();
+  }
+
+  // ---- Company-level fallback achievements ----
+  const achStart = findSection(/^##\s+(Key achievements|Highlights|Wins)\b/i);
+  if (achStart !== -1) {
+    const end = sectionEnd(achStart);
+    for (let j = achStart + 1; j < end; j++) {
+      const bullet = lines[j].match(/^\s*[-*+]\s+(.+)$/);
+      if (bullet) out.achievements.push(plainify(bullet[1]));
+    }
+  }
+
   return out;
+}
+
+function tenureSortKey(field) {
+  // Sort companies by their start year (descending). Field examples:
+  //  "Mar 2022 – Present", "2018–2021", "Jan 2015 - Dec 2017".
+  if (!field) return 0;
+  const m = field.match(/(19|20)\d{2}/g);
+  if (!m) return 0;
+  return parseInt(m[0], 10);
 }
 
 export class JobHistoryResume extends LitElement {
@@ -65,6 +151,7 @@ export class JobHistoryResume extends LitElement {
     state: { state: true },
     error: { state: true },
     companies: { state: true },
+    expanded: { state: true },
   };
 
   constructor() {
@@ -72,6 +159,7 @@ export class JobHistoryResume extends LitElement {
     this.state = 'idle';
     this.error = '';
     this.companies = [];
+    this.expanded = new Set();
   }
 
   connectedCallback() {
@@ -100,15 +188,19 @@ export class JobHistoryResume extends LitElement {
           const { content } = await window.JobKB.readFile(f.path);
           return { ...f, ...parseDoc(content), content };
         } catch (e) {
-          return { ...f, title: f.name.replace(/\.md$/, ''), fields: {}, summary: '', content: '', error: String(e) };
+          return { ...f, title: f.name.replace(/\.md$/, ''), fields: {}, summary: '', roles: [], achievements: [], content: '', error: String(e) };
         }
       }));
-      // Sort: those with a tenure-end of 'Present' first, then by tenure-start desc, then by name.
       loaded.sort((a, b) => {
-        const aPresent = /Present/i.test(a.fields['My tenure'] || a.fields['Tenure'] || '');
-        const bPresent = /Present/i.test(b.fields['My tenure'] || b.fields['Tenure'] || '');
+        const aTen = a.fields['My tenure'] || a.fields['Tenure'] || '';
+        const bTen = b.fields['My tenure'] || b.fields['Tenure'] || '';
+        const aPresent = /Present/i.test(aTen);
+        const bPresent = /Present/i.test(bTen);
         if (aPresent !== bPresent) return aPresent ? -1 : 1;
-        return (b.fields['My tenure'] || '').localeCompare(a.fields['My tenure'] || '');
+        const ay = tenureSortKey(aTen);
+        const by = tenureSortKey(bTen);
+        if (ay !== by) return by - ay;
+        return aTen.localeCompare(bTen);
       });
       this.companies = loaded;
       this.state = 'loaded';
@@ -118,7 +210,33 @@ export class JobHistoryResume extends LitElement {
     }
   }
 
-  _renderCard(c) {
+  _toggle(slug) {
+    const next = new Set(this.expanded);
+    if (next.has(slug)) next.delete(slug); else next.add(slug);
+    this.expanded = next;
+  }
+
+  _renderRole(role) {
+    return html`
+      <li class="wh-role">
+        <div class="wh-role__bullet" aria-hidden="true"></div>
+        <div class="wh-role__body">
+          <header class="wh-role__head">
+            <h4 class="wh-role__title">${role.title}</h4>
+            ${role.dates ? html`<span class="wh-role__dates">${role.dates}</span>` : nothing}
+          </header>
+          ${role.location ? html`<p class="wh-role__loc">${role.location}</p>` : nothing}
+          ${role.achievements.length ? html`
+            <ul class="wh-role__ach">
+              ${role.achievements.map(a => html`<li>${a}</li>`)}
+            </ul>
+          ` : nothing}
+        </div>
+      </li>
+    `;
+  }
+
+  _renderCompany(c) {
     const slug = c.name.replace(/\.md$/, '');
     const tenure = c.fields['My tenure'] || c.fields['Tenure'] || '';
     const sector = c.fields['Sector'] || '';
@@ -126,49 +244,79 @@ export class JobHistoryResume extends LitElement {
     const location = c.fields['Location'] || '';
     const operating = c.fields['Operating mode'] || '';
     const rolesHeld = c.fields['Roles held'] || '';
-    const subline = operating || rolesHeld
-      ? plainify(operating || rolesHeld)
-      : '';
+    const initial = (c.title || slug).trim().charAt(0).toUpperCase();
 
-    const chips = [sector, stage, location].filter(Boolean);
+    const chips = [sector, stage, location, operating].filter(Boolean);
+
+    const hasRoles = c.roles && c.roles.length > 0;
+    const hasAch = c.achievements && c.achievements.length > 0;
+    const expanded = this.expanded.has(slug);
+    const expandable = hasRoles || hasAch || c.summary;
 
     return html`
-      <a class="company-card" href="/job/history/companies/${slug}/">
-        <div class="company-card__top">
-          <div class="company-card__title">
-            <h3>${c.title}</h3>
-            ${subline ? html`<p class="company-card__sub">${subline}</p>` : nothing}
+      <article class="wh-company ${expanded ? 'is-expanded' : ''}">
+        <button class="wh-company__head"
+                type="button"
+                aria-expanded=${expanded ? 'true' : 'false'}
+                @click=${() => expandable && this._toggle(slug)}>
+          <span class="wh-company__logo" aria-hidden="true">${initial}</span>
+          <span class="wh-company__title">
+            <span class="wh-company__name">${c.title}</span>
+            ${rolesHeld ? html`<span class="wh-company__roles">${rolesHeld}</span>` : nothing}
+            ${chips.length ? html`
+              <span class="wh-company__chips">
+                ${chips.map(t => html`<span class="wh-chip">${t}</span>`)}
+              </span>
+            ` : nothing}
+          </span>
+          <span class="wh-company__meta">
+            ${tenure ? html`<span class="wh-company__tenure">${tenure}</span>` : nothing}
+            ${expandable ? html`
+              <span class="wh-company__caret" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+            ` : nothing}
+          </span>
+        </button>
+
+        ${expanded ? html`
+          <div class="wh-company__body">
+            ${c.summary ? html`<p class="wh-company__summary">${c.summary}</p>` : nothing}
+
+            ${hasRoles ? html`
+              <ul class="wh-roles">
+                ${c.roles.map(r => this._renderRole(r))}
+              </ul>
+            ` : nothing}
+
+            ${!hasRoles && hasAch ? html`
+              <h5 class="wh-section-h">Key achievements</h5>
+              <ul class="wh-role__ach wh-role__ach--flat">
+                ${c.achievements.map(a => html`<li>${a}</li>`)}
+              </ul>
+            ` : nothing}
+
+            <div class="wh-company__footer">
+              <a class="wh-company__link" href="/job/history/companies/${slug}/">Open full entry →</a>
+            </div>
           </div>
-          ${tenure ? html`<span class="company-card__tenure">${tenure}</span>` : nothing}
-        </div>
-        ${c.summary ? html`<p class="company-card__summary">${c.summary}</p>` : nothing}
-        ${chips.length ? html`
-          <ul class="company-card__chips">
-            ${chips.map(t => html`<li>${t}</li>`)}
-          </ul>
         ` : nothing}
-      </a>
+      </article>
     `;
   }
 
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
-        <section class="company-grid">
-          ${Array.from({ length: 3 }).map(() => html`
-            <div class="company-card" style="cursor:default;">
-              <div class="company-card__top">
-                <div class="company-card__title">
-                  <div class="skeleton" style="width:60%;height:22px;display:block;margin-bottom:var(--space-2);"></div>
-                  <div class="skeleton" style="width:80%;height:14px;display:block;"></div>
+        <section class="wh-list">
+          ${Array.from({ length: 4 }).map(() => html`
+            <div class="wh-company">
+              <div class="wh-company__head" style="cursor:default;">
+                <div class="skeleton" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                  <div class="skeleton" style="width:50%;height:18px;display:block;margin-bottom:6px;"></div>
+                  <div class="skeleton" style="width:40%;height:13px;display:block;"></div>
                 </div>
-                <div class="skeleton" style="width:90px;height:14px;"></div>
+                <div class="skeleton" style="width:120px;height:14px;"></div>
               </div>
-              <div class="skeleton" style="width:100%;height:14px;display:block;margin-bottom:8px;"></div>
-              <div class="skeleton" style="width:92%;height:14px;display:block;margin-bottom:8px;"></div>
-              <div class="skeleton" style="width:75%;height:14px;display:block;margin-bottom:var(--space-4);"></div>
-              <div class="skeleton skeleton--pill" style="width:60px;height:20px;display:inline-block;margin-right:8px;"></div>
-              <div class="skeleton skeleton--pill" style="width:80px;height:20px;display:inline-block;"></div>
             </div>
           `)}
         </section>
@@ -184,8 +332,8 @@ export class JobHistoryResume extends LitElement {
       return html`<div class="placeholder"><h2>No companies found</h2><p>Expected files in ${COMPANIES_DIR}</p></div>`;
     }
     return html`
-      <section class="company-grid">
-        ${this.companies.map(c => this._renderCard(c))}
+      <section class="wh-list">
+        ${this.companies.map(c => this._renderCompany(c))}
       </section>
     `;
   }

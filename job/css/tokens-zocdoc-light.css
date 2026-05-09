@@ -1,0 +1,71 @@
+/* Zocdoc-inspired theme — light.
+   Coral primary, deep navy ink, warm off-white surfaces. Mirrors the soft
+   rounded look of zocdoc.com (book.zocdoc.com get-started page). */
+[data-theme="zocdoc-light"] {
+  --bg: #FFF7F4;
+  --bg-surface: #FCEEED;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(27, 32, 39, 0.10);
+
+  --fg: #1B2027;
+  --fg-muted: #4B5663;
+  --fg-subtle: #7C8593;
+  --fg-link: #002080;
+
+  --accent: #002080;                       /* deep navy */
+  --accent-fg: #FFFFFF;
+  --accent-muted: rgba(255, 126, 115, 0.18);
+  --accent-strong: #FF7E73;                /* coral */
+  --accent-strong-fg: #FFFFFF;
+
+  --border: rgba(27, 32, 39, 0.10);
+  --border-strong: rgba(27, 32, 39, 0.22);
+
+  --success: #2C8A6E;
+  --error: #C0382B;
+  --warning: #F2B400;
+
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --font-size-display: 56px;
+  --font-size-title-1: 36px;
+  --font-size-title-2: 28px;
+  --font-size-title-3: 22px;
+  --font-size-title-4: 18px;
+  --font-size-body-lg: 18px;
+  --font-size-body: 16px;
+  --font-size-small: 14px;
+  --font-size-caption: 12px;
+
+  --lh-display: 1.1;
+  --lh-title: 1.25;
+  --lh-body: 1.55;
+  --lh-tight: 1.35;
+
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
+  --radius-2xl: 60px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 8px rgba(27,32,39,0.06);
+  --shadow-md: 0 10px 28px rgba(27,32,39,0.08);
+  --shadow-lg: 0 20px 56px rgba(27,32,39,0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+}
