@@ -10,22 +10,20 @@ async function authHeader() {
   return { Authorization: `Bearer ${token}` };
 }
 
-export async function fetchPipeline({ sync = false } = {}) {
+export async function fetchPipeline() {
   const headers = await authHeader();
-  const url = sync ? `${FN_URL}?sync=1` : FN_URL;
-  const res = await fetch(url, { headers });
+  const res = await fetch(FN_URL, { headers });
   if (!res.ok) throw new Error(`jobs-pipe ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
 export async function setStatus(role, status) {
-  // role can be { slug, rowNumber } or just a slug string for backward compat.
-  const body = typeof role === 'string' ? { slug: role, status } : { slug: role.slug, rowNumber: role.rowNumber, status };
+  const slug = typeof role === 'string' ? role : role.slug;
   const headers = await authHeader();
   const res = await fetch(FN_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ slug, status }),
   });
   if (!res.ok) throw new Error(`set-status ${res.status}: ${await res.text()}`);
   return res.json();

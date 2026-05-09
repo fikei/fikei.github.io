@@ -20,14 +20,15 @@ const DIM_LABELS = {
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
-// Resume + Cover, Source + Salary all live on the detail page now.
+// Rows are tappable so the View button is gone; the rightmost cell now
+// holds only the triple-dot menu.
 const COLUMNS = [
   { id: 'fit',     label: 'Fit',     sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
   { id: 'status',  label: 'Status',  sortKey: 'status',  type: 'text' },
   { id: 'company', label: 'Company', sortKey: 'company', type: 'text' },
   { id: 'role',    label: 'Role',    sortKey: 'title',   type: 'text' },
   { id: 'sector',  label: 'Sector',  sortKey: 'sector',  type: 'text' },
-  { id: 'view',    label: '',        sortKey: null },
+  { id: 'menu',    label: '',        sortKey: null },
 ];
 
 // Drop rows without an apply link, and any Strava postings (out of scope).
@@ -100,13 +101,9 @@ export class JobPipeline extends LitElement {
   async _maybeLoad() {
     if (document.body.dataset.authState !== 'in') return;
     if (this.state === 'loading' || this.state === 'loaded') return;
-    await this._load(false);
-  }
-
-  async _load(sync) {
     this.state = 'loading';
     try {
-      const data = await fetchPipeline({ sync });
+      const data = await fetchPipeline();
       this.roles = (data.roles || []).slice();
       this.state = 'loaded';
     } catch (e) {
@@ -114,8 +111,6 @@ export class JobPipeline extends LitElement {
       this.state = 'error';
     }
   }
-
-  async _onSync() { await this._load(true); }
 
   _onSortClick(col) {
     if (!col.sortKey) return;
@@ -223,30 +218,24 @@ export class JobPipeline extends LitElement {
   }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
-  _renderViewCell(r) {
+  _renderMenuCell(r) {
     const archived = isArchived(r);
     const menuOpen = this.openMenuSlug === r.slug;
     return html`
-      <div class="row-actions">
-        <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener"
-           @click=${() => stashRolePrefill(r)}>
-          View
-        </a>
-        <div class="row-menu">
-          <button class="row-menu__trigger" aria-label="Row actions"
-                  aria-expanded=${menuOpen ? 'true' : 'false'}
-                  @click=${(e) => this._toggleMenu(r.slug, e)}>⋮</button>
-          ${menuOpen ? html`
-            <div class="row-menu__panel" role="menu">
-              <button role="menuitem" class="row-menu__item" @click=${() => this._onArchive(r, !archived)}>
-                ${archived ? 'Unarchive' : 'Archive'}
-              </button>
-              <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
-                Delete…
-              </button>
-            </div>
-          ` : nothing}
-        </div>
+      <div class="row-menu">
+        <button class="row-menu__trigger" aria-label="Row actions"
+                aria-expanded=${menuOpen ? 'true' : 'false'}
+                @click=${(e) => this._toggleMenu(r.slug, e)}>⋮</button>
+        ${menuOpen ? html`
+          <div class="row-menu__panel" role="menu">
+            <button role="menuitem" class="row-menu__item" @click=${() => this._onArchive(r, !archived)}>
+              ${archived ? 'Unarchive' : 'Archive'}
+            </button>
+            <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
+              Delete…
+            </button>
+          </div>
+        ` : nothing}
       </div>
     `;
   }
@@ -301,7 +290,7 @@ export class JobPipeline extends LitElement {
         <td><strong>${r.company}</strong></td>
         <td>${r.title}</td>
         <td>${this._renderSectorCell(r)}</td>
-        <td>${this._renderViewCell(r)}</td>
+        <td>${this._renderMenuCell(r)}</td>
       </tr>
     `;
   }
@@ -421,9 +410,6 @@ export class JobPipeline extends LitElement {
             <option value="archived" ?selected=${this.archivedView==='archived'}>Archived only</option>
           </select>
         </label>
-        <button class="btn btn--sm" @click=${() => this._onSync()}>
-          Sync from sheet
-        </button>
       </div>
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
