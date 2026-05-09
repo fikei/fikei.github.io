@@ -30,6 +30,9 @@ async function listRoles() {
       r.hard_fails as "hardFails", r.applied_at, r.status_changed_at,
       r.first_seen, r.last_seen,
       r.archived_at as "archivedAt",
+      r.closed_detected_at as "closedDetectedAt",
+      r.is_live as "isLive",
+      r.liveness_checked_at as "livenessCheckedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
       coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter",
       coalesce((

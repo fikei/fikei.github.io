@@ -2,7 +2,7 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill } = await import('../pipeline.js' + V);
+const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness } = await import('../pipeline.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -59,6 +59,9 @@ export class JobPipeline extends LitElement {
     selectedRow: { state: true },
     archivedView: { state: true },   // 'active' | 'all' | 'archived'
     openMenuSlug: { state: true },
+    livenessChecking: { state: true },
+    closedSinceLastVisit: { state: true },
+    bannerDismissed: { state: true },
   };
 
   constructor() {
@@ -71,6 +74,12 @@ export class JobPipeline extends LitElement {
     this.selectedRow = null;
     this.archivedView = 'active';
     this.openMenuSlug = null;
+    this.livenessChecking = false;
+    this.closedSinceLastVisit = [];
+    this.bannerDismissed = false;
+    this._lastVisitAt = (() => {
+      try { return localStorage.getItem('job:jobs:lastVisitAt') || null; } catch { return null; }
+    })();
   }
 
   connectedCallback() {
@@ -105,10 +114,42 @@ export class JobPipeline extends LitElement {
     try {
       const data = await fetchPipeline();
       this.roles = (data.roles || []).slice();
+      this._computeClosedSinceLastVisit();
+      // Stamp the visit AFTER reading lastVisit so the banner sticks for
+      // this session.
+      try { localStorage.setItem('job:jobs:lastVisitAt', new Date().toISOString()); } catch {}
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
+    }
+  }
+
+  _computeClosedSinceLastVisit() {
+    const cutoff = this._lastVisitAt ? Date.parse(this._lastVisitAt) : 0;
+    this.closedSinceLastVisit = this.roles.filter(r =>
+      r.closedDetectedAt && Date.parse(r.closedDetectedAt) > cutoff
+    );
+  }
+
+  async _onCheckLiveness() {
+    if (this.livenessChecking) return;
+    this.livenessChecking = true;
+    this.requestUpdate();
+    try {
+      const res = await checkLiveness();
+      // Refresh the pipeline so newly-closed rows appear with archive/closed flags.
+      const data = await fetchPipeline();
+      this.roles = (data.roles || []).slice();
+      this._computeClosedSinceLastVisit();
+      if (res.closed?.length) {
+        this.bannerDismissed = false;
+      }
+    } catch (e) {
+      this.error = String(e);
+    } finally {
+      this.livenessChecking = false;
+      this.requestUpdate();
     }
   }
 
@@ -398,6 +439,19 @@ export class JobPipeline extends LitElement {
     const rows = this._sorted();
     const archivedCount = this.roles.filter(r => isVisibleRole(r) && isArchived(r)).length;
     return html`
+      ${!this.bannerDismissed && this.closedSinceLastVisit.length ? html`
+        <div class="closed-banner" role="status">
+          <div>
+            <strong>${this.closedSinceLastVisit.length}
+            ${this.closedSinceLastVisit.length === 1 ? 'role was' : 'roles were'} closed since your last visit.</strong>
+            They've been moved to Closed and archived.
+            <span class="muted">${this.closedSinceLastVisit.slice(0, 4).map(r => r.company).join(', ')}${this.closedSinceLastVisit.length > 4 ? '…' : ''}</span>
+          </div>
+          <button class="row-menu__trigger" aria-label="Dismiss"
+                  @click=${() => { this.bannerDismissed = true; }}>×</button>
+        </div>
+      ` : nothing}
+
       <div class="pipeline-meta">
         <strong>${rows.length}</strong> roles, sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.
         <label class="pipeline-meta__filter">
@@ -410,6 +464,10 @@ export class JobPipeline extends LitElement {
             <option value="archived" ?selected=${this.archivedView==='archived'}>Archived only</option>
           </select>
         </label>
+        <button class="btn btn--sm" ?disabled=${this.livenessChecking}
+                @click=${() => this._onCheckLiveness()}>
+          ${this.livenessChecking ? 'Checking…' : 'Check liveness'}
+        </button>
       </div>
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
