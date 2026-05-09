@@ -169,7 +169,6 @@ const DEFAULT_TARGET_TITLES = [
   'director, product', 'director of product',
 ];
 
-<<<<<<< HEAD
 // Geography filter — read vision.target_geographies; fall back to the
 // usual PM hubs + remote so empty vision still gives sane defaults.
 const DEFAULT_TARGET_GEOGRAPHIES = [
@@ -202,8 +201,6 @@ function geoMatches(loc: string, targets: string[]): boolean {
   return targets.some(t => l.includes(t));
 }
 
-=======
->>>>>>> origin/master
 async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_titleCache && Date.now() - _titleCache.at < TITLE_CACHE_MS) return _titleCache.rows;
   const rows = await sql<{ titles: string[] | null }[]>`
