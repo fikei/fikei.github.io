@@ -1,4 +1,4 @@
-// Bundled schema for migrate-job. Mirrors 047 + 048 + 049 from supabase/migrations.
+// Bundled schema for migrate-job. Mirrors 047–050 from supabase/migrations.
 export const SCHEMA_SQL = String.raw`
 -- /job product schema (Phase 2 migration foundation).
 -- Tables live in their own schema to avoid colliding with Boards.
@@ -215,4 +215,26 @@ alter table job.pipeline_roles
 create index if not exists pipeline_roles_archived_idx
   on job.pipeline_roles (archived_at)
   where archived_at is not null;
+
+-- 050 ----------------------------------------------------------------
+-- Sector tag normalization. Free-text sector strings on pipeline_roles
+-- (e.g. "Healthcare AI", "Mental Health / AI", "Legal AI") get parsed into
+-- atomic tags and joined many-to-many.
+create table if not exists job.sector_tags (
+  slug        text primary key,                    -- 'healthcare', 'ai', 'legal'
+  name        text not null,                       -- canonical display name
+  category    text,                                -- optional grouping ('industry' | 'modality' | …)
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists job.role_sector_tags (
+  role_slug   text references job.pipeline_roles(slug) on delete cascade,
+  tag_slug    text references job.sector_tags(slug) on delete cascade,
+  primary key (role_slug, tag_slug)
+);
+
+create index if not exists role_sector_tags_tag_idx on job.role_sector_tags (tag_slug);
+
+alter table job.sector_tags enable row level security;
+alter table job.role_sector_tags enable row level security;
 `;
