@@ -42,6 +42,18 @@ serve(async (req) => {
         await sql`delete from job.user_sources where id = ${id} and user_email = ${email}`;
         return jsonResp({ ok: true, id, deleted: true });
       }
+      if (body.action === 'reset_bullets') {
+        // One-off admin: wipes match_bullets on every active recommendation
+        // so the next worker tick(s) regenerate with the current prompt.
+        const r = await sql`
+          update job.recommended_roles
+             set match_bullets = null
+           where dismissed_at is null
+             and added_to_pipeline_slug is null
+             and match_bullets is not null
+           returning id`;
+        return jsonResp({ ok: true, cleared: (r as unknown as unknown[]).length });
+      }
       if (id && body.action === 'run') {
         const cronSecret = Deno.env.get('CRON_SECRET') || '';
         const r = await fetch(PULL_URL, {
