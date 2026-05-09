@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = '0.21.0';
-console.log(`[job] v${VERSION} - merged cards + skeleton + drop salary/source cols`);
+const VERSION = '0.22.0';
+console.log(`[job] v${VERSION} - archive: triple-dot menu + view filter + footer`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -33,6 +33,28 @@ function applySignedInState(email) {
   document.body.dataset.authState = 'in';
   // Notify components that may have mounted before the event arrived.
   document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
+  injectFooter();
+}
+
+// Add a single shared footer to every /job page on first signed-in render.
+// Stays out of the route HTML so we don't have to edit five files for copy.
+function injectFooter() {
+  if (document.querySelector('.app__foot')) return;
+  const main = document.querySelector('.app__main');
+  if (!main) return;
+  const foot = document.createElement('footer');
+  foot.className = 'app__foot';
+  foot.innerHTML = `
+    <div class="app__foot__inner">
+      <span class="muted">/job · v${VERSION} · ctrl.rodeo</span>
+      <span class="muted">
+        <a href="/" class="link-subtle">ctrl.rodeo</a>
+        <span aria-hidden="true"> · </span>
+        <a href="https://github.com/fikei/job" target="_blank" rel="noopener" class="link-subtle">fikei/job</a>
+      </span>
+    </div>
+  `;
+  main.appendChild(foot);
 }
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when

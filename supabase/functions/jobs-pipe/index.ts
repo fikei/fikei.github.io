@@ -11,8 +11,8 @@ import { computeFit, RoleRow } from './fit.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.4.0';
-console.log(`[jobs-pipe] v${VERSION} - Postgres cutover + sheet sync`);
+const VERSION = '0.5.0';
+console.log(`[jobs-pipe] v${VERSION} - archive support`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const STATUS_ENUM = new Set([
@@ -136,6 +136,8 @@ async function listRoles() {
       r.contact, r.salary_range as salary, r.salary_low, r.salary_high,
       r.sector, r.investors, r.fit_score as score, r.fit_breakdown as breakdown,
       r.hard_fails as "hardFails", r.applied_at, r.status_changed_at,
+      r.first_seen, r.last_seen,
+      r.archived_at as "archivedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
       coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter"
     from job.pipeline_roles r
@@ -164,10 +166,6 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
-      const status = String(body.status ?? '');
-      if (!STATUS_ENUM.has(status)) {
-        return err(`status must be one of: ${Array.from(STATUS_ENUM).filter(Boolean).join(', ')}`, 400);
-      }
       let slug = body.slug ? String(body.slug) : '';
       let rowNumber = Number(body.rowNumber);
       const sql = db();
@@ -181,7 +179,22 @@ serve(async (req) => {
       }
       if (!slug) return err('role not found (provide slug or rowNumber)', 404);
 
-      // Update Postgres first.
+      // Archive / unarchive — independent from status changes.
+      if ('archived' in body) {
+        const archived = !!body.archived;
+        await sql`
+          update job.pipeline_roles
+          set archived_at = ${archived ? sql`now()` : null}
+          where slug = ${slug};
+        `;
+        return jsonResp({ ok: true, slug, archived });
+      }
+
+      // Status writeback.
+      const status = String(body.status ?? '');
+      if (!STATUS_ENUM.has(status)) {
+        return err(`status must be one of: ${Array.from(STATUS_ENUM).filter(Boolean).join(', ')}`, 400);
+      }
       await sql`
         update job.pipeline_roles
         set status = ${status},
@@ -190,7 +203,6 @@ serve(async (req) => {
             status_history = coalesce(status_history, '[]'::jsonb) || ${sql.json([{ status, at: new Date().toISOString() }])}
         where slug = ${slug};
       `;
-      // Mirror to the sheet so the /jobs skill stays in sync. Best-effort.
       if (Number.isInteger(rowNumber) && rowNumber >= 2) {
         try { await writeSheetCell(SHEET_ID, `Roles!C${rowNumber}`, status); } catch (e) {
           console.warn('[jobs-pipe] sheet writeback failed', e);

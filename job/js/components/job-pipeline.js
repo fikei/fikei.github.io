@@ -2,7 +2,7 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus } = await import('../pipeline.js' + V);
+const { fetchPipeline, setStatus, setArchived } = await import('../pipeline.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -39,6 +39,13 @@ function isVisibleRole(r) {
   return true;
 }
 
+function isArchived(r) { return !!r.archivedAt; }
+function archiveFilter(r, view) {
+  if (view === 'archived') return isArchived(r);
+  if (view === 'all')      return true;
+  return !isArchived(r); // 'active' default
+}
+
 export class JobPipeline extends LitElement {
   createRenderRoot() { return this; }
 
@@ -49,6 +56,8 @@ export class JobPipeline extends LitElement {
     sortKey: { state: true },
     sortDir: { state: true },
     selectedRow: { state: true },
+    archivedView: { state: true },   // 'active' | 'all' | 'archived'
+    openMenuSlug: { state: true },
   };
 
   constructor() {
@@ -59,6 +68,8 @@ export class JobPipeline extends LitElement {
     this.sortKey = 'score';
     this.sortDir = 'desc';
     this.selectedRow = null;
+    this.archivedView = 'active';
+    this.openMenuSlug = null;
   }
 
   connectedCallback() {
@@ -67,13 +78,22 @@ export class JobPipeline extends LitElement {
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
     document.addEventListener('job:auth:ready', this._onAuth);
-    this._onKey = (e) => { if (e.key === 'Escape') this._closeFitModal(); };
+    this._onKey = (e) => {
+      if (e.key === 'Escape') { this._closeFitModal(); this.openMenuSlug = null; }
+    };
     document.addEventListener('keydown', this._onKey);
+    this._onDocClick = (e) => {
+      if (!this.openMenuSlug) return;
+      // Close menu when clicking outside any row-menu element.
+      if (!e.target.closest('.row-menu')) this.openMenuSlug = null;
+    };
+    document.addEventListener('click', this._onDocClick);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('keydown', this._onKey);
+    document.removeEventListener('click', this._onDocClick);
     super.disconnectedCallback();
   }
 
@@ -116,7 +136,7 @@ export class JobPipeline extends LitElement {
   _sorted() {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
-    const arr = this.roles.filter(isVisibleRole);
+    const arr = this.roles.filter(r => isVisibleRole(r) && archiveFilter(r, this.archivedView));
     arr.sort((a, b) => {
       const av = a[key];
       const bv = b[key];
@@ -161,13 +181,48 @@ export class JobPipeline extends LitElement {
   }
 
   _detailHref(r) { return `/job/jobs/${r.slug}/`; }
+
+  _toggleMenu(slug, e) {
+    e.stopPropagation();
+    this.openMenuSlug = this.openMenuSlug === slug ? null : slug;
+  }
+
+  async _onArchive(r, archived) {
+    this.openMenuSlug = null;
+    const prev = r.archivedAt;
+    r.archivedAt = archived ? new Date().toISOString() : null;
+    this.requestUpdate();
+    try {
+      await setArchived(r.slug, archived);
+    } catch (e) {
+      r.archivedAt = prev;
+      r._error = String(e);
+      this.requestUpdate();
+    }
+  }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
   _renderViewCell(r) {
+    const archived = isArchived(r);
+    const menuOpen = this.openMenuSlug === r.slug;
     return html`
-      <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener">
-        View
-      </a>
+      <div class="row-actions">
+        <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener">
+          View
+        </a>
+        <div class="row-menu">
+          <button class="row-menu__trigger" aria-label="Row actions"
+                  aria-expanded=${menuOpen ? 'true' : 'false'}
+                  @click=${(e) => this._toggleMenu(r.slug, e)}>⋮</button>
+          ${menuOpen ? html`
+            <div class="row-menu__panel" role="menu">
+              <button role="menuitem" class="row-menu__item" @click=${() => this._onArchive(r, !archived)}>
+                ${archived ? 'Unarchive' : 'Archive'}
+              </button>
+            </div>
+          ` : nothing}
+        </div>
+      </div>
     `;
   }
 
@@ -193,7 +248,7 @@ export class JobPipeline extends LitElement {
 
   _renderRow(r) {
     return html`
-      <tr>
+      <tr class=${isArchived(r) ? 'is-archived' : ''}>
         <td>
           <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
             title="Tap to see the breakdown" @click=${() => this._openFitModal(r)}>
@@ -306,10 +361,21 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._sorted();
+    const archivedCount = this.roles.filter(r => isVisibleRole(r) && isArchived(r)).length;
     return html`
       <div class="pipeline-meta">
         <strong>${rows.length}</strong> roles, sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.
-        <button class="btn btn--sm" style="margin-left:var(--space-3);" @click=${() => this._onSync()}>
+        <label class="pipeline-meta__filter">
+          <span class="muted">View:</span>
+          <select class="status-select" style="min-width:120px;"
+                  .value=${this.archivedView}
+                  @change=${(e) => { this.archivedView = e.target.value; }}>
+            <option value="active"   ?selected=${this.archivedView==='active'}>Active</option>
+            <option value="all"      ?selected=${this.archivedView==='all'}>All (incl. archived)</option>
+            <option value="archived" ?selected=${this.archivedView==='archived'}>Archived only</option>
+          </select>
+        </label>
+        <button class="btn btn--sm" @click=${() => this._onSync()}>
           Sync from sheet
         </button>
       </div>
@@ -319,6 +385,19 @@ export class JobPipeline extends LitElement {
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>
       </div>
+
+      <div class="pipeline-foot">
+        ${archivedCount > 0 ? html`
+          <button class="btn btn--sm" @click=${() => {
+            this.archivedView = this.archivedView === 'active' ? 'all' : 'active';
+          }}>
+            ${this.archivedView === 'active'
+              ? `Show archived (${archivedCount})`
+              : 'Hide archived'}
+          </button>
+        ` : html`<span class="muted">No archived roles yet.</span>`}
+      </div>
+
       ${this._renderFitModal()}
     `;
   }
