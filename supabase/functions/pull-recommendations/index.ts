@@ -86,7 +86,19 @@ serve(async (req) => {
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
+<<<<<<< HEAD
+      // Drop anything whose title doesn't match the user's target titles
+      // BEFORE scoring, so we don't bullet-generate for irrelevant roles
+      // and don't store them at all.
+      const targetTitles = await loadTargetTitles(sql);
+      const onTarget = targetTitles.length
+        ? pulled.filter(r => titleMatches(r.title || '', targetTitles))
+        : pulled;
+      const droppedOffTarget = pulled.length - onTarget.length;
+      const { kept, dropped } = scoreAndFilter(onTarget, src.min_score);
+=======
       const { kept, dropped } = scoreAndFilter(pulled, src.min_score);
+>>>>>>> origin/master
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -120,8 +132,13 @@ serve(async (req) => {
         const ctx = await loadUserContext(sql);
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
+<<<<<<< HEAD
+      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget, error: null });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
+=======
       await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline, error: null });
       summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
+>>>>>>> origin/master
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
@@ -133,6 +150,51 @@ serve(async (req) => {
     headers: { 'content-type': 'application/json' },
   });
 });
+
+// ---------- Target-title filter ----------
+// Reads the user's vision.target_titles array (e.g. ['Founding PM',
+// 'Senior PM', 'Product Lead', 'Head of Product']) and keeps only
+// postings whose title contains one of those phrases (or a close
+// synonym). When vision is empty, this is a no-op — computeFit's
+// title hard-fails are the only floor.
+
+let _titleCache: { rows: string[]; at: number } | null = null;
+const TITLE_CACHE_MS = 60_000;
+
+async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
+  if (_titleCache && Date.now() - _titleCache.at < TITLE_CACHE_MS) return _titleCache.rows;
+  const rows = await sql<{ titles: string[] | null }[]>`
+    select target_titles as titles from job.vision order by updated_at desc limit 1
+  `;
+  const titles = ((rows[0]?.titles as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  _titleCache = { rows: titles, at: Date.now() };
+  return titles;
+}
+
+// Tokenize each target title into the meaningful keywords that need to
+// appear in the posting title. e.g. 'Founding PM' → ['founding', 'pm'].
+// A posting matches when one full target's keywords are all present.
+function titleMatches(postingTitle: string, targets: string[]): boolean {
+  const t = postingTitle.toLowerCase();
+  // Synonym expansion: pm ⇄ product manager, head of product ⇄ head, product
+  const synonymized = (target: string): string[] => {
+    const norm = target
+      .replace(/\bproduct manager\b/g, 'pm')
+      .replace(/\bsenior\b/g, 'sr')
+      .trim();
+    return norm.split(/[\s,]+/).filter(Boolean);
+  };
+  for (const target of targets) {
+    const keywords = synonymized(target);
+    if (!keywords.length) continue;
+    // The posting title (also synonymized) must contain every keyword.
+    const haystack = t
+      .replace(/\bproduct manager\b/g, 'pm')
+      .replace(/\bsenior\b/g, 'sr');
+    if (keywords.every(k => haystack.includes(k))) return true;
+  }
+  return false;
+}
 
 // ---------- Scoring + filtering ----------
 
