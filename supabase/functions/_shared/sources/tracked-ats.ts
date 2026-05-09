@@ -83,15 +83,66 @@ const ADAPTERS: Record<string, (c: TrackedCompany) => Promise<RecommendedRoleInp
   ashby:      pullAshby,
 };
 
+// Best-effort derivation from a posting URL — used as a fallback when
+// tracked_companies is empty / un-backfilled. Returns null if the URL
+// isn't a recognized ATS posting.
+function deriveFromUrl(url: string): { ats: string; atsSlug: string } | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    const seg = u.pathname.split('/').filter(Boolean);
+    if (/(?:^|\.)(boards|job-boards)\.greenhouse\.io$/i.test(host) && seg[0]) {
+      return { ats: 'Greenhouse', atsSlug: seg[0] };
+    }
+    if (/(?:^|\.)jobs\.lever\.co$/i.test(host) && seg[0]) {
+      return { ats: 'Lever', atsSlug: seg[0] };
+    }
+    if (/(?:^|\.)jobs\.ashbyhq\.com$/i.test(host) && seg[0]) {
+      return { ats: 'Ashby', atsSlug: seg[0] };
+    }
+    return null;
+  } catch { return null; }
+}
+
 export const trackedAtsSource: Source = {
   type: 'tracked-ats',
   async pull(_cfg, ctx) {
     const sql = db();
-    const companies = await sql<TrackedCompany[]>`
+
+    // 1) Companies you've explicitly tracked.
+    const tracked = await sql<TrackedCompany[]>`
       select slug, name, ats, ats_slug, sector
       from job.tracked_companies
       where ats is not null and ats_slug is not null
     `;
+
+    // 2) Fallback: scan existing pipeline rows for ATS URLs and derive
+    //    company-board pairs we haven't seen yet. Means you don't have
+    //    to backfill anything for the source to start working — the
+    //    moment you add a Greenhouse/Lever/Ashby URL to the pipeline,
+    //    we'll start pulling that company's whole board.
+    const pipelineRows = await sql<{ company_name: string; url: string; sector: string | null }[]>`
+      select company_name, url, sector
+      from job.pipeline_roles
+      where url is not null
+        and url ~* '(greenhouse|lever|ashbyhq)'
+    `;
+    const seen = new Set(tracked.map(c => `${(c.ats || '').toLowerCase()}:${(c.ats_slug || '').toLowerCase()}`));
+    const companies: TrackedCompany[] = [...tracked];
+    for (const r of pipelineRows) {
+      const d = deriveFromUrl(r.url);
+      if (!d) continue;
+      const key = `${d.ats.toLowerCase()}:${d.atsSlug.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      companies.push({
+        slug:     d.atsSlug.toLowerCase(),
+        name:     r.company_name,
+        ats:      d.ats,
+        ats_slug: d.atsSlug,
+        sector:   r.sector,
+      });
+    }
     const out: RecommendedRoleInput[] = [];
     for (const c of companies) {
       const adapter = ADAPTERS[(c.ats || '').toLowerCase()];
