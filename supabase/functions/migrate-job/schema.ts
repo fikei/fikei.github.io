@@ -282,9 +282,39 @@ create table if not exists job.recommended_roles (
   unique (source, source_id)
 );
 
+alter table job.recommended_roles
+  add column if not exists fit_score      int,
+  add column if not exists fit_breakdown  jsonb,
+  add column if not exists hard_fails     text[] default '{}',
+  add column if not exists sector         text,
+  add column if not exists investors      text[] default '{}',
+  add column if not exists user_email     text,
+  add column if not exists user_source_id uuid;
+
 create index if not exists recommended_roles_active_idx
   on job.recommended_roles (suggested_at desc)
-  where dismissed_at is null and added_to_pipeline_slug is null;
+  where dismissed_at is null
+    and added_to_pipeline_slug is null
+    and (fit_score is null or fit_score >= 50);
 
 alter table job.recommended_roles enable row level security;
+
+-- User-configured recommendation sources (see migration 054).
+create table if not exists job.user_sources (
+  id              uuid primary key default gen_random_uuid(),
+  user_email      text not null,
+  type            text not null,
+  label           text,
+  config          jsonb not null default '{}'::jsonb,
+  enabled         boolean not null default true,
+  schedule_cron   text not null default '0 */6 * * *',
+  min_score       int not null default 50,
+  last_run_at     timestamptz,
+  last_run_count  int,
+  last_dropped    int,
+  last_error      text,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+alter table job.user_sources enable row level security;
 `;
