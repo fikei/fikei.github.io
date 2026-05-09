@@ -77,7 +77,12 @@ async function fetchOneFeed(feed: FeedConfig): Promise<RecommendedRoleInput[]> {
   });
   if (!res.ok) throw new Error(`linkedin-rss ${res.status} for ${feed.url.slice(0, 80)}`);
   const xml = await res.text();
+  console.log(`[linkedin-rss] ${feed.label || feed.url.slice(0, 60)}: ${xml.length} bytes, ct=${res.headers.get('content-type')}`);
   const items = xml.split(/<item[\s>]/i).slice(1).map(chunk => '<item ' + chunk.split(/<\/item>/i)[0] + '</item>');
+  if (!items.length) {
+    // Surface what we actually got for debugging — first 200 chars.
+    throw new Error(`no <item> in feed; first chars: ${xml.replace(/\s+/g, ' ').slice(0, 200)}`);
+  }
   return items.map(itemXml => {
     const titleRaw = tag(itemXml, 'title');
     const link     = tag(itemXml, 'link');
@@ -112,14 +117,18 @@ export const linkedinRssSource: Source<LinkedInRssConfig> = {
       : (cfg.feedUrl ? [{ url: cfg.feedUrl }] : []);
     if (!feeds.length) throw new Error('linkedin-rss: config.feeds (or feedUrl) is required');
     const out: RecommendedRoleInput[] = [];
+    const errs: string[] = [];
     for (const f of feeds) {
       try {
         const rows = await fetchOneFeed(f);
         out.push(...rows);
       } catch (e) {
-        // Don't kill the whole source for one bad feed.
-        console.warn(`[linkedin-rss] ${f.url}: ${(e as Error).message}`);
+        errs.push(`${f.label || f.url.slice(0, 40)}: ${(e as Error).message.slice(0, 200)}`);
       }
+    }
+    // If every feed failed, throw so the user_sources row sees last_error.
+    if (!out.length && errs.length === feeds.length) {
+      throw new Error(errs.join(' | ').slice(0, 500));
     }
     return out;
   },
