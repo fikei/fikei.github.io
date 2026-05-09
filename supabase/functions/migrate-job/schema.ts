@@ -346,13 +346,10 @@ update job.tracked_companies tc
              when pr.url ~* 'ashbyhq\.com'   then 'Ashby'
            end as ats,
            case
-<<<<<<< HEAD
              when pr.url ~* '(boards|job-boards)\.greenhouse\.io/([^/?#]+)'
                then (regexp_match(pr.url, '(?:boards|job-boards)\.greenhouse\.io/([^/?#]+)'))[1]
-=======
              when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
                then (regexp_match(pr.url, 'boards\.greenhouse\.io/([^/?#]+)'))[1]
->>>>>>> origin/master
              when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
                then (regexp_match(pr.url, 'jobs\.lever\.co/([^/?#]+)'))[1]
              when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
@@ -361,11 +358,8 @@ update job.tracked_companies tc
            row_number() over (partition by pr.company_slug order by pr.created_at desc) as rn
       from job.pipeline_roles pr
      where pr.company_slug is not null
-<<<<<<< HEAD
        and pr.url ~* '((boards|job-boards)\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)'
-=======
        and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)'
->>>>>>> origin/master
   ) d
  where d.company_slug = tc.slug
    and d.rn = 1
