@@ -700,6 +700,30 @@
 
 .asset-doc { max-width: 720px; }
 
+/* --- Diff highlighting (resume + cover letter "Show changes") --- */
+.asset-doc ins.d-add {
+  background: rgba(76, 175, 80, 0.18);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(76, 175, 80, 0.6);
+  text-underline-offset: 2px;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+.asset-doc del.d-del {
+  background: rgba(244, 67, 54, 0.12);
+  color: rgba(244, 67, 54, 0.85);
+  text-decoration: line-through;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+.asset-doc mark.d-jd {
+  background: rgba(255, 213, 79, 0.35);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
 /* --- Role detail (drill page) --- */
 .role-header {
   display: flex;

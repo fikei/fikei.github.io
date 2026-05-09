@@ -5,12 +5,15 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
   import('../logo.js' + V),
+  import('../diff.js' + V),
 ]);
+
+const BASE_RESUME_SLUG = '__base__';
 
 const TABS = [
   { id: 'details',      label: 'Role details' },
@@ -51,6 +54,8 @@ export class JobRoleDetail extends LitElement {
     activeTab: { state: true },
     role: { state: true },
     assets: { state: true },         // { resume, cover-letter, analysis } each: {content, draft, mode, saving, dirty, error}
+    baseResume: { state: true },     // { content } | null — canonical untargeted resume, source of truth for diff
+    showChanges: { state: true },    // bool — toggle the diff/highlight overlay on resume + cover tabs
   };
 
   constructor() {
@@ -66,6 +71,8 @@ export class JobRoleDetail extends LitElement {
     // analysis + resume + cover.
     this.role = this.slug ? readRolePrefill(this.slug) : null;
     this.assets = { 'resume': null, 'cover-letter': null, 'analysis': null };
+    this.baseResume = null;
+    this.showChanges = true;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -97,15 +104,17 @@ export class JobRoleDetail extends LitElement {
     if (!this.slug) { this.state = 'error'; this.error = 'Missing slug'; return; }
     this.state = 'loading';
     try {
-      // Load the role row + all three asset rows in parallel.
-      const [pipeline, resume, cover, analysis] = await Promise.all([
+      // Load the role row + all three asset rows + the base resume in parallel.
+      const [pipeline, resume, cover, analysis, baseResume] = await Promise.all([
         fetchPipeline(),
         this._loadAsset('resume'),
         this._loadAsset('cover-letter'),
         this._loadAsset('analysis'),
+        this._loadBaseResume(),
       ]);
       this.role = (pipeline.roles || []).find(r => r.slug === this.slug) || null;
       this.assets = { 'resume': resume, 'cover-letter': cover, 'analysis': analysis };
+      this.baseResume = baseResume;
       this.state = 'loaded';
       document.title = this.role
         ? `${this.role.company} — ${this.role.title} — /job`
@@ -126,6 +135,64 @@ export class JobRoleDetail extends LitElement {
     } catch (e) {
       return { kind, content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: String(e) };
     }
+  }
+
+  async _loadBaseResume() {
+    try {
+      const r = await readRoleAsset(BASE_RESUME_SLUG, 'resume');
+      if (!r) return { content: '', missing: true };
+      return { content: r.content_md, missing: false };
+    } catch {
+      return { content: '', missing: true };
+    }
+  }
+
+  // Open a stripped-down print window with just one asset rendered, then
+  // call window.print(). Print CSS strips the diff/highlight markup so the
+  // saved PDF is clean. User picks "Save as PDF" in the print dialog.
+  _downloadAssetPdf(kind) {
+    const a = this.assets[kind];
+    if (!a || !a.content) return;
+    const r = this.role || {};
+    const docTitle = `IanFike_${kind === 'resume' ? 'Resume' : 'CoverLetter'}_${(r.company || 'role').replace(/\s+/g, '_')}`;
+    const html = renderMarkdown(a.content); // clean — no diff markers
+    const w = window.open('', '_blank', 'noopener');
+    if (!w) return;
+    w.document.write(`<!doctype html>
+<html><head><meta charset="utf-8"><title>${docTitle}</title>
+<style>
+  body { font: 12pt/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Arial, sans-serif; color: #111; max-width: 740px; margin: 48px auto; padding: 0 32px; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.08em; margin: 18pt 0 6pt; border-bottom: 1px solid #ddd; padding-bottom: 2pt; }
+  h3 { font-size: 12pt; margin: 12pt 0 2pt; }
+  p, li { font-size: 10.5pt; line-height: 1.5; }
+  ul { padding-left: 18pt; margin: 4pt 0 8pt; }
+  em { color: #555; }
+  a { color: inherit; text-decoration: none; }
+  /* Strip any diff markers that snuck through */
+  ins, mark, del { all: unset; }
+  del { display: none !important; }
+  @page { size: letter; margin: 0.6in; }
+  @media print { body { margin: 0; padding: 0; } }
+</style></head>
+<body>${html}
+<script>
+  window.addEventListener('load', () => { setTimeout(() => window.print(), 50); });
+</script>
+</body></html>`);
+    w.document.close();
+  }
+
+  _toggleChanges() { this.showChanges = !this.showChanges; }
+
+  // For the cover-letter tab, pull source phrases out of the analysis JSON
+  // for "what was tailored from the JD" highlighting.
+  _coverHighlightSources() {
+    const ana = this.assets['analysis'];
+    if (!ana || ana.mode !== 'view') return [];
+    const parsed = this._parseAnalysis(ana.content);
+    if (!parsed) return [];
+    return [parsed.suggestedAngle, parsed.whyFits, parsed.strengths, parsed.gaps].filter(Boolean);
   }
 
   _autoGenerateMissing() {
@@ -472,6 +539,20 @@ export class JobRoleDetail extends LitElement {
         </div>
       `;
     }
+    const canDiff = (kind === 'resume' || kind === 'cover-letter') && a.mode === 'view';
+    const showingChanges = canDiff && this.showChanges;
+
+    let bodyHtml = '';
+    if (a.mode === 'view') {
+      if (kind === 'resume' && showingChanges && this.baseResume?.content) {
+        bodyHtml = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
+      } else if (kind === 'cover-letter' && showingChanges) {
+        bodyHtml = renderMarkdown(highlightPhrases(a.content, this._coverHighlightSources()));
+      } else {
+        bodyHtml = renderMarkdown(a.content);
+      }
+    }
+
     return html`
       ${(kind === 'resume' || kind === 'cover-letter') ? this._renderTailoringCallout(kind) : nothing}
       ${(kind === 'resume' || kind === 'cover-letter') ? this._renderChangeLog(kind) : nothing}
@@ -481,6 +562,19 @@ export class JobRoleDetail extends LitElement {
           <button class="btn btn--sm" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
             ${a.saving ? 'Regenerating…' : 'Regenerate'}
           </button>
+          ${canDiff ? html`
+            <button class="btn btn--sm ${this.showChanges ? 'btn--primary' : ''}" @click=${() => this._toggleChanges()}>
+              ${this.showChanges ? 'Hide changes' : 'Show changes'}
+            </button>
+          ` : nothing}
+          <button class="btn btn--sm btn--accent" @click=${() => this._downloadAssetPdf(kind)}>
+            Download clean PDF
+          </button>
+          ${kind === 'resume' && this.baseResume?.missing ? html`
+            <span class="muted" style="font-size: var(--font-size-small);">
+              No base resume yet — generate one in <a href="/job/history/?tab=base">Career → Base resume</a>.
+            </span>
+          ` : nothing}
         ` : html`
           <button class="btn btn--sm btn--primary" ?disabled=${!a.dirty || a.saving} @click=${() => this._saveEdit(kind)}>
             ${a.saving ? 'Saving…' : 'Save'}
@@ -491,7 +585,7 @@ export class JobRoleDetail extends LitElement {
       </div>
       ${a.mode === 'edit'
         ? html`<textarea class="asset-editor" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)}></textarea>`
-        : html`<article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(a.content))}</article>`}
+        : html`<article class="kb-doc asset-doc">${unsafeHTML(bodyHtml)}</article>`}
     `;
   }
 

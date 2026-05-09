@@ -10,8 +10,10 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.2.0';
-console.log(`[gen-asset] v${VERSION} - Postgres cutover`);
+const VERSION = '0.3.0';
+console.log(`[gen-asset] v${VERSION} - base-resume kind for diff baseline`);
+
+const BASE_RESUME_SLUG = '__base__';
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -99,13 +101,34 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
+      : kindIn === 'base-resume' ? 'base-resume'
       : null;
+    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", or "base-resume"', 400);
+
+    // base-resume is global — no role required, persisted in job.global_assets.
+    if (kind === 'base-resume') {
+      const kb = await loadKb();
+      const system = buildSystemPrompt(kind);
+      const user = buildUserMessage(kind, kb, null);
+      const content = await callClaude(system, user);
+      const sql = db();
+      await sql`
+        insert into job.global_assets (kind, content_md, generated_by, generated_at)
+        values ('base-resume', ${content}, ${ANTHROPIC_MODEL}, now())
+        on conflict (kind) do update set
+          content_md = excluded.content_md,
+          generated_by = excluded.generated_by,
+          generated_at = excluded.generated_at,
+          updated_at = now();
+      `;
+      return jsonResp({ ok: true, slug: BASE_RESUME_SLUG, kind, content });
+    }
+
     if (!slugIn && !rowIn) return err('slug or rowNumber required', 400);
-    if (!kind) return err('kind must be "resume", "cover-letter", or "analysis"', 400);
 
     const role = await loadRole(slugIn, rowIn);
     if (!role) return err('role not found', 404);

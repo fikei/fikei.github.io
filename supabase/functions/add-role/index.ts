@@ -8,9 +8,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
+import { computeFit } from '../jobs-pipe/fit.ts';
 
-const VERSION = '0.1.3';
-console.log(`[add-role] v${VERSION} - og:title + ATS host parsing for Workday/Greenhouse/Lever/Ashby`);
+const VERSION = '0.1.5';
+console.log(`[add-role] v${VERSION} - tighten sector regex (no false-positive EdTech on "learning")`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -40,9 +41,10 @@ function decodeEntities(s: string): string {
     .trim();
 }
 
-// Returns { title, siteName } where title is og:title (preferred — Workday and
-// most JS-rendered ATS pages leave <title> empty) or the <title> element text.
-async function fetchPageMeta(url: string): Promise<{ title: string | null; siteName: string | null }> {
+// Returns title (og:title preferred), siteName, and a plain-text body
+// distilled from og:description / meta-description / inner text. Used to
+// detect salary range + sector hints without needing a real DOM parser.
+async function fetchPageMeta(url: string): Promise<{ title: string | null; siteName: string | null; body: string }> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
@@ -52,7 +54,7 @@ async function fetchPageMeta(url: string): Promise<{ title: string | null; siteN
       signal: ctrl.signal,
     });
     clearTimeout(t);
-    if (!res.ok) return { title: null, siteName: null };
+    if (!res.ok) return { title: null, siteName: null, body: '' };
     const html = await res.text();
 
     let title: string | null = null;
@@ -65,8 +67,76 @@ async function fetchPageMeta(url: string): Promise<{ title: string | null; siteN
 
     const siteMatch = html.match(OG_SITE_RE);
     const siteName = siteMatch ? (decodeEntities(siteMatch[1]) || null) : null;
-    return { title, siteName };
-  } catch { return { title: null, siteName: null }; }
+
+    // Body text: prefer og:description (Workday, Greenhouse, Ashby all set
+    // this with the full JD). Fall back to meta description, then a crude
+    // tag strip.
+    let body = '';
+    const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
+    if (ogDesc) body = decodeEntities(ogDesc[1]);
+    if (!body) {
+      const md = html.match(/<meta[^>]+name=["']description["'][^>]*content=["']([^"']+)["']/i);
+      if (md) body = decodeEntities(md[1]);
+    }
+    if (!body) {
+      body = decodeEntities(html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' '));
+    }
+
+    return { title, siteName, body: body.slice(0, 12000) };
+  } catch { return { title: null, siteName: null, body: '' }; }
+}
+
+// Pull a salary range out of free-text JD body. Looks for "$NNN,NNN - $NNN,NNN"
+// or "$NNNk - $NNNk" patterns. Returns { low, high, range } in dollars.
+function parseSalary(text: string): { low: number | null; high: number | null; range: string | null } {
+  if (!text) return { low: null, high: null, range: null };
+  const norm = text.replace(/–|—/g, '-').replace(/\s+/g, ' ');
+  // $NNN,NNN(.NN)? - $NNN,NNN(.NN)?  | $NNNk - $NNNk
+  const re = /\$\s*([\d,]+(?:\.\d+)?)\s*(k)?\s*[-–—to]+\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(k)?/i;
+  const m = norm.match(re);
+  if (m) {
+    const a = parseFloat(m[1].replace(/,/g, '')) * (m[2] ? 1000 : 1);
+    const b = parseFloat(m[3].replace(/,/g, '')) * (m[4] ? 1000 : 1);
+    if (a > 1000 && b > 1000 && b >= a) {
+      const range = `$${Math.round(a / 1000)}k–$${Math.round(b / 1000)}k`;
+      return { low: Math.round(a), high: Math.round(b), range };
+    }
+  }
+  // single $NNN,NNN+ figure (e.g. "starting at $200,000")
+  const single = norm.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(k)?(?!\d)/);
+  if (single) {
+    const v = parseFloat(single[1].replace(/,/g, '')) * (single[2] ? 1000 : 1);
+    if (v > 50000 && v < 1_000_000) {
+      return { low: Math.round(v), high: Math.round(v), range: `$${Math.round(v / 1000)}k` };
+    }
+  }
+  return { low: null, high: null, range: null };
+}
+
+// Crude sector tagger from JD text. Matches the same vocabulary the fit
+// scorer / sector-tags module recognizes, so the score reflects the tag.
+function inferSector(text: string, company: string): string {
+  const haystack = (text + ' ' + company).toLowerCase();
+  const tags: string[] = [];
+  const map: Array<[RegExp, string]> = [
+    [/\b(health(?:care)?|medical|clinical|telehealth|payer|provider|medicaid|medicare|patient)\b/, 'Healthcare'],
+    [/\b(edtech|k-?12|university|undergrad|curriculum|tutor)\b/, 'EdTech'],
+    [/\blegal\s*(ai|tech)\b/, 'Legal AI'],
+    [/(\bai\b|\bml\b|\bllm\b|generative\s+ai|large\s+language\s+model)/, 'AI'],
+    [/\b(fintech|banking|consumer\s+lending|payments?\s+platform|insurtech)\b/, 'Fintech'],
+    [/saas/, 'SaaS'],
+    [/marketplace/, 'Marketplace'],
+    [/consumer|retail|e-?commerce/, 'Consumer'],
+    [/hardware|robotics/, 'Hardware'],
+    [/productivity|workflow|automation/, 'Productivity'],
+    [/security|cyber/, 'Security'],
+  ];
+  for (const [re, name] of map) {
+    if (re.test(haystack)) tags.push(name);
+  }
+  // Dedupe; keep the first 3 tags as the sector blob.
+  return Array.from(new Set(tags)).slice(0, 3).join(' / ');
 }
 
 // "cityblockhealth.wd1.myworkdayjobs.com" → "Cityblock Health".
@@ -156,20 +226,22 @@ serve(async (req) => {
     let title = String(body.title || '').trim();
     let company = String(body.company || '').trim();
 
-    if (!title || !company) {
-      const meta = await fetchPageMeta(url);
+    // Always pull the page so we have the JD body for salary + sector
+    // detection, even if title/company were passed in by the caller.
+    const meta = await fetchPageMeta(url);
+    if (!title) {
       const guess = splitTitleCompany(meta.title);
-      if (!title && guess.title) title = guess.title;
-      if (!company && guess.company) company = guess.company;
+      if (guess.title) title = guess.title;
+    }
+    if (!company) {
+      const guess = splitTitleCompany(meta.title);
+      if (guess.company) company = guess.company;
       if (!company && meta.siteName) company = meta.siteName;
     }
-    // ATS host-based fallback (Workday subdomains, Greenhouse/Lever/Ashby
-    // path slugs). Beats a no-op "(unknown company)" placeholder.
     if (!company) {
       const fromHost = companyFromHost(url);
       if (fromHost) company = fromHost;
     }
-    // URL-path fallback for the role title (Workday: /job/<Title>_R-1466).
     if (!title) {
       const fromPath = titleFromUrl(url);
       if (fromPath) title = fromPath;
@@ -238,8 +310,10 @@ serve(async (req) => {
       `;
     }
 
-    // Tag the row using whatever sector blob the user / recommendation passed.
-    const sector = String(body.sector || '').trim();
+    // --- Sector tagging ---
+    // Caller-supplied (rec carry-over) wins, otherwise infer from JD body.
+    const sectorIn = String(body.sector || '').trim();
+    const sector = sectorIn || inferSector(meta.body, company);
     if (sector) {
       await sql`update job.pipeline_roles set sector = ${sector} where slug = ${slug}`;
       const tags = parseSectorTags(sector);
@@ -249,6 +323,76 @@ serve(async (req) => {
         await sql`insert into job.role_sector_tags (role_slug, tag_slug) values (${slug}, ${t.slug}) on conflict do nothing`;
       }
     }
+
+    // --- Salary parsing from JD body ---
+    const sal = parseSalary(meta.body);
+    if (sal.range) {
+      await sql`
+        update job.pipeline_roles
+        set salary_range = ${sal.range},
+            salary_low = ${sal.low},
+            salary_high = ${sal.high}
+        where slug = ${slug};
+      `;
+    }
+
+    // --- Liveness stamps so the row reads as "seen today" in the UI. ---
+    await sql`
+      update job.pipeline_roles
+      set first_seen = coalesce(first_seen, current_date),
+          last_seen = current_date
+      where slug = ${slug};
+    `;
+
+    // --- Tracked-company enrichment so the logo + future crawls work. ---
+    if (companySlug) {
+      try {
+        const u = new URL(url);
+        const host = u.hostname.toLowerCase();
+        const isAts = /(wd\d+\.myworkdayjobs|greenhouse\.io|lever\.co|ashbyhq\.com|smartrecruiters\.com|linkedin\.com|workable\.com)/.test(host);
+        await sql`
+          update job.tracked_companies
+          set
+            careers_url = coalesce(careers_url, ${url}),
+            ats = coalesce(ats, ${
+              /myworkdayjobs/.test(host) ? 'Workday'
+              : /greenhouse/.test(host) ? 'Greenhouse'
+              : /lever/.test(host) ? 'Lever'
+              : /ashbyhq/.test(host) ? 'Ashby'
+              : /smartrecruiters/.test(host) ? 'SmartRecruiters'
+              : null
+            }),
+            website_url = coalesce(website_url, ${ isAts ? null : `https://${host}` })
+          where slug = ${companySlug};
+        `;
+      } catch { /* best effort */ }
+    }
+
+    // --- Compute fit score so the row paints with a real pill. ---
+    try {
+      const fit = computeFit({
+        status: 'New',
+        rank: '',
+        company,
+        title,
+        url,
+        source: finalSource,
+        contact: '',
+        salary: sal.range || '',
+        sector: sector || '',
+        investors: '',
+        website: '',
+        crunchbase: '',
+      });
+      const breakdownJson = JSON.stringify(fit.breakdown);
+      await sql`
+        update job.pipeline_roles
+        set fit_score = ${fit.score},
+            fit_breakdown = ${breakdownJson}::jsonb,
+            hard_fails = ${fit.hardFails}
+        where slug = ${slug};
+      `;
+    } catch (e) { console.warn('[add-role] fit calc failed', e); }
 
     // Wire the recommendation → pipeline link, if any.
     if (body.fromRecommendationId) {
@@ -261,7 +405,16 @@ serve(async (req) => {
       } catch (e) { console.warn('[add-role] rec link failed', e); }
     }
 
-    return jsonResp({ ok: true, slug, title, company, source: finalSource, sourceLabel });
+    return jsonResp({
+      ok: true,
+      slug,
+      title,
+      company,
+      source: finalSource,
+      sourceLabel,
+      sector,
+      salaryRange: sal.range,
+    });
   } catch (e) {
     console.error('[add-role] error', e);
     return err((e as Error).message || 'server error', 500);
