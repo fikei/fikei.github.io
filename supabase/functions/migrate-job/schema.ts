@@ -321,32 +321,32 @@ alter table job.user_sources enable row level security;
 -- Backfill ats / ats_slug on tracked_companies from any pipeline_roles
 -- URL we already have. Idempotent: only updates rows where the field
 -- is still null. Safe to re-run on every schema apply.
-with derived as (
-  select distinct on (pr.company_slug)
-    pr.company_slug,
-    case
-      when pr.url ~* 'boards\.greenhouse\.io/[^/]+'                  then 'Greenhouse'
-      when pr.url ~* 'jobs\.lever\.co/[^/]+'                         then 'Lever'
-      when pr.url ~* 'jobs\.ashbyhq\.com/[^/]+'                      then 'Ashby'
-    end as ats,
-    case
-      when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
-        then substring(pr.url from 'boards\.greenhouse\.io/([^/?#]+)')
-      when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
-        then substring(pr.url from 'jobs\.lever\.co/([^/?#]+)')
-      when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
-        then substring(pr.url from 'jobs\.ashbyhq\.com/([^/?#]+)')
-    end as ats_slug
-  from job.pipeline_roles pr
-  where pr.company_slug is not null
-    and pr.url is not null
-    and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)/'
-)
 update job.tracked_companies tc
    set ats      = coalesce(tc.ats, d.ats),
        ats_slug = coalesce(tc.ats_slug, d.ats_slug),
        updated_at = now()
-  from derived d
+  from (
+    select pr.company_slug,
+           (regexp_match(pr.url, '(greenhouse\.io|lever\.co|ashbyhq\.com)'))[1] as host_marker,
+           case
+             when pr.url ~* 'greenhouse\.io' then 'Greenhouse'
+             when pr.url ~* 'lever\.co'      then 'Lever'
+             when pr.url ~* 'ashbyhq\.com'   then 'Ashby'
+           end as ats,
+           case
+             when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
+               then (regexp_match(pr.url, 'boards\.greenhouse\.io/([^/?#]+)'))[1]
+             when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
+               then (regexp_match(pr.url, 'jobs\.lever\.co/([^/?#]+)'))[1]
+             when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
+               then (regexp_match(pr.url, 'jobs\.ashbyhq\.com/([^/?#]+)'))[1]
+           end as ats_slug,
+           row_number() over (partition by pr.company_slug order by pr.created_at desc) as rn
+      from job.pipeline_roles pr
+     where pr.company_slug is not null
+       and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)'
+  ) d
  where d.company_slug = tc.slug
+   and d.rn = 1
    and (tc.ats is null or tc.ats_slug is null);
 `;

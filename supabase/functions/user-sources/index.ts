@@ -47,7 +47,8 @@ serve(async (req) => {
         const r = await fetch(PULL_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': cronSecret },
-          body: '{}',
+          // Pass the id so the worker bypasses the schedule for this one source.
+          body: JSON.stringify({ id }),
         });
         const text = await r.text();
         return jsonResp({ ok: r.ok, id, runStatus: r.status, runBody: safeJson(text) });

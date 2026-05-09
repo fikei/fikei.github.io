@@ -52,16 +52,31 @@ serve(async (req) => {
     return new Response('forbidden', { status: 403 });
   }
 
+  // Optional force-run: POST { id: '<user_source_id>' } from user-sources
+  // bypasses both the enabled flag and the schedule, so the user can
+  // trigger a single source from the UI without waiting for cron.
+  let forceId: string | null = null;
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json();
+      if (body && typeof body.id === 'string') forceId = body.id;
+    } catch { /* no body, that's fine */ }
+  }
+
   const sql = db();
-  const sources = await sql<UserSourceRow[]>`
-    select id, user_email, type, config, schedule_cron, min_score, last_run_at
-    from job.user_sources
-    where enabled = true
-  `;
+  const sources = forceId
+    ? await sql<UserSourceRow[]>`
+        select id, user_email, type, config, schedule_cron, min_score, last_run_at
+        from job.user_sources
+        where id = ${forceId}`
+    : await sql<UserSourceRow[]>`
+        select id, user_email, type, config, schedule_cron, min_score, last_run_at
+        from job.user_sources
+        where enabled = true`;
 
   const summary: Array<Record<string, unknown>> = [];
   for (const src of sources) {
-    if (!isDue(src)) { summary.push({ id: src.id, skipped: 'not-due' }); continue; }
+    if (!forceId && !isDue(src)) { summary.push({ id: src.id, skipped: 'not-due' }); continue; }
     const plugin = SOURCES[src.type];
     if (!plugin) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: `unknown source type: ${src.type}` });
