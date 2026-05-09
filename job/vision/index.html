@@ -6,8 +6,8 @@
   <title>Vision — /job</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/job/css/base.css?v=0.38.1">
-  <script src="/job/js/theme.js?v=0.38.1"></script>
+  <link rel="stylesheet" href="/job/css/base.css?v=0.39.0">
+  <script src="/job/js/theme.js?v=0.39.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -29,13 +29,10 @@
         <h1>Vision</h1>
         <p>Goals and intents. The same source the /jobs skill reads for relevance.</p>
       </header>
-      <div class="placeholder">
-        <h2>Vision view ships after History</h2>
-        <p>Reads fikei/job/02-goals-intents/ via kb-read. Edits commit through kb-write.</p>
-      </div>
+      <job-vision></job-vision>
     </main>
   </div>
 
-  <script type="module" src="/job/js/app.js?v=0.38.1"></script>
+  <script type="module" src="/job/js/app.js?v=0.39.0"></script>
 </body>
 </html>
