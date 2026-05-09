@@ -142,16 +142,10 @@ export class JobRecommendations extends LitElement {
           </div>
         </header>
 
-        ${bullets.length ? html`
-          <ul class="rec-card__bullets">
-            ${bullets.slice(0, 4).map(b => html`<li>${unsafeHTML(renderMarkdown(b))}</li>`)}
-          </ul>
-        ` : rec.description ? html`<p class="rec-card__desc">${rec.description}</p>` : nothing}
-
         <footer class="rec-card__foot">
           <button class="btn btn--sm btn--accent" ?disabled=${this.addingId === rec.id}
                   @click=${() => this._onAdd(rec)}>
-            ${this.addingId === rec.id ? 'Adding…' : 'Add to pipeline'}
+            ${this.addingId === rec.id ? 'Saving…' : 'Save role'}
           </button>
           <button class="link-subtle" @click=${() => this._onDismiss(rec.id)}>Dismiss</button>
         </footer>
@@ -176,16 +170,12 @@ export class JobRecommendations extends LitElement {
             ${Array.from({ length: 3 }).map(() => html`
               <div class="rec-card">
                 <div class="rec-card__head">
-                  <div class="skeleton" style="width:48px;height:48px;border-radius:var(--radius-md);"></div>
+                  <div class="skeleton" style="width:36px;height:36px;border-radius:var(--radius-sm);"></div>
                   <div style="flex:1;">
-                    <div class="skeleton" style="width:80%;height:18px;display:block;margin-bottom:8px;"></div>
-                    <div class="skeleton" style="width:60%;height:13px;display:block;margin-bottom:6px;"></div>
-                    <div class="skeleton" style="width:40%;height:13px;display:block;"></div>
+                    <div class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></div>
+                    <div class="skeleton" style="width:60%;height:11px;display:block;"></div>
                   </div>
                 </div>
-                <div class="skeleton" style="width:100%;height:12px;display:block;margin-top:16px;margin-bottom:6px;"></div>
-                <div class="skeleton" style="width:90%;height:12px;display:block;margin-bottom:6px;"></div>
-                <div class="skeleton" style="width:80%;height:12px;display:block;"></div>
               </div>
             `)}
           </div>
