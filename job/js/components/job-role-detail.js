@@ -5,7 +5,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -60,7 +60,10 @@ export class JobRoleDetail extends LitElement {
     this.slug = (params.get('slug') || '').toLowerCase();
     const tab = params.get('tab');
     this.activeTab = TABS.find(t => t.id === tab)?.id || 'details';
-    this.role = null;
+    // Pre-populate from sessionStorage if the user came from /job/jobs/.
+    // Title/company/tags paint instantly; the network refresh fills in
+    // analysis + resume + cover.
+    this.role = this.slug ? readRolePrefill(this.slug) : null;
     this.assets = { 'resume': null, 'cover-letter': null, 'analysis': null };
 
     const pretty = sessionStorage.getItem('job:prettyPath');
@@ -386,9 +389,92 @@ export class JobRoleDetail extends LitElement {
     `;
   }
 
+  _renderChromeFromPrefill() {
+    const r = this.role;
+    if (!r) return null;
+    return html`
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/job/jobs/">Jobs</a>
+        ${r.company ? html`<span>›</span><span>${r.company}</span>` : nothing}
+        <span>›</span>
+        <span>${r.title || this.slug}</span>
+      </nav>
+      <header class="role-header">
+        <div class="role-header__title">
+          <h1>${r.title || this.slug}</h1>
+          <p class="role-header__sub">${r.company || ''}${r.sector ? ` · ${r.sector}` : ''}</p>
+        </div>
+        <div class="role-header__actions">
+          ${r.url ? html`
+            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer">Apply ↗</a>
+          ` : nothing}
+        </div>
+      </header>
+      ${Array.isArray(r.sectorTags) && r.sectorTags.length ? html`
+        <ul class="tag-chips" style="margin: 0 0 var(--space-5);">
+          ${r.sectorTags.map(t => html`<li class="tag-chip">${t.name}</li>`)}
+        </ul>
+      ` : nothing}
+    `;
+  }
+
+  _renderShimmerBody() {
+    return html`
+      <dl class="role-meta">
+        ${Array.from({ length: 6 }).map(() => html`
+          <div class="role-meta__item">
+            <dt><span class="skeleton" style="width:48px;height:11px;display:inline-block;"></span></dt>
+            <dd><span class="skeleton" style="width:80%;height:14px;display:inline-block;"></span></dd>
+          </div>
+        `)}
+      </dl>
+      <div class="skeleton" style="width:100%;height:48px;border-radius:var(--radius-md);margin-bottom:var(--space-5);"></div>
+      <div class="role-cards">
+        ${Array.from({ length: 2 }).map(() => html`
+          <div class="role-card">
+            <div class="skeleton" style="width:140px;height:18px;display:inline-block;"></div>
+            <div class="role-card__split" style="margin-top:var(--space-3);">
+              ${Array.from({ length: 2 }).map(() => html`
+                <section>
+                  <div class="skeleton" style="width:80px;height:11px;display:block;margin-bottom:var(--space-2);"></div>
+                  <div class="skeleton" style="width:100%;height:12px;display:block;margin-bottom:6px;"></div>
+                  <div class="skeleton" style="width:90%;height:12px;display:block;margin-bottom:6px;"></div>
+                  <div class="skeleton" style="width:70%;height:12px;display:block;"></div>
+                </section>
+              `)}
+            </div>
+          </div>
+        `)}
+      </div>
+    `;
+  }
+
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
-      return html`<div class="placeholder"><h2>Loading…</h2></div>`;
+      // If the user came from the pipeline we already have title/company/tags
+      // in sessionStorage — paint that instantly with a shimmer body below.
+      if (this.role) {
+        return html`
+          ${this._renderChromeFromPrefill()}
+          <div class="asset-tabs">
+            ${TABS.map(t => html`
+              <button class="asset-tabs__tab ${this.activeTab === t.id ? 'is-active' : ''}"
+                      @click=${() => this._switchTab(t.id)}>
+                ${t.label}
+              </button>
+            `)}
+          </div>
+          <section class="asset-panel">
+            ${this._renderShimmerBody()}
+          </section>
+        `;
+      }
+      return html`
+        <div class="skeleton" style="width:140px;height:14px;margin-bottom:var(--space-3);display:block;"></div>
+        <div class="skeleton" style="width:60%;height:36px;margin-bottom:var(--space-2);display:block;"></div>
+        <div class="skeleton" style="width:40%;height:18px;margin-bottom:var(--space-5);display:block;"></div>
+        ${this._renderShimmerBody()}
+      `;
     }
     if (this.state === 'error') {
       return html`<div class="placeholder" style="border-color:var(--error);color:var(--error);">

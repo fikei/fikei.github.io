@@ -2,7 +2,7 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus, setArchived } = await import('../pipeline.js' + V);
+const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill } = await import('../pipeline.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -200,6 +200,27 @@ export class JobPipeline extends LitElement {
       this.requestUpdate();
     }
   }
+
+  async _onDelete(r) {
+    this.openMenuSlug = null;
+    const ok = window.confirm(
+      `Delete "${r.title}" at ${r.company}?\n\n` +
+      `The row disappears from the pipeline. We keep a record in the backend for continuity, but it won't show up in any view.`
+    );
+    if (!ok) return;
+    // Optimistic: drop from local list.
+    const idx = this.roles.findIndex(x => x.slug === r.slug);
+    const removed = idx >= 0 ? this.roles.splice(idx, 1)[0] : null;
+    this.requestUpdate();
+    try {
+      await deleteRole(r.slug);
+    } catch (e) {
+      // restore on failure
+      if (removed) this.roles.splice(idx, 0, removed);
+      r._error = String(e);
+      this.requestUpdate();
+    }
+  }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
   _renderViewCell(r) {
@@ -207,7 +228,8 @@ export class JobPipeline extends LitElement {
     const menuOpen = this.openMenuSlug === r.slug;
     return html`
       <div class="row-actions">
-        <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener">
+        <a class="btn btn--sm btn--accent" href=${this._detailHref(r)} target="_blank" rel="noopener"
+           @click=${() => stashRolePrefill(r)}>
           View
         </a>
         <div class="row-menu">
@@ -218,6 +240,9 @@ export class JobPipeline extends LitElement {
             <div class="row-menu__panel" role="menu">
               <button role="menuitem" class="row-menu__item" @click=${() => this._onArchive(r, !archived)}>
                 ${archived ? 'Unarchive' : 'Archive'}
+              </button>
+              <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
+                Delete…
               </button>
             </div>
           ` : nothing}
@@ -250,6 +275,7 @@ export class JobPipeline extends LitElement {
     // Don't navigate when the click landed on an interactive child
     // (status select, fit pill, View button, triple-dot menu).
     if (e.target.closest('button, select, a, .row-menu, .fit-pill--button')) return;
+    stashRolePrefill(r);
     window.open(this._detailHref(r), '_blank', 'noopener');
   }
 
