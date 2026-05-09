@@ -1,29 +1,35 @@
-/* Zocdoc-inspired theme — dark.
-   Deep ink background with coral accents and soft warm surfaces. */
+/* Zocdoc theme — dark. Mirrors generic-dark with green swapped for yellow
+   and a tighter corner-radius scale. */
 [data-theme="zocdoc-dark"] {
-  --bg: #14171F;
-  --bg-surface: #1B1F29;
-  --bg-elevated: #232734;
+  /* Backgrounds — neutral greyscale */
+  --bg: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1f2630;
   --bg-overlay: rgba(255, 255, 255, 0.06);
 
-  --fg: #F5EFEA;
-  --fg-muted: #B7BEC9;
-  --fg-subtle: #8A93A0;
-  --fg-link: #FF7E73;
+  /* Content */
+  --fg: #f0f6fc;
+  --fg-muted: rgba(240, 246, 252, 0.72);
+  --fg-subtle: rgba(240, 246, 252, 0.50);
+  --fg-link: #FFCD3F;
 
-  --accent: #FF7E73;                       /* coral leads in dark */
-  --accent-fg: #14171F;
-  --accent-muted: rgba(255, 126, 115, 0.18);
-  --accent-strong: #FFD2C9;                /* soft pink */
-  --accent-strong-fg: #1B2027;
+  /* Interactive — Zocdoc yellow leads as the active accent */
+  --accent: #FFCD3F;
+  --accent-fg: #0d1117;
+  --accent-muted: rgba(255, 205, 63, 0.16);
+  --accent-strong: #FFCD3F;
+  --accent-strong-fg: #0d1117;
 
-  --border: rgba(245, 239, 234, 0.10);
-  --border-strong: rgba(245, 239, 234, 0.24);
+  /* Borders */
+  --border: rgba(240, 246, 252, 0.12);
+  --border-strong: rgba(240, 246, 252, 0.24);
 
-  --success: #6FD3B0;
-  --error: #FF8A7A;
-  --warning: #F7CC52;
+  /* Sentiment */
+  --success: #9FE870;
+  --error: #FF7A6E;
+  --warning: #FFEB69;
 
+  /* Typography */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -46,17 +52,20 @@
   --fw-medium: 500;
   --fw-semibold: 600;
 
-  --radius-sm: 14px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
-  --radius-xl: 40px;
-  --radius-2xl: 60px;
+  /* Radius — Zocdoc scale (tighter than Wise) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 40px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.32);
-  --shadow-md: 0 10px 28px rgba(0,0,0,0.42);
-  --shadow-lg: 0 20px 56px rgba(0,0,0,0.55);
+  /* Shadows */
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.30);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.40);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.55);
 
+  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
