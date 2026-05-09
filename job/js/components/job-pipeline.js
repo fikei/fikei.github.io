@@ -3,7 +3,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
-const { companyLogoUrl } = await import('../companyLogo.js' + V);
+const { logoSrc, logoInitial } = await import('../logo.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
 
@@ -304,28 +304,6 @@ export class JobPipeline extends LitElement {
   }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
-  _renderCompanyLogo(r, size = 28) {
-    const src = companyLogoUrl({ url: r.url, company: r.company });
-    const initial = (r.company || '?').slice(0, 1).toUpperCase();
-    const sizePx = `${size}px`;
-    if (!src) {
-      return html`<div class="company-logo company-logo--placeholder"
-                       style="width:${sizePx};height:${sizePx};" aria-hidden="true">${initial}</div>`;
-    }
-    return html`<img class="company-logo" style="width:${sizePx};height:${sizePx};"
-                     src=${src} alt="${r.company || ''} logo"
-                     loading="lazy" referrerpolicy="no-referrer"
-                     @error=${(e) => {
-                       const ph = document.createElement('div');
-                       ph.className = 'company-logo company-logo--placeholder';
-                       ph.style.width = sizePx;
-                       ph.style.height = sizePx;
-                       ph.setAttribute('aria-hidden', 'true');
-                       ph.textContent = initial;
-                       e.target.replaceWith(ph);
-                     }} />`;
-  }
-
   _renderMenuCell(r) {
     const archived = isArchived(r);
     const menuOpen = this.openMenuSlug === r.slug;
@@ -397,8 +375,8 @@ export class JobPipeline extends LitElement {
         </td>
         <td class="role-cell">
           <div class="role-cell__inner">
-            ${this._renderCompanyLogo(r, 28)}
-            <div class="role-cell__text">
+            ${this._renderLogo(r, 'sm')}
+            <div>
               <div class="role-cell__title">${r.title || '(untitled)'}</div>
               <div class="role-cell__company">${r.company || ''}</div>
             </div>
@@ -407,6 +385,26 @@ export class JobPipeline extends LitElement {
         <td>${this._renderSectorCell(r)}</td>
         <td>${this._renderMenuCell(r)}</td>
       </tr>
+    `;
+  }
+
+  _renderLogo(r, size = 'sm') {
+    const src = logoSrc(r);
+    const cls = `company-logo company-logo--${size}`;
+    if (!src) {
+      return html`<span class=${cls + ' company-logo--placeholder'} aria-hidden="true">${logoInitial(r.company)}</span>`;
+    }
+    return html`
+      <img class=${cls} src=${src} alt=""
+           loading="lazy" decoding="async"
+           @error=${(e) => {
+             // Swap to placeholder when Clearbit returns 404.
+             const span = document.createElement('span');
+             span.className = cls + ' company-logo--placeholder';
+             span.setAttribute('aria-hidden', 'true');
+             span.textContent = logoInitial(r.company);
+             e.target.replaceWith(span);
+           }}/>
     `;
   }
 

@@ -1217,13 +1217,6 @@
 
 /* --- Role cell (title row 1, company row 2) --- */
 .role-cell { line-height: 1.3; }
-.role-cell__inner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.role-cell__text { min-width: 0; }
 .role-cell__title {
   font-weight: var(--fw-medium);
   color: var(--fg);
@@ -1232,32 +1225,6 @@
   margin-top: 2px;
   font-size: var(--font-size-small);
   color: var(--fg-subtle);
-}
-
-/* --- Company logo (shared across pipeline + detail) --- */
-.company-logo {
-  flex-shrink: 0;
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  object-fit: contain;
-}
-.company-logo--lg { border-radius: var(--radius-md); }
-.company-logo--placeholder {
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-.company-logo--lg.company-logo--placeholder { font-size: var(--font-size-title-3); }
-
-.role-header__lead {
-  display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-  min-width: 0;
 }
 
 /* --- Liveness completion banner --- */
@@ -1294,4 +1261,42 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .dots-anim::after { content: '…'; animation: none; }
+}
+
+/* --- Square company logo (table rows, detail header) --- */
+.company-logo {
+  display: inline-block;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  vertical-align: middle;
+}
+.company-logo--sm { width: 28px; height: 28px; border-radius: var(--radius-sm); }
+.company-logo--md { width: 40px; height: 40px; }
+.company-logo--lg { width: 56px; height: 56px; border-radius: var(--radius-md); }
+
+.company-logo--placeholder {
+  display: inline-grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
+.company-logo--placeholder.company-logo--sm { font-size: 14px; }
+.company-logo--placeholder.company-logo--md { font-size: 18px; }
+.company-logo--placeholder.company-logo--lg { font-size: 24px; }
+
+.role-cell__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.role-header__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
 }

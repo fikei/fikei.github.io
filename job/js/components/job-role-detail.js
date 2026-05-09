@@ -5,35 +5,12 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }, { companyLogoUrl }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
-  import('../companyLogo.js' + V),
+  import('../logo.js' + V),
 ]);
-
-function renderCompanyLogo(role, size = 44) {
-  const src = companyLogoUrl({ url: role?.url, company: role?.company });
-  const initial = (role?.company || '?').slice(0, 1).toUpperCase();
-  const sizePx = `${size}px`;
-  if (!src) {
-    return html`<div class="company-logo company-logo--placeholder company-logo--lg"
-                     style="width:${sizePx};height:${sizePx};" aria-hidden="true">${initial}</div>`;
-  }
-  return html`<img class="company-logo company-logo--lg"
-                   style="width:${sizePx};height:${sizePx};"
-                   src=${src} alt="${role?.company || ''} logo"
-                   loading="lazy" referrerpolicy="no-referrer"
-                   @error=${(e) => {
-                     const ph = document.createElement('div');
-                     ph.className = 'company-logo company-logo--placeholder company-logo--lg';
-                     ph.style.width = sizePx;
-                     ph.style.height = sizePx;
-                     ph.setAttribute('aria-hidden', 'true');
-                     ph.textContent = initial;
-                     e.target.replaceWith(ph);
-                   }} />`;
-}
 
 const TABS = [
   { id: 'details',      label: 'Details' },
@@ -425,7 +402,20 @@ export class JobRoleDetail extends LitElement {
       </nav>
       <header class="role-header">
         <div class="role-header__lead">
-          ${renderCompanyLogo(r, 44)}
+          ${(() => {
+            const src = logoSrc(r);
+            return src
+              ? html`<img class="company-logo company-logo--lg" src=${src} alt=""
+                          loading="lazy" decoding="async"
+                          @error=${(e) => {
+                            const span = document.createElement('span');
+                            span.className = 'company-logo company-logo--lg company-logo--placeholder';
+                            span.setAttribute('aria-hidden', 'true');
+                            span.textContent = logoInitial(r.company);
+                            e.target.replaceWith(span);
+                          }}/>`
+              : html`<span class="company-logo company-logo--lg company-logo--placeholder" aria-hidden="true">${logoInitial(r.company)}</span>`;
+          })()}
           <div class="role-header__title">
             <h1>${r.title || this.slug}</h1>
             <p class="role-header__sub">${r.company || ''}${r.sector ? ` · ${r.sector}` : ''}</p>
@@ -519,12 +509,9 @@ export class JobRoleDetail extends LitElement {
       </nav>
 
       <header class="role-header">
-        <div class="role-header__lead">
-          ${renderCompanyLogo(r, 44)}
-          <div class="role-header__title">
-            <h1>${r?.title || this.slug}</h1>
-            <p class="role-header__sub">${r?.company || ''}${r?.sector ? ` · ${r.sector}` : ''}</p>
-          </div>
+        <div class="role-header__title">
+          <h1>${r?.title || this.slug}</h1>
+          <p class="role-header__sub">${r?.company || ''}${r?.sector ? ` · ${r.sector}` : ''}</p>
         </div>
         <div class="role-header__actions">
           ${r?.url ? html`

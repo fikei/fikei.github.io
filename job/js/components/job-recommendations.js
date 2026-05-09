@@ -5,10 +5,10 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { companyLogoUrl }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
-  import('../companyLogo.js' + V),
+  import('../logo.js' + V),
 ]);
 
 function relTime(iso) {
@@ -103,19 +103,17 @@ export class JobRecommendations extends LitElement {
       <article class="rec-card" role="listitem">
         <header class="rec-card__head">
           ${(() => {
-            const src = rec.logoUrl || companyLogoUrl({ url: rec.url, company: rec.company });
-            const initial = (rec.company || '?').slice(0, 1);
+            const src = rec.logoUrl || logoSrc(rec);
             return src
-              ? html`<img class="rec-card__logo" src=${src} alt="${rec.company || ''} logo"
-                          loading="lazy" referrerpolicy="no-referrer"
+              ? html`<img class="rec-card__logo" src=${src} alt="" loading="lazy" decoding="async"
                           @error=${(e) => {
-                            const ph = document.createElement('div');
-                            ph.className = 'rec-card__logo rec-card__logo--placeholder';
-                            ph.setAttribute('aria-hidden', 'true');
-                            ph.textContent = initial;
-                            e.target.replaceWith(ph);
-                          }} />`
-              : html`<div class="rec-card__logo rec-card__logo--placeholder" aria-hidden="true">${initial}</div>`;
+                            const div = document.createElement('div');
+                            div.className = 'rec-card__logo rec-card__logo--placeholder';
+                            div.setAttribute('aria-hidden', 'true');
+                            div.textContent = logoInitial(rec.company);
+                            e.target.replaceWith(div);
+                          }}/>`
+              : html`<div class="rec-card__logo rec-card__logo--placeholder" aria-hidden="true">${logoInitial(rec.company)}</div>`;
           })()}
           <div class="rec-card__title-block">
             <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
