@@ -9,8 +9,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '..
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 
-const VERSION = '0.1.0';
-console.log(`[add-role] v${VERSION}`);
+const VERSION = '0.1.1';
+console.log(`[add-role] v${VERSION} - upsert tracked_companies before role insert`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -85,12 +85,26 @@ serve(async (req) => {
     const finalSource = body.source ? String(body.source) : source;
 
     const sql = db();
+    const companySlug = slugify(company);
+
+    // Ensure the company FK exists. pipeline_roles.company_slug references
+    // tracked_companies(slug); without this upsert we 500 on the first role
+    // we add for a brand-new company (e.g. a Workday/Lever URL the crawler
+    // hasn't seeded yet).
+    if (companySlug) {
+      await sql`
+        insert into job.tracked_companies (slug, name)
+        values (${companySlug}, ${company})
+        on conflict (slug) do nothing;
+      `;
+    }
+
     // Insert / restore — if a deleted row exists for this slug, un-delete it.
     await sql`
       insert into job.pipeline_roles (
         slug, company_slug, company_name, title, url, source, status
       ) values (
-        ${slug}, ${slugify(company)}, ${company}, ${title},
+        ${slug}, ${companySlug}, ${company}, ${title},
         ${url}, ${finalSource}, 'New'
       )
       on conflict (slug) do update set
