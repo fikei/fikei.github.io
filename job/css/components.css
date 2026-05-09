@@ -1755,3 +1755,155 @@
   background: var(--border);
   margin: 4px 0;
 }
+
+/* --- Pipeline table column sizing + cell shape --- */
+.pipeline-table { table-layout: fixed; }
+
+.col-fit    { width: 72px;  min-width: 72px; }
+.col-status { width: 140px; min-width: 120px; }
+.col-role   { width: auto;  max-width: 360px; }
+.col-sector { width: 280px; min-width: 180px; }
+.col-menu   { width: 56px;  min-width: 56px; text-align: right; }
+
+.pipeline-table .col-role .role-cell__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.pipeline-table .col-role .role-cell__text { min-width: 0; flex: 1; }
+.pipeline-table .col-role .role-cell__title,
+.pipeline-table .col-role .role-cell__company {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pipeline-table .col-sector .tag-chips {
+  flex-wrap: wrap;
+  max-height: 56px;
+  overflow: hidden;
+}
+
+/* --- Mobile (< 720px): stack each row as a card --- */
+@media (max-width: 720px) {
+  .pipeline-table-wrap {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .pipeline-table {
+    display: block;
+    table-layout: auto;
+  }
+  .pipeline-table thead { display: none; }
+  .pipeline-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .pipeline-table tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "fit role menu"
+      "status sector sector";
+    gap: var(--space-2) var(--space-3);
+    align-items: center;
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+  }
+  .pipeline-table tr:hover td { background: transparent; }
+  .pipeline-table td {
+    border-bottom: 0;
+    padding: 0;
+  }
+  .pipeline-table .col-fit    { grid-area: fit;    width: auto; }
+  .pipeline-table .col-status { grid-area: status; width: auto; }
+  .pipeline-table .col-role   { grid-area: role;   max-width: none; min-width: 0; }
+  .pipeline-table .col-sector { grid-area: sector; width: auto; }
+  .pipeline-table .col-menu   { grid-area: menu;   width: auto; text-align: right; }
+  .pipeline-table .col-sector .tag-chips { max-height: none; }
+}
+
+/* --- Mobile top app bar (hamburger → drawer) --- */
+.mobile-bar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+}
+.mobile-bar__menu {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 18px;
+  cursor: pointer;
+}
+.mobile-bar__menu:hover { background: var(--bg-surface); }
+.mobile-bar__brand {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body-lg);
+  letter-spacing: -0.015em;
+}
+.mobile-bar__sub {
+  margin-left: var(--space-2);
+  font-size: var(--font-size-small);
+  color: var(--fg-subtle);
+  font-weight: var(--fw-medium);
+}
+
+/* Drawer scrim + sliding panel for rail nav. */
+.rail-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(14,15,12,0.45);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+body.rail-open .rail-scrim { display: block; opacity: 1; }
+[data-theme$="-dark"] .rail-scrim { background: rgba(0,0,0,0.55); }
+
+@media (max-width: 720px) {
+  .mobile-bar { display: flex; }
+  .app__rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(280px, 86vw);
+    height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform 220ms cubic-bezier(0.2, 0.0, 0.0, 1.0);
+    z-index: 50;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-5) var(--space-4);
+    gap: var(--space-5);
+  }
+  body.rail-open .app__rail { transform: translateX(0); }
+  .rail-foot { margin-top: auto; flex-direction: column; align-items: flex-start; }
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "rail"
+      "main"
+      "footer";
+  }
+  /* Rail no longer occupies layout flow on mobile — reclaim the column. */
+  .app > .app__rail { grid-area: rail; }
+  .app__main { padding: var(--space-4); }
+}

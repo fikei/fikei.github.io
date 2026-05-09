@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.37.1";
-console.log(`[job] v${VERSION} - pdfjs worker fix for base-resume PDF upload`);
+const VERSION = "0.38.0";
+console.log(`[job] v${VERSION} - responsive jobs table + mobile drawer nav`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -35,6 +35,7 @@ function applySignedInState(email) {
   // Notify components that may have mounted before the event arrived.
   document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
   injectFooter();
+  injectMobileBar();
 }
 
 // Inject the global footer (theme toggle + version + links) into the .app
@@ -45,6 +46,56 @@ function injectFooter() {
   if (!app) return;
   const el = document.createElement('job-footer');
   app.appendChild(el);
+}
+
+// Inject a mobile top app bar (hamburger + brand) at the start of every
+// page's <main>. CSS hides it on >720px screens. Tapping the menu button
+// flips body.rail-open which slides the rail in as a drawer.
+function injectMobileBar() {
+  if (document.querySelector('.mobile-bar')) return;
+  const main = document.querySelector('.app__main');
+  const app = document.querySelector('.app');
+  if (!main || !app) return;
+
+  const bar = document.createElement('header');
+  bar.className = 'mobile-bar';
+  bar.innerHTML = `
+    <button type="button" class="mobile-bar__menu" aria-label="Open navigation"
+            aria-controls="job-rail" aria-expanded="false">☰</button>
+    <span class="mobile-bar__brand">ctrl.rodeo<span class="mobile-bar__sub">/ job</span></span>
+  `;
+  main.prepend(bar);
+
+  // Scrim sits between rail and the rest of the page; tapping it closes.
+  let scrim = document.querySelector('.rail-scrim');
+  if (!scrim) {
+    scrim = document.createElement('div');
+    scrim.className = 'rail-scrim';
+    scrim.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(scrim);
+  }
+
+  const close = () => {
+    document.body.classList.remove('rail-open');
+    bar.querySelector('.mobile-bar__menu').setAttribute('aria-expanded', 'false');
+  };
+  const open = () => {
+    document.body.classList.add('rail-open');
+    bar.querySelector('.mobile-bar__menu').setAttribute('aria-expanded', 'true');
+  };
+
+  bar.querySelector('.mobile-bar__menu').addEventListener('click', () => {
+    document.body.classList.contains('rail-open') ? close() : open();
+  });
+  scrim.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  // Tapping a nav link inside the rail should close the drawer.
+  document.querySelector('.app__rail')?.addEventListener('click', (e) => {
+    if (e.target.closest('a[href]')) close();
+  });
+  // If the viewport grows past the breakpoint, drop the open state.
+  const mq = window.matchMedia('(min-width: 721px)');
+  mq.addEventListener?.('change', (e) => { if (e.matches) close(); });
 }
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when
