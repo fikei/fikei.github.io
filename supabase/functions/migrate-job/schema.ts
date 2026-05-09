@@ -317,4 +317,36 @@ create table if not exists job.user_sources (
   updated_at      timestamptz not null default now()
 );
 alter table job.user_sources enable row level security;
+
+-- Backfill ats / ats_slug on tracked_companies from any pipeline_roles
+-- URL we already have. Idempotent: only updates rows where the field
+-- is still null. Safe to re-run on every schema apply.
+with derived as (
+  select distinct on (pr.company_slug)
+    pr.company_slug,
+    case
+      when pr.url ~* 'boards\.greenhouse\.io/[^/]+'                  then 'Greenhouse'
+      when pr.url ~* 'jobs\.lever\.co/[^/]+'                         then 'Lever'
+      when pr.url ~* 'jobs\.ashbyhq\.com/[^/]+'                      then 'Ashby'
+    end as ats,
+    case
+      when pr.url ~* 'boards\.greenhouse\.io/([^/?#]+)'
+        then substring(pr.url from 'boards\.greenhouse\.io/([^/?#]+)')
+      when pr.url ~* 'jobs\.lever\.co/([^/?#]+)'
+        then substring(pr.url from 'jobs\.lever\.co/([^/?#]+)')
+      when pr.url ~* 'jobs\.ashbyhq\.com/([^/?#]+)'
+        then substring(pr.url from 'jobs\.ashbyhq\.com/([^/?#]+)')
+    end as ats_slug
+  from job.pipeline_roles pr
+  where pr.company_slug is not null
+    and pr.url is not null
+    and pr.url ~* '(boards\.greenhouse\.io|jobs\.lever\.co|jobs\.ashbyhq\.com)/'
+)
+update job.tracked_companies tc
+   set ats      = coalesce(tc.ats, d.ats),
+       ats_slug = coalesce(tc.ats_slug, d.ats_slug),
+       updated_at = now()
+  from derived d
+ where d.company_slug = tc.slug
+   and (tc.ats is null or tc.ats_slug is null);
 `;
