@@ -246,16 +246,24 @@ export class JobPipeline extends LitElement {
     `;
   }
 
+  _onRowClick(r, e) {
+    // Don't navigate when the click landed on an interactive child
+    // (status select, fit pill, View button, triple-dot menu).
+    if (e.target.closest('button, select, a, .row-menu, .fit-pill--button')) return;
+    window.open(this._detailHref(r), '_blank', 'noopener');
+  }
+
   _renderRow(r) {
     return html`
-      <tr class=${isArchived(r) ? 'is-archived' : ''}>
+      <tr class=${'pipeline-row' + (isArchived(r) ? ' is-archived' : '')}
+          @click=${(e) => this._onRowClick(r, e)}>
         <td>
           <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
-            title="Tap to see the breakdown" @click=${() => this._openFitModal(r)}>
+            title="Tap to see the breakdown" @click=${(e) => { e.stopPropagation(); this._openFitModal(r); }}>
             ${r.score == null ? '—' : r.score}
           </button>
         </td>
-        <td class="status-cell">
+        <td class="status-cell" @click=${(e) => e.stopPropagation()}>
           <select class="status-select ${r._saving ? 'is-saving' : ''}"
             data-status=${r.status || 'New'}
             ?disabled=${r._saving}
