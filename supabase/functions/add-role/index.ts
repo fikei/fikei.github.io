@@ -9,11 +9,14 @@ import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '..
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 
-const VERSION = '0.1.1';
-console.log(`[add-role] v${VERSION} - upsert tracked_companies before role insert`);
+const VERSION = '0.1.3';
+console.log(`[add-role] v${VERSION} - og:title + ATS host parsing for Workday/Greenhouse/Lever/Ashby`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
+const OG_TITLE_RE = /<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i;
+const OG_TITLE_RE2 = /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["'][^>]*>/i;
+const OG_SITE_RE = /<meta[^>]+property=["']og:site_name["'][^>]*content=["']([^"']+)["'][^>]*>/i;
 // LinkedIn job pages /jobs/view/{id}/ — try to coerce to the original
 // posting if the page reveals it. Best-effort; many LinkedIn URLs are
 // kept as-is.
@@ -25,7 +28,21 @@ function detectSource(url: string): { source: string; sourceLabel: string } {
   return { source: 'Manual', sourceLabel: 'Manual' };
 }
 
-async function fetchTitle(url: string): Promise<string | null> {
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&[a-z]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Returns { title, siteName } where title is og:title (preferred — Workday and
+// most JS-rendered ATS pages leave <title> empty) or the <title> element text.
+async function fetchPageMeta(url: string): Promise<{ title: string | null; siteName: string | null }> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 8000);
@@ -35,11 +52,81 @@ async function fetchTitle(url: string): Promise<string | null> {
       signal: ctrl.signal,
     });
     clearTimeout(t);
-    if (!res.ok) return null;
+    if (!res.ok) return { title: null, siteName: null };
     const html = await res.text();
-    const m = html.match(TITLE_RE);
-    if (!m) return null;
-    return m[1].replace(/&amp;/g, '&').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim() || null;
+
+    let title: string | null = null;
+    const og = html.match(OG_TITLE_RE) || html.match(OG_TITLE_RE2);
+    if (og) title = decodeEntities(og[1]) || null;
+    if (!title) {
+      const m = html.match(TITLE_RE);
+      if (m) title = decodeEntities(m[1]) || null;
+    }
+
+    const siteMatch = html.match(OG_SITE_RE);
+    const siteName = siteMatch ? (decodeEntities(siteMatch[1]) || null) : null;
+    return { title, siteName };
+  } catch { return { title: null, siteName: null }; }
+}
+
+// "cityblockhealth.wd1.myworkdayjobs.com" → "Cityblock Health".
+// "boards.greenhouse.io/acme" path-based fallback handled by the og:site_name.
+function companyFromHost(urlStr: string): string | null {
+  try {
+    const u = new URL(urlStr);
+    const host = u.hostname.toLowerCase();
+    // Workday: <subdomain>.wdN.myworkdayjobs.com → subdomain is the company.
+    const wd = host.match(/^([a-z0-9-]+)\.wd\d+\.myworkdayjobs\.com$/);
+    if (wd) return spacedTitleCase(wd[1]);
+    // Greenhouse: boards.greenhouse.io/<slug>/jobs/...
+    if (/(^|\.)greenhouse\.io$/.test(host)) {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg && seg !== 'jobs') return spacedTitleCase(seg);
+    }
+    // Lever: jobs.lever.co/<slug>/...
+    if (/(^|\.)lever\.co$/.test(host)) {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg) return spacedTitleCase(seg);
+    }
+    // Ashby: jobs.ashbyhq.com/<slug>/... or <slug>.ashbyhq.com
+    const ashbySub = host.match(/^([a-z0-9-]+)\.ashbyhq\.com$/);
+    if (ashbySub && ashbySub[1] !== 'jobs') return spacedTitleCase(ashbySub[1]);
+    if (host === 'jobs.ashbyhq.com') {
+      const seg = u.pathname.split('/').filter(Boolean)[0];
+      if (seg) return spacedTitleCase(seg);
+    }
+    return null;
+  } catch { return null; }
+}
+
+// "cityblockhealth" → "Cityblock Health"; best-effort split on common roots.
+function spacedTitleCase(s: string): string {
+  const cleaned = s.replace(/[-_]+/g, ' ').trim();
+  // Split runs on common joiner words (health, labs, ai, hq, inc, co, app).
+  const split = cleaned.replace(/(.+?)(health|labs|ai|hq|inc|co|app|tech|capital|partners)$/i, '$1 $2');
+  return split.split(/\s+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// "Senior Product Manager — R-1466 — Cityblock" → strip trailing job IDs.
+function cleanTitle(t: string): string {
+  return t
+    .replace(/[\s\-–—_]*R-?\d{2,}\s*$/i, '')
+    .replace(/[\s\-–—_]*Job\s*ID:?\s*\S+\s*$/i, '')
+    .trim();
+}
+
+// Last-resort: pull a title from the URL's path. Workday role URLs end in
+// /job/<Title-Slug>_R-1466.
+function titleFromUrl(urlStr: string): string | null {
+  try {
+    const u = new URL(urlStr);
+    const segs = u.pathname.split('/').filter(Boolean);
+    const idx = segs.indexOf('job');
+    if (idx >= 0 && segs[idx + 1]) {
+      const raw = decodeURIComponent(segs[idx + 1]).split('_')[0];
+      return cleanTitle(raw.replace(/[-_]+/g, ' '));
+    }
+    return null;
   } catch { return null; }
 }
 
@@ -70,11 +157,24 @@ serve(async (req) => {
     let company = String(body.company || '').trim();
 
     if (!title || !company) {
-      const pageTitle = await fetchTitle(url);
-      const guess = splitTitleCompany(pageTitle);
+      const meta = await fetchPageMeta(url);
+      const guess = splitTitleCompany(meta.title);
       if (!title && guess.title) title = guess.title;
       if (!company && guess.company) company = guess.company;
+      if (!company && meta.siteName) company = meta.siteName;
     }
+    // ATS host-based fallback (Workday subdomains, Greenhouse/Lever/Ashby
+    // path slugs). Beats a no-op "(unknown company)" placeholder.
+    if (!company) {
+      const fromHost = companyFromHost(url);
+      if (fromHost) company = fromHost;
+    }
+    // URL-path fallback for the role title (Workday: /job/<Title>_R-1466).
+    if (!title) {
+      const fromPath = titleFromUrl(url);
+      if (fromPath) title = fromPath;
+    }
+    if (title) title = cleanTitle(title);
     if (!title) title = '(untitled role)';
     if (!company) company = '(unknown company)';
 
@@ -85,38 +185,58 @@ serve(async (req) => {
     const finalSource = body.source ? String(body.source) : source;
 
     const sql = db();
-    const companySlug = slugify(company);
+    const companySlug = slugify(company) || null;
 
-    // Ensure the company FK exists. pipeline_roles.company_slug references
-    // tracked_companies(slug); without this upsert we 500 on the first role
-    // we add for a brand-new company (e.g. a Workday/Lever URL the crawler
-    // hasn't seeded yet).
+    // Insert tracked_companies AND pipeline_roles in a single statement so
+    // the FK target is visible inside the same statement (postgres
+    // evaluates CTEs before the final INSERT). Avoids the
+    // pipeline_roles_company_slug_fkey violation when adding a role for a
+    // brand-new company (e.g. a Workday/Lever URL the crawler hasn't
+    // seeded yet).
     if (companySlug) {
       await sql`
-        insert into job.tracked_companies (slug, name)
-        values (${companySlug}, ${company})
-        on conflict (slug) do nothing;
+        with c as (
+          insert into job.tracked_companies (slug, name)
+          values (${companySlug}, ${company})
+          on conflict (slug) do nothing
+          returning slug
+        )
+        insert into job.pipeline_roles (
+          slug, company_slug, company_name, title, url, source, status
+        ) values (
+          ${slug}, ${companySlug}, ${company}, ${title},
+          ${url}, ${finalSource}, 'New'
+        )
+        on conflict (slug) do update set
+          url = excluded.url,
+          title = excluded.title,
+          company_name = excluded.company_name,
+          company_slug = excluded.company_slug,
+          source = coalesce(job.pipeline_roles.source, excluded.source),
+          deleted_at = null,
+          archived_at = null,
+          updated_at = now();
+      `;
+    } else {
+      // No company slug — insert without the FK link.
+      await sql`
+        insert into job.pipeline_roles (
+          slug, company_slug, company_name, title, url, source, status
+        ) values (
+          ${slug}, null, ${company}, ${title},
+          ${url}, ${finalSource}, 'New'
+        )
+        on conflict (slug) do update set
+          url = excluded.url,
+          title = excluded.title,
+          company_name = excluded.company_name,
+          company_slug = excluded.company_slug,
+          source = coalesce(job.pipeline_roles.source, excluded.source),
+          deleted_at = null,
+          archived_at = null,
+          updated_at = now();
       `;
     }
-
-    // Insert / restore — if a deleted row exists for this slug, un-delete it.
-    await sql`
-      insert into job.pipeline_roles (
-        slug, company_slug, company_name, title, url, source, status
-      ) values (
-        ${slug}, ${companySlug}, ${company}, ${title},
-        ${url}, ${finalSource}, 'New'
-      )
-      on conflict (slug) do update set
-        url = excluded.url,
-        title = excluded.title,
-        company_name = excluded.company_name,
-        company_slug = excluded.company_slug,
-        source = coalesce(job.pipeline_roles.source, excluded.source),
-        deleted_at = null,
-        archived_at = null,
-        updated_at = now();
-    `;
 
     // Tag the row using whatever sector blob the user / recommendation passed.
     const sector = String(body.sector || '').trim();
