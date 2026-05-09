@@ -28,10 +28,12 @@ async function readFileAsText(file) {
 let _pdfLib = null;
 async function getPdfLib() {
   if (_pdfLib) return _pdfLib;
-  // pdfjs-dist v4 — legacy build runs without a worker for small docs.
-  const mod = await import('https://esm.run/pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
-  // Disable the worker so we don't have to host a worker file.
-  mod.GlobalWorkerOptions.workerSrc = '';
+  // pdfjs-dist v4 requires a worker. Pin both main + worker to the same
+  // version on jsdelivr so they stay in sync.
+  const PDFJS_VERSION = '4.7.76';
+  const mod = await import(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/legacy/build/pdf.mjs`);
+  mod.GlobalWorkerOptions.workerSrc =
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/legacy/build/pdf.worker.min.mjs`;
   _pdfLib = mod;
   return mod;
 }
@@ -39,7 +41,7 @@ async function getPdfLib() {
 async function readPdfAsText(file) {
   const lib = await getPdfLib();
   const buf = await file.arrayBuffer();
-  const doc = await lib.getDocument({ data: buf, useWorker: false, isEvalSupported: false }).promise;
+  const doc = await lib.getDocument({ data: buf, isEvalSupported: false }).promise;
   const pages = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
