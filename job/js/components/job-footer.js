@@ -43,9 +43,9 @@ export class JobFooter extends LitElement {
         <div class="footer__controls">
           <label class="theme-toggle">
             Theme
-            <select @change=${this._setTheme} .value=${this.theme}>
+            <select @change=${this._setTheme}>
               ${THEMES.map(t => html`
-                <option value=${t.value}>${t.label}</option>
+                <option value=${t.value} ?selected=${t.value === this.theme}>${t.label}</option>
               `)}
             </select>
           </label>
