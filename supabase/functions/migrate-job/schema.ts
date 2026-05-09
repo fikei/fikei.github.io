@@ -318,6 +318,19 @@ create table if not exists job.user_sources (
 );
 alter table job.user_sources enable row level security;
 
+-- Daily cache for paid source plugins (see migration 055).
+create table if not exists job.source_cache (
+  source        text not null,
+  config_hash   text not null,
+  fetched_on    date not null default current_date,
+  raw           jsonb not null,
+  fetched_count int,
+  fetched_at    timestamptz not null default now(),
+  primary key (source, config_hash, fetched_on)
+);
+create index if not exists source_cache_recent_idx on job.source_cache (source, fetched_on desc);
+alter table job.source_cache enable row level security;
+
 -- Backfill ats / ats_slug on tracked_companies from any pipeline_roles
 -- URL we already have. Idempotent: only updates rows where the field
 -- is still null. Safe to re-run on every schema apply.
