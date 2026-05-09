@@ -1,6 +1,8 @@
 // pipeline.js — thin client for the jobs-pipe Edge Function.
 const FN_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/jobs-pipe';
 const LIVENESS_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/check-liveness';
+const ADD_ROLE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/add-role';
+const REC_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recommendations';
 
 async function authHeader() {
   const supabase = window.CtrlAuth?.getSupabaseClient?.();
@@ -49,6 +51,34 @@ export async function deleteRole(slug) {
     body: JSON.stringify({ slug, action: 'delete' }),
   });
   if (!res.ok) throw new Error(`delete-role ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function addRole({ url, title, company, sector, source, fromRecommendationId } = {}) {
+  const headers = await authHeader();
+  const res = await fetch(ADD_ROLE_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, title, company, sector, source, fromRecommendationId }),
+  });
+  if (!res.ok) throw new Error(`add-role ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function fetchRecommendations() {
+  const headers = await authHeader();
+  const res = await fetch(REC_URL, { headers });
+  if (!res.ok) throw new Error(`recommendations ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+export async function dismissRecommendation(id) {
+  const headers = await authHeader();
+  const res = await fetch(REC_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, dismiss: true }),
+  });
+  if (!res.ok) throw new Error(`dismiss-rec ${res.status}: ${await res.text()}`);
   return res.json();
 }
 

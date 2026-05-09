@@ -1,4 +1,4 @@
-// Bundled schema for migrate-job. Mirrors 047–052 from supabase/migrations.
+// Bundled schema for migrate-job. Mirrors 047–053 from supabase/migrations.
 export const SCHEMA_SQL = String.raw`
 -- /job product schema (Phase 2 migration foundation).
 -- Tables live in their own schema to avoid colliding with Boards.
@@ -197,14 +197,12 @@ begin
     execute format('alter table job.%I enable row level security;', t);
   end loop;
 end $$;
-
 -- 048 ----------------------------------------------------------------
 -- Allow analysis as a role_assets kind. The detail page stores Claude's
 -- structured analysis (brief, why-fits, risks, candidate-strength) here.
 alter table job.role_assets drop constraint if exists role_assets_kind_check;
 alter table job.role_assets add constraint role_assets_kind_check
   check (kind in ('resume', 'cover-letter', 'notes', 'analysis'));
-
 -- 049 ----------------------------------------------------------------
 -- Soft-archive flag for pipeline_roles. archived_at IS NULL means active;
 -- a non-null timestamp means the row is archived (hidden from the default
@@ -215,7 +213,6 @@ alter table job.pipeline_roles
 create index if not exists pipeline_roles_archived_idx
   on job.pipeline_roles (archived_at)
   where archived_at is not null;
-
 -- 050 ----------------------------------------------------------------
 -- Sector tag normalization. Free-text sector strings on pipeline_roles
 -- (e.g. "Healthcare AI", "Mental Health / AI", "Legal AI") get parsed into
@@ -237,7 +234,6 @@ create index if not exists role_sector_tags_tag_idx on job.role_sector_tags (tag
 
 alter table job.sector_tags enable row level security;
 alter table job.role_sector_tags enable row level security;
-
 -- 051 ----------------------------------------------------------------
 -- Soft-delete column for pipeline_roles. Hidden from every UI surface
 -- (no filter exposes it), kept in DB for continuity / undo.
@@ -247,7 +243,6 @@ alter table job.pipeline_roles
 create index if not exists pipeline_roles_deleted_idx
   on job.pipeline_roles (deleted_at)
   where deleted_at is null;
-
 -- 052 ----------------------------------------------------------------
 -- Liveness tracking for pipeline_roles. A background job HEADs each URL
 -- on a cadence; rows that 404 (or otherwise become unreachable) get
@@ -261,4 +256,35 @@ alter table job.pipeline_roles
 create index if not exists pipeline_roles_liveness_idx
   on job.pipeline_roles (liveness_checked_at nulls first)
   where deleted_at is null;
+-- 053 ----------------------------------------------------------------
+-- Recommendations staging. The /jobs skill (or future LinkedIn pull
+-- worker) inserts here; the recommendations Edge Function reads.
+-- Card layout in /job/jobs/ expects: logo, title, company · location ·
+-- salary, posted date, source, 3 bullets explaining the match.
+create table if not exists job.recommended_roles (
+  id              uuid primary key default gen_random_uuid(),
+  source          text not null,                 -- 'linkedin' | 'web' | 'manual'
+  source_id       text,                          -- per-source dedup key
+  source_label    text,                          -- "Web-sourced", "LinkedIn Recommended"
+  url             text not null,
+  company         text,
+  title           text,
+  location        text,                          -- "San Francisco (Hybrid)"
+  salary          text,                          -- "$320,000 – $375,000"
+  logo_url        text,
+  posted_at       timestamptz,                   -- "Posted 1w ago" derived
+  description     text,                          -- 1 sentence headline
+  match_bullets   jsonb,                         -- array of markdown strings (3 by convention)
+  suggested_at    timestamptz not null default now(),
+  dismissed_at    timestamptz,
+  added_to_pipeline_slug text references job.pipeline_roles(slug) on delete set null,
+  payload         jsonb,
+  unique (source, source_id)
+);
+
+create index if not exists recommended_roles_active_idx
+  on job.recommended_roles (suggested_at desc)
+  where dismissed_at is null and added_to_pipeline_slug is null;
+
+alter table job.recommended_roles enable row level security;
 `;

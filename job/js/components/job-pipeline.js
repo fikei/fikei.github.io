@@ -2,7 +2,9 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness } = await import('../pipeline.js' + V);
+const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
+// Mount the recommendations widget. It self-loads when the user is signed in.
+import('./job-recommendations.js' + V);
 
 const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
 const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
@@ -62,6 +64,10 @@ export class JobPipeline extends LitElement {
     livenessChecking: { state: true },
     closedSinceLastVisit: { state: true },
     bannerDismissed: { state: true },
+    pasteOpen: { state: true },
+    pasteUrl: { state: true },
+    pasteSaving: { state: true },
+    pasteError: { state: true },
   };
 
   constructor() {
@@ -77,6 +83,10 @@ export class JobPipeline extends LitElement {
     this.livenessChecking = false;
     this.closedSinceLastVisit = [];
     this.bannerDismissed = false;
+    this.pasteOpen = false;
+    this.pasteUrl = '';
+    this.pasteSaving = false;
+    this.pasteError = '';
     this._lastVisitAt = (() => {
       try { return localStorage.getItem('job:jobs:lastVisitAt') || null; } catch { return null; }
     })();
@@ -94,17 +104,45 @@ export class JobPipeline extends LitElement {
     document.addEventListener('keydown', this._onKey);
     this._onDocClick = (e) => {
       if (!this.openMenuSlug) return;
-      // Close menu when clicking outside any row-menu element.
       if (!e.target.closest('.row-menu')) this.openMenuSlug = null;
     };
     document.addEventListener('click', this._onDocClick);
+    this._onRefresh = async () => {
+      try {
+        const data = await fetchPipeline();
+        this.roles = (data.roles || []).slice();
+      } catch {}
+    };
+    document.addEventListener('job:pipeline:refresh', this._onRefresh);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('keydown', this._onKey);
     document.removeEventListener('click', this._onDocClick);
+    document.removeEventListener('job:pipeline:refresh', this._onRefresh);
     super.disconnectedCallback();
+  }
+
+  async _onPasteSubmit(e) {
+    e.preventDefault();
+    if (!this.pasteUrl || this.pasteSaving) return;
+    this.pasteSaving = true;
+    this.pasteError = '';
+    try {
+      const r = await addRole({ url: this.pasteUrl });
+      // refresh & close
+      const data = await fetchPipeline();
+      this.roles = (data.roles || []).slice();
+      this.pasteOpen = false;
+      this.pasteUrl = '';
+      // Open the new role's detail page in a new tab so the user can flesh it out.
+      window.open(`/job/jobs/${r.slug}/`, '_blank', 'noopener');
+    } catch (err) {
+      this.pasteError = String(err);
+    } finally {
+      this.pasteSaving = false;
+    }
   }
 
   async _maybeLoad() {
@@ -439,6 +477,8 @@ export class JobPipeline extends LitElement {
     const rows = this._sorted();
     const archivedCount = this.roles.filter(r => isVisibleRole(r) && isArchived(r)).length;
     return html`
+      <job-recommendations></job-recommendations>
+
       ${!this.bannerDismissed && this.closedSinceLastVisit.length ? html`
         <div class="closed-banner" role="status">
           <div>
@@ -468,7 +508,23 @@ export class JobPipeline extends LitElement {
                 @click=${() => this._onCheckLiveness()}>
           ${this.livenessChecking ? 'Checking…' : 'Check liveness'}
         </button>
+        <button class="btn btn--sm btn--accent"
+                @click=${() => { this.pasteOpen = !this.pasteOpen; this.pasteError = ''; }}>
+          ${this.pasteOpen ? 'Cancel' : '＋ Add a role'}
+        </button>
       </div>
+
+      ${this.pasteOpen ? html`
+        <form class="paste-row" @submit=${(e) => this._onPasteSubmit(e)}>
+          <input type="url" required placeholder="Paste a job posting URL"
+                 .value=${this.pasteUrl}
+                 @input=${(e) => { this.pasteUrl = e.target.value; }}>
+          <button type="submit" class="btn btn--sm btn--primary" ?disabled=${this.pasteSaving || !this.pasteUrl}>
+            ${this.pasteSaving ? 'Adding…' : 'Add'}
+          </button>
+          ${this.pasteError ? html`<span class="muted" style="color:var(--error);font-size:var(--font-size-small);">${this.pasteError}</span>` : nothing}
+        </form>
+      ` : nothing}
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
           <thead>${this._renderHeader()}</thead>
