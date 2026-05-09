@@ -1058,3 +1058,159 @@
 .closed-banner strong { display: block; margin-bottom: 2px; color: var(--error); }
 .closed-banner .muted { display: block; margin-top: var(--space-1); }
 [data-theme="generic-dark"] .closed-banner { background: rgba(255,122,110,0.10); border-color: rgba(255,122,110,0.28); }
+
+/* --- Paste-a-link form --- */
+.paste-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-3) 0 var(--space-4);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.paste-row input[type="url"] {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.paste-row input[type="url"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* --- Recommendations widget --- */
+.rec-shell {
+  margin-bottom: var(--space-6);
+}
+.rec-shell__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.rec-shell__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  letter-spacing: -0.01em;
+}
+.rec-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(360px, 420px);
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-3);
+  scroll-snap-type: x proximity;
+}
+.rec-row::-webkit-scrollbar { height: 8px; }
+.rec-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-pill); }
+
+.rec-card {
+  scroll-snap-align: start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.rec-card__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.rec-card__logo {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  object-fit: cover;
+}
+.rec-card__logo--placeholder {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  color: var(--fg-muted);
+}
+.rec-card__title-block { min-width: 0; flex: 1; }
+.rec-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.rec-card__meta {
+  margin: 4px 0 0;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+}
+.rec-card__source {
+  margin: 6px 0 0;
+  font-size: var(--font-size-small);
+  color: var(--fg-subtle);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rec-card__source-icon { font-size: 13px; opacity: 0.8; }
+
+.rec-card__bullets {
+  list-style: disc;
+  margin: 0 0 0 var(--space-4);
+  padding: 0;
+  font-size: var(--font-size-body);
+  line-height: 1.55;
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.rec-card__bullets li > * { display: inline; }
+.rec-card__bullets p { display: inline; margin: 0; }
+.rec-card__desc { margin: 0; font-size: var(--font-size-body); color: var(--fg-muted); }
+
+.rec-card__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.rec-card__foot .link-subtle {
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: var(--font-size-small);
+  cursor: pointer;
+  padding: 0;
+}
+
+.rec-empty {
+  padding: var(--space-5);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-small);
+}
