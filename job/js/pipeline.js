@@ -42,6 +42,48 @@ export async function setArchived(slug, archived) {
   return res.json();
 }
 
+export async function deleteRole(slug) {
+  const headers = await authHeader();
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, action: 'delete' }),
+  });
+  if (!res.ok) throw new Error(`delete-role ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+// Stash a role row in sessionStorage so the detail page can paint title/
+// company/tags instantly on next load. Read with readRolePrefill(slug).
+export function stashRolePrefill(role) {
+  if (!role?.slug) return;
+  try {
+    sessionStorage.setItem(`job:rolePrefill:${role.slug}`, JSON.stringify({
+      slug: role.slug,
+      company: role.company,
+      title: role.title,
+      sector: role.sector,
+      sectorTags: role.sectorTags || [],
+      score: role.score,
+      status: role.status,
+      url: role.url,
+      salary: role.salary,
+      source: role.source,
+      first_seen: role.first_seen,
+      last_seen: role.last_seen,
+      archivedAt: role.archivedAt,
+      hasResume: role.hasResume,
+      hasCoverLetter: role.hasCoverLetter,
+    }));
+  } catch { /* sessionStorage unavailable — silently skip */ }
+}
+export function readRolePrefill(slug) {
+  try {
+    const raw = sessionStorage.getItem(`job:rolePrefill:${slug}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 const GEN_ASSET_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gen-asset';
 
 export async function generateAsset(slug, kind) {

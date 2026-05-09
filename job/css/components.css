@@ -995,3 +995,8 @@
 [data-theme="generic-dark"] .tag-chip { color: var(--accent-strong); }
 [data-theme="ctrl-light"]   .tag-chip { color: var(--accent-strong); background: rgba(0,168,160,0.12); }
 [data-theme="ctrl-dark"]    .tag-chip { color: var(--accent-strong); background: rgba(0,255,247,0.14); }
+
+/* Danger menu item (Delete) */
+.row-menu__item--danger { color: var(--error); }
+.row-menu__item--danger:hover { background: rgba(168,32,13,0.08); }
+[data-theme="generic-dark"] .row-menu__item--danger:hover { background: rgba(255,122,110,0.12); }

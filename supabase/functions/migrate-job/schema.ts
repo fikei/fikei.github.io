@@ -1,4 +1,4 @@
-// Bundled schema for migrate-job. Mirrors 047–050 from supabase/migrations.
+// Bundled schema for migrate-job. Mirrors 047–051 from supabase/migrations.
 export const SCHEMA_SQL = String.raw`
 -- /job product schema (Phase 2 migration foundation).
 -- Tables live in their own schema to avoid colliding with Boards.
@@ -237,4 +237,14 @@ create index if not exists role_sector_tags_tag_idx on job.role_sector_tags (tag
 
 alter table job.sector_tags enable row level security;
 alter table job.role_sector_tags enable row level security;
+
+-- 051 ----------------------------------------------------------------
+-- Soft-delete column for pipeline_roles. Hidden from every UI surface
+-- (no filter exposes it), kept in DB for continuity / undo.
+alter table job.pipeline_roles
+  add column if not exists deleted_at timestamptz;
+
+create index if not exists pipeline_roles_deleted_idx
+  on job.pipeline_roles (deleted_at)
+  where deleted_at is null;
 `;

@@ -12,8 +12,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '..
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 
-const VERSION = '0.6.0';
-console.log(`[jobs-pipe] v${VERSION} - sector tag tokens`);
+const VERSION = '0.7.0';
+console.log(`[jobs-pipe] v${VERSION} - soft delete`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 const STATUS_ENUM = new Set([
@@ -166,6 +166,7 @@ async function listRoles() {
     from job.pipeline_roles r
     left join job.role_assets ra_resume on ra_resume.role_slug = r.slug and ra_resume.kind = 'resume'
     left join job.role_assets ra_cover  on ra_cover.role_slug = r.slug and ra_cover.kind = 'cover-letter'
+    where r.deleted_at is null
     order by r.fit_score desc nulls last, r.title asc;
   `;
   return rows;
@@ -211,6 +212,16 @@ serve(async (req) => {
           where slug = ${slug};
         `;
         return jsonResp({ ok: true, slug, archived });
+      }
+
+      // Soft delete — row stays in DB but disappears from every list.
+      if (body.action === 'delete') {
+        await sql`
+          update job.pipeline_roles
+          set deleted_at = now()
+          where slug = ${slug};
+        `;
+        return jsonResp({ ok: true, slug, deleted: true });
       }
 
       // Status writeback.
