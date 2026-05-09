@@ -4,7 +4,16 @@
 import { LitElement, html } from 'https://esm.run/lit@3';
 
 const ROUTES = [
-  { href: '/job/jobs/',    label: 'Jobs',        match: /^\/job\/jobs\/?/ },
+  {
+    href: '/job/jobs/',
+    label: 'Jobs',
+    match: /^\/job\/jobs\/?/,
+    sub: [
+      { href: '/job/jobs/?bucket=leads',   label: 'Leads',   bucket: 'leads' },
+      { href: '/job/jobs/?bucket=active',  label: 'Active',  bucket: 'active' },
+      { href: '/job/jobs/?bucket=archive', label: 'Archive', bucket: 'archive' },
+    ],
+  },
   { href: '/job/history/', label: 'Your career', match: /^\/job\/history\/?/ },
   { href: '/job/vision/',  label: 'Vision',      match: /^\/job\/vision\/?/ }
 ];
@@ -13,12 +22,24 @@ export class JobRail extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
-    path:  { state: true }
+    path:  { state: true },
+    bucket: { state: true },
   };
 
   constructor() {
     super();
     this.path = location.pathname;
+    this.bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
+    this._onBucket = (e) => { this.bucket = e.detail.bucket; };
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener('job:jobs:bucket', this._onBucket);
+  }
+  disconnectedCallback() {
+    document.removeEventListener('job:jobs:bucket', this._onBucket);
+    super.disconnectedCallback();
   }
 
   render() {
@@ -30,14 +51,29 @@ export class JobRail extends LitElement {
         </div>
         <nav>
           <ul class="nav-list">
-            ${ROUTES.map(r => html`
-              <li>
-                <a href=${r.href}
-                   aria-current=${r.match.test(this.path) ? 'page' : 'false'}>
-                  ${r.label}
-                </a>
-              </li>
-            `)}
+            ${ROUTES.map(r => {
+              const active = r.match.test(this.path);
+              return html`
+                <li>
+                  <a href=${r.href}
+                     aria-current=${active ? 'page' : 'false'}>
+                    ${r.label}
+                  </a>
+                  ${active && r.sub ? html`
+                    <ul class="nav-sublist">
+                      ${r.sub.map(s => html`
+                        <li>
+                          <a href=${s.href}
+                             aria-current=${this.bucket === s.bucket ? 'page' : 'false'}>
+                            ${s.label}
+                          </a>
+                        </li>
+                      `)}
+                    </ul>
+                  ` : ''}
+                </li>
+              `;
+            })}
           </ul>
         </nav>
       </aside>
