@@ -6,13 +6,59 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline, generateAsset }, { readRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
 ]);
 
 const BASE_RESUME_SLUG = '__base__';
+
+// File → string. .md/.txt are read as UTF-8 text. .pdf uses pdfjs-dist
+// (loaded on first use) to extract text from each page. Anything else
+// is read as text and best-effort.
+async function readFileAsText(file) {
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.pdf') || file.type === 'application/pdf') {
+    return await readPdfAsText(file);
+  }
+  return await file.text();
+}
+
+let _pdfLib = null;
+async function getPdfLib() {
+  if (_pdfLib) return _pdfLib;
+  // pdfjs-dist v4 — legacy build runs without a worker for small docs.
+  const mod = await import('https://esm.run/pdfjs-dist@4.7.76/legacy/build/pdf.mjs');
+  // Disable the worker so we don't have to host a worker file.
+  mod.GlobalWorkerOptions.workerSrc = '';
+  _pdfLib = mod;
+  return mod;
+}
+
+async function readPdfAsText(file) {
+  const lib = await getPdfLib();
+  const buf = await file.arrayBuffer();
+  const doc = await lib.getDocument({ data: buf, useWorker: false, isEvalSupported: false }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const tc = await page.getTextContent();
+    // Re-flow text items into lines using their y coordinates.
+    const lines = new Map();
+    for (const item of tc.items) {
+      const y = Math.round(item.transform[5]);
+      if (!lines.has(y)) lines.set(y, []);
+      lines.get(y).push(item);
+    }
+    const ordered = Array.from(lines.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([, items]) => items.sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    pages.push(ordered.join('\n'));
+  }
+  return pages.join('\n\n').trim();
+}
 
 // Lazy-load the resume sub-component so the Work History tab doesn't
 // pull markdown deps when only the Narratives tab is active.
@@ -107,14 +153,38 @@ export class JobCareer extends LitElement {
     history.replaceState(null, '', `/job/history/${qs}`);
   }
 
-  async _generateBaseResume() {
+  async _onBaseUpload(file) {
+    if (!file) return;
     this.baseResume = { ...this.baseResume, generating: true, error: '' };
     try {
-      const res = await generateAsset(null, 'base-resume');
-      this.baseResume = { content: res.content, missing: false, generating: false, error: '' };
+      const text = await readFileAsText(file);
+      if (!text || !text.trim()) throw new Error('Empty file');
+      await writeRoleAsset(BASE_RESUME_SLUG, 'resume', text);
+      this.baseResume = { content: text, missing: false, generating: false, error: '' };
     } catch (e) {
-      this.baseResume = { ...this.baseResume, generating: false, error: String(e) };
+      this.baseResume = { ...this.baseResume, generating: false, error: String(e?.message || e) };
     }
+  }
+
+  async _onBasePaste() {
+    const ta = this.querySelector('#base-paste');
+    const text = (ta?.value || '').trim();
+    if (!text) {
+      this.baseResume = { ...this.baseResume, error: 'Paste your resume first.' };
+      return;
+    }
+    this.baseResume = { ...this.baseResume, generating: true, error: '' };
+    try {
+      await writeRoleAsset(BASE_RESUME_SLUG, 'resume', text);
+      this.baseResume = { content: text, missing: false, generating: false, error: '' };
+    } catch (e) {
+      this.baseResume = { ...this.baseResume, generating: false, error: String(e?.message || e) };
+    }
+  }
+
+  _onBaseClear() {
+    // Just reveal the upload zone — the next upload/paste overwrites the row.
+    this.baseResume = { content: '', missing: true, generating: false, error: '' };
   }
 
   _renderBase() {
@@ -126,23 +196,49 @@ export class JobCareer extends LitElement {
         <div class="skeleton" style="width:80%;height:14px;display:block;"></div>
       `;
     }
+    const hasContent = !!b.content;
     return html`
       <section class="narrative-block">
-        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);">
+        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap;">
           <div>
             <h2 style="margin:0;">Base resume</h2>
             <p class="muted" style="margin:0;font-size:var(--font-size-small);">
-              The canonical, untargeted resume — generated from your KB. Each per-role tailoring diffs against this.
+              Upload or paste your canonical resume. Per-role tailoring will diff against this.
             </p>
           </div>
-          <button class="btn btn--sm ${b.missing ? 'btn--primary' : ''}" ?disabled=${b.generating} @click=${() => this._generateBaseResume()}>
-            ${b.generating ? 'Generating…' : (b.missing ? 'Generate from KB' : 'Regenerate from KB')}
-          </button>
+          ${hasContent ? html`
+            <button class="btn btn--sm" ?disabled=${b.generating} @click=${() => this._onBaseClear()}>Replace</button>
+          ` : nothing}
         </header>
-        ${b.error ? html`<p class="muted" style="color:var(--error);">${b.error}</p>` : nothing}
-        ${b.content
-          ? html`<article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(b.content))}</article>`
-          : html`<p class="muted">No base resume yet. Generate one to enable diff highlighting on per-role resumes.</p>`}
+
+        ${!hasContent ? html`
+          <div class="base-upload">
+            <label class="base-upload__drop">
+              <input type="file" accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
+                     @change=${(e) => this._onBaseUpload(e.target.files?.[0])}
+                     ?disabled=${b.generating}>
+              <span class="base-upload__cta">
+                ${b.generating ? 'Reading file…' : 'Upload resume'}
+              </span>
+              <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf</span>
+            </label>
+            <details style="margin-top: var(--space-4);">
+              <summary class="muted" style="cursor:pointer;font-size:var(--font-size-small);">Or paste resume text</summary>
+              <textarea id="base-paste" class="asset-editor" style="margin-top: var(--space-3); min-height: 240px;"
+                        placeholder="# Ian Fike&#10;&#10;Paste markdown or plain text here…"></textarea>
+              <button class="btn btn--sm btn--primary" style="margin-top: var(--space-3);"
+                      ?disabled=${b.generating} @click=${() => this._onBasePaste()}>
+                ${b.generating ? 'Saving…' : 'Save pasted resume'}
+              </button>
+            </details>
+          </div>
+        ` : nothing}
+
+        ${b.error ? html`<p class="muted" style="color:var(--error);margin-top:var(--space-3);">${b.error}</p>` : nothing}
+
+        ${hasContent
+          ? html`<article class="kb-doc asset-doc" style="margin-top: var(--space-4);">${unsafeHTML(renderMarkdown(b.content))}</article>`
+          : nothing}
       </section>
     `;
   }
