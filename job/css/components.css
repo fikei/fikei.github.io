@@ -1149,6 +1149,13 @@
   color: var(--fg-muted);
 }
 .rec-card__title-block { min-width: 0; flex: 1; }
+.rec-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.rec-card__title-row .fit-pill { flex-shrink: 0; }
 .rec-card__title {
   margin: 0;
   font-family: var(--font-display);

@@ -96,6 +96,14 @@ export class JobRecommendations extends LitElement {
     }
   }
 
+  _fitClass(s) {
+    if (s == null) return 'fit-pill fit-pill--poor';
+    if (s >= 70) return 'fit-pill fit-pill--strong';
+    if (s >= 50) return 'fit-pill fit-pill--ok';
+    if (s >= 30) return 'fit-pill fit-pill--weak';
+    return 'fit-pill fit-pill--poor';
+  }
+
   _renderCard(rec) {
     const meta = [rec.company, rec.location, rec.salary].filter(Boolean).join('  •  ');
     const bullets = Array.isArray(rec.matchBullets) ? rec.matchBullets : [];
@@ -116,7 +124,12 @@ export class JobRecommendations extends LitElement {
               : html`<div class="rec-card__logo rec-card__logo--placeholder" aria-hidden="true">${logoInitial(rec.company)}</div>`;
           })()}
           <div class="rec-card__title-block">
-            <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
+            <div class="rec-card__title-row">
+              <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
+              ${rec.fitScore != null
+                ? html`<span class=${this._fitClass(rec.fitScore)} title="Fit score">${rec.fitScore}</span>`
+                : nothing}
+            </div>
             ${meta ? html`<p class="rec-card__meta">${meta}</p>` : nothing}
             <p class="rec-card__source">
               ${rec.postedAt ? html`Posted ${relTime(rec.postedAt)}` : nothing}

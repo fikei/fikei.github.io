@@ -1,0 +1,273 @@
+// pull-recommendations — single tick of the recommendations worker.
+//
+// On every invocation:
+//   1. Find user_sources rows that are enabled and due per schedule_cron.
+//   2. For each one, look up the plugin in SOURCES[type] and call pull().
+//   3. Score every returned posting with the same fit logic as the pipeline.
+//   4. Drop hard-failed roles AND roles below user_sources.min_score.
+//   5. Insert survivors into job.recommended_roles using ON CONFLICT
+//      DO NOTHING RETURNING * to learn which rows are actually new.
+//   6. For new rows only, ask Claude Haiku for 3 personalized match
+//      bullets grounded in the user's resume / skills / wins / vision.
+//   7. Stamp last_run_at, last_run_count, last_dropped, last_error.
+//
+// Auth: header X-Cron-Secret must match env CRON_SECRET. The pg_cron
+// schedule sets this header.
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { db } from '../_shared/job-db.ts';
+import { computeFit, type RoleRow } from '../jobs-pipe/fit.ts';
+import { SOURCES } from '../_shared/sources/registry.ts';
+import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
+
+const VERSION = '0.1.0';
+console.log(`[pull-recommendations] v${VERSION}`);
+
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';
+const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
+
+interface UserSourceRow {
+  id:            string;
+  user_email:    string;
+  type:          string;
+  config:        Record<string, unknown>;
+  schedule_cron: string;
+  min_score:     number;
+  last_run_at:   string | null;
+}
+
+interface UserContext {
+  resume:   string;
+  skills:   string;
+  wins:     string;
+  vision:   string;
+}
+
+serve(async (req) => {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return new Response('POST only', { status: 405 });
+  }
+  const secret = Deno.env.get('CRON_SECRET');
+  if (secret && req.headers.get('x-cron-secret') !== secret) {
+    return new Response('forbidden', { status: 403 });
+  }
+
+  const sql = db();
+  const sources = await sql<UserSourceRow[]>`
+    select id, user_email, type, config, schedule_cron, min_score, last_run_at
+    from job.user_sources
+    where enabled = true
+  `;
+
+  const summary: Array<Record<string, unknown>> = [];
+  for (const src of sources) {
+    if (!isDue(src)) { summary.push({ id: src.id, skipped: 'not-due' }); continue; }
+    const plugin = SOURCES[src.type];
+    if (!plugin) {
+      await markRun(sql, src.id, { count: 0, dropped: 0, error: `unknown source type: ${src.type}` });
+      summary.push({ id: src.id, skipped: 'unknown-type' });
+      continue;
+    }
+    try {
+      const since = src.last_run_at ? new Date(src.last_run_at) : null;
+      const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
+      const { kept, dropped } = scoreAndFilter(pulled, src.min_score);
+      const inserted = await insertNew(sql, src, kept);
+      if (inserted.length) {
+        const ctx = await loadUserContext(sql);
+        await Promise.all(inserted.map(row => generateBullets(sql, row, ctx)));
+      }
+      await markRun(sql, src.id, { count: inserted.length, dropped, error: null });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, inserted: inserted.length });
+    } catch (e) {
+      await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
+      summary.push({ id: src.id, type: src.type, error: (e as Error).message });
+    }
+  }
+
+  return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary }, null, 2), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+});
+
+// ---------- Scoring + filtering ----------
+
+interface ScoredRow {
+  input:     RecommendedRoleInput;
+  fitScore:  number;
+  breakdown: Record<string, number>;
+  hardFails: string[];
+}
+
+function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number): { kept: ScoredRow[]; dropped: number } {
+  const kept: ScoredRow[] = [];
+  let dropped = 0;
+  for (const r of rows) {
+    const fit = computeFit(toRoleRow(r));
+    if (fit.hardFails.length || fit.score < minScore) { dropped++; continue; }
+    kept.push({ input: r, fitScore: fit.score, breakdown: fit.breakdown as unknown as Record<string, number>, hardFails: fit.hardFails });
+  }
+  return { kept, dropped };
+}
+
+// Map a RecommendedRoleInput → the RoleRow shape computeFit expects.
+// computeFit was written against the spreadsheet row, so this is mostly
+// a field-renaming pass with a few "we don't have it yet" defaults.
+function toRoleRow(r: RecommendedRoleInput): RoleRow {
+  return {
+    status:     '',
+    rank:      '',
+    company:    r.company || '',
+    title:      r.title || '',
+    url:        r.url,
+    source:     r.sourceLabel || r.source,
+    contact:    '',
+    salary:     r.salary || '',
+    sector:     r.sector || '',
+    investors:  (r.investors || []).join(', '),
+    website:    '',
+    crunchbase: '',
+  };
+}
+
+// ---------- Insert ----------
+
+async function insertNew(
+  sql: ReturnType<typeof db>,
+  src: UserSourceRow,
+  rows: ScoredRow[],
+): Promise<Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null }>> {
+  if (!rows.length) return [];
+  const values = rows.map(r => ({
+    user_email:     src.user_email,
+    user_source_id: src.id,
+    source:         r.input.source,
+    source_id:      r.input.sourceId,
+    source_label:   r.input.sourceLabel ?? null,
+    url:            r.input.url,
+    company:        r.input.company ?? null,
+    title:          r.input.title ?? null,
+    location:       r.input.location ?? null,
+    salary:         r.input.salary ?? null,
+    logo_url:       r.input.logoUrl ?? null,
+    posted_at:      r.input.postedAt ?? null,
+    description:    r.input.description ?? null,
+    fit_score:      r.fitScore,
+    fit_breakdown:  r.breakdown,
+    hard_fails:     r.hardFails,
+    sector:         r.input.sector ?? null,
+    investors:      r.input.investors ?? [],
+    payload:        r.input.payload ?? null,
+  }));
+  const inserted = await sql`
+    insert into job.recommended_roles ${sql(values)}
+    on conflict (source, source_id) do nothing
+    returning id, company, title, url, fit_score as "fitScore", fit_breakdown as "breakdown", payload
+  `;
+  return inserted as unknown as Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null }>;
+}
+
+// ---------- Bullet generation ----------
+//
+// Bullets answer two halves at once:
+//   - Why does the user fit this role? (cite their skills/wins/vision)
+//   - Why does the role fit the user? (cite the breakdown — e.g. "+22 title")
+
+async function loadUserContext(sql: ReturnType<typeof db>): Promise<UserContext> {
+  const [skills, wins, vision] = await Promise.all([
+    sql`select name, type, level, body_md from job.skills order by name`,
+    sql`select headline, metric_value, body_md from job.wins order by created_at desc limit 30`,
+    sql`select body_md from job.vision order by created_at desc limit 1`,
+  ]);
+  return {
+    resume: '', // hook for a future "primary resume" lookup
+    skills: (skills as Array<Record<string, unknown>>).map(s => `- ${s.name} (${s.type}/${s.level}): ${(s.body_md || '').toString().slice(0, 200)}`).join('\n'),
+    wins:   (wins as Array<Record<string, unknown>>).map(w => `- ${w.headline} (${w.metric_value || 'n/a'}): ${(w.body_md || '').toString().slice(0, 200)}`).join('\n'),
+    vision: (vision as Array<Record<string, unknown>>)[0]?.body_md as string || '',
+  };
+}
+
+async function generateBullets(
+  sql: ReturnType<typeof db>,
+  row: { id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null },
+  user: UserContext,
+): Promise<void> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return;       // no key → leave bullets null, widget falls back to description
+  const system = `You write 3 short markdown bullets explaining why a candidate fits a job.
+Each bullet cites a CONCRETE detail from the candidate's skills/wins/vision OR from the role's fit breakdown — never vague platitudes.
+Keep each bullet under 22 words. Return only the markdown bullets, nothing else.`;
+  const userPrompt = [
+    `# Role`,
+    `${row.title} at ${row.company} (fit score ${row.fitScore}).`,
+    `Score breakdown: ${Object.entries(row.breakdown).map(([k, v]) => `${k}=${v}`).join(', ')}.`,
+    `URL: ${row.url}`,
+    `\n# Candidate skills\n${user.skills || '(none)'}`,
+    `\n# Recent wins\n${user.wins || '(none)'}`,
+    `\n# Vision\n${user.vision || '(none)'}`,
+  ].join('\n');
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 400,
+        system,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`anthropic ${res.status}`);
+    const data = await res.json() as { content: Array<{ type: string; text: string }> };
+    const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    const bullets = text.split('\n').map(l => l.replace(/^[-*]\s*/, '').trim()).filter(Boolean).slice(0, 3);
+    if (bullets.length) {
+      await sql`update job.recommended_roles set match_bullets = ${sql.json(bullets)} where id = ${row.id}`;
+    }
+  } catch (e) {
+    console.warn(`[pull-recommendations] bullet gen failed for ${row.id}: ${(e as Error).message}`);
+  }
+}
+
+// ---------- Schedule ----------
+// Tiny cron predicate. Supports the cases we actually use: '0 */6 * * *',
+// '*/30 * * * *', '0 9 * * *'. Falls back to "due if last_run_at older
+// than 6h" for anything fancier.
+function isDue(src: UserSourceRow): boolean {
+  if (!src.last_run_at) return true;
+  const lastMs = Date.parse(src.last_run_at);
+  if (!isFinite(lastMs)) return true;
+  const ageMin = (Date.now() - lastMs) / 60_000;
+  const cron = src.schedule_cron.trim();
+  // hourly modulus
+  const m = cron.match(/^(\S+)\s+\*\/(\d+)\s+\*\s+\*\s+\*$/);
+  if (m) return ageMin >= Number(m[2]) * 60 - 5;
+  // every-N-minutes
+  const m2 = cron.match(/^\*\/(\d+)\s+\*\s+\*\s+\*\s+\*$/);
+  if (m2) return ageMin >= Number(m2[1]) - 1;
+  // daily at HH
+  const m3 = cron.match(/^0\s+(\d+)\s+\*\s+\*\s+\*$/);
+  if (m3) return ageMin >= 24 * 60 - 30;
+  return ageMin >= 6 * 60;
+}
+
+async function markRun(
+  sql: ReturnType<typeof db>,
+  id: string,
+  { count, dropped, error }: { count: number; dropped: number; error: string | null },
+) {
+  await sql`
+    update job.user_sources
+       set last_run_at    = now(),
+           last_run_count = ${count},
+           last_dropped   = ${dropped},
+           last_error     = ${error},
+           updated_at     = now()
+     where id = ${id}
+  `;
+}

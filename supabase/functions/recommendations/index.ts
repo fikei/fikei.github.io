@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[recommendations] v${VERSION}`);
+const VERSION = '0.2.0';
+console.log(`[recommendations] v${VERSION} - score-filtered + fitScore in response`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -21,10 +21,15 @@ serve(async (req) => {
       const rows = await sql`
         select id, source, source_label as "sourceLabel", url, company, title, location,
                salary, logo_url as "logoUrl", posted_at as "postedAt",
-               description, match_bullets as "matchBullets", suggested_at as "suggestedAt"
+               description, match_bullets as "matchBullets", suggested_at as "suggestedAt",
+               fit_score as "fitScore", fit_breakdown as "breakdown",
+               hard_fails as "hardFails", sector
         from job.recommended_roles
-        where dismissed_at is null and added_to_pipeline_slug is null
-        order by suggested_at desc
+        where dismissed_at is null
+          and added_to_pipeline_slug is null
+          and (fit_score is null or fit_score >= 50)
+          and coalesce(array_length(hard_fails, 1), 0) = 0
+        order by fit_score desc nulls last, suggested_at desc
         limit 24;
       `;
       return jsonResp({ ok: true, version: VERSION, count: rows.length, recommendations: rows });
