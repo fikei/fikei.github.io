@@ -6,9 +6,7 @@ const THEMES = [
   { value: 'generic-light', label: 'Generic · Light' },
   { value: 'generic-dark',  label: 'Generic · Dark' },
   { value: 'ctrl-light',    label: 'CTRL · Light' },
-  { value: 'ctrl-dark',     label: 'CTRL · Dark' },
-  { value: 'zocdoc-light',  label: 'Zocdoc · Light' },
-  { value: 'zocdoc-dark',   label: 'Zocdoc · Dark' }
+  { value: 'ctrl-dark',     label: 'CTRL · Dark' }
 ];
 
 export class JobFooter extends LitElement {
