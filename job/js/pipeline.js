@@ -31,6 +31,17 @@ export async function setStatus(role, status) {
   return res.json();
 }
 
+export async function setArchived(slug, archived) {
+  const headers = await authHeader();
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, archived }),
+  });
+  if (!res.ok) throw new Error(`set-archived ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 const GEN_ASSET_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gen-asset';
 
 export async function generateAsset(slug, kind) {

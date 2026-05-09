@@ -1,5 +1,4 @@
-// Bundled schema for migrate-job. Mirrors 047 + 048 from supabase/migrations.
-// Backticks stripped from inline SQL since this is a template literal.
+// Bundled schema for migrate-job. Mirrors 047 + 048 + 049 from supabase/migrations.
 export const SCHEMA_SQL = String.raw`
 -- /job product schema (Phase 2 migration foundation).
 -- Tables live in their own schema to avoid colliding with Boards.
@@ -205,4 +204,15 @@ end $$;
 alter table job.role_assets drop constraint if exists role_assets_kind_check;
 alter table job.role_assets add constraint role_assets_kind_check
   check (kind in ('resume', 'cover-letter', 'notes', 'analysis'));
+
+-- 049 ----------------------------------------------------------------
+-- Soft-archive flag for pipeline_roles. archived_at IS NULL means active;
+-- a non-null timestamp means the row is archived (hidden from the default
+-- pipeline view).
+alter table job.pipeline_roles
+  add column if not exists archived_at timestamptz;
+
+create index if not exists pipeline_roles_archived_idx
+  on job.pipeline_roles (archived_at)
+  where archived_at is not null;
 `;

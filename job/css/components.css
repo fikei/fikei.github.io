@@ -877,3 +877,94 @@
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after { animation: none; opacity: 0.5; }
 }
+
+/* --- Pipeline meta line + bottom strip --- */
+.pipeline-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.pipeline-meta__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+}
+.pipeline-foot {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-5) 0 var(--space-6);
+}
+
+/* --- Row actions: View button + triple-dot menu --- */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.row-menu { position: relative; }
+.row-menu__trigger {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-size: 18px;
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  padding: 0;
+}
+.row-menu__trigger:hover { color: var(--fg); border-color: var(--border-strong); }
+.row-menu__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 160px;
+  padding: var(--space-1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.row-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.row-menu__item:hover { background: var(--bg-surface); }
+
+/* --- Archived row treatment --- */
+.pipeline-table tr.is-archived td { opacity: 0.55; }
+.pipeline-table tr.is-archived:hover td { opacity: 0.85; }
+
+/* --- App footer (injected once per page) --- */
+.app__foot {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+.app__foot__inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle);
+}
+.app__foot__inner .link-subtle { color: var(--fg-subtle); }
+.app__foot__inner .link-subtle:hover { color: var(--fg-muted); }
+@media (max-width: 640px) {
+  .app__foot__inner { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}
