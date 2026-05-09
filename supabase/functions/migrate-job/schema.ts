@@ -327,7 +327,6 @@ update job.tracked_companies tc
        updated_at = now()
   from (
     select pr.company_slug,
-           (regexp_match(pr.url, '(greenhouse\.io|lever\.co|ashbyhq\.com)'))[1] as host_marker,
            case
              when pr.url ~* 'greenhouse\.io' then 'Greenhouse'
              when pr.url ~* 'lever\.co'      then 'Lever'
