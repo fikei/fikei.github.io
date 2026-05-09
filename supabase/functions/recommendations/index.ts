@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[recommendations] v${VERSION} - score-filtered + fitScore in response`);
+const VERSION = '0.3.0';
+console.log(`[recommendations] v${VERSION} - dedupe against pipeline by company+title`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -19,17 +19,23 @@ serve(async (req) => {
 
     if (req.method === 'GET') {
       const rows = await sql`
-        select id, source, source_label as "sourceLabel", url, company, title, location,
-               salary, logo_url as "logoUrl", posted_at as "postedAt",
-               description, match_bullets as "matchBullets", suggested_at as "suggestedAt",
-               fit_score as "fitScore", fit_breakdown as "breakdown",
-               hard_fails as "hardFails", sector
-        from job.recommended_roles
-        where dismissed_at is null
-          and added_to_pipeline_slug is null
-          and (fit_score is null or fit_score >= 50)
-          and coalesce(array_length(hard_fails, 1), 0) = 0
-        order by fit_score desc nulls last, suggested_at desc
+        select r.id, r.source, r.source_label as "sourceLabel", r.url, r.company, r.title, r.location,
+               r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
+               r.description, r.match_bullets as "matchBullets", r.suggested_at as "suggestedAt",
+               r.fit_score as "fitScore", r.fit_breakdown as "breakdown",
+               r.hard_fails as "hardFails", r.sector
+        from job.recommended_roles r
+        where r.dismissed_at is null
+          and r.added_to_pipeline_slug is null
+          and (r.fit_score is null or r.fit_score >= 50)
+          and coalesce(array_length(r.hard_fails, 1), 0) = 0
+          and not exists (
+            select 1
+              from job.pipeline_roles p
+             where lower(p.company_name) = lower(r.company)
+               and lower(p.title) = lower(r.title)
+          )
+        order by r.fit_score desc nulls last, r.suggested_at desc
         limit 24;
       `;
       return jsonResp({ ok: true, version: VERSION, count: rows.length, recommendations: rows });

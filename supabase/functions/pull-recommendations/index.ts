@@ -87,7 +87,21 @@ serve(async (req) => {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
       const { kept, dropped } = scoreAndFilter(pulled, src.min_score);
-      const inserted = await insertNew(sql, src, kept);
+      // Drop anything the user already has in their pipeline (any state —
+      // active, archived, deleted). Match on (lower(company), lower(title))
+      // so a different ATS URL for the same posting still dedupes.
+      const pipelineKeys = await sql<{ key: string }[]>`
+        select distinct lower(company_name) || '|' || lower(title) as key
+          from job.pipeline_roles
+         where company_name is not null and title is not null
+      `;
+      const pipelineSet = new Set(pipelineKeys.map(r => r.key));
+      const filtered = kept.filter(r => {
+        const k = `${(r.input.company || '').toLowerCase()}|${(r.input.title || '').toLowerCase()}`;
+        return !pipelineSet.has(k);
+      });
+      const droppedToPipeline = kept.length - filtered.length;
+      const inserted = await insertNew(sql, src, filtered);
       // Bullets for newly-inserted rows AND any older active row that
       // never got bullets (e.g. from a prior failed run). Capped per
       // tick so one Anthropic outage doesn't burn the whole budget.
@@ -106,8 +120,8 @@ serve(async (req) => {
         const ctx = await loadUserContext(sql);
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
-      await markRun(sql, src.id, { count: inserted.length, dropped, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, inserted: inserted.length });
+      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline, error: null });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
@@ -224,17 +238,22 @@ async function generateBullets(
 ): Promise<void> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return;       // no key → leave bullets null, widget falls back to description
-  const system = `You write 3 short markdown bullets explaining why a candidate fits a job.
-Each bullet cites a CONCRETE detail from the candidate's skills/wins/vision OR from the role's fit breakdown — never vague platitudes.
-Keep each bullet under 22 words. Return only the markdown bullets, nothing else.`;
+  const system = `Write exactly 3 markdown bullets, each <= 18 words, plain language.
+Use **bold** for the 1–3 key phrases per bullet. No headers, no lead-ins, no platitudes.
+
+Bullet 1 — what the company does + the role in one sentence.
+Bullet 2 — why it MATCHES the user's stated job needs (sector / stage / comp / location / scope / culture).
+Bullet 3 — the open question to confirm before applying (location, scope, comp, autonomy, etc.).
+
+Return only the 3 bullets, nothing else.`;
   const userPrompt = [
     `# Role`,
-    `${row.title} at ${row.company} (fit score ${row.fitScore}).`,
-    `Score breakdown: ${Object.entries(row.breakdown).map(([k, v]) => `${k}=${v}`).join(', ')}.`,
+    `Title: ${row.title}`,
+    `Company: ${row.company}`,
+    `Fit score: ${row.fitScore} (${Object.entries(row.breakdown).map(([k, v]) => `${k}=${v}`).join(', ')})`,
     `URL: ${row.url}`,
-    `\n# Candidate skills\n${user.skills || '(none)'}`,
-    `\n# Recent wins\n${user.wins || '(none)'}`,
-    `\n# Vision\n${user.vision || '(none)'}`,
+    `\n# Candidate's job-search needs (vision)\n${user.vision || '(none)'}`,
+    `\n# Skills (background only — don't list them, just check fit)\n${user.skills || '(none)'}`,
   ].join('\n');
   try {
     const res = await fetch(ANTHROPIC_URL, {
