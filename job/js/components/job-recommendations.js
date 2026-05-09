@@ -5,9 +5,10 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
+  import('../logo.js' + V),
 ]);
 
 function relTime(iso) {
@@ -101,9 +102,19 @@ export class JobRecommendations extends LitElement {
     return html`
       <article class="rec-card" role="listitem">
         <header class="rec-card__head">
-          ${rec.logoUrl
-            ? html`<img class="rec-card__logo" src=${rec.logoUrl} alt="${rec.company || ''} logo" />`
-            : html`<div class="rec-card__logo rec-card__logo--placeholder" aria-hidden="true">${(rec.company || '?').slice(0, 1)}</div>`}
+          ${(() => {
+            const src = rec.logoUrl || logoSrc(rec);
+            return src
+              ? html`<img class="rec-card__logo" src=${src} alt="" loading="lazy" decoding="async"
+                          @error=${(e) => {
+                            const div = document.createElement('div');
+                            div.className = 'rec-card__logo rec-card__logo--placeholder';
+                            div.setAttribute('aria-hidden', 'true');
+                            div.textContent = logoInitial(rec.company);
+                            e.target.replaceWith(div);
+                          }}/>`
+              : html`<div class="rec-card__logo rec-card__logo--placeholder" aria-hidden="true">${logoInitial(rec.company)}</div>`;
+          })()}
           <div class="rec-card__title-block">
             <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
             ${meta ? html`<p class="rec-card__meta">${meta}</p>` : nothing}
