@@ -2045,7 +2045,10 @@
   margin-top: var(--space-2);
 }
 
-/* --- Recommended-for-you full list (sortable table) --- */
+/* --- Recommended-for-you page --- */
+/* Reuses .pipeline-table-wrap + .pipeline-table for the table itself.
+   These styles just cover the page header, new columns, action group,
+   and the round red dismiss button. */
 .recs-page__head {
   display: flex;
   align-items: baseline;
@@ -2058,56 +2061,47 @@
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
 }
-.recs-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-}
-.recs-table {
-  width: 100%;
-  border-collapse: collapse;
+
+/* Columns specific to the recs table — sizes mirror existing pipeline
+   col-* declarations (around line 2500). */
+.pipeline-table .col-location { width: 14%; min-width: 120px; color: var(--text-muted); }
+.pipeline-table .col-added    { width: 88px;  white-space: nowrap; color: var(--text-muted); }
+
+.rec-source {
   font-size: var(--font-size-body-sm);
-}
-.recs-table th,
-.recs-table td {
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-.recs-table thead th {
-  background: var(--bg-surface);
-  font-weight: var(--fw-semibold);
   color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  user-select: none;
-  position: sticky;
-  top: 0;
-  z-index: 1;
 }
-.recs-table th[data-sortable] { cursor: pointer; }
-.recs-table th[data-sortable]:hover { color: var(--text); }
-.recs-table th[aria-sort]::after {
-  margin-left: 4px;
-  opacity: 0.7;
+
+.rec-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-end;
 }
-.recs-table th[aria-sort="ascending"]::after  { content: ' ↑'; }
-.recs-table th[aria-sort="descending"]::after { content: ' ↓'; }
-.recs-table tbody tr:last-child td { border-bottom: 0; }
-.recs-table tbody tr:hover { background: var(--bg-surface); }
-.recs-table td.recs-table__title a {
-  color: var(--text);
-  text-decoration: none;
+
+/* Small red circle with × for one-click dismiss in a table row. */
+.btn-dismiss {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: filter 0.1s ease, transform 0.1s ease;
 }
-.recs-table td.recs-table__title a:hover { text-decoration: underline; }
-.recs-table td.recs-table__source { color: var(--text-muted); }
-.recs-table__empty {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--text-muted);
+.btn-dismiss:hover  { filter: brightness(0.92); }
+.btn-dismiss:active { transform: scale(0.94); }
+.btn-dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* --- Square company logo (table rows, detail header) --- */
@@ -2619,6 +2613,14 @@
   .pipeline-table .col-sector { grid-area: sector; width: auto; }
   .pipeline-table .col-menu   { grid-area: menu;   width: auto; text-align: right; }
   .pipeline-table .col-sector .tag-chips { max-height: none; }
+  /* Recs table extras — show as a meta line below the role on mobile. */
+  .pipeline-table tr:has(.col-location) {
+    grid-template-areas:
+      "fit  role     menu"
+      "loc  source   added";
+  }
+  .pipeline-table .col-location { grid-area: loc;    width: auto; }
+  .pipeline-table .col-added    { grid-area: added;  width: auto; text-align: right; }
 }
 
 /* --- Mobile top app bar (hamburger → drawer) --- */
