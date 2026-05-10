@@ -32,7 +32,7 @@ export interface RecommendedRoleInput {
   enrichmentStatus?:    'resolved' | 'unresolved' | 'failed';
   enrichmentRetryAt?:   string;       // ISO8601
   canonicalUrl?:        string;       // canonical apply URL when resolved
-  companyId?:           string;       // job.companies.id when known
+  companyId?:           string;       // job.hiring_companies.id when known
 }
 
 // A Source<Cfg> is a pure function from config → array of postings. No
