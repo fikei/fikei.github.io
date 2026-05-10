@@ -3,15 +3,21 @@
 // Pages compose: <div class="app"><job-rail></job-rail><main class="app__main">…</main><job-footer></job-footer></div>
 import { LitElement, html } from 'https://esm.run/lit@3';
 
+// Each Jobs sub-item is either a bucket-filter on /job/jobs/ (matched
+// by `bucket`) or a real sub-page (matched by `path` prefix). The
+// renderer below uses `path ? prefix-match : bucket-equality` to decide
+// aria-current — so when we're on a sub-page like /job/jobs/recommended/,
+// none of the bucket items light up.
 const ROUTES = [
   {
     href: '/job/jobs/',
     label: 'Jobs',
     match: /^\/job\/jobs\/?/,
     sub: [
-      { href: '/job/jobs/?bucket=leads',   label: 'Leads',   bucket: 'leads' },
-      { href: '/job/jobs/?bucket=active',  label: 'Active',  bucket: 'active' },
-      { href: '/job/jobs/?bucket=archive', label: 'Archive', bucket: 'archive' },
+      { href: '/job/jobs/?bucket=leads',     label: 'Leads',                bucket: 'leads' },
+      { href: '/job/jobs/?bucket=active',    label: 'Active',               bucket: 'active' },
+      { href: '/job/jobs/?bucket=archive',   label: 'Archive',              bucket: 'archive' },
+      { href: '/job/jobs/recommended/',      label: 'Recommended for you',  path: '/job/jobs/recommended/' },
     ],
   },
   { href: '/job/history/', label: 'Your career', match: /^\/job\/history\/?/ },
@@ -61,14 +67,23 @@ export class JobRail extends LitElement {
                   </a>
                   ${active && r.sub ? html`
                     <ul class="nav-sublist">
-                      ${r.sub.map(s => html`
-                        <li>
-                          <a href=${s.href}
-                             aria-current=${this.bucket === s.bucket ? 'page' : 'false'}>
-                            ${s.label}
-                          </a>
-                        </li>
-                      `)}
+                      ${r.sub.map(s => {
+                        // Path-based sub-items (real sub-pages) win out
+                        // over bucket-based ones — when we're on
+                        // /job/jobs/recommended/, no bucket should look
+                        // active.
+                        const onSubPath = r.sub.some(x => x.path && this.path.startsWith(x.path));
+                        const subActive = s.path
+                          ? this.path.startsWith(s.path)
+                          : (!onSubPath && this.bucket === s.bucket);
+                        return html`
+                          <li>
+                            <a href=${s.href} aria-current=${subActive ? 'page' : 'false'}>
+                              ${s.label}
+                            </a>
+                          </li>
+                        `;
+                      })}
                     </ul>
                   ` : ''}
                 </li>

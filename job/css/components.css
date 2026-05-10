@@ -1826,6 +1826,78 @@
   .dots-anim::after { content: '…'; animation: none; }
 }
 
+/* --- Recommendations widget: "See all" footer link --- */
+.rec-shell__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+/* --- Recommended-for-you full list (sortable table) --- */
+.recs-page__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.recs-page__head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+}
+.recs-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+.recs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+}
+.recs-table th,
+.recs-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.recs-table thead th {
+  background: var(--bg-surface);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.recs-table th[data-sortable] { cursor: pointer; }
+.recs-table th[data-sortable]:hover { color: var(--text); }
+.recs-table th[aria-sort]::after {
+  margin-left: 4px;
+  opacity: 0.7;
+}
+.recs-table th[aria-sort="ascending"]::after  { content: ' ↑'; }
+.recs-table th[aria-sort="descending"]::after { content: ' ↓'; }
+.recs-table tbody tr:last-child td { border-bottom: 0; }
+.recs-table tbody tr:hover { background: var(--bg-surface); }
+.recs-table td.recs-table__title a {
+  color: var(--text);
+  text-decoration: none;
+}
+.recs-table td.recs-table__title a:hover { text-decoration: underline; }
+.recs-table td.recs-table__source { color: var(--text-muted); }
+.recs-table__empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+
 /* --- Square company logo (table rows, detail header) --- */
 .company-logo {
   display: inline-block;

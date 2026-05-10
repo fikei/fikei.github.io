@@ -65,9 +65,12 @@ export async function addRole({ url, title, company, sector, source, fromRecomme
   return res.json();
 }
 
-export async function fetchRecommendations() {
+export async function fetchRecommendations(opts = {}) {
   const headers = await authHeader();
-  const res = await fetch(REC_URL, { headers });
+  // opts.view === 'all' → full list (no fit-score floor) for the
+  // "Recommended for you" page. Default is the carousel/widget view.
+  const url = opts.view === 'all' ? `${REC_URL}?view=all` : REC_URL;
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`recommendations ${res.status}: ${await res.text()}`);
   return res.json();
 }

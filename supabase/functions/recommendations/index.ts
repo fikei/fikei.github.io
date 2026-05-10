@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.3.0';
-console.log(`[recommendations] v${VERSION} - dedupe against pipeline by company+title`);
+const VERSION = '0.4.0';
+console.log(`[recommendations] v${VERSION} - ?view=all lifts score floor for "Recommended for you" page`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -18,6 +18,14 @@ serve(async (req) => {
     const sql = db();
 
     if (req.method === 'GET') {
+      // ?view=all   → all active recs regardless of fit score (for the
+      //               "Recommended for you" full-list page). Still excludes
+      //               dismissed + already-in-pipeline; those are signal of
+      //               user intent, not just score thresholds.
+      // (default)   → score floor 50, max 60 rows (drives the carousel).
+      const url = new URL(req.url);
+      const view = url.searchParams.get('view') || 'default';
+      const isAll = view === 'all';
       const rows = await sql`
         select r.id, r.source, r.source_label as "sourceLabel", r.url, r.company, r.title, r.location,
                r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
@@ -27,8 +35,8 @@ serve(async (req) => {
         from job.recommended_roles r
         where r.dismissed_at is null
           and r.added_to_pipeline_slug is null
-          and (r.fit_score is null or r.fit_score >= 50)
-          and coalesce(array_length(r.hard_fails, 1), 0) = 0
+          and (${isAll} or r.fit_score is null or r.fit_score >= 50)
+          and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
           and not exists (
             select 1
               from job.pipeline_roles p
@@ -36,9 +44,9 @@ serve(async (req) => {
                and lower(p.title) = lower(r.title)
           )
         order by r.fit_score desc nulls last, r.suggested_at desc
-        limit 60;
+        limit ${isAll ? 500 : 60};
       `;
-      return jsonResp({ ok: true, version: VERSION, count: rows.length, recommendations: rows });
+      return jsonResp({ ok: true, version: VERSION, view, count: rows.length, recommendations: rows });
     }
 
     if (req.method === 'POST') {
