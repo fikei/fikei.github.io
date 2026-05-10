@@ -185,15 +185,27 @@ export class JobRecommendations extends LitElement {
     if (this.state === 'error' || !this.items.length) {
       return html`<div class="rec-shell">${this._renderEmpty()}</div>`;
     }
+    // Show only the top 5 by fit score on the widget; full list lives
+    // on /job/jobs/recommended/. Items already arrive sorted by
+    // fit_score desc from the recommendations function.
+    const top = this.items.slice(0, 5);
+    const total = this.items.length;
     return html`
       <section class="rec-shell" aria-label="Recommendations">
         <header class="rec-shell__head">
           <h2>Recommended for you</h2>
-          <span class="muted">${this.items.length} fresh ${this.items.length === 1 ? 'role' : 'roles'}</span>
+          <span class="muted">
+            Top ${top.length} of ${total} ${total === 1 ? 'role' : 'roles'}
+          </span>
         </header>
         <div class="rec-row" role="list">
-          ${this.items.map(r => this._renderCard(r))}
+          ${top.map(r => this._renderCard(r))}
         </div>
+        <footer class="rec-shell__foot">
+          <a class="link-subtle" href="/job/jobs/recommended/">
+            See all recommendations →
+          </a>
+        </footer>
       </section>
     `;
   }

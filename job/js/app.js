@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.52.0";
-console.log(`[job] v${VERSION} - Cover letter: shimmer-on-edit, selection-to-edit, click-through history`);
+const VERSION = "0.53.0";
+console.log(`[job] v${VERSION} - Top-5 recs widget + Recommended for you page + rename Leads→Saved`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -22,6 +22,8 @@ if (location.pathname.startsWith('/job/history/drill')) {
 }
 if (location.pathname.startsWith('/job/jobs/drill')) {
   import('./components/job-role-detail.js' + V);
+} else if (location.pathname.startsWith('/job/jobs/recommended')) {
+  import('./components/job-recommendations-table.js' + V);
 } else if (location.pathname.startsWith('/job/jobs')) {
   import('./components/job-pipeline.js' + V);
 }
