@@ -198,12 +198,21 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
         continue;
       }
 
-      let job: ExtractedJob | null;
-      try {
-        job = await extractJob({ subject, sender, body });
-      } catch (e) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message });
-        continue;
+      // Fast path: LinkedIn job alert subjects are reliably "{title} at
+      // {company}", which is more accurate than Haiku's extraction
+      // (Haiku gets confused by the "you might also like" sidecards
+      // LinkedIn includes and flags the whole message as a digest).
+      let job: ExtractedJob | null = parseLinkedInSubject(subject, sender, body);
+
+      // Fallback: Haiku for non-LinkedIn senders, or LinkedIn where the
+      // subject didn't match.
+      if (!job) {
+        try {
+          job = await extractJob({ subject, sender, body });
+        } catch (e) {
+          await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message });
+          continue;
+        }
       }
 
       if (!job || !job.company || (job.confidence !== undefined && job.confidence < 0.5)) {
@@ -370,14 +379,8 @@ async function extractJob(args: { subject: string; sender: string; body: string 
   if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const data = await r.json() as { content: Array<{ type: string; text: string }> };
   const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
-  // Tolerate ```json fences in case the model adds them despite system.
-  const jsonText = text.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
-  let parsed: { company?: string; title?: string; location?: string; alertUrl?: string; confidence?: number };
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    throw new Error(`bad JSON from haiku: ${jsonText.slice(0, 120)}`);
-  }
+  const parsed = extractFirstJsonObject(text) as { company?: string; title?: string; location?: string; alertUrl?: string; confidence?: number } | null;
+  if (!parsed) throw new Error(`bad JSON from haiku: ${text.slice(0, 120)}`);
   return {
     company:    (parsed.company || '').trim(),
     title:      (parsed.title || '').trim(),
@@ -385,5 +388,61 @@ async function extractJob(args: { subject: string; sender: string; body: string 
     alertUrl:   (parsed.alertUrl || '').trim() || undefined,
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : undefined,
   };
+}
+
+// Tolerant JSON extractor: finds the first balanced { ... } block in
+// the text (ignoring leading/trailing prose and ```json fences) and
+// parses it. Haiku sometimes appends commentary after the JSON despite
+// system instructions; this absorbs that.
+function extractFirstJsonObject(text: string): unknown {
+  // Strip code fences first.
+  const stripped = text.replace(/```json\s*/gi, '').replace(/```/g, '');
+  const start = stripped.indexOf('{');
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < stripped.length; i++) {
+    const c = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) {
+        const candidate = stripped.slice(start, i + 1);
+        try { return JSON.parse(candidate); } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
+// LinkedIn job-alert subjects: "{title} at {company}".
+// Body always contains at least one link to linkedin.com/comm/jobs/view
+// or linkedin.com/jobs/view — use the first one as the apply URL.
+// Returns null when the subject doesn't match (e.g. weekly recap emails).
+function parseLinkedInSubject(subject: string, sender: string, body: string): ExtractedJob | null {
+  if (!/linkedin\.com/i.test(sender)) return null;
+  // Exclude obvious digest/recap subjects.
+  if (/\b(jobs for you|top jobs|jobs of the week|recap|roundup)\b/i.test(subject)) return null;
+  const m = subject.match(/^(.+?)\s+at\s+(.+?)\s*$/i);
+  if (!m) return null;
+  const title = m[1].trim();
+  const company = m[2].trim();
+  if (!title || !company) return null;
+
+  // Find the first job-view link in the body.
+  const urlMatch = body.match(/https?:\/\/(?:www\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/[^\s"'<>)]+/i);
+  const alertUrl = urlMatch?.[0];
+
+  // Best-effort location: first line after the subject's match in the
+  // body that looks like a location string. Optional.
+  const locMatch = body.match(/\b([A-Z][A-Za-z .'-]+,\s*[A-Z]{2}(?:\s*\(Hybrid\)|\s*\(Remote\)|\s*\(On-site\))?)\b/);
+  const location = locMatch?.[1];
+
+  return { company, title, location, alertUrl, confidence: 0.9 };
 }
 
