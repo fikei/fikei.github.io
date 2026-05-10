@@ -102,26 +102,33 @@ VOICE RULES:
 
 Output ONLY the markdown. No preamble. No "Here is your reformatted resume." Start with "# ".`;
 
-export const COVER_RATIONALE_VOICE = `You are annotating a cover letter to explain why each load-bearing phrase is there.
+export const COVER_RATIONALE_VOICE = `You are annotating a cover letter for the candidate. Two jobs:
+
+A) Explain why each load-bearing phrase is there ("highlights").
+B) Surface places where new information would strengthen the letter ("opportunities") — concrete data, projects, anecdotes, or narratives that aren't in the sources you were given but would obviously sharpen the application if the candidate added them.
 
 You will receive:
 - The full cover letter text.
 - A set of "source" bullets from a role analysis (Suggested angle, Why it fits, Strengths, Gaps to address). These describe what the cover letter SHOULD do for this role.
 
-Your job: identify 4–8 specific phrases or short sentences in the cover letter that map to one of the sources. For each, return:
-- "phrase":   an exact substring of the cover letter (verbatim, including any punctuation). Pick the shortest substring that captures the load-bearing claim — usually a clause, sometimes a sentence. Must appear EXACTLY in the cover letter.
-- "label":    one of "Suggested angle", "Why it fits", "Strengths", "Gaps to address" — the source field this phrase supports.
-- "rationale": one sentence (≤25 words) explaining what work the phrase does for the application — what point it makes, which JD/analysis bullet it addresses. NOT a paraphrase of the phrase itself.
+For HIGHLIGHTS, identify 4–8 specific phrases or short sentences that map to one of the sources. For each:
+- "phrase":    exact substring of the cover letter (verbatim, including punctuation). Pick the shortest substring that captures the load-bearing claim.
+- "label":     one of "Suggested angle", "Why it fits", "Strengths", "Gaps to address".
+- "rationale": one sentence (≤25 words) explaining what work the phrase does — NOT a paraphrase of itself.
 
-Output ONLY a JSON object: { "highlights": [ {phrase, label, rationale}, ... ] }. No prose, no code fence.
+For OPPORTUNITIES, identify 2–5 places where missing information would make the letter materially stronger. For each:
+- "phrase":     exact substring of the cover letter (verbatim) where the missing info would live. Usually a sentence the candidate has hedged or generalized. Must appear EXACTLY in the letter.
+- "gap":        one sentence (≤25 words) naming what's missing — e.g. "No specific metric for the platform scaling outcome," or "Vague on which compliance frameworks Ian has shipped against."
+- "ask":        one short question (≤20 words) the candidate could answer to fill the gap, written to them in second person ("What specific…", "Which framework…", "How long did…").
+
+Output ONLY a JSON object: { "highlights": [...], "opportunities": [...] }. No prose, no code fence.
 
 Rules:
-- Each "phrase" MUST be a verbatim substring. If a sentence has been rewritten, find the closest exact substring.
-- Phrases must NOT overlap. Pick the most important one if two candidates collide.
-- Order them in document order (top to bottom).
-- 4–8 highlights total. Quality over quantity. If only 4 sentences are doing real work, pick those 4.
-- Skip pleasantries, sign-offs, the opener salutation, and generic transitions.
-- Don't reuse the same source label more than 3 times.`;
+- Each phrase MUST be a verbatim substring. Highlights and opportunities can overlap with different rationales (rare, but allowed if both are genuinely there).
+- Order each list in document order.
+- Skip pleasantries, sign-offs, the opener salutation.
+- Highlights: don't reuse the same source label more than 3 times.
+- Opportunities: prefer specific asks that would unlock a concrete next sentence — avoid generic asks like "What else can you share?"`;
 
 export const COVER_EDIT_VOICE = `You will receive:
 - The current cover letter (markdown).
@@ -138,7 +145,7 @@ RULES:
 - Don't fabricate facts. If the instruction asks for evidence the letter doesn't have, lean on what's already there or skip.
 - Do NOT add a preamble or a meta line like "Here's the revised letter." Output ONLY the markdown.`;
 
-export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit';
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add';
 
 export function buildSystemPrompt(kind: GenKind): string {
   if (kind === 'format-resume') {

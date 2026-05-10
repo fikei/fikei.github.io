@@ -861,6 +861,37 @@
   background: var(--accent);
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
+
+/* Opportunity card: amber accent + sigil + "ask" subtitle. */
+.cover-comment--op { background: rgba(255, 213, 79, 0.06); }
+.cover-comment--op .cover-comment__num {
+  background: rgba(255, 213, 79, 0.25);
+  color: #8a5a00;
+  border-color: rgba(255, 213, 79, 0.45);
+}
+.cover-comment--op.is-active::before { background: #c98a00; }
+.cover-comment--op.is-active .cover-comment__num {
+  background: #c98a00;
+  color: #fff;
+  border-color: #c98a00;
+}
+.cover-comment__ask {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-small);
+  font-style: italic;
+  color: var(--fg);
+}
+
+/* Opportunity marks in the body: dotted amber underline, no fill. */
+.asset-doc mark.d-op {
+  background: transparent;
+  color: inherit;
+  border-bottom: 2px dotted #c98a00;
+  padding: 0 1px;
+  cursor: help;
+}
+.asset-doc mark.d-op sup.d-fn { color: #8a5a00; }
+
 .cover-rail__list[data-active]:not([data-active=""]) .cover-comment:not(.is-active) {
   opacity: 0.55;
 }
