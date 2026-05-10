@@ -1572,6 +1572,12 @@
 .pipeline-row:hover td { background: var(--bg-surface); }
 .pipeline-row.is-archived { cursor: pointer; }
 
+/* --- Drag-to-reorder (Saved bucket) --- */
+.pipeline-row.is-reorderable { cursor: grab; }
+.pipeline-row.is-reorderable:active { cursor: grabbing; }
+.pipeline-row.is-dragging td { opacity: 0.4; }
+.pipeline-row.is-drop-target td { box-shadow: inset 0 2px 0 0 var(--accent); }
+
 /* --- Sector tag chips (pipeline cell) --- */
 .tag-chips {
   list-style: none;

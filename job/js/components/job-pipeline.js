@@ -44,6 +44,25 @@ const COLUMNS = [
   { id: 'menu',   label: '',       sortKey: null },
 ];
 
+// Manual ordering — user can drag rows in the Saved (leads) bucket. Order
+// persists in localStorage as a per-bucket array of slugs. Any column sort
+// overrides it; a "Use custom order" button restores it.
+const MANUAL_ORDER_KEY = 'job:jobs:manualOrder';
+function loadManualOrders() {
+  try {
+    const raw = localStorage.getItem(MANUAL_ORDER_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return {
+      leads:   Array.isArray(parsed.leads)   ? parsed.leads   : [],
+      active:  Array.isArray(parsed.active)  ? parsed.active  : [],
+      archive: Array.isArray(parsed.archive) ? parsed.archive : [],
+    };
+  } catch { return { leads: [], active: [], archive: [] }; }
+}
+function saveManualOrders(orders) {
+  try { localStorage.setItem(MANUAL_ORDER_KEY, JSON.stringify(orders)); } catch {}
+}
+
 // Drop rows without an apply link, and any Strava postings (out of scope).
 function isVisibleRole(r) {
   if (!r.url) return false;
@@ -86,12 +105,22 @@ export class JobPipeline extends LitElement {
     this.state = 'idle';
     this.error = '';
     this.roles = [];
-    this.sortKey = 'score';
-    this.sortDir = 'desc';
+    this._manualOrders = loadManualOrders();
+    this._dragSlug = null;
+    this._dragOverSlug = null;
     this.selectedRow = null;
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
     this.bucket = (b === 'leads' || b === 'active' || b === 'archive') ? b : 'leads';
+    // Default to manual order in Saved if the user has dragged something
+    // before; otherwise fall back to fit-score.
+    if (this.bucket === 'leads' && this._manualOrders.leads.length) {
+      this.sortKey = 'manual';
+      this.sortDir = 'asc';
+    } else {
+      this.sortKey = 'score';
+      this.sortDir = 'desc';
+    }
     if (b !== this.bucket) {
       // Normalise URL so subnav highlight matches.
       const qs = new URLSearchParams(location.search);
@@ -245,6 +274,22 @@ export class JobPipeline extends LitElement {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
     const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket));
+    if (key === 'manual') {
+      const order = this._manualOrders[this.bucket] || [];
+      const idx = new Map(order.map((slug, i) => [slug, i]));
+      arr.sort((a, b) => {
+        const ai = idx.has(a.slug) ? idx.get(a.slug) : Infinity;
+        const bi = idx.has(b.slug) ? idx.get(b.slug) : Infinity;
+        if (ai !== bi) return ai - bi;
+        // New (unordered) rows fall to the bottom, broken by fit desc.
+        const av = a.score, bv = b.score;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return bv - av;
+      });
+      return arr;
+    }
     arr.sort((a, b) => {
       const av = a[key];
       const bv = b[key];
@@ -299,6 +344,15 @@ export class JobPipeline extends LitElement {
     e.preventDefault();
     if (bucket === this.bucket) return;
     this.bucket = bucket;
+    // On Saved, prefer manual order if the user has one; otherwise reset to
+    // fit-desc. The other buckets always default to fit-desc.
+    if (bucket === 'leads' && this._manualOrders.leads.length) {
+      this.sortKey = 'manual';
+      this.sortDir = 'asc';
+    } else {
+      this.sortKey = 'score';
+      this.sortDir = 'desc';
+    }
     const qs = new URLSearchParams(location.search);
     qs.set('bucket', bucket);
     history.pushState(null, '', `${location.pathname}?${qs}`);
@@ -340,6 +394,72 @@ export class JobPipeline extends LitElement {
     }
   }
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
+
+  // --- Drag-to-reorder (Saved bucket only) -----------------------------
+  _canReorder() { return this.bucket === 'leads'; }
+
+  _onDragStart(r, e) {
+    if (!this._canReorder()) return;
+    this._dragSlug = r.slug;
+    try {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', r.slug);
+    } catch {}
+  }
+  _onDragOver(r, e) {
+    if (!this._canReorder() || !this._dragSlug) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this._dragOverSlug !== r.slug) {
+      this._dragOverSlug = r.slug;
+      this.requestUpdate();
+    }
+  }
+  _onDragLeave(r) {
+    if (this._dragOverSlug === r.slug) {
+      this._dragOverSlug = null;
+      this.requestUpdate();
+    }
+  }
+  _onDragEnd() {
+    this._dragSlug = null;
+    this._dragOverSlug = null;
+    this.requestUpdate();
+  }
+  _onDrop(r, e) {
+    if (!this._canReorder()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const from = this._dragSlug;
+    this._dragSlug = null;
+    this._dragOverSlug = null;
+    if (!from || from === r.slug) { this.requestUpdate(); return; }
+
+    // Compute new order from the currently displayed sequence so the move
+    // is visually exact, regardless of which sort was active.
+    const displayed = this._sorted().map(x => x.slug);
+    const fromIdx = displayed.indexOf(from);
+    const toIdx = displayed.indexOf(r.slug);
+    if (fromIdx < 0 || toIdx < 0) { this.requestUpdate(); return; }
+    displayed.splice(fromIdx, 1);
+    displayed.splice(toIdx, 0, from);
+
+    this._manualOrders = { ...this._manualOrders, [this.bucket]: displayed };
+    saveManualOrders(this._manualOrders);
+    this.sortKey = 'manual';
+    this.sortDir = 'asc';
+    this.requestUpdate();
+  }
+
+  _useCustomOrder() {
+    // Seed with the current visible order so the user's new manual order
+    // starts where they were looking (typically fit-desc).
+    const displayed = this._sorted().map(x => x.slug);
+    this._manualOrders = { ...this._manualOrders, [this.bucket]: displayed };
+    saveManualOrders(this._manualOrders);
+    this.sortKey = 'manual';
+    this.sortDir = 'asc';
+  }
 
   _renderMenuCell(r) {
     const archived = isArchived(r);
@@ -424,8 +544,20 @@ export class JobPipeline extends LitElement {
 
   _renderRow(r) {
     const showStatus = this.bucket !== 'leads';
+    const reorder = this._canReorder();
+    const cls = 'pipeline-row'
+      + (isArchived(r) ? ' is-archived' : '')
+      + (reorder ? ' is-reorderable' : '')
+      + (reorder && this._dragSlug === r.slug ? ' is-dragging' : '')
+      + (reorder && this._dragOverSlug === r.slug && this._dragSlug && this._dragSlug !== r.slug ? ' is-drop-target' : '');
     return html`
-      <tr class=${'pipeline-row' + (isArchived(r) ? ' is-archived' : '')}
+      <tr class=${cls}
+          draggable=${reorder ? 'true' : 'false'}
+          @dragstart=${(e) => this._onDragStart(r, e)}
+          @dragover=${(e) => this._onDragOver(r, e)}
+          @dragleave=${() => this._onDragLeave(r)}
+          @drop=${(e) => this._onDrop(r, e)}
+          @dragend=${() => this._onDragEnd()}
           @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
           <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
@@ -609,7 +741,16 @@ export class JobPipeline extends LitElement {
       ` : nothing}
 
       <div class="pipeline-meta">
-        <strong>${rows.length}</strong> ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'}, sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.
+        <strong>${rows.length}</strong> ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'},
+        ${this.sortKey === 'manual'
+          ? html`in your custom order. <span class="muted">Drag rows to rearrange.</span>`
+          : html`sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.`}
+        ${this.bucket === 'leads' && this.sortKey !== 'manual' && this._manualOrders.leads.length ? html`
+          <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Use my order</button>
+        ` : nothing}
+        ${this.bucket === 'leads' && this.sortKey !== 'manual' && !this._manualOrders.leads.length ? html`
+          <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Arrange manually</button>
+        ` : nothing}
         <button class="btn btn--sm" ?disabled=${this.livenessChecking}
                 @click=${() => this._onCheckLiveness()}>
           ${this.livenessChecking ? 'Checking…' : 'Check liveness'}
