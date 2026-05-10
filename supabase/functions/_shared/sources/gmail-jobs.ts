@@ -78,10 +78,6 @@ const DIGEST_HINTS = [
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
-const ENRICH_URL =
-  Deno.env.get('ENRICH_JOB_SOURCE_URL') ||
-  'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/enrich-job-source';
-
 interface ExtractedJob {
   company: string;
   title: string;
@@ -227,51 +223,32 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
         continue;
       }
 
-      // Enrichment.
-      let enriched: { resolved: boolean; companyId: string; canonicalUrl?: string; jdText?: string; nextRetryAt?: string; atsProvider?: string };
-      try {
-        enriched = await enrich({ company: job.company, title: job.title, hintAtsUrl: job.alertUrl, hintDomain: senderDomain(sender) });
-      } catch (e) {
-        console.warn(`[gmail-jobs] enrich(${job.company}) failed: ${(e as Error).message}`);
-        // Soft-fail: still emit the row pointing at the alert URL,
-        // flagged unresolved, so the user sees something.
-        enriched = { resolved: false, companyId: '', canonicalUrl: undefined };
-      }
-
-      const url = enriched.canonicalUrl || job.alertUrl;
+      // Phase 1: emit with the aggregator URL directly. Canonical-URL
+      // resolution (resolve LinkedIn alert → Greenhouse posting) is
+      // deferred — it adds API surface, schema, and failure modes that
+      // aren't load-bearing for "show me job recs in the widget."
+      // Click-through to the aggregator is one extra step, acceptable.
+      // The enrich-job-source function is still on disk for when this
+      // becomes worth re-enabling.
+      const url = job.alertUrl;
       if (!url) {
         await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_url', { extracted: job });
         continue;
       }
 
-      const sourceId = `gmail:${messageId}`;
-      const sourceLabel = enriched.resolved && enriched.atsProvider
-        ? `Gmail · ${enriched.atsProvider} · ${job.company}`
-        : `Gmail · ${job.company}`;
-
       out.push({
         source:      'gmail-jobs',
-        sourceId,
-        sourceLabel,
+        sourceId:    `gmail:${messageId}`,
+        sourceLabel: `Gmail · ${job.company}`,
         url,
         company:     job.company,
         title:       job.title,
         location:    job.location,
         postedAt:    msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : undefined,
-        description: enriched.jdText ? enriched.jdText.slice(0, 4000) : undefined,
-        enrichmentStatus:  enriched.resolved ? 'resolved' : 'unresolved',
-        enrichmentRetryAt: enriched.nextRetryAt,
-        canonicalUrl:      enriched.canonicalUrl,
-        companyId:         enriched.companyId || undefined,
         payload: {
-          gmailMessageId:    messageId,
-          gmailApiId:        msg.id,
-          enrichmentResolved: enriched.resolved,
-          enrichmentRetryAt:  enriched.nextRetryAt ?? null,
-          companyId:          enriched.companyId || null,
-          canonicalUrl:       enriched.canonicalUrl ?? null,
-          alertUrl:           job.alertUrl ?? null,
-          atsProvider:        enriched.atsProvider ?? null,
+          gmailMessageId: messageId,
+          gmailApiId:     msg.id,
+          alertUrl:       job.alertUrl ?? null,
           sender,
         },
       });
@@ -312,11 +289,6 @@ function looksLikeDigest(subject: string, sender: string): boolean {
   // hnhiring / yc.startup.jobs digests are always multi-role
   if (/(hnhiring\.com|hackernewsletter\.com)/.test(sender)) return true;
   return false;
-}
-
-function senderDomain(sender: string): string | undefined {
-  const m = sender.match(/<?([^<\s@]+)@([^>\s]+)>?/);
-  return m?.[2]?.toLowerCase();
 }
 
 async function logSkipped(
@@ -415,19 +387,3 @@ async function extractJob(args: { subject: string; sender: string; body: string 
   };
 }
 
-// ---------- enrichment call ----------
-
-async function enrich(args: { company: string; title: string; hintAtsUrl?: string; hintDomain?: string }): Promise<{ resolved: boolean; companyId: string; canonicalUrl?: string; jdText?: string; nextRetryAt?: string; atsProvider?: string }> {
-  const r = await fetch(ENRICH_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Service role bearer so the function can be called function-to-function.
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
-    },
-    body: JSON.stringify(args),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!r.ok) throw new Error(`enrich ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  return await r.json();
-}
