@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.40.0";
-console.log(`[job] v${VERSION} - vision: tabs + card grid + inline detail`);
+const VERSION = "0.40.1";
+console.log(`[job] v${VERSION} - role column fixed-width; sector absorbs slack (resolved on top of vision rebase)`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
