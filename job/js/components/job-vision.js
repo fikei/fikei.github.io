@@ -1,7 +1,15 @@
-// job-vision — render & edit the goals/intents corpus that the /jobs skill
-// reads for relevance scoring. Lists 02-goals-intents/ via kb-read, renders
-// each .md file, and commits edits back through kb-write (with baseSha
-// concurrency control).
+// job-vision — tabbed browser for fikei/job/02-goals-intents/.
+//
+// Layout:
+//   [Narrative | Goals | Intents | Filters | Other]   ← only non-empty tabs
+//   Grid of cards  (title · path · preview · word count · "Open")
+//   Click a card  → expands inline (full-row) to render the markdown and
+//                   expose Edit/Save/Cancel. Edits commit via kb-write with
+//                   baseSha concurrency control.
+//
+// Filename → tab classification is a tolerant prefix/keyword match; anything
+// unmatched lands in "Other". The /jobs skill reads the same files; nothing
+// here changes what it sees on disk.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
@@ -12,19 +20,62 @@ const [{ renderMarkdown }, { writeFile }] = await Promise.all([
 
 const VISION_DIR = '02-goals-intents';
 
+// Order matters — tabs render in this order; first match wins. The "All" tab
+// is prepended automatically. Each entry maps to (label, predicate).
+const CATEGORIES = [
+  { id: 'narrative', label: 'Narrative',
+    test: (n) => /^(narrative|voice|story|bio|about|arc)/.test(n) },
+  { id: 'goals',     label: 'Goals',
+    test: (n) => /^(goal|north|mission|vision|aim|ambition)/.test(n) },
+  { id: 'intents',   label: 'Intents',
+    test: (n) => /^(intent|target|seeking|looking|wants|preference)/.test(n) },
+  { id: 'filters',   label: 'Filters',
+    test: (n) => /^(criteria|filter|dealbreaker|anti|no-go|must|reject|exclud)/.test(n) },
+  { id: 'other',     label: 'Other', test: () => true },
+];
+
+function categoryFor(name) {
+  const base = name.replace(/\.md$/, '').toLowerCase();
+  for (const c of CATEGORIES) if (c.test(base)) return c.id;
+  return 'other';
+}
+
 function titleFromFile(name, content) {
   const m = (content || '').match(/^#\s+(.+)$/m);
   if (m) return m[1].trim();
   return name.replace(/\.md$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// Plain-text preview: drop the H1, strip markdown syntax, collapse whitespace.
+function previewFor(content) {
+  const noH1 = (content || '').replace(/^#\s+.+\n+/, '');
+  const stripped = noH1
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, s, l) => (l || s))
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^[#>*\-+\s]+/gm, '')
+    .replace(/\*\*?([^*]+)\*\*?/g, '$1')
+    .replace(/_+([^_]+)_+/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped;
+}
+
+function wordCount(content) {
+  return (content || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
 export class JobVision extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
-    state: { state: true },
-    error: { state: true },
-    files: { state: true }, // [{ path, name, content, sha, editing, draft, saving, saveError }]
+    state:    { state: true },
+    error:    { state: true },
+    files:    { state: true }, // [{ path, name, content, sha, category, editing, draft, saving, saveError }]
+    activeTab:{ state: true }, // 'all' | category id
+    openPath: { state: true }, // currently expanded file
   };
 
   constructor() {
@@ -32,6 +83,9 @@ export class JobVision extends LitElement {
     this.state = 'idle';
     this.error = '';
     this.files = [];
+    const params = new URLSearchParams(location.search);
+    this.activeTab = params.get('tab') || 'all';
+    this.openPath = params.get('open') || '';
   }
 
   connectedCallback() {
@@ -59,12 +113,18 @@ export class JobVision extends LitElement {
       const files = await Promise.all(mdEntries.map(async (e) => {
         try {
           const { content, sha } = await window.JobKB.readFile(e.path);
-          return { path: e.path, name: e.name, content, sha,
-                   editing: false, draft: '', saving: false, saveError: '' };
+          return {
+            path: e.path, name: e.name, content, sha,
+            category: categoryFor(e.name),
+            editing: false, draft: '', saving: false, saveError: '',
+          };
         } catch (err) {
-          return { path: e.path, name: e.name, content: '', sha: '',
-                   editing: false, draft: '', saving: false,
-                   saveError: String(err?.message || err) };
+          return {
+            path: e.path, name: e.name, content: '', sha: '',
+            category: categoryFor(e.name),
+            editing: false, draft: '', saving: false,
+            saveError: String(err?.message || err),
+          };
         }
       }));
       this.files = files;
@@ -73,6 +133,32 @@ export class JobVision extends LitElement {
       this.error = String(e?.message || e);
       this.state = 'error';
     }
+  }
+
+  _writeUrl() {
+    const qs = new URLSearchParams();
+    if (this.activeTab && this.activeTab !== 'all') qs.set('tab', this.activeTab);
+    if (this.openPath) qs.set('open', this.openPath);
+    const search = qs.toString();
+    history.replaceState(null, '', '/job/vision/' + (search ? `?${search}` : ''));
+  }
+
+  _switchTab(id) {
+    this.activeTab = id;
+    if (this.openPath) {
+      const open = this.files.find(f => f.path === this.openPath);
+      if (open && id !== 'all' && open.category !== id) this.openPath = '';
+    }
+    this._writeUrl();
+  }
+
+  _openCard(path) {
+    this.openPath = this.openPath === path ? '' : path;
+    if (!this.openPath) {
+      // Close any in-progress edit when collapsing.
+      this._updateFile(path, { editing: false, draft: '', saveError: '' });
+    }
+    this._writeUrl();
   }
 
   _updateFile(path, patch) {
@@ -84,11 +170,9 @@ export class JobVision extends LitElement {
     if (!f) return;
     this._updateFile(path, { editing: true, draft: f.content, saveError: '' });
   }
-
   _cancelEdit(path) {
     this._updateFile(path, { editing: false, draft: '', saveError: '' });
   }
-
   _onDraftInput(path, value) {
     this._updateFile(path, { draft: value });
   }
@@ -120,26 +204,77 @@ export class JobVision extends LitElement {
     }
   }
 
-  _renderFile(f) {
+  _visibleTabs() {
+    const counts = new Map([['all', this.files.length]]);
+    for (const f of this.files) counts.set(f.category, (counts.get(f.category) || 0) + 1);
+    const tabs = [{ id: 'all', label: 'All', count: counts.get('all') || 0 }];
+    for (const c of CATEGORIES) {
+      const n = counts.get(c.id) || 0;
+      if (n > 0) tabs.push({ id: c.id, label: c.label, count: n });
+    }
+    return tabs;
+  }
+
+  _filteredFiles() {
+    if (this.activeTab === 'all') return this.files;
+    return this.files.filter(f => f.category === this.activeTab);
+  }
+
+  _renderTabs(tabs) {
+    return html`
+      <div class="asset-tabs">
+        ${tabs.map(t => html`
+          <button class="asset-tabs__tab ${this.activeTab === t.id ? 'is-active' : ''}"
+                  @click=${() => this._switchTab(t.id)}>
+            ${t.label} <span class="muted" style="font-weight:400;">${t.count}</span>
+          </button>
+        `)}
+      </div>
+    `;
+  }
+
+  _renderCard(f) {
     const title = titleFromFile(f.name, f.content);
+    const preview = previewFor(f.content);
+    const words = wordCount(f.content);
+    const isOpen = this.openPath === f.path;
+    if (isOpen) return this._renderDetail(f, title);
+    return html`
+      <button type="button" class="vision-card" @click=${() => this._openCard(f.path)}>
+        <h3 class="vision-card__title">${title}</h3>
+        <div class="vision-card__meta">
+          <span>${f.name}</span>
+          <span>·</span>
+          <span>${words} ${words === 1 ? 'word' : 'words'}</span>
+        </div>
+        <p class="vision-card__preview">${preview || '_(empty)_'}</p>
+        <div class="vision-card__footer">
+          <span class="vision-card__cta">Open →</span>
+        </div>
+      </button>
+    `;
+  }
+
+  _renderDetail(f, title) {
     const stripped = (f.content || '').replace(/^#\s+.+\n+/, '');
     return html`
-      <section class="narrative-block">
-        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap;">
+      <section class="vision-detail">
+        <header class="vision-detail__head">
           <div>
-            <h2 style="margin:0;">${title}</h2>
+            <h2 class="vision-detail__title">${title}</h2>
             <p class="muted" style="margin:0;font-size:var(--font-size-small);font-family:var(--font-mono);">${f.path}</p>
           </div>
-          ${f.editing ? html`
-            <div style="display:flex;gap:var(--space-2);">
+          <div class="vision-detail__actions">
+            ${f.editing ? html`
               <button class="btn btn--sm" ?disabled=${f.saving} @click=${() => this._cancelEdit(f.path)}>Cancel</button>
               <button class="btn btn--sm btn--primary" ?disabled=${f.saving} @click=${() => this._save(f.path)}>
                 ${f.saving ? 'Saving…' : 'Save'}
               </button>
-            </div>
-          ` : html`
-            <button class="btn btn--sm" @click=${() => this._startEdit(f.path)}>Edit</button>
-          `}
+            ` : html`
+              <button class="btn btn--sm" @click=${() => this._startEdit(f.path)}>Edit</button>
+              <button class="btn btn--sm" @click=${() => this._openCard(f.path)}>Close</button>
+            `}
+          </div>
         </header>
 
         ${f.saveError ? html`
@@ -147,11 +282,11 @@ export class JobVision extends LitElement {
         ` : nothing}
 
         ${f.editing ? html`
-          <textarea class="asset-editor" style="min-height: 320px;"
+          <textarea class="asset-editor" style="min-height: 360px;"
                     .value=${f.draft}
                     @input=${(e) => this._onDraftInput(f.path, e.target.value)}></textarea>
         ` : html`
-          <article class="kb-doc">${unsafeHTML(renderMarkdown(stripped || f.content || '_(empty)_'))}</article>
+          <article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(stripped || f.content || '_(empty)_'))}</article>
         `}
       </section>
     `;
@@ -160,12 +295,15 @@ export class JobVision extends LitElement {
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
-        <section class="narrative-block">
-          <div class="skeleton" style="width:240px;height:18px;display:block;margin-bottom:var(--space-3);"></div>
-          <div class="skeleton" style="width:100%;height:14px;display:block;margin-bottom:8px;"></div>
-          <div class="skeleton" style="width:96%;height:14px;display:block;margin-bottom:8px;"></div>
-          <div class="skeleton" style="width:80%;height:14px;display:block;"></div>
-        </section>
+        <div class="vision-grid">
+          ${[0,1,2,3].map(() => html`
+            <div class="vision-card" style="cursor:default;">
+              <div class="skeleton" style="width:60%;height:18px;display:block;margin-bottom:8px;"></div>
+              <div class="skeleton" style="width:90%;height:12px;display:block;margin-bottom:6px;"></div>
+              <div class="skeleton" style="width:80%;height:12px;display:block;"></div>
+            </div>
+          `)}
+        </div>
       `;
     }
     if (this.state === 'error') {
@@ -177,12 +315,27 @@ export class JobVision extends LitElement {
     }
     if (!this.files.length) {
       return html`
-        <div class="placeholder">
-          <h2>No vision files yet</h2>
-          <p>Add markdown files to <code>${VISION_DIR}/</code> in fikei/job to see them here.</p>
+        <div class="vision-empty">
+          <h2 style="margin:0 0 var(--space-2);">No vision files yet</h2>
+          <p style="margin:0;">Add markdown files to <code>${VISION_DIR}/</code> in fikei/job to see them here.</p>
         </div>`;
     }
-    return html`${this.files.map(f => this._renderFile(f))}`;
+    const tabs = this._visibleTabs();
+    const filtered = this._filteredFiles();
+    const totalWords = this.files.reduce((sum, f) => sum + wordCount(f.content), 0);
+    return html`
+      ${this._renderTabs(tabs)}
+      <div class="vision-meta">
+        <span>${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}</span>
+        <span>·</span>
+        <span>${totalWords.toLocaleString()} words across all of Vision</span>
+      </div>
+      <div class="vision-grid">
+        ${filtered.length === 0
+          ? html`<div class="vision-empty" style="grid-column: 1 / -1;">Nothing in this category yet.</div>`
+          : filtered.map(f => this._renderCard(f))}
+      </div>
+    `;
   }
 }
 
