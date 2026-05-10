@@ -10,8 +10,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.5.0';
-console.log(`[gen-asset] v${VERSION} - cover-rationale kind: AI semantic-match cover letter phrases to analysis sources`);
+const VERSION = '0.6.0';
+console.log(`[gen-asset] v${VERSION} - cover-edit kind: comment-anchored chat edits to the cover letter`);
 
 const BASE_RESUME_SLUG = '__base__';
 
@@ -101,15 +101,46 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
       : kindIn === 'base-resume' ? 'base-resume'
       : kindIn === 'format-resume' ? 'format-resume'
       : kindIn === 'cover-rationale' ? 'cover-rationale'
+      : kindIn === 'cover-edit' ? 'cover-edit'
       : null;
-    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", "base-resume", "format-resume", or "cover-rationale"', 400);
+    if (!kind) return err('kind must be a known value', 400);
+
+    // cover-edit is stateless: take cover letter + comment context +
+    // user instruction, return the full revised markdown. No DB write —
+    // the frontend persists via writeRoleAsset.
+    if (kind === 'cover-edit') {
+      const coverText = String(body.cover_text || '').trim();
+      const instruction = String(body.instruction || '').trim();
+      const comment = body.comment && typeof body.comment === 'object' ? body.comment : null;
+      if (!coverText) return err('cover_text required', 400);
+      if (!instruction) return err('instruction required', 400);
+      if (coverText.length > 16 * 1024) return err('cover_text exceeds 16KB', 413);
+      if (instruction.length > 2 * 1024) return err('instruction exceeds 2KB', 413);
+      const system = buildSystemPrompt(kind);
+      const commentBlock = comment
+        ? `# Anchored comment\n\nLabel: ${String(comment.label || '')}\nAnchor phrase: ${String(comment.anchor_phrase || '')}\nRationale: ${String(comment.rationale || '')}\n\n`
+        : '';
+      const user = `# Cover letter
+
+${coverText}
+
+${commentBlock}# Instruction
+
+${instruction}
+
+# Ask
+
+Return the full revised cover letter markdown. Markdown only, no preamble.`;
+      const content = await callClaude(system, user);
+      return jsonResp({ ok: true, kind, content });
+    }
 
     // cover-rationale is stateless: take cover letter + analysis sources,
     // return a JSON list of {phrase, label, rationale}. No DB write.
