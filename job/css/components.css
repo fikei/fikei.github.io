@@ -2409,7 +2409,10 @@
   gap: 2px;
 }
 .nav-sublist a {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: 6px var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--fg-muted);
@@ -2420,6 +2423,28 @@
 .nav-sublist a[aria-current="page"] {
   background: var(--accent-muted);
   color: var(--accent);
+}
+.nav-sublist .nav-sub__label { min-width: 0; }
+
+/* Tiny count chip next to sub-nav labels (Saved · Active · Recommended). */
+.nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.nav-sublist a[aria-current="page"] .nav-count {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
 }
 
 /* --- Bucket tabs (in-page Leads / Active / Archive) --- */
