@@ -75,47 +75,71 @@ function chunkPhrase(s) {
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+// Highlight phrases AND collect rationale comments for each match.
+// `sources` is an array of `{ label, text }` — label shows in the comment
+// header (e.g. "Suggested angle"), text is the source bullet/sentence.
+//
+// Returns `{ html, comments }` where:
+//   html      — markdown with <mark class="d-jd" data-rationale="N">…</mark>
+//   comments  — [{ id, label, text }] in order of first appearance.
+//
+// The renderer can drop the body into the page and render the comments
+// list in a side rail, anchoring each card to its mark via the data-id.
 export function highlightPhrases(text, sources) {
-  let body = String(text || '');
-  if (!body) return body;
-  const seen = new Set();
-  const phrases = [];
+  const body = String(text || '');
+  if (!body) return { html: body, comments: [] };
+
+  // Build phrase → source map (longest-first; first source wins for ties).
+  const phraseToSource = new Map();
   for (const src of (sources || [])) {
-    for (const c of chunkPhrase(src)) {
+    if (!src) continue;
+    const label = (typeof src === 'string') ? '' : (src.label || '');
+    const stext = (typeof src === 'string') ? src : (src.text || '');
+    for (const c of chunkPhrase(stext)) {
       const k = c.toLowerCase();
-      if (seen.has(k)) continue;
-      seen.add(k);
-      phrases.push(c);
+      if (phraseToSource.has(k)) continue;
+      phraseToSource.set(k, { phrase: c, label, text: stext });
     }
   }
-  // Sort longest-first so longer phrases match before their substrings.
-  phrases.sort((a, b) => b.length - a.length);
+  const phrases = Array.from(phraseToSource.values()).sort((a, b) => b.phrase.length - a.phrase.length);
 
-  // Track ranges already wrapped to avoid nested <mark>.
-  const wrapped = []; // [startIdx, endIdx)
-  const hits = [];   // [{start, end, phrase}]
+  // Find non-overlapping matches in document order.
+  const wrapped = [];
+  const hits = [];
   const lower = body.toLowerCase();
   for (const p of phrases) {
-    const re = new RegExp(escapeRegex(p), 'gi');
+    const re = new RegExp(escapeRegex(p.phrase), 'gi');
     let m;
     while ((m = re.exec(lower)) !== null) {
       const start = m.index;
       const end = start + m[0].length;
-      const overlaps = wrapped.some(([s, e]) => start < e && end > s);
-      if (overlaps) continue;
+      if (wrapped.some(([s, e]) => start < e && end > s)) continue;
       wrapped.push([start, end]);
-      hits.push({ start, end });
+      hits.push({ start, end, label: p.label, text: p.text });
     }
   }
-  if (!hits.length) return body;
+  if (!hits.length) return { html: body, comments: [] };
   hits.sort((a, b) => a.start - b.start);
+
+  // De-duplicate comments by (label + text) so two highlights of the same
+  // bullet share one comment card.
+  const commentMap = new Map();
+  const comments = [];
+  let nextId = 1;
   let out = '';
   let cursor = 0;
   for (const h of hits) {
+    const key = `${h.label}\n${h.text}`;
+    let id = commentMap.get(key);
+    if (!id) {
+      id = nextId++;
+      commentMap.set(key, id);
+      comments.push({ id, label: h.label, text: h.text });
+    }
     out += body.slice(cursor, h.start);
-    out += `<mark class="d-jd">${body.slice(h.start, h.end)}</mark>`;
+    out += `<mark class="d-jd" data-rationale="${id}">${body.slice(h.start, h.end)}<sup class="d-fn">${id}</sup></mark>`;
     cursor = h.end;
   }
   out += body.slice(cursor);
-  return out;
+  return { html: out, comments };
 }

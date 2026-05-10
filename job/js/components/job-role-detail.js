@@ -186,13 +186,20 @@ export class JobRoleDetail extends LitElement {
   _toggleChanges() { this.showChanges = !this.showChanges; }
 
   // For the cover-letter tab, pull source phrases out of the analysis JSON
-  // for "what was tailored from the JD" highlighting.
+  // for "what was tailored from the JD" highlighting. Returns labeled
+  // sources so the comment rail can show which analysis field each
+  // highlight came from.
   _coverHighlightSources() {
     const ana = this.assets['analysis'];
     if (!ana || ana.mode !== 'view') return [];
     const parsed = this._parseAnalysis(ana.content);
     if (!parsed) return [];
-    return [parsed.suggestedAngle, parsed.whyFits, parsed.strengths, parsed.gaps].filter(Boolean);
+    const out = [];
+    if (parsed.suggestedAngle) out.push({ label: 'Suggested angle', text: parsed.suggestedAngle });
+    if (parsed.whyFits)        out.push({ label: 'Why it fits',     text: parsed.whyFits });
+    if (parsed.strengths)      out.push({ label: 'Strengths',       text: parsed.strengths });
+    if (parsed.gaps)           out.push({ label: 'Gaps to address', text: parsed.gaps });
+    return out;
   }
 
   _autoGenerateMissing() {
@@ -543,15 +550,20 @@ export class JobRoleDetail extends LitElement {
     const showingChanges = canDiff && this.showChanges;
 
     let bodyHtml = '';
+    let coverComments = [];
     if (a.mode === 'view') {
       if (kind === 'resume' && showingChanges && this.baseResume?.content) {
         bodyHtml = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
       } else if (kind === 'cover-letter' && showingChanges) {
-        bodyHtml = renderMarkdown(highlightPhrases(a.content, this._coverHighlightSources()));
+        const { html: marked, comments } = highlightPhrases(a.content, this._coverHighlightSources());
+        bodyHtml = renderMarkdown(marked);
+        coverComments = comments;
       } else {
         bodyHtml = renderMarkdown(a.content);
       }
     }
+
+    const isCover = kind === 'cover-letter';
 
     return html`
       ${(kind === 'resume' || kind === 'cover-letter') ? this._renderTailoringCallout(kind) : nothing}
@@ -564,7 +576,7 @@ export class JobRoleDetail extends LitElement {
           </button>
           ${canDiff ? html`
             <button class="btn btn--sm ${this.showChanges ? 'btn--primary' : ''}" @click=${() => this._toggleChanges()}>
-              ${this.showChanges ? 'Hide changes' : 'Show changes'}
+              ${this.showChanges ? (isCover ? 'Hide comments' : 'Hide changes') : (isCover ? 'Show comments' : 'Show changes')}
             </button>
           ` : nothing}
           <button class="btn btn--sm btn--accent" @click=${() => this._downloadAssetPdf(kind)}>
@@ -572,7 +584,7 @@ export class JobRoleDetail extends LitElement {
           </button>
           ${kind === 'resume' && this.baseResume?.missing ? html`
             <span class="muted" style="font-size: var(--font-size-small);">
-              No base resume yet — generate one in <a href="/job/history/?tab=base">Career → Base resume</a>.
+              No base resume yet — set one in <a href="/job/history/?tab=base">Career → Base resume</a>.
             </span>
           ` : nothing}
         ` : html`
@@ -584,9 +596,41 @@ export class JobRoleDetail extends LitElement {
         ${a.error ? html`<span class="muted" style="color:var(--error);">${a.error}</span>` : nothing}
       </div>
       ${a.mode === 'edit'
-        ? html`<textarea class="asset-editor" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)}></textarea>`
-        : html`<article class="kb-doc asset-doc">${unsafeHTML(bodyHtml)}</article>`}
+        ? html`<textarea class="asset-editor asset-editor--inline" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)} @blur=${() => a.dirty && this._saveEdit(kind)}></textarea>`
+        : (isCover && coverComments.length
+          ? html`
+            <div class="cover-layout">
+              <article class="kb-doc asset-doc cover-layout__body">${unsafeHTML(bodyHtml)}</article>
+              <aside class="cover-layout__rail" aria-label="Rationale">
+                <h4 class="cover-rail__title">Rationale</h4>
+                <p class="muted cover-rail__hint">Why each highlighted phrase is here.</p>
+                ${coverComments.map(c => html`
+                  <article class="cover-comment" data-rationale-id=${c.id}
+                           @mouseenter=${() => this._highlightRationale(c.id, true)}
+                           @mouseleave=${() => this._highlightRationale(c.id, false)}>
+                    <header class="cover-comment__head">
+                      <span class="cover-comment__num">${c.id}</span>
+                      <span class="cover-comment__label">${c.label}</span>
+                    </header>
+                    <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
+                  </article>
+                `)}
+              </aside>
+            </div>
+          `
+          : html`<article class="kb-doc asset-doc">${unsafeHTML(bodyHtml)}</article>`)}
     `;
+  }
+
+  // Visual link between a comment card and its highlights — toggle a class
+  // on every <mark> with the matching data-rationale id when the card is
+  // hovered, so the user can see which sentences a rationale anchors to.
+  _highlightRationale(id, on) {
+    const root = this.querySelector('.cover-layout__body');
+    if (!root) return;
+    root.querySelectorAll(`mark[data-rationale="${id}"]`).forEach(el => {
+      el.classList.toggle('is-focused', on);
+    });
   }
 
   _renderChromeFromPrefill() {
