@@ -6,6 +6,7 @@ import { trackedAtsSource } from './tracked-ats.ts';
 import { linkedinRssSource } from './linkedin-rss.ts';
 import { rssSource } from './rss.ts';
 import { theirstackSource } from './theirstack.ts';
+import { gmailJobsSource } from './gmail-jobs.ts';
 
 export const SOURCES: Record<string, Source> = {
   [fixtureSource.type]:     fixtureSource,
@@ -13,4 +14,5 @@ export const SOURCES: Record<string, Source> = {
   [linkedinRssSource.type]: linkedinRssSource as unknown as Source,
   [rssSource.type]:         rssSource as unknown as Source,
   [theirstackSource.type]:  theirstackSource as unknown as Source,
+  [gmailJobsSource.type]:   gmailJobsSource as unknown as Source,
 };
