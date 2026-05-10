@@ -806,7 +806,12 @@ export class JobRoleDetail extends LitElement {
   _renderSelectionPopover() {
     const p = this.selectionPopover;
     if (!p) return nothing;
-    const style = `position:absolute; left:${p.x}px; top:${p.y}px; transform: translateX(-50%);`;
+    // Clamp so the popover doesn't overflow the viewport.
+    const padding = 12;
+    const halfW = 200;
+    const cx = Math.max(padding + halfW, Math.min(window.innerWidth - padding - halfW, p.x));
+    const cy = Math.min(window.innerHeight - 80, p.y);
+    const style = `position:fixed; left:${cx}px; top:${cy}px; transform: translateX(-50%);`;
     return html`
       <div class="sel-popover" style=${style} @mousedown=${(e) => e.preventDefault()}>
         <form class="cover-thread__form sel-popover__form" @submit=${(e) => {
@@ -1009,29 +1014,33 @@ export class JobRoleDetail extends LitElement {
       return;
     }
     const sel = window.getSelection();
+    // Empty / collapsed selection: only auto-clear when the popover is
+    // not currently open. Once open, only an explicit close (×, Escape,
+    // submit) dismisses — so clicking into the popover input doesn't
+    // race against selection collapse and hide the UI.
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-      // Keep the popover up if the user moved focus into the popover
-      // input (selection then becomes collapsed there).
+      if (!this.selectionPopover) return;
       const inPopover = document.activeElement?.closest?.('.sel-popover');
-      if (!inPopover && this.selectionPopover) this.selectionPopover = null;
+      if (inPopover) return;
+      // Slight grace period right after first show so the click that
+      // sets focus doesn't kill the popover before it mounts.
+      if (this.selectionPopover.shownAt && Date.now() - this.selectionPopover.shownAt < 300) return;
+      this.selectionPopover = null;
       return;
     }
     const range = sel.getRangeAt(0);
     const body = this.querySelector('.cover-layout__body');
-    if (!body || !body.contains(range.commonAncestorContainer)) {
-      if (this.selectionPopover) this.selectionPopover = null;
-      return;
-    }
+    if (!body || !body.contains(range.commonAncestorContainer)) return;
     const text = sel.toString().trim();
     if (text.length < 3) return;
     const rect = range.getBoundingClientRect();
-    const scrollY = window.scrollY;
     this.selectionPopover = {
       visible: true,
       x: rect.left + rect.width / 2,
-      y: rect.bottom + scrollY + 8,
+      y: rect.bottom + 8,
       text,
       savedRange: range.cloneRange(),
+      shownAt: Date.now(),
     };
   }
 
@@ -1242,6 +1251,13 @@ export class JobRoleDetail extends LitElement {
     this._alignComments();
     this._applyEditingShimmer();
     this._ensureBodyObserver();
+    // Focus the popover input the first time it appears, so the user
+    // can start typing without an extra click.
+    if (this.selectionPopover?.visible && !this._popoverFocused) {
+      const ta = this.querySelector('.sel-popover textarea');
+      if (ta) { try { ta.focus(); this._popoverFocused = true; } catch {} }
+    }
+    if (!this.selectionPopover?.visible && this._popoverFocused) this._popoverFocused = false;
   }
 
   // Reflow comment cards whenever the body's height changes (window
