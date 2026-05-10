@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -77,6 +77,8 @@ export class JobRoleDetail extends LitElement {
     showChanges: { state: true },    // bool — toggle the diff/highlight overlay on resume + cover tabs
     coverRationale: { state: true }, // { sig, highlights, loading, error } — AI cover-letter rationale cache
     activeRationale: { state: true }, // number | null — currently focused comment/highlight pair
+    threads: { state: true },         // { [commentId]: { messages: [...], sending, error } } — chat-to-edit per comment
+    coverUndo: { state: true },       // { content, label, expiresAt } | null — one-shot undo for last AI edit
   };
 
   constructor() {
@@ -96,6 +98,8 @@ export class JobRoleDetail extends LitElement {
     this.showChanges = true;
     this.coverRationale = { sig: '', highlights: [], loading: false, error: '' };
     this.activeRationale = null;
+    this.threads = {};
+    this.coverUndo = null;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -651,6 +655,13 @@ export class JobRoleDetail extends LitElement {
         ${a.error ? html`<span class="muted" style="color:var(--error);">${a.error}</span>` : nothing}
       </div>
 
+      ${isCover && this.coverUndo ? html`
+        <div class="cover-undo">
+          <span>AI edit applied (${this.coverUndo.label}).</span>
+          <button class="btn btn--sm" @click=${() => this._undoCoverEdit()}>Undo</button>
+        </div>
+      ` : nothing}
+
       ${isCover && showingChanges
         ? html`
           <div class="cover-layout">
@@ -682,19 +693,64 @@ export class JobRoleDetail extends LitElement {
                 <p class="cover-rail__empty">No load-bearing phrases yet — try regenerating the cover letter.</p>
               ` : nothing}
               <div class="cover-rail__list" data-active=${this.activeRationale ?? ''}>
-                ${coverComments.map(c => html`
-                  <article class="cover-comment ${this.activeRationale === c.id ? 'is-active' : ''}"
-                           data-rationale-id=${c.id}
-                           @click=${() => this._scrollToHighlight(c.id)}
-                           @mouseenter=${() => this._highlightRationale(c.id, true)}
-                           @mouseleave=${() => this._highlightRationale(c.id, false)}>
-                    <header class="cover-comment__head">
-                      <span class="cover-comment__num">${c.id}</span>
-                      <span class="cover-comment__label">${c.label}</span>
-                    </header>
-                    <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
-                  </article>
-                `)}
+                ${coverComments.map(c => {
+                  const thread = this._getThread(c.id);
+                  const isActive = this.activeRationale === c.id;
+                  return html`
+                    <article class="cover-comment ${isActive ? 'is-active' : ''}"
+                             data-rationale-id=${c.id}
+                             @mouseenter=${() => this._highlightRationale(c.id, true)}
+                             @mouseleave=${() => this._highlightRationale(c.id, false)}>
+                      <header class="cover-comment__head" @click=${() => { this._scrollToHighlight(c.id); }}>
+                        <span class="cover-comment__num">${c.id}</span>
+                        <span class="cover-comment__label">${c.label}</span>
+                      </header>
+                      <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
+
+                      ${thread.messages.length ? html`
+                        <ul class="cover-thread">
+                          ${thread.messages.map(m => html`
+                            <li class="cover-thread__msg cover-thread__msg--${m.role}">
+                              ${unsafeHTML(renderMarkdown(m.text))}
+                            </li>
+                          `)}
+                          ${thread.sending ? html`
+                            <li class="cover-thread__msg cover-thread__msg--assistant">
+                              <span class="dots-anim">Editing</span>
+                            </li>
+                          ` : nothing}
+                          ${thread.error ? html`
+                            <li class="cover-thread__msg cover-thread__msg--error">${thread.error}</li>
+                          ` : nothing}
+                        </ul>
+                      ` : nothing}
+
+                      <form class="cover-thread__form" @submit=${(e) => {
+                        e.preventDefault();
+                        const input = e.currentTarget.querySelector('textarea');
+                        const v = input.value;
+                        input.value = '';
+                        this._sendCommentChat(c.id, v);
+                      }}>
+                        <textarea class="cover-thread__input"
+                                  rows="1"
+                                  placeholder=${isActive ? 'How should this change?' : 'Chat to edit…'}
+                                  ?disabled=${thread.sending}
+                                  @keydown=${(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault();
+                                      e.currentTarget.form.requestSubmit();
+                                    }
+                                  }}
+                                  @input=${(e) => {
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                  }}></textarea>
+                        <button class="cover-thread__send" type="submit" ?disabled=${thread.sending} aria-label="Send">↵</button>
+                      </form>
+                    </article>
+                  `;
+                })}
               </div>
             </aside>
           </div>
@@ -790,6 +846,119 @@ export class JobRoleDetail extends LitElement {
       if (this._coverSig() === sig) {
         this.coverRationale = { sig, highlights: [], loading: false, error: String(e?.message || e) };
       }
+    }
+  }
+
+  // ----- Chat-to-edit on cover-letter comments -----------------------------
+
+  _threadKey(commentId) { return `cover:${commentId}`; }
+
+  _getThread(commentId) {
+    return this.threads[this._threadKey(commentId)] || { messages: [], sending: false, error: '' };
+  }
+
+  _setThread(commentId, t) {
+    this.threads = { ...this.threads, [this._threadKey(commentId)]: t };
+  }
+
+  // Send a chat message anchored to a comment. Pushes user msg into the
+  // thread, calls cover-edit, applies the new content, snapshots an undo.
+  async _sendCommentChat(commentId, instruction) {
+    const a = this.assets['cover-letter'];
+    if (!a || !a.content) return;
+    const trimmed = String(instruction || '').trim();
+    if (!trimmed) return;
+
+    const comment = (this.coverRationale.highlights || []).find((_h, i) => i + 1 === commentId);
+    if (!comment) return;
+
+    const prev = this._getThread(commentId);
+    const next = {
+      messages: [...prev.messages, { role: 'user', text: trimmed }],
+      sending: true,
+      error: '',
+    };
+    this._setThread(commentId, next);
+
+    try {
+      const newContent = await applyCoverEdit({
+        coverText: a.content,
+        instruction: trimmed,
+        comment: { label: comment.label, anchor_phrase: comment.phrase, rationale: comment.rationale },
+      });
+      // Snapshot for one-shot undo. Expire after 30s.
+      this.coverUndo = {
+        content: a.content,
+        label: `comment ${commentId}`,
+        expiresAt: Date.now() + 30_000,
+      };
+      // Persist immediately and refresh editHtml so the user sees the
+      // change. Rationale will refetch automatically (signature changed).
+      await writeRoleAsset(this.slug, 'cover-letter', newContent);
+      this.assets = {
+        ...this.assets,
+        'cover-letter': {
+          ...this.assets['cover-letter'],
+          content: newContent,
+          saveStatus: 'saved',
+          savedAt: Date.now(),
+        },
+      };
+      this._refreshEditHtml('cover-letter');
+      this._setThread(commentId, {
+        messages: [...next.messages, { role: 'assistant', text: 'Applied. Edit highlighted briefly. Undo available for 30s.' }],
+        sending: false,
+        error: '',
+      });
+      this._flashCoverEdit();
+      // Schedule undo expiry → state clear.
+      setTimeout(() => {
+        if (this.coverUndo && this.coverUndo.expiresAt <= Date.now()) this.coverUndo = null;
+      }, 30_000 + 200);
+    } catch (e) {
+      this._setThread(commentId, {
+        messages: next.messages,
+        sending: false,
+        error: String(e?.message || e),
+      });
+    }
+  }
+
+  // Briefly flash the cover-letter body to show that a chat edit just
+  // landed. Pure visual cue — no diff overlay (the rationale rail will
+  // refresh on its own and surface what's now load-bearing).
+  _flashCoverEdit() {
+    const body = this.querySelector('.cover-layout__body');
+    if (!body) return;
+    body.classList.remove('cover-flash');
+    // Force reflow so the animation restarts if it was already applied.
+    void body.offsetWidth;
+    body.classList.add('cover-flash');
+    setTimeout(() => body.classList.remove('cover-flash'), 1600);
+  }
+
+  async _undoCoverEdit() {
+    if (!this.coverUndo) return;
+    const { content } = this.coverUndo;
+    this.coverUndo = null;
+    try {
+      await writeRoleAsset(this.slug, 'cover-letter', content);
+      this.assets = {
+        ...this.assets,
+        'cover-letter': {
+          ...this.assets['cover-letter'],
+          content,
+          saveStatus: 'saved',
+          savedAt: Date.now(),
+        },
+      };
+      this._refreshEditHtml('cover-letter');
+    } catch (e) {
+      // Surface the error inline; user can retry or hand-edit.
+      this.assets = {
+        ...this.assets,
+        'cover-letter': { ...this.assets['cover-letter'], error: `undo failed: ${String(e?.message || e)}` },
+      };
     }
   }
 

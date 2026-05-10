@@ -167,4 +167,21 @@ export async function fetchCoverRationale(coverText, sources) {
   return Array.isArray(j.highlights) ? j.highlights : [];
 }
 
-window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale };
+// Apply a chat-driven edit to the cover letter. `comment` is optional
+// {label, anchor_phrase, rationale} for surgical, comment-anchored edits;
+// without it the AI treats `instruction` as a doc-wide directive.
+export async function applyCoverEdit({ coverText, instruction, comment }) {
+  const headers = await authHeader();
+  const body = { kind: 'cover-edit', cover_text: coverText, instruction };
+  if (comment) body.comment = comment;
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return j.content;
+}
+
+window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit };

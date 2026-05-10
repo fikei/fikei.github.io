@@ -123,7 +123,22 @@ Rules:
 - Skip pleasantries, sign-offs, the opener salutation, and generic transitions.
 - Don't reuse the same source label more than 3 times.`;
 
-export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale';
+export const COVER_EDIT_VOICE = `You will receive:
+- The current cover letter (markdown).
+- A specific comment that's anchored to one phrase: { label, anchor_phrase, rationale }. The anchor_phrase is verbatim text from the cover letter; the comment explains why it's there.
+- A user instruction directing how to edit.
+
+Your job: return the full revised cover letter as markdown, with the user's instruction applied.
+
+RULES:
+- Preserve the overall structure (paragraphs, sign-off, signature). Don't reorder paragraphs unless instructed.
+- Edit only what's needed to satisfy the instruction. Most paragraphs should be unchanged.
+- The anchor_phrase area is the most likely target unless the instruction broadens scope.
+- Keep all the cover-letter voice rules (no em dashes, no "passionate about", no "excited to", no banned phrases — see your training).
+- Don't fabricate facts. If the instruction asks for evidence the letter doesn't have, lean on what's already there or skip.
+- Do NOT add a preamble or a meta line like "Here's the revised letter." Output ONLY the markdown.`;
+
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit';
 
 export function buildSystemPrompt(kind: GenKind): string {
   if (kind === 'format-resume') {
@@ -131,6 +146,13 @@ export function buildSystemPrompt(kind: GenKind): string {
   }
   if (kind === 'cover-rationale') {
     return COVER_RATIONALE_VOICE;
+  }
+  if (kind === 'cover-edit') {
+    return `You are revising Ian Fike's cover letter. Apply the user's edit instruction precisely.
+
+${COVER_EDIT_VOICE}
+
+${COVER_LETTER_VOICE}`;
   }
   const voice =
     kind === 'cover-letter' ? COVER_LETTER_VOICE :
