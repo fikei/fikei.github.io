@@ -734,7 +734,7 @@ export class JobRoleDetail extends LitElement {
                       }}>
                         <textarea class="cover-thread__input"
                                   rows="1"
-                                  placeholder=${isActive ? 'How should this change?' : 'Chat to edit…'}
+                                  placeholder=${isActive ? 'How should this change?' : 'Direct an edit…'}
                                   ?disabled=${thread.sending}
                                   @keydown=${(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -746,7 +746,11 @@ export class JobRoleDetail extends LitElement {
                                     e.target.style.height = 'auto';
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                   }}></textarea>
-                        <button class="cover-thread__send" type="submit" ?disabled=${thread.sending} aria-label="Send">↵</button>
+                        <button class="cover-thread__send" type="submit" ?disabled=${thread.sending} aria-label="Send">
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M8 13V3"/><path d="M3 8l5-5 5 5"/>
+                          </svg>
+                        </button>
                       </form>
                     </article>
                   `;
