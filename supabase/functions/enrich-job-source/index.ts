@@ -4,7 +4,7 @@
 // and ats_provider — or an unresolved flag with a retry timestamp.
 //
 // Cascade (cheapest → most expensive):
-//   1. job.companies cache hit (resolved row).
+//   1. job.hiring_companies cache hit (resolved row).
 //   2. ATS detection from sender domain or company-name guesses against
 //      Greenhouse / Lever / Ashby.
 //   3. Careers-page scrape (best-effort via direct fetch).
@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.1.0';
-console.log(`[enrich-job-source] v${VERSION} - cache → ats → scrape cascade`);
+const VERSION = '0.2.0';
+console.log(`[enrich-job-source] v${VERSION} - rename cache to job.hiring_companies (avoid collision with career history)`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -88,17 +88,17 @@ serve(async (req) => {
   // 1) Cache lookup or insert.
   const existing = await sql<CompanyRow[]>`
     select id, name, domain, ats_provider, ats_slug, careers_url, resolution_status, retry_count
-      from job.companies
+      from job.hiring_companies
      where name_norm = lower(trim(${company}))
      limit 1
   `;
   let row = existing[0] as CompanyRow | undefined;
   if (!row) {
     const [inserted] = await sql<CompanyRow[]>`
-      insert into job.companies (name, domain)
+      insert into job.hiring_companies (name, domain)
         values (${company}, ${normalizeDomain(body.hintDomain) || null})
       on conflict (name_norm) do update
-        set domain = coalesce(job.companies.domain, excluded.domain),
+        set domain = coalesce(job.hiring_companies.domain, excluded.domain),
             updated_at = now()
       returning id, name, domain, ats_provider, ats_slug, careers_url, resolution_status, retry_count
     `;
@@ -127,7 +127,7 @@ serve(async (req) => {
     // even a partial resolve (provider+slug, no canonical match) helps
     // the next user querying the same company.
     await sql`
-      update job.companies
+      update job.hiring_companies
          set ats_provider = ${detected.provider},
              ats_slug = ${detected.slug},
              careers_url = ${detected.careersUrl ?? null},
@@ -155,7 +155,7 @@ serve(async (req) => {
   const nextCount = (row.retry_count || 0) + 1;
   const retryAt = nextRetry(nextCount);
   await sql`
-    update job.companies
+    update job.hiring_companies
        set resolution_status = 'unresolved',
            retry_count = ${nextCount},
            next_retry_at = ${retryAt.toISOString()},
