@@ -80,9 +80,34 @@ Format rules:
 - No em dashes. No "passionate about" / "excited to". No try-hard cleverness.
 - Reference real projects/skills/wins by their slug-like name when relevant.`;
 
-export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume';
+export const FORMAT_RESUME_VOICE = `You will receive raw text extracted from a resume PDF or pasted from another tool. The text has lost its structure: headings, bullets, and section breaks may be flattened into one stream.
+
+Your job: reconstruct it as clean, well-structured markdown. Preserve every fact verbatim — names, dates, companies, titles, metrics, locations. Do NOT paraphrase, embellish, summarize, or invent. If something is ambiguous, keep the source phrasing.
+
+OUTPUT STRUCTURE:
+- Start with a top-level "# Name" heading.
+- Italic line for current title/role if present.
+- Plain contact line (city · email · website/links).
+- Then "## Summary" (if there's a summary paragraph), "## Experience", "## Skills", "## Education", "## Projects", etc — only the sections actually present in the source.
+- Each role under Experience: "### Title, Company (start–end)", optional location line, then bullets prefixed "- ".
+- Lines that are clearly bullets in the source (start with •, ●, ▪, ◦, -, or are short imperatives starting with verbs like "Owned", "Shipped", "Led", "Scaled") become "- " bullets.
+- Lines that are clearly section headers (all-caps, large in source, isolated on their own line) become "## " or "### ".
+
+VOICE RULES:
+- No em dashes. Replace any — with periods, commas, or colons.
+- Smart quotes/dashes/bullet glyphs normalized to ASCII.
+- Drop runs of whitespace inside lines.
+- Don't add fluff. Don't add a summary if the source had none.
+- Don't reorder sections. Don't merge or split bullets.
+
+Output ONLY the markdown. No preamble. No "Here is your reformatted resume." Start with "# ".`;
+
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume';
 
 export function buildSystemPrompt(kind: GenKind): string {
+  if (kind === 'format-resume') {
+    return `You are a resume reformatter. ${FORMAT_RESUME_VOICE}`;
+  }
   const voice =
     kind === 'cover-letter' ? COVER_LETTER_VOICE :
     kind === 'analysis'     ? ANALYSIS_VOICE :

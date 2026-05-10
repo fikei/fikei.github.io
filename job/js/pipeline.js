@@ -138,4 +138,18 @@ export async function generateAsset(slug, kind) {
   return res.json(); // { slug, kind, content }
 }
 
-window.JobPipeline = { fetchPipeline, setStatus, generateAsset };
+// Send raw resume text through Claude to get well-formatted markdown back.
+// Stateless on the server — caller is responsible for persisting the result.
+export async function formatResumeText(rawText) {
+  const headers = await authHeader();
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'format-resume', raw_text: rawText }),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return j.content;
+}
+
+window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText };

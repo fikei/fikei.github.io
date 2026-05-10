@@ -6,7 +6,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, formatResumeText }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -92,7 +92,8 @@ export class JobCareer extends LitElement {
     activeTab: { state: true },
     vision: { state: true },
     promptTags: { state: true },
-    baseResume: { state: true },     // { content, missing, generating, error }
+    baseResume: { state: true },     // saved row: { content, missing, generating, error }
+    baseDraft: { state: true },      // editing buffer: { text, status, error } — status in idle|reading|formatting|saving
   };
 
   constructor() {
@@ -104,6 +105,7 @@ export class JobCareer extends LitElement {
     this.vision = null;
     this.promptTags = [];
     this.baseResume = { content: '', missing: true, generating: false, error: '' };
+    this.baseDraft = { text: '', status: 'idle', error: '' };
   }
 
   connectedCallback() {
@@ -155,42 +157,67 @@ export class JobCareer extends LitElement {
     history.replaceState(null, '', `/job/history/${qs}`);
   }
 
+  // Upload: extract text and drop it into the draft textarea — does NOT
+  // save. User reviews, optionally runs AI cleanup, then saves.
   async _onBaseUpload(file) {
     if (!file) return;
-    this.baseResume = { ...this.baseResume, generating: true, error: '' };
+    this.baseDraft = { text: '', status: 'reading', error: '' };
     try {
       const text = await readFileAsText(file);
       if (!text || !text.trim()) throw new Error('Empty file');
-      await writeRoleAsset(BASE_RESUME_SLUG, 'resume', text);
-      this.baseResume = { content: text, missing: false, generating: false, error: '' };
+      this.baseDraft = { text, status: 'idle', error: '' };
     } catch (e) {
-      this.baseResume = { ...this.baseResume, generating: false, error: String(e?.message || e) };
+      this.baseDraft = { text: '', status: 'idle', error: String(e?.message || e) };
     }
   }
 
-  async _onBasePaste() {
-    const ta = this.querySelector('#base-paste');
-    const text = (ta?.value || '').trim();
+  _onDraftInput(e) {
+    this.baseDraft = { ...this.baseDraft, text: e.target.value };
+  }
+
+  // Send the draft text through Claude to reformat into clean markdown.
+  // Replaces the draft with the cleaned version on success.
+  async _onCleanupDraft() {
+    const text = (this.baseDraft.text || '').trim();
     if (!text) {
-      this.baseResume = { ...this.baseResume, error: 'Paste your resume first.' };
+      this.baseDraft = { ...this.baseDraft, error: 'Paste or upload resume text first.' };
       return;
     }
-    this.baseResume = { ...this.baseResume, generating: true, error: '' };
+    this.baseDraft = { ...this.baseDraft, status: 'formatting', error: '' };
+    try {
+      const cleaned = await formatResumeText(text);
+      this.baseDraft = { text: cleaned, status: 'idle', error: '' };
+    } catch (e) {
+      this.baseDraft = { ...this.baseDraft, status: 'idle', error: String(e?.message || e) };
+    }
+  }
+
+  async _onSaveDraft() {
+    const text = (this.baseDraft.text || '').trim();
+    if (!text) {
+      this.baseDraft = { ...this.baseDraft, error: 'Nothing to save.' };
+      return;
+    }
+    this.baseDraft = { ...this.baseDraft, status: 'saving', error: '' };
     try {
       await writeRoleAsset(BASE_RESUME_SLUG, 'resume', text);
       this.baseResume = { content: text, missing: false, generating: false, error: '' };
+      this.baseDraft = { text: '', status: 'idle', error: '' };
     } catch (e) {
-      this.baseResume = { ...this.baseResume, generating: false, error: String(e?.message || e) };
+      this.baseDraft = { ...this.baseDraft, status: 'idle', error: String(e?.message || e) };
     }
   }
 
   _onBaseClear() {
-    // Just reveal the upload zone — the next upload/paste overwrites the row.
+    // Reveal the upload/edit zone again, seeded with the saved content so
+    // the user can edit-in-place rather than starting from scratch.
+    this.baseDraft = { text: this.baseResume.content || '', status: 'idle', error: '' };
     this.baseResume = { content: '', missing: true, generating: false, error: '' };
   }
 
   _renderBase() {
     const b = this.baseResume;
+    const d = this.baseDraft;
     if (this.state === 'loading') {
       return html`
         <div class="skeleton" style="width:100%;height:14px;display:block;margin-bottom:8px;"></div>
@@ -199,17 +226,18 @@ export class JobCareer extends LitElement {
       `;
     }
     const hasContent = !!b.content;
+    const busy = d.status !== 'idle';
     return html`
       <section class="narrative-block">
         <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap;">
           <div>
             <h2 style="margin:0;">Base resume</h2>
             <p class="muted" style="margin:0;font-size:var(--font-size-small);">
-              Upload or paste your canonical resume. Per-role tailoring will diff against this.
+              Upload or paste your canonical resume, then clean it up with AI before saving. Per-role tailoring diffs against this.
             </p>
           </div>
           ${hasContent ? html`
-            <button class="btn btn--sm" ?disabled=${b.generating} @click=${() => this._onBaseClear()}>Replace</button>
+            <button class="btn btn--sm" ?disabled=${busy} @click=${() => this._onBaseClear()}>Replace</button>
           ` : nothing}
         </header>
 
@@ -218,24 +246,34 @@ export class JobCareer extends LitElement {
             <label class="base-upload__drop">
               <input type="file" accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
                      @change=${(e) => this._onBaseUpload(e.target.files?.[0])}
-                     ?disabled=${b.generating}>
+                     ?disabled=${busy}>
               <span class="base-upload__cta">
-                ${b.generating ? 'Reading file…' : 'Upload resume'}
+                ${d.status === 'reading' ? 'Reading file…' : 'Upload resume'}
               </span>
-              <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf</span>
+              <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf — or paste below</span>
             </label>
-            <details style="margin-top: var(--space-4);">
-              <summary class="muted" style="cursor:pointer;font-size:var(--font-size-small);">Or paste resume text</summary>
-              <textarea id="base-paste" class="asset-editor" style="margin-top: var(--space-3); min-height: 240px;"
-                        placeholder="# Ian Fike&#10;&#10;Paste markdown or plain text here…"></textarea>
-              <button class="btn btn--sm btn--primary" style="margin-top: var(--space-3);"
-                      ?disabled=${b.generating} @click=${() => this._onBasePaste()}>
-                ${b.generating ? 'Saving…' : 'Save pasted resume'}
+
+            <textarea class="asset-editor" style="margin-top: var(--space-4); min-height: 320px;"
+                      placeholder="# Your name&#10;&#10;Upload above, or paste markdown / plain text here. Then click Clean up with AI to fix structure, or Save to keep as-is."
+                      .value=${d.text}
+                      @input=${(e) => this._onDraftInput(e)}
+                      ?disabled=${busy}></textarea>
+
+            <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3);align-items:center;flex-wrap:wrap;">
+              <button class="btn btn--sm" ?disabled=${busy || !d.text.trim()} @click=${() => this._onCleanupDraft()}>
+                ${d.status === 'formatting' ? 'Cleaning up…' : 'Clean up with AI'}
               </button>
-            </details>
+              <button class="btn btn--sm btn--primary" ?disabled=${busy || !d.text.trim()} @click=${() => this._onSaveDraft()}>
+                ${d.status === 'saving' ? 'Saving…' : 'Save'}
+              </button>
+              <span class="muted" style="font-size:var(--font-size-small);">
+                AI rewrites structure (headings, bullets) without changing facts. Review before saving.
+              </span>
+            </div>
           </div>
         ` : nothing}
 
+        ${d.error ? html`<p class="muted" style="color:var(--error);margin-top:var(--space-3);">${d.error}</p>` : nothing}
         ${b.error ? html`<p class="muted" style="color:var(--error);margin-top:var(--space-3);">${b.error}</p>` : nothing}
 
         ${hasContent

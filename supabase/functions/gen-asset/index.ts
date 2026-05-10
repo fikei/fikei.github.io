@@ -10,8 +10,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.3.0';
-console.log(`[gen-asset] v${VERSION} - base-resume kind for diff baseline`);
+const VERSION = '0.4.0';
+console.log(`[gen-asset] v${VERSION} - format-resume kind: reformat raw text into clean markdown`);
 
 const BASE_RESUME_SLUG = '__base__';
 
@@ -101,13 +101,25 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
       : kindIn === 'base-resume' ? 'base-resume'
+      : kindIn === 'format-resume' ? 'format-resume'
       : null;
-    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", or "base-resume"', 400);
+    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", "base-resume", or "format-resume"', 400);
+
+    // format-resume is stateless: take raw text in, return clean markdown.
+    // Does not touch the DB. The frontend persists separately.
+    if (kind === 'format-resume') {
+      const rawText = String(body.raw_text || '').trim();
+      if (!rawText) return err('raw_text required', 400);
+      if (rawText.length > 32 * 1024) return err('raw_text exceeds 32KB', 413);
+      const system = buildSystemPrompt(kind);
+      const content = await callClaude(system, rawText);
+      return jsonResp({ ok: true, kind, content });
+    }
 
     // base-resume is global — no role required, persisted in job.global_assets.
     if (kind === 'base-resume') {
