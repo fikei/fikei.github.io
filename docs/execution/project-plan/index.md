@@ -31,11 +31,20 @@
 | [Phase 11: Instagram Import](./phase-11-instagram-import.md) | Pending | 0/73 |
 | [Phase 12: Lookback](./phase-12-lookback.md) | IN PROGRESS | 47/249 |
 | [Phase 13: Boards React Rewrite](./phase-13-react-rewrite.md) | Pending | 0/272 |
+| [Phase 14: Gmail → Jobs Pipe](./phase-14-gmail-jobs-pipe.md) | IN PROGRESS | 0/73 |
 | [Backlog](./backlog.md) | Future | 1/118 |
 
 ---
 
 ## Recent Milestones
+
+### Gmail → Jobs Pipe — Phase 1 Started
+**Added: 2026-05-10** — Phase 14 filed from [PRD: Job Product](/docs/strategy/prds/job-product.md)
+
+- **Scope**: Gmail OAuth (Option B split — `gmail-auth` function + `_shared/google-tokens.ts` shared with `calendar-api`), token storage in `user_google_tokens` keyed by `(user_id, scope_set)`, job-source enrichment cascade (cache → ATS patterns → careers scrape → unresolved bucket), `GmailJobsSource` plugin with recruiter-blast skip logic and aggregator allowlist, `gmail-scan` cron function, fixture-based test path
+- **Deferred to Phase 2**: contacts graph, connections enrichment, LinkedIn CSV upload, network overlay, paid enrichment APIs
+- **Infrastructure**: 3 new migrations (`021_user_google_tokens`, `022_job_companies`, `023_gmail_skipped`), 3 new edge functions (`gmail-auth`, `enrich-job-source`, `gmail-scan`), 2 shared helpers (`_shared/google-tokens.ts`, `_shared/gmail.ts`)
+- **Total tasks**: 73 across 4 epics, 12 stories
 
 ### Systemic v2 — Planned
 **Added: 2026-04-10** — 16 stories filed from [PRD: Systemic v2](/docs/strategy/prds/systemic-v2.md)

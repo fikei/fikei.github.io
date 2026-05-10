@@ -24,6 +24,15 @@ export interface RecommendedRoleInput {
   // matchBullets are produced post-pull by the worker; plugins leave
   // this empty and let the worker generate them once per new row.
   payload?:      Record<string, unknown>;
+  // Enrichment status for sources that resolve a canonical posting in a
+  // separate step (e.g. gmail-jobs → enrich-job-source). 'unresolved'
+  // means we surfaced the row with the alert/aggregator URL because we
+  // couldn't find the canonical JD; the widget should flag it. Sources
+  // that don't have this concept can leave these undefined.
+  enrichmentStatus?:    'resolved' | 'unresolved' | 'failed';
+  enrichmentRetryAt?:   string;       // ISO8601
+  canonicalUrl?:        string;       // canonical apply URL when resolved
+  companyId?:           string;       // job.companies.id when known
 }
 
 // A Source<Cfg> is a pure function from config → array of postings. No
