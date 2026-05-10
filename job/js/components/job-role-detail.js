@@ -4,6 +4,25 @@
 // in the top-right opens the posting in a new tab.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
+
+// Lazy-loaded turndown — only imported when the user enters edit mode the
+// first time. Used to roundtrip the contenteditable HTML back to markdown
+// on save so we preserve the same on-disk format we render from.
+let _turndown = null;
+async function getTurndown() {
+  if (_turndown) return _turndown;
+  const mod = await import('https://esm.run/turndown@7');
+  const T = mod.default || mod.Turndown || mod;
+  const td = new T({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '_' });
+  // Strip diff/highlight wrappers if any survive (they shouldn't — we
+  // render plain markdown into edit mode — but belt-and-braces).
+  td.addRule('stripDiff', {
+    filter: ['mark', 'ins', 'del', 'sup'],
+    replacement: (content) => content,
+  });
+  _turndown = td;
+  return td;
+}
 const V = (new URL(import.meta.url)).search;
 const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
@@ -57,6 +76,7 @@ export class JobRoleDetail extends LitElement {
     baseResume: { state: true },     // { content } | null — canonical untargeted resume, source of truth for diff
     showChanges: { state: true },    // bool — toggle the diff/highlight overlay on resume + cover tabs
     coverRationale: { state: true }, // { sig, highlights, loading, error } — AI cover-letter rationale cache
+    activeRationale: { state: true }, // number | null — currently focused comment/highlight pair
   };
 
   constructor() {
@@ -75,6 +95,7 @@ export class JobRoleDetail extends LitElement {
     this.baseResume = null;
     this.showChanges = true;
     this.coverRationale = { sig: '', highlights: [], loading: false, error: '' };
+    this.activeRationale = null;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -231,29 +252,8 @@ export class JobRoleDetail extends LitElement {
     }
   }
 
-  _enterEdit(kind) {
-    const a = this.assets[kind];
-    this.assets = { ...this.assets, [kind]: { ...a, mode: 'edit', draft: a.content } };
-  }
-  _cancelEdit(kind) {
-    const a = this.assets[kind];
-    this.assets = { ...this.assets, [kind]: { ...a, mode: 'view', draft: a.content, dirty: false, error: '' } };
-  }
-  _onDraftInput(kind, e) {
-    const a = this.assets[kind];
-    this.assets = { ...this.assets, [kind]: { ...a, draft: e.target.value, dirty: e.target.value !== a.content } };
-  }
-  async _saveEdit(kind) {
-    const a = this.assets[kind];
-    if (!a.dirty) return;
-    this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
-    try {
-      await writeRoleAsset(this.slug, kind, a.draft);
-      this.assets = { ...this.assets, [kind]: { ...a, content: a.draft, mode: 'view', saving: false, dirty: false } };
-    } catch (e) {
-      this.assets = { ...this.assets, [kind]: { ...a, saving: false, error: String(e) } };
-    }
-  }
+  // Old textarea-based edit methods replaced by inline contenteditable —
+  // see _enterEdit / _cancelEdit / _saveInlineEdit further down.
 
   // --- Details tab ---------------------------------------------------------
 
@@ -599,44 +599,63 @@ export class JobRoleDetail extends LitElement {
             </span>
           ` : nothing}
         ` : html`
-          <button class="btn btn--sm btn--primary" ?disabled=${!a.dirty || a.saving} @click=${() => this._saveEdit(kind)}>
+          <button class="btn btn--sm btn--primary" ?disabled=${!a.dirty || a.saving} @click=${() => this._saveInlineEdit(kind)}>
             ${a.saving ? 'Saving…' : 'Save'}
           </button>
           <button class="btn btn--sm" @click=${() => this._cancelEdit(kind)}>Cancel</button>
+          <span class="muted" style="font-size: var(--font-size-small);">Editing inline. Cmd/Ctrl+S to save.</span>
         `}
         ${a.error ? html`<span class="muted" style="color:var(--error);">${a.error}</span>` : nothing}
       </div>
       ${a.mode === 'edit'
-        ? html`<textarea class="asset-editor asset-editor--inline" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)} @blur=${() => a.dirty && this._saveEdit(kind)}></textarea>`
+        ? html`
+          <article class="kb-doc asset-doc asset-doc--editing"
+                   contenteditable="true"
+                   spellcheck="true"
+                   data-edit-kind=${kind}
+                   @input=${() => this._onContentEditableInput(kind)}
+                   @keydown=${(e) => {
+                     if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                       e.preventDefault();
+                       this._saveInlineEdit(kind);
+                     }
+                   }}>${unsafeHTML(a.editHtml || '')}</article>
+        `
         : (isCover && showingChanges
           ? html`
             <div class="cover-layout">
-              <article class="kb-doc asset-doc cover-layout__body">${unsafeHTML(bodyHtml)}</article>
+              <article class="kb-doc asset-doc cover-layout__body"
+                       data-active=${this.activeRationale ?? ''}
+                       @click=${(e) => {
+                         const m = e.target.closest('mark[data-rationale]');
+                         if (m) this._activateRationale(Number(m.dataset.rationale));
+                       }}>${unsafeHTML(bodyHtml)}</article>
               <aside class="cover-layout__rail" aria-label="Rationale">
-                <h4 class="cover-rail__title">Rationale</h4>
-                <p class="muted cover-rail__hint">Why each highlighted phrase is doing work.</p>
-                ${coverLoading && !coverComments.length ? html`
-                  <div class="cover-rail__empty">
-                    <span class="dots-anim">Reading the cover letter</span>
-                  </div>
-                ` : nothing}
+                <header class="cover-rail__head">
+                  <h4 class="cover-rail__title">Comments</h4>
+                  ${coverLoading ? html`<span class="cover-rail__spin"><span class="dots-anim">Reading</span></span>` : nothing}
+                </header>
                 ${this.coverRationale.error ? html`
-                  <p class="muted" style="color:var(--error);">${this.coverRationale.error}</p>
+                  <p class="muted" style="color:var(--error);padding:0 var(--space-3);">${this.coverRationale.error}</p>
                 ` : nothing}
                 ${!coverLoading && !coverComments.length && !this.coverRationale.error ? html`
-                  <p class="muted cover-rail__empty">No load-bearing phrases identified yet. Edit and save the cover letter, or click "Hide comments / Show comments" to retry.</p>
+                  <p class="cover-rail__empty">No load-bearing phrases yet — try regenerating the cover letter.</p>
                 ` : nothing}
-                ${coverComments.map(c => html`
-                  <article class="cover-comment" data-rationale-id=${c.id}
-                           @mouseenter=${() => this._highlightRationale(c.id, true)}
-                           @mouseleave=${() => this._highlightRationale(c.id, false)}>
-                    <header class="cover-comment__head">
-                      <span class="cover-comment__num">${c.id}</span>
-                      <span class="cover-comment__label">${c.label}</span>
-                    </header>
-                    <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
-                  </article>
-                `)}
+                <div class="cover-rail__list" data-active=${this.activeRationale ?? ''}>
+                  ${coverComments.map(c => html`
+                    <article class="cover-comment ${this.activeRationale === c.id ? 'is-active' : ''}"
+                             data-rationale-id=${c.id}
+                             @click=${() => this._scrollToHighlight(c.id)}
+                             @mouseenter=${() => this._highlightRationale(c.id, true)}
+                             @mouseleave=${() => this._highlightRationale(c.id, false)}>
+                      <header class="cover-comment__head">
+                        <span class="cover-comment__num">${c.id}</span>
+                        <span class="cover-comment__label">${c.label}</span>
+                      </header>
+                      <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
+                    </article>
+                  `)}
+                </div>
               </aside>
             </div>
           `
@@ -698,6 +717,115 @@ export class JobRoleDetail extends LitElement {
     root.querySelectorAll(`mark[data-rationale="${id}"]`).forEach(el => {
       el.classList.toggle('is-focused', on);
     });
+  }
+
+  // Click on a highlight or comment activates the pair — selected highlight
+  // gets a deeper background, selected card gets a left bar; everything
+  // else dims so the active pair stands out (Google-Docs-style).
+  _activateRationale(id) {
+    this.activeRationale = (this.activeRationale === id) ? null : id;
+    if (this.activeRationale) {
+      // Scroll the matching card into view in the rail.
+      const card = this.querySelector(`.cover-comment[data-rationale-id="${id}"]`);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  _scrollToHighlight(id) {
+    const root = this.querySelector('.cover-layout__body');
+    const mark = root?.querySelector(`mark[data-rationale="${id}"]`);
+    if (mark) {
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.activeRationale = id;
+    }
+  }
+
+  // After every render, re-position the comment cards so each one sits at
+  // the same vertical offset as its first highlight. Mimics Google Docs
+  // marginalia. Cards that would collide stack downward by a small gap.
+  _alignComments() {
+    const layout = this.querySelector('.cover-layout');
+    if (!layout) return;
+    const body = layout.querySelector('.cover-layout__body');
+    const rail = layout.querySelector('.cover-layout__rail');
+    if (!body || !rail) return;
+    const cards = Array.from(rail.querySelectorAll('.cover-comment'));
+    if (!cards.length) return;
+    const layoutTop = layout.getBoundingClientRect().top;
+    const positions = [];
+    for (const card of cards) {
+      const id = card.dataset.rationaleId;
+      const mark = body.querySelector(`mark[data-rationale="${id}"]`);
+      if (!mark) { card.style.top = ''; continue; }
+      const wantedTop = mark.getBoundingClientRect().top - layoutTop;
+      // Avoid overlap with previous card.
+      const prev = positions[positions.length - 1];
+      const minTop = prev ? prev.bottom + 8 : 0;
+      const top = Math.max(wantedTop, minTop);
+      card.style.top = `${top}px`;
+      positions.push({ top, bottom: top + card.offsetHeight });
+    }
+  }
+
+  updated(changed) {
+    super.updated?.(changed);
+    // Re-anchor cover-letter comment cards after any render that could
+    // have changed their layout (cover content, rationale set, tab swap,
+    // active state, etc).
+    this._alignComments();
+  }
+
+  // ----- Inline edit (contenteditable + turndown roundtrip) -----------------
+
+  // Enter edit mode without leaving the rendered article — captures the
+  // current rendered HTML once so subsequent re-renders don't clobber the
+  // contenteditable subtree. We render *plain* markdown (no diffs/marks)
+  // so the editor doesn't show diff junk while the user types.
+  _enterEdit(kind) {
+    const a = this.assets[kind];
+    if (!a) return;
+    const editHtml = renderMarkdown(a.content || '');
+    this.assets = {
+      ...this.assets,
+      [kind]: { ...a, mode: 'edit', draft: a.content || '', editHtml, dirty: false, error: '' },
+    };
+  }
+
+  _cancelEdit(kind) {
+    const a = this.assets[kind];
+    this.assets = { ...this.assets, [kind]: { ...a, mode: 'view', draft: a.content, editHtml: '', dirty: false, error: '' } };
+  }
+
+  // Read the contenteditable's HTML, roundtrip back to markdown, persist.
+  async _saveInlineEdit(kind) {
+    const a = this.assets[kind];
+    if (!a) return;
+    const article = this.querySelector(`article[data-edit-kind="${kind}"]`);
+    if (!article) return;
+    this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
+    try {
+      const td = await getTurndown();
+      const md = td.turndown(article.innerHTML).trim();
+      if (!md) throw new Error('empty content');
+      await writeRoleAsset(this.slug, kind, md);
+      this.assets = {
+        ...this.assets,
+        [kind]: { ...a, content: md, draft: md, mode: 'view', editHtml: '', dirty: false, saving: false, error: '' },
+      };
+    } catch (e) {
+      this.assets = { ...this.assets, [kind]: { ...a, saving: false, error: String(e?.message || e) } };
+    }
+  }
+
+  // Mark dirty whenever the user types; do NOT mutate editHtml (keeping
+  // its reference stable is what stops Lit from re-rendering the subtree
+  // and clobbering the cursor).
+  _onContentEditableInput(kind) {
+    const a = this.assets[kind];
+    if (!a || a.mode !== 'edit') return;
+    if (!a.dirty) {
+      this.assets = { ...this.assets, [kind]: { ...a, dirty: true } };
+    }
   }
 
   _renderChromeFromPrefill() {
