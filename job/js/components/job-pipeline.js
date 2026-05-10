@@ -573,7 +573,7 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._sorted();
-    const bucketLabel = { leads: 'Leads', active: 'Active', archive: 'Archive' }[this.bucket];
+    const bucketLabel = { leads: 'Saved', active: 'Active', archive: 'Archive' }[this.bucket];
     return html`
       ${this.bucket === 'leads' ? html`<job-recommendations></job-recommendations>` : nothing}
 

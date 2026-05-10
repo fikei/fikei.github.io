@@ -14,7 +14,7 @@ const ROUTES = [
     label: 'Jobs',
     match: /^\/job\/jobs\/?/,
     sub: [
-      { href: '/job/jobs/?bucket=leads',     label: 'Leads',                bucket: 'leads' },
+      { href: '/job/jobs/?bucket=leads',     label: 'Saved',                bucket: 'leads' },
       { href: '/job/jobs/?bucket=active',    label: 'Active',               bucket: 'active' },
       { href: '/job/jobs/?bucket=archive',   label: 'Archive',              bucket: 'archive' },
       { href: '/job/jobs/recommended/',      label: 'Recommended for you',  path: '/job/jobs/recommended/' },

@@ -79,6 +79,9 @@ export class JobRoleDetail extends LitElement {
     activeRationale: { state: true }, // number | null — currently focused comment/highlight pair
     threads: { state: true },         // { [commentId]: { messages: [...], sending, error } } — chat-to-edit per comment
     coverUndo: { state: true },       // { content, label, expiresAt } | null — one-shot undo for last AI edit
+    editingAnchor: { state: true },   // { kind: 'comment'|'selection', commentId?, phrase, instruction? } | null
+    selectionPopover: { state: true },// { visible, x, y, text, savedRange } | null — floating "edit selection" UI
+    coverHistory: { state: true },    // [{ id, ts, source, content, label, instruction? }] reverse-chrono
   };
 
   constructor() {
@@ -100,6 +103,9 @@ export class JobRoleDetail extends LitElement {
     this.activeRationale = null;
     this.threads = {};
     this.coverUndo = null;
+    this.editingAnchor = null;
+    this.selectionPopover = null;
+    this.coverHistory = [];
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -118,10 +124,13 @@ export class JobRoleDetail extends LitElement {
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
     document.addEventListener('job:auth:ready', this._onAuth);
+    this._onSelectionChange = () => this._handleSelectionChange();
+    document.addEventListener('selectionchange', this._onSelectionChange);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
+    document.removeEventListener('selectionchange', this._onSelectionChange);
     // Flush pending autosaves on unmount.
     for (const k of ['resume', 'cover-letter']) {
       if (this._autosaveTimers?.[k]) {
@@ -150,6 +159,17 @@ export class JobRoleDetail extends LitElement {
       this.assets = { 'resume': resume, 'cover-letter': cover, 'analysis': analysis };
       this.baseResume = baseResume;
       this.state = 'loaded';
+      // Seed history with the loaded cover letter so the user has a
+      // baseline to revert to even before they make any edits.
+      if (cover?.content) {
+        this.coverHistory = [{
+          id: this._newId(),
+          ts: Date.now(),
+          source: 'initial',
+          content: cover.content,
+          label: 'Loaded version',
+        }];
+      }
       document.title = this.role
         ? `${this.role.company} — ${this.role.title} — /job`
         : `${this.slug} — /job`;
@@ -662,6 +682,8 @@ export class JobRoleDetail extends LitElement {
         </div>
       ` : nothing}
 
+      ${isCover && this.selectionPopover?.visible ? this._renderSelectionPopover() : nothing}
+
       ${isCover && showingChanges
         ? html`
           <div class="cover-layout">
@@ -681,6 +703,7 @@ export class JobRoleDetail extends LitElement {
                          this._flushSave(kind);
                        }
                      }}>${unsafeHTML(a.editHtml || '')}</article>
+            <aside class="cover-layout__sidebar">
             <aside class="cover-layout__rail" aria-label="Comments">
               <header class="cover-rail__head">
                 <h4 class="cover-rail__title">Comments</h4>
@@ -757,6 +780,8 @@ export class JobRoleDetail extends LitElement {
                 })}
               </div>
             </aside>
+            ${this._renderHistory()}
+            </aside>
           </div>
         `
         : html`
@@ -773,6 +798,85 @@ export class JobRoleDetail extends LitElement {
                    }}>${unsafeHTML(a.editHtml || '')}</article>
         `}
     `;
+  }
+
+  // Floating popover that appears next to a non-empty selection inside
+  // the cover body. Lets the user direct an edit on just that range.
+  _renderSelectionPopover() {
+    const p = this.selectionPopover;
+    if (!p) return nothing;
+    const style = `position:absolute; left:${p.x}px; top:${p.y}px; transform: translateX(-50%);`;
+    return html`
+      <div class="sel-popover" style=${style} @mousedown=${(e) => e.preventDefault()}>
+        <form class="cover-thread__form sel-popover__form" @submit=${(e) => {
+          e.preventDefault();
+          const input = e.currentTarget.querySelector('textarea');
+          this._sendSelectionChat(input.value);
+        }}>
+          <textarea class="cover-thread__input"
+                    rows="1"
+                    autofocus
+                    placeholder="Direct an edit to selection…"
+                    @keydown=${(e) => {
+                      if (e.key === 'Escape') { this._closeSelectionPopover(); }
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        e.currentTarget.form.requestSubmit();
+                      }
+                    }}></textarea>
+          <button class="cover-thread__send" type="submit" aria-label="Send">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 13V3"/><path d="M3 8l5-5 5 5"/>
+            </svg>
+          </button>
+        </form>
+        <button class="sel-popover__close" type="button" @click=${() => this._closeSelectionPopover()} aria-label="Close">×</button>
+      </div>
+    `;
+  }
+
+  _renderHistory() {
+    const items = this.coverHistory || [];
+    if (items.length === 0) return nothing;
+    return html`
+      <aside class="cover-history" aria-label="Edit history">
+        <header class="cover-rail__head">
+          <h4 class="cover-rail__title">History</h4>
+          <span class="cover-rail__spin">${items.length} version${items.length === 1 ? '' : 's'}</span>
+        </header>
+        <ol class="cover-history__list">
+          ${items.map((h, i) => html`
+            <li class="cover-history__item ${i === 0 ? 'cover-history__item--current' : ''}">
+              <button class="cover-history__btn" ?disabled=${i === 0} @click=${() => this._restoreHistory(h.id)} title=${h.instruction || ''}>
+                <span class="cover-history__icon" data-source=${h.source}>${this._historyIcon(h.source)}</span>
+                <span class="cover-history__meta">
+                  <span class="cover-history__label">${h.label || this._historyDefaultLabel(h.source)}</span>
+                  ${h.instruction ? html`<span class="cover-history__inst">${this._truncate(h.instruction, 80)}</span>` : nothing}
+                </span>
+                <span class="cover-history__ts">${this._timeAgo(h.ts)}</span>
+              </button>
+            </li>
+          `)}
+        </ol>
+      </aside>
+    `;
+  }
+
+  _historyIcon(source) {
+    if (source === 'ai-comment' || source === 'ai-selection' || source === 'pre-ai') return '✨';
+    if (source === 'manual') return '✎';
+    if (source === 'restore' || source === 'pre-restore') return '↻';
+    return '·';
+  }
+  _historyDefaultLabel(source) {
+    if (source === 'manual') return 'Manual edit';
+    if (source === 'ai-comment') return 'AI edit (comment)';
+    if (source === 'ai-selection') return 'AI edit (selection)';
+    if (source === 'initial') return 'Loaded version';
+    if (source === 'pre-ai') return 'Pre-AI snapshot';
+    if (source === 'pre-restore') return 'Pre-restore snapshot';
+    if (source === 'restore') return 'Restored version';
+    return source;
   }
 
   // Save-status pill in the toolbar — green dot for "Saved", amber for
@@ -853,6 +957,157 @@ export class JobRoleDetail extends LitElement {
     }
   }
 
+  // ----- Edit history (cover letter) ----------------------------------------
+
+  _newId() { return Math.random().toString(36).slice(2, 10); }
+
+  _pushHistory(entry) {
+    // Skip if content didn't actually change from the most recent entry.
+    const last = this.coverHistory[0];
+    if (last && last.content === entry.content) return;
+    this.coverHistory = [{ id: this._newId(), ts: Date.now(), ...entry }, ...this.coverHistory].slice(0, 50);
+  }
+
+  async _restoreHistory(id) {
+    const entry = this.coverHistory.find(h => h.id === id);
+    if (!entry) return;
+    const a = this.assets['cover-letter'];
+    if (!a) return;
+    // Snapshot the current state into history as a "before restore" entry
+    // so we can come back to it via the same UI.
+    this._pushHistory({ source: 'pre-restore', content: a.content, label: 'Before restore' });
+    try {
+      await writeRoleAsset(this.slug, 'cover-letter', entry.content);
+      this.assets = {
+        ...this.assets,
+        'cover-letter': { ...a, content: entry.content, saveStatus: 'saved', savedAt: Date.now() },
+      };
+      this._refreshEditHtml('cover-letter');
+      this._pushHistory({ source: 'restore', content: entry.content, label: `Restored: ${entry.label || this._truncate(entry.instruction, 60) || 'version'}` });
+      this._flashCoverEdit();
+    } catch (e) {
+      this.assets = { ...this.assets, 'cover-letter': { ...a, error: `restore failed: ${String(e?.message || e)}` } };
+    }
+  }
+
+  _truncate(s, n) {
+    if (!s) return '';
+    s = String(s);
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  // ----- Selection-based edit ----------------------------------------------
+
+  // Watch document selection; if the user has selected non-empty text
+  // inside the cover body, show a floating "Edit with AI" popover near
+  // the selection end. Selection inside the chat composer / comment rail
+  // doesn't trigger.
+  _handleSelectionChange() {
+    if (this.activeTab !== 'cover-letter' || !this.showChanges) {
+      if (this.selectionPopover) this.selectionPopover = null;
+      return;
+    }
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      // Keep the popover up if the user moved focus into the popover
+      // input (selection then becomes collapsed there).
+      const inPopover = document.activeElement?.closest?.('.sel-popover');
+      if (!inPopover && this.selectionPopover) this.selectionPopover = null;
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const body = this.querySelector('.cover-layout__body');
+    if (!body || !body.contains(range.commonAncestorContainer)) {
+      if (this.selectionPopover) this.selectionPopover = null;
+      return;
+    }
+    const text = sel.toString().trim();
+    if (text.length < 3) return;
+    const rect = range.getBoundingClientRect();
+    const scrollY = window.scrollY;
+    this.selectionPopover = {
+      visible: true,
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + scrollY + 8,
+      text,
+      savedRange: range.cloneRange(),
+    };
+  }
+
+  _closeSelectionPopover() { this.selectionPopover = null; }
+
+  async _sendSelectionChat(instruction) {
+    const sp = this.selectionPopover;
+    if (!sp || !instruction.trim()) return;
+    const phrase = sp.text;
+    this.selectionPopover = null;
+    await this._applyCoverEdit({
+      anchorPhrase: phrase,
+      instruction: instruction.trim(),
+      source: 'ai-selection',
+      label: this._truncate(phrase, 40),
+      thread: null,
+    });
+  }
+
+  // ----- Shared apply pipeline for AI edits ---------------------------------
+
+  // One method drives every AI edit (comment-anchored or selection-based)
+  // so shimmer, history, undo, and post-apply refresh stay consistent.
+  async _applyCoverEdit({ anchorPhrase, anchorCommentLabel = '', anchorRationale = '', instruction, source, label, commentIdForThread = null }) {
+    const a = this.assets['cover-letter'];
+    if (!a || !a.content) return;
+
+    this.editingAnchor = { kind: source === 'ai-comment' ? 'comment' : 'selection', commentId: commentIdForThread, phrase: anchorPhrase };
+    if (commentIdForThread != null) {
+      const prev = this._getThread(commentIdForThread);
+      this._setThread(commentIdForThread, {
+        messages: [...prev.messages, { role: 'user', text: instruction }],
+        sending: true, error: '',
+      });
+    }
+    try {
+      const newContent = await applyCoverEdit({
+        coverText: a.content,
+        instruction,
+        comment: { label: anchorCommentLabel || 'User selection', anchor_phrase: anchorPhrase, rationale: anchorRationale },
+      });
+
+      // History entry for the version we're replacing (before-state).
+      this._pushHistory({ source: 'pre-ai', content: a.content, label: 'Before AI edit', instruction });
+      // Undo snapshot pointing to the pre-AI content.
+      this.coverUndo = { content: a.content, label, expiresAt: Date.now() + 30_000 };
+
+      await writeRoleAsset(this.slug, 'cover-letter', newContent);
+      this.assets = {
+        ...this.assets,
+        'cover-letter': { ...this.assets['cover-letter'], content: newContent, saveStatus: 'saved', savedAt: Date.now() },
+      };
+      this._refreshEditHtml('cover-letter');
+      this._pushHistory({ source, content: newContent, label, instruction });
+      this._flashCoverEdit();
+
+      if (commentIdForThread != null) {
+        const cur = this._getThread(commentIdForThread);
+        this._setThread(commentIdForThread, {
+          messages: [...cur.messages, { role: 'assistant', text: 'Edit applied. Undo available for 30s.' }],
+          sending: false, error: '',
+        });
+      }
+
+      setTimeout(() => { if (this.coverUndo && this.coverUndo.expiresAt <= Date.now()) this.coverUndo = null; }, 30_200);
+    } catch (e) {
+      if (commentIdForThread != null) {
+        const cur = this._getThread(commentIdForThread);
+        this._setThread(commentIdForThread, { messages: cur.messages, sending: false, error: String(e?.message || e) });
+      } else {
+        this.assets = { ...this.assets, 'cover-letter': { ...this.assets['cover-letter'], error: String(e?.message || e) } };
+      }
+    } finally {
+      this.editingAnchor = null;
+    }
+  }
+
   // ----- Chat-to-edit on cover-letter comments -----------------------------
 
   _threadKey(commentId) { return `cover:${commentId}`; }
@@ -865,67 +1120,23 @@ export class JobRoleDetail extends LitElement {
     this.threads = { ...this.threads, [this._threadKey(commentId)]: t };
   }
 
-  // Send a chat message anchored to a comment. Pushes user msg into the
-  // thread, calls cover-edit, applies the new content, snapshots an undo.
+  // Send a chat message anchored to a comment. Thin wrapper around the
+  // shared _applyCoverEdit pipeline so shimmer, history, and undo behave
+  // identically regardless of where the edit was triggered from.
   async _sendCommentChat(commentId, instruction) {
-    const a = this.assets['cover-letter'];
-    if (!a || !a.content) return;
     const trimmed = String(instruction || '').trim();
     if (!trimmed) return;
-
     const comment = (this.coverRationale.highlights || []).find((_h, i) => i + 1 === commentId);
     if (!comment) return;
-
-    const prev = this._getThread(commentId);
-    const next = {
-      messages: [...prev.messages, { role: 'user', text: trimmed }],
-      sending: true,
-      error: '',
-    };
-    this._setThread(commentId, next);
-
-    try {
-      const newContent = await applyCoverEdit({
-        coverText: a.content,
-        instruction: trimmed,
-        comment: { label: comment.label, anchor_phrase: comment.phrase, rationale: comment.rationale },
-      });
-      // Snapshot for one-shot undo. Expire after 30s.
-      this.coverUndo = {
-        content: a.content,
-        label: `comment ${commentId}`,
-        expiresAt: Date.now() + 30_000,
-      };
-      // Persist immediately and refresh editHtml so the user sees the
-      // change. Rationale will refetch automatically (signature changed).
-      await writeRoleAsset(this.slug, 'cover-letter', newContent);
-      this.assets = {
-        ...this.assets,
-        'cover-letter': {
-          ...this.assets['cover-letter'],
-          content: newContent,
-          saveStatus: 'saved',
-          savedAt: Date.now(),
-        },
-      };
-      this._refreshEditHtml('cover-letter');
-      this._setThread(commentId, {
-        messages: [...next.messages, { role: 'assistant', text: 'Applied. Edit highlighted briefly. Undo available for 30s.' }],
-        sending: false,
-        error: '',
-      });
-      this._flashCoverEdit();
-      // Schedule undo expiry → state clear.
-      setTimeout(() => {
-        if (this.coverUndo && this.coverUndo.expiresAt <= Date.now()) this.coverUndo = null;
-      }, 30_000 + 200);
-    } catch (e) {
-      this._setThread(commentId, {
-        messages: next.messages,
-        sending: false,
-        error: String(e?.message || e),
-      });
-    }
+    return this._applyCoverEdit({
+      anchorPhrase: comment.phrase,
+      anchorCommentLabel: comment.label,
+      anchorRationale: comment.rationale,
+      instruction: trimmed,
+      source: 'ai-comment',
+      label: `${comment.label}: ${this._truncate(trimmed, 50)}`,
+      commentIdForThread: commentId,
+    });
   }
 
   // Briefly flash the cover-letter body to show that a chat edit just
@@ -1027,10 +1238,41 @@ export class JobRoleDetail extends LitElement {
 
   updated(changed) {
     super.updated?.(changed);
-    // Re-anchor cover-letter comment cards after any render that could
-    // have changed their layout (cover content, rationale set, tab swap,
-    // active state, etc).
     this._alignComments();
+    this._applyEditingShimmer();
+  }
+
+  // Paint a shimmer + sparkle overlay on whichever <mark> (or first text
+  // substring) matches editingAnchor.phrase while an AI edit is in flight.
+  _applyEditingShimmer() {
+    const body = this.querySelector('.cover-layout__body');
+    if (!body) return;
+    body.querySelectorAll('.ai-shimmer').forEach(el => el.classList.remove('ai-shimmer'));
+    const anchor = this.editingAnchor;
+    if (!anchor || !anchor.phrase) return;
+    // Comment-anchored: target the mark by data-rationale id when we
+    // can map phrase → id.
+    if (anchor.kind === 'comment' && anchor.commentId != null) {
+      const m = body.querySelector(`mark[data-rationale="${anchor.commentId}"]`);
+      if (m) { m.classList.add('ai-shimmer'); return; }
+    }
+    // Otherwise: best-effort first-substring match across text nodes.
+    const phrase = anchor.phrase.toLowerCase();
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const idx = node.nodeValue.toLowerCase().indexOf(phrase);
+      if (idx < 0) continue;
+      try {
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + phrase.length);
+        const span = document.createElement('span');
+        span.className = 'ai-shimmer ai-shimmer--inline';
+        range.surroundContents(span);
+      } catch { /* range may cross element boundaries — skip silently */ }
+      return;
+    }
   }
 
   // ----- Always-on inline editing + autosave --------------------------------
@@ -1076,6 +1318,11 @@ export class JobRoleDetail extends LitElement {
         this.assets = { ...this.assets, [kind]: { ...cur, content: md, saveStatus: 'saved', savedAt: Date.now() } };
       } else {
         this.assets = { ...this.assets, [kind]: { ...cur, content: md } };
+      }
+      // Track manual edits in cover-letter history so the user can flip
+      // back to any prior version (theirs or the AI's).
+      if (kind === 'cover-letter') {
+        this._pushHistory({ source: 'manual', content: md, label: 'Manual edit' });
       }
     } catch (e) {
       this.assets = { ...this.assets, [kind]: { ...this.assets[kind], saveStatus: 'error', error: String(e?.message || e) } };
