@@ -155,8 +155,8 @@ export async function formatResumeText(rawText) {
   return j.content;
 }
 
-// Get AI rationale for a cover letter given role-analysis source bullets.
-// Returns [{ phrase, label, rationale }] in document order; empty array on
+// Get AI rationale + opportunities for a cover letter given the role-analysis
+// source bullets. Returns { highlights, opportunities }; empty arrays on
 // failure. Stateless on the server.
 export async function fetchCoverRationale(coverText, sources) {
   const headers = await authHeader();
@@ -167,7 +167,23 @@ export async function fetchCoverRationale(coverText, sources) {
   });
   if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
   const j = await res.json();
-  return Array.isArray(j.highlights) ? j.highlights : [];
+  return {
+    highlights:    Array.isArray(j.highlights)    ? j.highlights    : [],
+    opportunities: Array.isArray(j.opportunities) ? j.opportunities : [],
+  };
+}
+
+// Append a markdown snippet to job.global_assets kind='narrative-additions'.
+// Used to capture missing info volunteered through opportunity threads.
+export async function addNarrative({ snippet, sourceRole, ask }) {
+  const headers = await authHeader();
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'narrative-add', snippet, source_role: sourceRole, ask }),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  return res.json();
 }
 
 // Apply a chat-driven edit to the cover letter. `comment` is optional
@@ -187,4 +203,4 @@ export async function applyCoverEdit({ coverText, instruction, comment }) {
   return j.content;
 }
 
-window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit };
+window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative };

@@ -75,20 +75,24 @@ function chunkPhrase(s) {
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-// Wrap AI-supplied highlights into the markdown source. `aiHighlights` is
-// an array of `{phrase, label, rationale}` returned by the cover-rationale
-// edge function. Each phrase is matched as a verbatim case-insensitive
-// substring; non-matches are silently skipped (the model occasionally
-// paraphrases). Returns `{html, comments}` shaped like highlightPhrases.
-export function applyAIHighlights(text, aiHighlights) {
+// Wrap AI-supplied highlights AND opportunities into the markdown source.
+// Both are returned by the cover-rationale edge function:
+//   highlights:    [{ phrase, label, rationale }]
+//   opportunities: [{ phrase, gap, ask }]
+// Each phrase is matched as a verbatim case-insensitive substring;
+// non-matches are silently skipped. Returns `{ html, comments }` where
+// each comment carries `kind: 'rationale' | 'opportunity'` so the rail
+// can style them differently.
+export function applyAIHighlights(text, highlights, opportunities) {
   const body = String(text || '');
-  if (!body || !Array.isArray(aiHighlights) || aiHighlights.length === 0) {
-    return { html: body, comments: [] };
-  }
+  const hl = Array.isArray(highlights) ? highlights : [];
+  const ops = Array.isArray(opportunities) ? opportunities : [];
+  if (!body || (!hl.length && !ops.length)) return { html: body, comments: [] };
   const lower = body.toLowerCase();
   const wrapped = [];
   const hits = [];
-  for (const h of aiHighlights) {
+
+  for (const h of hl) {
     const phrase = String(h?.phrase || '').trim();
     if (!phrase) continue;
     const start = lower.indexOf(phrase.toLowerCase());
@@ -96,8 +100,19 @@ export function applyAIHighlights(text, aiHighlights) {
     const end = start + phrase.length;
     if (wrapped.some(([s, e]) => start < e && end > s)) continue;
     wrapped.push([start, end]);
-    hits.push({ start, end, label: String(h.label || ''), rationale: String(h.rationale || '') });
+    hits.push({ start, end, kind: 'rationale', label: String(h.label || ''), body: String(h.rationale || '') });
   }
+  for (const o of ops) {
+    const phrase = String(o?.phrase || '').trim();
+    if (!phrase) continue;
+    const start = lower.indexOf(phrase.toLowerCase());
+    if (start < 0) continue;
+    const end = start + phrase.length;
+    if (wrapped.some(([s, e]) => start < e && end > s)) continue;
+    wrapped.push([start, end]);
+    hits.push({ start, end, kind: 'opportunity', label: 'Opportunity', gap: String(o.gap || ''), ask: String(o.ask || ''), body: String(o.gap || '') });
+  }
+
   if (!hits.length) return { html: body, comments: [] };
   hits.sort((a, b) => a.start - b.start);
   const comments = [];
@@ -105,9 +120,17 @@ export function applyAIHighlights(text, aiHighlights) {
   let cursor = 0;
   hits.forEach((h, i) => {
     const id = i + 1;
-    comments.push({ id, label: h.label, text: h.rationale });
+    comments.push({
+      id,
+      kind: h.kind,
+      label: h.label,
+      text: h.body,
+      ask: h.ask || '',
+      phrase: body.slice(h.start, h.end),
+    });
     out += body.slice(cursor, h.start);
-    out += `<mark class="d-jd" data-rationale="${id}">${body.slice(h.start, h.end)}<sup class="d-fn">${id}</sup></mark>`;
+    const cls = h.kind === 'opportunity' ? 'd-op' : 'd-jd';
+    out += `<mark class="${cls}" data-rationale="${id}">${body.slice(h.start, h.end)}<sup class="d-fn">${id}</sup></mark>`;
     cursor = h.end;
   });
   out += body.slice(cursor);

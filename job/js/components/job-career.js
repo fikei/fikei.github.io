@@ -94,6 +94,7 @@ export class JobCareer extends LitElement {
     promptTags: { state: true },
     baseResume: { state: true },     // saved row: { content, missing, generating, error }
     baseDraft: { state: true },      // editing buffer: { text, status, error } — status in idle|reading|formatting|saving
+    narrativeAdditions: { state: true }, // markdown blob — additions captured via opportunity threads
   };
 
   constructor() {
@@ -106,6 +107,7 @@ export class JobCareer extends LitElement {
     this.promptTags = [];
     this.baseResume = { content: '', missing: true, generating: false, error: '' };
     this.baseDraft = { text: '', status: 'idle', error: '' };
+    this.narrativeAdditions = '';
   }
 
   connectedCallback() {
@@ -144,6 +146,11 @@ export class JobCareer extends LitElement {
         const r = await readRoleAsset(BASE_RESUME_SLUG, 'resume');
         if (r?.content_md) this.baseResume = { content: r.content_md, missing: false, generating: false, error: '' };
       } catch { /* leave missing=true */ }
+      // Best-effort load of narrative-additions for the Narratives tab.
+      try {
+        const n = await readRoleAsset('__narratives__', 'notes');
+        if (n?.content_md) this.narrativeAdditions = n.content_md;
+      } catch { /* leave empty */ }
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
@@ -354,6 +361,20 @@ export class JobCareer extends LitElement {
         <div class="kb-doc">
           <p><em>Open the Vision tab to read or edit the live narrative. (Direct fetch lands with the Vision page rebuild.)</em></p>
         </div>
+      </section>
+
+      <section class="narrative-block">
+        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);">
+          <div>
+            <h2 style="margin:0;">Additions</h2>
+            <p class="muted" style="margin:0;font-size:var(--font-size-small);">
+              New context you've added via cover-letter opportunity threads. Drawn from <code>job.global_assets</code>.
+            </p>
+          </div>
+        </header>
+        ${this.narrativeAdditions
+          ? html`<article class="kb-doc">${unsafeHTML(renderMarkdown(this.narrativeAdditions))}</article>`
+          : html`<p class="muted" style="font-size:var(--font-size-small);">Nothing yet. When you respond to an "Opportunity" comment on a cover letter, the info you provide lands here.</p>`}
       </section>
 
       <section class="narrative-block">
