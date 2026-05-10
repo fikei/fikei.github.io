@@ -38,13 +38,12 @@
 
 ## Recent Milestones
 
-### Gmail → Jobs Pipe — Phase 1 Started
-**Added: 2026-05-10** — Phase 14 filed from [PRD: Job Product](/docs/strategy/prds/job-product.md)
+### Gmail → Jobs Pipe — Phase 1 Shipped
+**Updated: 2026-05-10** — Phase 1 narrowed to recs-only after schema collision with existing `job.companies` (career history). Canonical-URL enrichment carved out into Phase 1.5.
 
-- **Scope**: Gmail OAuth (Option B split — `gmail-auth` function + `_shared/google-tokens.ts` shared with `calendar-api`), token storage in `user_google_tokens` keyed by `(user_id, scope_set)`, job-source enrichment cascade (cache → ATS patterns → careers scrape → unresolved bucket), `GmailJobsSource` plugin with recruiter-blast skip logic and aggregator allowlist, `gmail-scan` cron function, fixture-based test path
-- **Deferred to Phase 2**: contacts graph, connections enrichment, LinkedIn CSV upload, network overlay, paid enrichment APIs
-- **Infrastructure**: 3 new migrations (`021_user_google_tokens`, `022_job_companies`, `023_gmail_skipped`), 3 new edge functions (`gmail-auth`, `enrich-job-source`, `gmail-scan`), 2 shared helpers (`_shared/google-tokens.ts`, `_shared/gmail.ts`)
-- **Total tasks**: 73 across 4 epics, 12 stories
+- **Phase 1 (shipped)**: Gmail OAuth via `gmail-auth` (Option B split, shared `_shared/google-tokens.ts`), `user_google_tokens` keyed by `(user_id, scope_set)`, `GmailJobsSource` plugin with sender allowlist + Haiku extraction + digest skip-and-log, `job.gmail_skipped` audit, `job.gmail_scan_state` cursor. Roles emit with the aggregator URL (LinkedIn / Wellfound / Otta) — user clicks through to the listing page for JD + apply.
+- **Phase 1.5 (next)**: Canonical-URL enrichment via `enrich-job-source` + `job.hiring_companies` cache. Brief: [gmail-jobs-pipe-phase-1-5-enrichment.md](/docs/strategy/prds/gmail-jobs-pipe-phase-1-5-enrichment.md). `enrich-job-source` function and the cache table design already exist on disk; Phase 1.5 is plumbing them in.
+- **Phase 2 (deferred)**: contacts graph, LinkedIn CSV upload, network overlay, paid enrichment APIs.
 
 ### Systemic v2 — Planned
 **Added: 2026-04-10** — 16 stories filed from [PRD: Systemic v2](/docs/strategy/prds/systemic-v2.md)
