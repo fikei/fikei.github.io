@@ -187,80 +187,96 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       }
 
       const subject = getHeader(msg, 'Subject') || '';
-      if (looksLikeDigest(subject, sender)) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'multi_role_digest', { subject });
-        continue;
-      }
-
       const body = extractBody(msg);
       if (!body) {
         await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: 'empty_body' });
         continue;
       }
 
-      // Fast path: LinkedIn job alert subjects are reliably "{title} at
-      // {company}", which is more accurate than Haiku's extraction
-      // (Haiku gets confused by the "you might also like" sidecards
-      // LinkedIn includes and flags the whole message as a digest).
-      let job: ExtractedJob | null = parseLinkedInSubject(subject, sender, body);
+      // Decide single-role vs. digest. Digests get fanned out — one
+      // recommended_roles row per role found in the body.
+      let jobs: ExtractedJob[];
+      const isDigest = looksLikeDigest(subject, sender);
 
-      // Fallback: Haiku for non-LinkedIn senders, or LinkedIn where the
-      // subject didn't match.
-      if (!job) {
+      if (isDigest) {
         try {
-          job = await extractJob({ subject, sender, body });
+          jobs = await extractJobsMulti({ subject, sender, body });
         } catch (e) {
-          await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message });
+          await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message, digest: true });
           continue;
+        }
+        if (!jobs.length) {
+          await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_roles_in_digest', { subject });
+          continue;
+        }
+      } else {
+        // Single-role path. LinkedIn subjects parse cleanly without
+        // Haiku; everything else goes to Haiku for single extraction.
+        let job: ExtractedJob | null = parseLinkedInSubject(subject, sender, body);
+        if (!job) {
+          try {
+            job = await extractJob({ subject, sender, body });
+          } catch (e) {
+            await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message });
+            continue;
+          }
+        }
+        if (!job || !job.company) {
+          await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_company', { extracted: job });
+          continue;
+        }
+        if (!job.title) {
+          await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_title', { extracted: job });
+          continue;
+        }
+        // If Haiku itself reports low confidence (suggesting digest), retry
+        // through the multi extractor instead of dropping the message.
+        if ((job.confidence ?? 1) < 0.4) {
+          try {
+            jobs = await extractJobsMulti({ subject, sender, body });
+          } catch (e) {
+            await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message, digestRetry: true });
+            continue;
+          }
+          if (!jobs.length) jobs = [job];   // fall back to the single guess
+        } else {
+          jobs = [job];
         }
       }
 
-      if (!job || !job.company || (job.confidence !== undefined && job.confidence < 0.5)) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_company', { extracted: job });
-        continue;
+      // Emit one rec per role. Source IDs include the role index so the
+      // unique (source, source_id) constraint accepts the whole fan-out.
+      let emitted = 0;
+      for (let i = 0; i < jobs.length; i++) {
+        const job = jobs[i];
+        const url = job.alertUrl;
+        if (!url || !job.company || !job.title) continue;
+        out.push({
+          source:      'gmail-jobs',
+          sourceId:    `gmail:${messageId}:${i}`,
+          sourceLabel: `Gmail · ${job.company}`,
+          url,
+          company:     job.company,
+          title:       job.title,
+          location:    job.location,
+          postedAt:    msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : undefined,
+          payload: {
+            gmailMessageId: messageId,
+            gmailApiId:     msg.id,
+            alertUrl:       job.alertUrl ?? null,
+            sender,
+            digest:         isDigest || jobs.length > 1,
+            roleIndex:      i,
+            roleCount:      jobs.length,
+          },
+        });
+        emitted++;
       }
-      if (!job.title) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_title', { extracted: job });
-        continue;
+      // If a digest's roles were all unusable (no url/company/title), log
+      // so we can audit — otherwise the message silently disappears.
+      if (!emitted) {
+        await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_usable_roles', { extracted: jobs });
       }
-
-      // Multi-role guard #2: if Haiku confessed multiple roles in one
-      // message, we treat it as a digest. Haiku is instructed to set
-      // confidence < 0.4 in that case.
-      if ((job.confidence ?? 1) < 0.4) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'multi_role_digest', { extracted: job });
-        continue;
-      }
-
-      // Phase 1: emit with the aggregator URL directly. Canonical-URL
-      // resolution (resolve LinkedIn alert → Greenhouse posting) is
-      // deferred — it adds API surface, schema, and failure modes that
-      // aren't load-bearing for "show me job recs in the widget."
-      // Click-through to the aggregator is one extra step, acceptable.
-      // The enrich-job-source function is still on disk for when this
-      // becomes worth re-enabling.
-      const url = job.alertUrl;
-      if (!url) {
-        await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_url', { extracted: job });
-        continue;
-      }
-
-      out.push({
-        source:      'gmail-jobs',
-        sourceId:    `gmail:${messageId}`,
-        sourceLabel: `Gmail · ${job.company}`,
-        url,
-        company:     job.company,
-        title:       job.title,
-        location:    job.location,
-        postedAt:    msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : undefined,
-        payload: {
-          gmailMessageId: messageId,
-          gmailApiId:     msg.id,
-          alertUrl:       job.alertUrl ?? null,
-          sender,
-        },
-      });
     }
 
     // Persist new cursor. Prefer the historyId Gmail returned;
@@ -388,6 +404,113 @@ async function extractJob(args: { subject: string; sender: string; body: string 
     alertUrl:   (parsed.alertUrl || '').trim() || undefined,
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : undefined,
   };
+}
+
+// ---------- Multi-role extraction (digests) ----------
+//
+// HN "who's hiring" threads, LinkedIn weekly recaps, and any sender on
+// the digest-hint list go through this path. Haiku returns an ARRAY of
+// roles found in the message body. Each becomes a separate
+// recommended_roles row downstream.
+
+const EXTRACT_MULTI_SYSTEM = `You extract ALL distinct job postings from a single email digest (LinkedIn weekly, Hacker News "who's hiring", aggregator roundups, etc).
+
+Return STRICT JSON: an array of role objects, nothing else.
+
+[
+  { "company": "...", "title": "...", "location": "...", "alertUrl": "..." },
+  ...
+]
+
+Rules:
+- One object per distinct role. Same company + same title = one role.
+- "alertUrl" is the link to that specific role's posting/apply page. Required.
+- "company" is the hiring company, never the email sender. e.g. "Anthropic" not "LinkedIn".
+- "location" is the role's location string ("San Francisco, CA", "Remote, US"). Empty string if absent.
+- If you cannot identify a clear company AND title AND alertUrl for a role, OMIT it. Empty array is better than guesses.
+- Cap at 30 roles per message. Skip "you might also like" filler if it's not part of the main digest content.`;
+
+async function extractJobsMulti(args: { subject: string; sender: string; body: string }): Promise<ExtractedJob[]> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) {
+    console.warn('[gmail-jobs] ANTHROPIC_API_KEY missing; skipping multi-extraction');
+    return [];
+  }
+  // Digests are usually larger; bump the body cap to 16k. LinkedIn
+  // weekly recaps are ~10–12k of meaningful text.
+  const trimmed = args.body.slice(0, 16000);
+  const userPrompt = [
+    `Subject: ${args.subject}`,
+    `From: ${args.sender}`,
+    `---`,
+    trimmed,
+  ].join('\n');
+
+  const r = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4096,
+      system: EXTRACT_MULTI_SYSTEM,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const data = await r.json() as { content: Array<{ type: string; text: string }> };
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+  const parsed = extractFirstJsonArray(text);
+  if (!parsed) throw new Error(`bad JSON array from haiku: ${text.slice(0, 120)}`);
+  const out: ExtractedJob[] = [];
+  for (const r of parsed as Array<{ company?: string; title?: string; location?: string; alertUrl?: string }>) {
+    const company  = (r.company || '').trim();
+    const title    = (r.title || '').trim();
+    const alertUrl = (r.alertUrl || '').trim();
+    if (!company || !title || !alertUrl) continue;
+    out.push({
+      company,
+      title,
+      location: (r.location || '').trim() || undefined,
+      alertUrl,
+      confidence: 0.85,
+    });
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
+// Tolerant JSON array extractor — finds the first balanced [ ... ] block
+// and parses it. Mirrors extractFirstJsonObject for the multi prompt.
+function extractFirstJsonArray(text: string): unknown[] | null {
+  const stripped = text.replace(/```json\s*/gi, '').replace(/```/g, '');
+  const start = stripped.indexOf('[');
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < stripped.length; i++) {
+    const c = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '[') depth++;
+    else if (c === ']') {
+      depth--;
+      if (depth === 0) {
+        const candidate = stripped.slice(start, i + 1);
+        try {
+          const parsed = JSON.parse(candidate);
+          return Array.isArray(parsed) ? parsed : null;
+        } catch { return null; }
+      }
+    }
+  }
+  return null;
 }
 
 // Tolerant JSON extractor: finds the first balanced { ... } block in
