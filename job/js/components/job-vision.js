@@ -93,6 +93,33 @@ const MONEY_LABELS = /^(base|base floor|salary|salary floor|cash|total comp|tota
 
 function isMoney(label) { return MONEY_LABELS.test(label); }
 
+// Some KB files have a literal bullet glyph after the markdown marker
+// (e.g. `- • foo` from copy/paste). Both the marker AND the glyph render,
+// giving the appearance of "double bullets". Strip the leading glyph
+// (and other common variants) from the captured text. Also collapse any
+// remaining nested markdown bullet markers at the very start.
+const LEADING_BULLET_RE = /^[\s ]*[•·●○◦▪▫–—-][\s ]*/;
+
+function cleanBulletText(text) {
+  let out = (text || '').trim();
+  // Repeat in case the line is `· · foo` etc.
+  for (let i = 0; i < 3 && LEADING_BULLET_RE.test(out); i++) {
+    out = out.replace(LEADING_BULLET_RE, '');
+  }
+  return out.trim();
+}
+
+// Normalize the raw markdown body before marked sees it: when a list line
+// starts with `- • foo` (or any equivalent), drop the glyph so marked
+// renders only one bullet from the list marker. Leaves real content alone.
+function normalizeBulletGlyphs(md) {
+  if (!md) return md;
+  return md.replace(
+    /^([ \t]*)([-*+])([ \t]+)([•·●○◦▪▫–—-])([ \t]+|)/gm,
+    (_m, indent, marker, sp, _glyph, _tail) => `${indent}${marker}${sp}`
+  );
+}
+
 // First non-field, non-heading bullet line from the body — used as a card
 // preview when the file is bullet-heavy (deal-breakers, voice rules, etc.).
 function firstBullets(body, max = 3) {
@@ -100,7 +127,7 @@ function firstBullets(body, max = 3) {
   const out = [];
   for (const line of body.split(/\r?\n/)) {
     const m = line.match(/^\s*[-*+]\s+(.+?)\s*$/);
-    if (m) out.push(m[1]);
+    if (m) out.push(cleanBulletText(m[1]));
     if (out.length >= max) break;
   }
   return out;
@@ -387,7 +414,7 @@ export class JobVision extends LitElement {
         ` : html`
           ${this._renderFacts(doc)}
           ${doc.body ? html`
-            <article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(doc.body))}</article>
+            <article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(normalizeBulletGlyphs(doc.body)))}</article>
           ` : (doc.fields.length ? nothing : html`<p class="muted">_(empty)_</p>`)}
         `}
       </section>

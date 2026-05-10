@@ -15,8 +15,8 @@ import { readSheetValues } from '../jobs-pipe/sheets.ts';
 import { SCHEMA_SQL } from './schema.ts';
 import { DESKTOP_ASSETS } from './desktop-bundle.ts';
 
-const VERSION = '0.1.0';
-console.log(`[migrate-job] v${VERSION}`);
+const VERSION = '0.2.0';
+console.log(`[migrate-job] v${VERSION} - search plan v2: sections + fields + summary`);
 
 const SHEET_ID = '1YtZp3vxlsVP8t_eWpcYzYEVjaSKu8rVYmVRPr4AGeAU';
 
@@ -201,9 +201,8 @@ async function seedKb(sql: ReturnType<typeof postgres>): Promise<Pick<Counts, 'c
     }
   }
 
-  // Vision: fold all 02-goals-intents/*.md into a single row.
+  // Vision (v1 — kept for backwards compat with the existing scorer).
   const visionMd = vision.map(v => `# ${v.slug}\n\n${v.content}`).join('\n\n---\n\n');
-  // Pull a couple of the lighter fields out for structured access.
   const narrative = vision.find(v => v.slug === 'narrative-arc')?.content || null;
   const dealBreakers = vision.find(v => v.slug === 'deal-breakers')?.content || null;
   const voiceRules = vision.find(v => v.slug === 'voice-and-cover-letter-rules')?.content || null;
@@ -215,6 +214,9 @@ async function seedKb(sql: ReturnType<typeof postgres>): Promise<Pick<Counts, 'c
       voice_rules_md = excluded.voice_rules_md, raw_md = excluded.raw_md, updated_at = now();
   `;
 
+  // Search Plan v2 — parsed sections + fields. See migration 057.
+  await populateSearchPlanV2(sql, vision);
+
   return {
     companies: companies.length,
     projects: projects.length,
@@ -224,6 +226,225 @@ async function seedKb(sql: ReturnType<typeof postgres>): Promise<Pick<Counts, 'c
     win_skills: 0,
     vision: 1,
   };
+}
+
+// --- Search Plan v2: populate sections + fields + summary -----------------
+//
+// Mirrors the UI parse: between H1 and first H2 / non-field line, every
+// `**Label:** value` line becomes a field. Lists are split on `,`, `;`, or
+// ` / `. Money labels parse into cents.
+//
+// Filename → category mirrors the UI's CATEGORIES list so the two stay
+// consistent. Anything unmatched lands in 'other'.
+
+const SP_CATEGORIES: { id: string; test: (n: string) => boolean }[] = [
+  { id: 'narrative', test: (n) => /^(narrative|voice|story|bio|about|arc)/.test(n) },
+  { id: 'goals',     test: (n) => /^(goal|north|mission|vision|aim|ambition)/.test(n) },
+  { id: 'intents',   test: (n) => /^(intent|target|seeking|looking|wants|preference|stage|sector|role|geo|comp|salary|location)/.test(n) },
+  { id: 'filters',   test: (n) => /^(criteria|filter|dealbreaker|deal-breaker|anti|no-go|must|reject|exclud)/.test(n) },
+];
+
+function spCategoryFor(slug: string): string {
+  const base = slug.toLowerCase();
+  for (const c of SP_CATEGORIES) if (c.test(base)) return c.id;
+  return 'other';
+}
+
+const SP_MONEY_LABEL_RE = /^(base|base floor|base target|salary|salary floor|cash|total comp|total comp target|all-in|all in|fractional|fractional rate|fractional day rate|day rate|hourly).*$/i;
+const SP_EQUITY_LABEL_RE = /^(equity|equity target|equity expectation|options).*$/i;
+
+function spNormalizeLabel(label: string): string {
+  return label.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function spSplitList(value: string): string[] | null {
+  const parts = value.split(/\s*(?:,|;| \/ )\s*/).map(s => s.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts : null;
+}
+
+// Parse one money/range value into cents bounds. Handles "$180k", "180,000",
+// "$180k–$220k", "180k-220k", "$2k/day". Returns null if no number found.
+function spParseMoneyCents(value: string): { low: number | null; high: number | null } | null {
+  if (!value) return null;
+  const norm = value.toLowerCase().replace(/[,_]/g, '');
+  const nums = Array.from(norm.matchAll(/\$?\s*(\d+(?:\.\d+)?)\s*(k|m)?/g)).map(m => {
+    const n = parseFloat(m[1]);
+    if (Number.isNaN(n)) return null;
+    const scale = m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
+    return Math.round(n * scale * 100); // cents
+  }).filter((n): n is number => n !== null && n >= 100); // require ≥ $1
+  if (!nums.length) return null;
+  if (nums.length === 1) return { low: nums[0], high: nums[0] };
+  return { low: Math.min(...nums), high: Math.max(...nums) };
+}
+
+// Parse equity percentage range. Handles "0.5%", "0.5-1%", "0.5–1.0 %".
+function spParseEquityPct(value: string): { low: number | null; high: number | null } | null {
+  if (!value) return null;
+  const nums = Array.from(value.matchAll(/(\d+(?:\.\d+)?)/g)).map(m => parseFloat(m[1])).filter(n => !Number.isNaN(n));
+  if (!nums.length) return null;
+  if (nums.length === 1) return { low: nums[0], high: nums[0] };
+  return { low: Math.min(...nums), high: Math.max(...nums) };
+}
+
+interface ParsedField {
+  label: string;
+  value: string;
+  ord: number;
+  list: string[] | null;
+  money: { low: number | null; high: number | null } | null;
+  kind: 'money' | 'list' | 'range' | 'text';
+}
+
+function spClassifyField(label: string, value: string): ParsedField {
+  const ord = 0;
+  const list = spSplitList(value);
+  const isMoney = SP_MONEY_LABEL_RE.test(label) && !/^equity/i.test(label);
+  const money = isMoney ? spParseMoneyCents(value) : null;
+  const kind: ParsedField['kind'] = money ? 'money' : list ? 'list' : /[-–—]/.test(value) && /\d/.test(value) ? 'range' : 'text';
+  return { label, value, ord, list, money, kind };
+}
+
+async function populateSearchPlanV2(
+  sql: ReturnType<typeof postgres>,
+  vision: { path: string; slug: string; content: string }[],
+) {
+  // Wipe stale rows before re-upserting; sections cascade to fields.
+  await sql`delete from job.search_plan_sections;`;
+
+  const summary = {
+    base_floor_cents: null as number | null,
+    base_target_cents: null as number | null,
+    total_comp_target_cents: null as number | null,
+    equity_low: null as number | null,
+    equity_high: null as number | null,
+    fractional_day_rate_cents: null as number | null,
+    fractional_hourly_cents: null as number | null,
+    geo_primary: [] as string[],
+    geo_remote: null as string | null,
+    travel: null as string | null,
+    stage_min: null as string | null,
+    stage_max: null as string | null,
+    headcount_min: null as number | null,
+    headcount_max: null as number | null,
+    sector_primary: [] as string[],
+    sector_adjacent: [] as string[],
+    sector_avoid: [] as string[],
+    title_primary: [] as string[],
+    title_adjacent: [] as string[],
+    title_avoid: [] as string[],
+    deal_breakers: [] as string[],
+    narrative_arc_md: null as string | null,
+    voice_rules_md: null as string | null,
+  };
+
+  for (let idx = 0; idx < vision.length; idx++) {
+    const v = vision[idx];
+    const doc = parseDoc(v.content);
+    const title = doc.title || v.slug.replace(/[-_]+/g, ' ');
+    const category = spCategoryFor(v.slug);
+
+    await sql`
+      insert into job.search_plan_sections (slug, title, category, source_path, body_md, raw_md, ord)
+      values (${v.slug}, ${title}, ${category}, ${v.path}, ${doc.body || null}, ${v.content}, ${idx})
+      on conflict (slug) do update set
+        title = excluded.title, category = excluded.category, source_path = excluded.source_path,
+        body_md = excluded.body_md, raw_md = excluded.raw_md, ord = excluded.ord, updated_at = now();
+    `;
+
+    const entries = Object.entries(doc.fields);
+    for (let j = 0; j < entries.length; j++) {
+      const [label, value] = entries[j];
+      const pf = spClassifyField(label, value);
+      const labelNorm = spNormalizeLabel(label);
+      await sql`
+        insert into job.search_plan_fields (
+          section_slug, ord, label, label_norm, value, value_list,
+          value_min_cents, value_max_cents, kind
+        ) values (
+          ${v.slug}, ${j}, ${label}, ${labelNorm}, ${value},
+          ${pf.list}, ${pf.money?.low ?? null}, ${pf.money?.high ?? null}, ${pf.kind}
+        );
+      `;
+
+      // Route well-known fields to the summary row.
+      if (pf.money && /base floor/i.test(label)) summary.base_floor_cents = pf.money.low;
+      else if (pf.money && /base target/i.test(label)) summary.base_target_cents = pf.money.high ?? pf.money.low;
+      else if (pf.money && /total comp/i.test(label)) summary.total_comp_target_cents = pf.money.high ?? pf.money.low;
+      else if (pf.money && /day rate|fractional rate|fractional day/i.test(label)) summary.fractional_day_rate_cents = pf.money.low;
+      else if (pf.money && /hourly/i.test(label)) summary.fractional_hourly_cents = pf.money.low;
+
+      if (SP_EQUITY_LABEL_RE.test(label)) {
+        const eq = spParseEquityPct(value);
+        if (eq) { summary.equity_low = eq.low; summary.equity_high = eq.high; }
+      }
+
+      if (/^primary( sectors?)?$/i.test(label) && /sector/.test(v.slug)) summary.sector_primary = pf.list ?? [value];
+      else if (/^adjacent( sectors?)?$/i.test(label) && /sector/.test(v.slug)) summary.sector_adjacent = pf.list ?? [value];
+      else if (/^avoid( sectors?)?$/i.test(label) && /sector/.test(v.slug)) summary.sector_avoid = pf.list ?? [value];
+
+      if (/^primary( titles?)?$/i.test(label) && /role|title/.test(v.slug)) summary.title_primary = pf.list ?? [value];
+      else if (/^adjacent( titles?)?$/i.test(label) && /role|title/.test(v.slug)) summary.title_adjacent = pf.list ?? [value];
+      else if (/^avoid( titles?)?$/i.test(label) && /role|title/.test(v.slug)) summary.title_avoid = pf.list ?? [value];
+
+      if (/^primary$/i.test(label) && /geo|location/.test(v.slug)) summary.geo_primary = pf.list ?? [value];
+      else if (/^remote$/i.test(label) && /geo|location/.test(v.slug)) summary.geo_remote = value;
+      else if (/^travel/i.test(label)) summary.travel = value;
+
+      if (/^stage( range)?$/i.test(label)) {
+        const parts = pf.list ?? value.split(/\s*[–—-]\s*/).map(s => s.trim()).filter(Boolean);
+        if (parts.length >= 1) summary.stage_min = parts[0];
+        if (parts.length >= 2) summary.stage_max = parts[parts.length - 1];
+      }
+      if (/^headcount( range)?$/i.test(label)) {
+        const nums = Array.from(value.matchAll(/(\d+)/g)).map(m => parseInt(m[1], 10)).filter(n => !Number.isNaN(n));
+        if (nums.length >= 1) summary.headcount_min = nums[0];
+        if (nums.length >= 2) summary.headcount_max = nums[nums.length - 1];
+      }
+    }
+
+    // Body-derived summary fields.
+    if (v.slug === 'narrative-arc') summary.narrative_arc_md = v.content;
+    if (v.slug === 'voice-and-cover-letter-rules') summary.voice_rules_md = v.content;
+    if (/deal[-_]?breakers?/.test(v.slug)) {
+      // Pull top-level bullets as discrete deal-breakers.
+      const bullets = (doc.body || '').split(/\r?\n/)
+        .map(l => l.match(/^\s*[-*+]\s+(.+?)\s*$/))
+        .filter((m): m is RegExpMatchArray => !!m)
+        .map(m => m[1].replace(/^[•·●○◦▪▫–—-]\s*/, '').trim())
+        .filter(Boolean);
+      if (bullets.length) summary.deal_breakers = bullets;
+    }
+  }
+
+  await sql`
+    update job.search_plan_summary set
+      base_floor_cents          = ${summary.base_floor_cents},
+      base_target_cents         = ${summary.base_target_cents},
+      total_comp_target_cents   = ${summary.total_comp_target_cents},
+      equity_target_pct_low     = ${summary.equity_low},
+      equity_target_pct_high    = ${summary.equity_high},
+      fractional_day_rate_cents = ${summary.fractional_day_rate_cents},
+      fractional_hourly_cents   = ${summary.fractional_hourly_cents},
+      geo_primary               = ${summary.geo_primary},
+      geo_remote                = ${summary.geo_remote},
+      travel_willingness        = ${summary.travel},
+      stage_min                 = ${summary.stage_min},
+      stage_max                 = ${summary.stage_max},
+      headcount_min             = ${summary.headcount_min},
+      headcount_max             = ${summary.headcount_max},
+      sector_primary            = ${summary.sector_primary},
+      sector_adjacent           = ${summary.sector_adjacent},
+      sector_avoid              = ${summary.sector_avoid},
+      title_primary             = ${summary.title_primary},
+      title_adjacent            = ${summary.title_adjacent},
+      title_avoid               = ${summary.title_avoid},
+      deal_breakers             = ${summary.deal_breakers},
+      narrative_arc_md          = ${summary.narrative_arc_md},
+      voice_rules_md            = ${summary.voice_rules_md},
+      updated_at                = now()
+    where id = 1;
+  `;
 }
 
 // --- Sheet → pipeline_roles ------------------------------------------------
