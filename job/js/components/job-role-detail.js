@@ -5,7 +5,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -56,6 +56,7 @@ export class JobRoleDetail extends LitElement {
     assets: { state: true },         // { resume, cover-letter, analysis } each: {content, draft, mode, saving, dirty, error}
     baseResume: { state: true },     // { content } | null — canonical untargeted resume, source of truth for diff
     showChanges: { state: true },    // bool — toggle the diff/highlight overlay on resume + cover tabs
+    coverRationale: { state: true }, // { sig, highlights, loading, error } — AI cover-letter rationale cache
   };
 
   constructor() {
@@ -73,6 +74,7 @@ export class JobRoleDetail extends LitElement {
     this.assets = { 'resume': null, 'cover-letter': null, 'analysis': null };
     this.baseResume = null;
     this.showChanges = true;
+    this.coverRationale = { sig: '', highlights: [], loading: false, error: '' };
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -551,11 +553,20 @@ export class JobRoleDetail extends LitElement {
 
     let bodyHtml = '';
     let coverComments = [];
+    let coverLoading = false;
     if (a.mode === 'view') {
       if (kind === 'resume' && showingChanges && this.baseResume?.content) {
         bodyHtml = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
       } else if (kind === 'cover-letter' && showingChanges) {
-        const { html: marked, comments } = highlightPhrases(a.content, this._coverHighlightSources());
+        // Kick a fetch if our cached rationale doesn't match the current
+        // cover+sources. Render with whatever's in cache right now.
+        const sig = this._coverSig();
+        if (this.coverRationale.sig !== sig && !this.coverRationale.loading) {
+          // Defer to avoid mutating state during render.
+          queueMicrotask(() => this._ensureCoverRationale());
+        }
+        coverLoading = this.coverRationale.loading;
+        const { html: marked, comments } = applyAIHighlights(a.content, this.coverRationale.highlights);
         bodyHtml = renderMarkdown(marked);
         coverComments = comments;
       } else {
@@ -597,13 +608,24 @@ export class JobRoleDetail extends LitElement {
       </div>
       ${a.mode === 'edit'
         ? html`<textarea class="asset-editor asset-editor--inline" .value=${a.draft} @input=${(e) => this._onDraftInput(kind, e)} @blur=${() => a.dirty && this._saveEdit(kind)}></textarea>`
-        : (isCover && coverComments.length
+        : (isCover && showingChanges
           ? html`
             <div class="cover-layout">
               <article class="kb-doc asset-doc cover-layout__body">${unsafeHTML(bodyHtml)}</article>
               <aside class="cover-layout__rail" aria-label="Rationale">
                 <h4 class="cover-rail__title">Rationale</h4>
-                <p class="muted cover-rail__hint">Why each highlighted phrase is here.</p>
+                <p class="muted cover-rail__hint">Why each highlighted phrase is doing work.</p>
+                ${coverLoading && !coverComments.length ? html`
+                  <div class="cover-rail__empty">
+                    <span class="dots-anim">Reading the cover letter</span>
+                  </div>
+                ` : nothing}
+                ${this.coverRationale.error ? html`
+                  <p class="muted" style="color:var(--error);">${this.coverRationale.error}</p>
+                ` : nothing}
+                ${!coverLoading && !coverComments.length && !this.coverRationale.error ? html`
+                  <p class="muted cover-rail__empty">No load-bearing phrases identified yet. Edit and save the cover letter, or click "Hide comments / Show comments" to retry.</p>
+                ` : nothing}
                 ${coverComments.map(c => html`
                   <article class="cover-comment" data-rationale-id=${c.id}
                            @mouseenter=${() => this._highlightRationale(c.id, true)}
@@ -620,6 +642,51 @@ export class JobRoleDetail extends LitElement {
           `
           : html`<article class="kb-doc asset-doc">${unsafeHTML(bodyHtml)}</article>`)}
     `;
+  }
+
+  // Build a stable signature for "this cover letter + these analysis sources"
+  // so we re-fetch the AI rationale only when content changes.
+  _coverSig() {
+    const cover = this.assets['cover-letter']?.content || '';
+    const sources = this._coverHighlightSources();
+    const srcKey = sources.map(s => `${s.label}\n${s.text}`).join('\n---\n');
+    return `${cover.length}|${this._fnv(cover)}|${this._fnv(srcKey)}`;
+  }
+
+  _fnv(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16);
+  }
+
+  // Lazy fetch — runs when the cover-letter tab is showing comments and
+  // the current cache signature doesn't match the live cover/sources.
+  async _ensureCoverRationale() {
+    const sig = this._coverSig();
+    if (this.coverRationale.sig === sig && !this.coverRationale.error) return;
+    if (this.coverRationale.loading && this.coverRationale.sig === sig) return;
+    const cover = this.assets['cover-letter']?.content || '';
+    const sources = this._coverHighlightSources();
+    if (!cover || sources.length === 0) {
+      this.coverRationale = { sig, highlights: [], loading: false, error: '' };
+      return;
+    }
+    this.coverRationale = { sig, highlights: [], loading: true, error: '' };
+    try {
+      const highlights = await fetchCoverRationale(cover, sources);
+      // Only commit if the signature is still current — guards against a
+      // racing edit + regenerate that finishes after newer state.
+      if (this._coverSig() === sig) {
+        this.coverRationale = { sig, highlights, loading: false, error: '' };
+      }
+    } catch (e) {
+      if (this._coverSig() === sig) {
+        this.coverRationale = { sig, highlights: [], loading: false, error: String(e?.message || e) };
+      }
+    }
   }
 
   // Visual link between a comment card and its highlights — toggle a class

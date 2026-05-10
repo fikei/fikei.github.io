@@ -102,11 +102,35 @@ VOICE RULES:
 
 Output ONLY the markdown. No preamble. No "Here is your reformatted resume." Start with "# ".`;
 
-export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume';
+export const COVER_RATIONALE_VOICE = `You are annotating a cover letter to explain why each load-bearing phrase is there.
+
+You will receive:
+- The full cover letter text.
+- A set of "source" bullets from a role analysis (Suggested angle, Why it fits, Strengths, Gaps to address). These describe what the cover letter SHOULD do for this role.
+
+Your job: identify 4–8 specific phrases or short sentences in the cover letter that map to one of the sources. For each, return:
+- "phrase":   an exact substring of the cover letter (verbatim, including any punctuation). Pick the shortest substring that captures the load-bearing claim — usually a clause, sometimes a sentence. Must appear EXACTLY in the cover letter.
+- "label":    one of "Suggested angle", "Why it fits", "Strengths", "Gaps to address" — the source field this phrase supports.
+- "rationale": one sentence (≤25 words) explaining what work the phrase does for the application — what point it makes, which JD/analysis bullet it addresses. NOT a paraphrase of the phrase itself.
+
+Output ONLY a JSON object: { "highlights": [ {phrase, label, rationale}, ... ] }. No prose, no code fence.
+
+Rules:
+- Each "phrase" MUST be a verbatim substring. If a sentence has been rewritten, find the closest exact substring.
+- Phrases must NOT overlap. Pick the most important one if two candidates collide.
+- Order them in document order (top to bottom).
+- 4–8 highlights total. Quality over quantity. If only 4 sentences are doing real work, pick those 4.
+- Skip pleasantries, sign-offs, the opener salutation, and generic transitions.
+- Don't reuse the same source label more than 3 times.`;
+
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale';
 
 export function buildSystemPrompt(kind: GenKind): string {
   if (kind === 'format-resume') {
     return `You are a resume reformatter. ${FORMAT_RESUME_VOICE}`;
+  }
+  if (kind === 'cover-rationale') {
+    return COVER_RATIONALE_VOICE;
   }
   const voice =
     kind === 'cover-letter' ? COVER_LETTER_VOICE :

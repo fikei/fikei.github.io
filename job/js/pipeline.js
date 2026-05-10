@@ -152,4 +152,19 @@ export async function formatResumeText(rawText) {
   return j.content;
 }
 
-window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText };
+// Get AI rationale for a cover letter given role-analysis source bullets.
+// Returns [{ phrase, label, rationale }] in document order; empty array on
+// failure. Stateless on the server.
+export async function fetchCoverRationale(coverText, sources) {
+  const headers = await authHeader();
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'cover-rationale', cover_text: coverText, sources }),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.highlights) ? j.highlights : [];
+}
+
+window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale };

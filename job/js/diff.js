@@ -75,6 +75,45 @@ function chunkPhrase(s) {
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+// Wrap AI-supplied highlights into the markdown source. `aiHighlights` is
+// an array of `{phrase, label, rationale}` returned by the cover-rationale
+// edge function. Each phrase is matched as a verbatim case-insensitive
+// substring; non-matches are silently skipped (the model occasionally
+// paraphrases). Returns `{html, comments}` shaped like highlightPhrases.
+export function applyAIHighlights(text, aiHighlights) {
+  const body = String(text || '');
+  if (!body || !Array.isArray(aiHighlights) || aiHighlights.length === 0) {
+    return { html: body, comments: [] };
+  }
+  const lower = body.toLowerCase();
+  const wrapped = [];
+  const hits = [];
+  for (const h of aiHighlights) {
+    const phrase = String(h?.phrase || '').trim();
+    if (!phrase) continue;
+    const start = lower.indexOf(phrase.toLowerCase());
+    if (start < 0) continue;
+    const end = start + phrase.length;
+    if (wrapped.some(([s, e]) => start < e && end > s)) continue;
+    wrapped.push([start, end]);
+    hits.push({ start, end, label: String(h.label || ''), rationale: String(h.rationale || '') });
+  }
+  if (!hits.length) return { html: body, comments: [] };
+  hits.sort((a, b) => a.start - b.start);
+  const comments = [];
+  let out = '';
+  let cursor = 0;
+  hits.forEach((h, i) => {
+    const id = i + 1;
+    comments.push({ id, label: h.label, text: h.rationale });
+    out += body.slice(cursor, h.start);
+    out += `<mark class="d-jd" data-rationale="${id}">${body.slice(h.start, h.end)}<sup class="d-fn">${id}</sup></mark>`;
+    cursor = h.end;
+  });
+  out += body.slice(cursor);
+  return { html: out, comments };
+}
+
 // Highlight phrases AND collect rationale comments for each match.
 // `sources` is an array of `{ label, text }` — label shows in the comment
 // header (e.g. "Suggested angle"), text is the source bullet/sentence.

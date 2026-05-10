@@ -10,8 +10,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.4.0';
-console.log(`[gen-asset] v${VERSION} - format-resume kind: reformat raw text into clean markdown`);
+const VERSION = '0.5.0';
+console.log(`[gen-asset] v${VERSION} - cover-rationale kind: AI semantic-match cover letter phrases to analysis sources`);
 
 const BASE_RESUME_SLUG = '__base__';
 
@@ -101,14 +101,43 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
       : kindIn === 'base-resume' ? 'base-resume'
       : kindIn === 'format-resume' ? 'format-resume'
+      : kindIn === 'cover-rationale' ? 'cover-rationale'
       : null;
-    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", "base-resume", or "format-resume"', 400);
+    if (!kind) return err('kind must be "resume", "cover-letter", "analysis", "base-resume", "format-resume", or "cover-rationale"', 400);
+
+    // cover-rationale is stateless: take cover letter + analysis sources,
+    // return a JSON list of {phrase, label, rationale}. No DB write.
+    if (kind === 'cover-rationale') {
+      const coverText = String(body.cover_text || '').trim();
+      const sources = Array.isArray(body.sources) ? body.sources : [];
+      if (!coverText) return err('cover_text required', 400);
+      if (!sources.length) return err('sources required', 400);
+      if (coverText.length > 16 * 1024) return err('cover_text exceeds 16KB', 413);
+      const system = buildSystemPrompt(kind);
+      const user = `# Cover letter
+
+${coverText}
+
+# Sources
+
+${sources.map((s: any) => `## ${s.label || ''}\n${s.text || ''}`).join('\n\n')}
+
+# Ask
+
+Produce the JSON object now. JSON only.`;
+      const raw = await callClaude(system, user);
+      const stripped = raw.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+      let parsed: any = null;
+      try { parsed = JSON.parse(stripped); } catch { /* ignore */ }
+      const highlights = Array.isArray(parsed?.highlights) ? parsed.highlights : [];
+      return jsonResp({ ok: true, kind, highlights });
+    }
 
     // format-resume is stateless: take raw text in, return clean markdown.
     // Does not touch the DB. The frontend persists separately.

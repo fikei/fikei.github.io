@@ -813,6 +813,11 @@
 .cover-comment__body p { margin: 0 0 var(--space-2); }
 .cover-comment__body ul { margin: 0; padding-left: var(--space-4); }
 .cover-comment__body li { margin-bottom: var(--space-1); }
+.cover-rail__empty {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  padding: var(--space-3) 0;
+}
 
 @media (max-width: 960px) {
   .cover-layout {
