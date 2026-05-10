@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -75,7 +75,7 @@ export class JobRoleDetail extends LitElement {
     assets: { state: true },         // { resume, cover-letter, analysis } each: {content, draft, mode, saving, dirty, error}
     baseResume: { state: true },     // { content } | null — canonical untargeted resume, source of truth for diff
     showChanges: { state: true },    // bool — toggle the diff/highlight overlay on resume + cover tabs
-    coverRationale: { state: true }, // { sig, highlights, loading, error } — AI cover-letter rationale cache
+    coverRationale: { state: true }, // { sig, highlights, opportunities, loading, error } — AI cover-letter rationale cache
     activeRationale: { state: true }, // number | null — currently focused comment/highlight pair
     threads: { state: true },         // { [commentId]: { messages: [...], sending, error } } — chat-to-edit per comment
     coverUndo: { state: true },       // { content, label, expiresAt } | null — one-shot undo for last AI edit
@@ -99,7 +99,7 @@ export class JobRoleDetail extends LitElement {
     this.assets = { 'resume': null, 'cover-letter': null, 'analysis': null };
     this.baseResume = null;
     this.showChanges = true;
-    this.coverRationale = { sig: '', highlights: [], loading: false, error: '' };
+    this.coverRationale = { sig: '', highlights: [], opportunities: [], loading: false, error: '' };
     this.activeRationale = null;
     this.threads = {};
     this.coverUndo = null;
@@ -326,7 +326,7 @@ export class JobRoleDetail extends LitElement {
       html = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
       key = `diff:${this._fnv(this.baseResume.content)}:${this._fnv(a.content)}`;
     } else if (kind === 'cover-letter' && this.showChanges) {
-      const { html: marked } = applyAIHighlights(a.content, this.coverRationale.highlights);
+      const { html: marked } = applyAIHighlights(a.content, this.coverRationale.highlights, this.coverRationale.opportunities);
       html = renderMarkdown(marked);
       key = `cover:${this._fnv(a.content)}:${this._fnv(JSON.stringify(this.coverRationale.highlights))}`;
     } else {
@@ -648,7 +648,7 @@ export class JobRoleDetail extends LitElement {
         queueMicrotask(() => this._ensureCoverRationale());
       }
       coverLoading = this.coverRationale.loading;
-      ({ comments: coverComments } = applyAIHighlights(a.content, this.coverRationale.highlights));
+      ({ comments: coverComments } = applyAIHighlights(a.content, this.coverRationale.highlights, this.coverRationale.opportunities));
     }
 
     return html`
@@ -720,16 +720,21 @@ export class JobRoleDetail extends LitElement {
                 ${coverComments.map(c => {
                   const thread = this._getThread(c.id);
                   const isActive = this.activeRationale === c.id;
+                  const isOp = c.kind === 'opportunity';
+                  const ph = isOp
+                    ? (c.ask || 'Add the missing information…')
+                    : (isActive ? 'How should this change?' : 'Direct an edit…');
                   return html`
-                    <article class="cover-comment ${isActive ? 'is-active' : ''}"
+                    <article class="cover-comment ${isOp ? 'cover-comment--op' : ''} ${isActive ? 'is-active' : ''}"
                              data-rationale-id=${c.id}
                              @mouseenter=${() => this._highlightRationale(c.id, true)}
                              @mouseleave=${() => this._highlightRationale(c.id, false)}>
                       <header class="cover-comment__head" @click=${() => { this._scrollToHighlight(c.id); }}>
-                        <span class="cover-comment__num">${c.id}</span>
+                        <span class="cover-comment__num">${isOp ? '✦' : c.id}</span>
                         <span class="cover-comment__label">${c.label}</span>
                       </header>
                       <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
+                      ${isOp && c.ask ? html`<p class="cover-comment__ask">${c.ask}</p>` : nothing}
 
                       ${thread.messages.length ? html`
                         <ul class="cover-thread">
@@ -740,7 +745,7 @@ export class JobRoleDetail extends LitElement {
                           `)}
                           ${thread.sending ? html`
                             <li class="cover-thread__msg cover-thread__msg--assistant">
-                              <span class="dots-anim">Editing</span>
+                              <span class="dots-anim">${isOp ? 'Saving & weaving in' : 'Editing'}</span>
                             </li>
                           ` : nothing}
                           ${thread.error ? html`
@@ -754,11 +759,12 @@ export class JobRoleDetail extends LitElement {
                         const input = e.currentTarget.querySelector('textarea');
                         const v = input.value;
                         input.value = '';
-                        this._sendCommentChat(c.id, v);
+                        if (isOp) this._sendOpportunity(c, v);
+                        else      this._sendCommentChat(c.id, v);
                       }}>
                         <textarea class="cover-thread__input"
                                   rows="1"
-                                  placeholder=${isActive ? 'How should this change?' : 'Direct an edit…'}
+                                  placeholder=${ph}
                                   ?disabled=${thread.sending}
                                   @keydown=${(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -941,24 +947,19 @@ export class JobRoleDetail extends LitElement {
     const cover = this.assets['cover-letter']?.content || '';
     const sources = this._coverHighlightSources();
     if (!cover || sources.length === 0) {
-      this.coverRationale = { sig, highlights: [], loading: false, error: '' };
+      this.coverRationale = { sig, highlights: [], opportunities: [], loading: false, error: '' };
       return;
     }
-    this.coverRationale = { sig, highlights: [], loading: true, error: '' };
+    this.coverRationale = { sig, highlights: [], opportunities: [], loading: true, error: '' };
     try {
-      const highlights = await fetchCoverRationale(cover, sources);
-      // Only commit if the signature is still current — guards against a
-      // racing edit + regenerate that finishes after newer state.
+      const { highlights, opportunities } = await fetchCoverRationale(cover, sources);
       if (this._coverSig() === sig) {
-        this.coverRationale = { sig, highlights, loading: false, error: '' };
-        // Fold the new highlights into the editable HTML so they show
-        // inline. The user pauses while we fetch (~3s), so the cursor
-        // jump from re-rendering is acceptable here.
+        this.coverRationale = { sig, highlights, opportunities, loading: false, error: '' };
         this._refreshEditHtml('cover-letter');
       }
     } catch (e) {
       if (this._coverSig() === sig) {
-        this.coverRationale = { sig, highlights: [], loading: false, error: String(e?.message || e) };
+        this.coverRationale = { sig, highlights: [], opportunities: [], loading: false, error: String(e?.message || e) };
       }
     }
   }
@@ -1128,6 +1129,46 @@ export class JobRoleDetail extends LitElement {
 
   _setThread(commentId, t) {
     this.threads = { ...this.threads, [this._threadKey(commentId)]: t };
+  }
+
+  // Opportunity threads do double duty: persist the user's new info to
+  // job.global_assets (narrative-additions) AND weave it into the cover
+  // letter via the cover-edit pipeline. Both happen in parallel; the
+  // user sees the edit immediately and the narrative addition syncs to
+  // the Career → Narratives tab.
+  async _sendOpportunity(comment, userText) {
+    const text = String(userText || '').trim();
+    if (!text) return;
+    const prev = this._getThread(comment.id);
+    this._setThread(comment.id, {
+      messages: [...prev.messages, { role: 'user', text }],
+      sending: true, error: '',
+    });
+    const sourceRole = this.role ? `${this.role.company} — ${this.role.title}` : this.slug;
+    // Fire the narrative-add in the background; persist failure shouldn't
+    // block the cover edit.
+    addNarrative({ snippet: text, sourceRole, ask: comment.ask || '' }).catch(() => {});
+    try {
+      await this._applyCoverEdit({
+        anchorPhrase: comment.phrase,
+        anchorCommentLabel: 'Opportunity',
+        anchorRationale: comment.ask || comment.text || '',
+        instruction: `Weave in this new information from the candidate, naturally and concisely: ${text}`,
+        source: 'ai-comment',
+        label: `Opportunity: ${this._truncate(text, 50)}`,
+        commentIdForThread: comment.id,
+      });
+      // _applyCoverEdit replaces thread messages on success — append a
+      // small "saved to narratives" note so the user knows it persisted.
+      const cur = this._getThread(comment.id);
+      this._setThread(comment.id, {
+        messages: [...cur.messages, { role: 'assistant', text: 'Also saved to your narratives.' }],
+        sending: false, error: '',
+      });
+    } catch (e) {
+      // _applyCoverEdit already set thread error if commentIdForThread
+      // was passed — leave it.
+    }
   }
 
   // Send a chat message anchored to a comment. Thin wrapper around the

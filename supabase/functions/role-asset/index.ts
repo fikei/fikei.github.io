@@ -9,17 +9,18 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.1';
-console.log(`[role-asset] v${VERSION} - route __base__ slug to job.global_assets (redeploy)`);
+const VERSION = '0.3.0';
+console.log(`[role-asset] v${VERSION} - __base__ + __narratives__ routes to job.global_assets`);
 
 const KIND_RE = /^(resume|cover-letter|notes|analysis)$/;
 const SLUG_RE = /^[a-z0-9_-]+$/;
 const MAX_BYTES = 64 * 1024;
 
-// Sentinel slug used by the frontend to address the global, untargeted base
-// resume. Persisted in job.global_assets (no FK to pipeline_roles).
+// Sentinel slugs that route to job.global_assets instead of role_assets.
 const BASE_SLUG = '__base__';
 const BASE_GLOBAL_KIND = 'base-resume';
+const NARRATIVES_SLUG = '__narratives__';
+const NARRATIVES_GLOBAL_KIND = 'narrative-additions';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -38,7 +39,6 @@ serve(async (req) => {
       if (!KIND_RE.test(kind)) return err('invalid kind', 400);
 
       if (slug === BASE_SLUG) {
-        // Only resume is supported as a global asset today.
         if (kind !== 'resume') return err('not found', 404);
         const rows = await sql`
           select 'resume' as kind, content_md, generated_by, generated_at, edited_at, updated_at
@@ -48,6 +48,17 @@ serve(async (req) => {
         `;
         if (rows.length === 0) return err('not found', 404);
         return jsonResp({ slug: BASE_SLUG, ...rows[0] });
+      }
+
+      if (slug === NARRATIVES_SLUG) {
+        const rows = await sql`
+          select ${kind}::text as kind, content_md, generated_by, generated_at, edited_at, updated_at
+          from job.global_assets
+          where kind = ${NARRATIVES_GLOBAL_KIND}
+          limit 1;
+        `;
+        if (rows.length === 0) return err('not found', 404);
+        return jsonResp({ slug: NARRATIVES_SLUG, ...rows[0] });
       }
 
       const rows = await sql`

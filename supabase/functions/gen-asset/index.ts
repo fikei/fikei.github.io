@@ -10,8 +10,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.6.0';
-console.log(`[gen-asset] v${VERSION} - cover-edit kind: comment-anchored chat edits to the cover letter`);
+const VERSION = '0.7.0';
+console.log(`[gen-asset] v${VERSION} - cover opportunities + narrative-add to job.global_assets`);
 
 const BASE_RESUME_SLUG = '__base__';
 
@@ -101,7 +101,7 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
@@ -109,8 +109,34 @@ serve(async (req) => {
       : kindIn === 'format-resume' ? 'format-resume'
       : kindIn === 'cover-rationale' ? 'cover-rationale'
       : kindIn === 'cover-edit' ? 'cover-edit'
+      : kindIn === 'narrative-add' ? 'narrative-add'
       : null;
     if (!kind) return err('kind must be a known value', 400);
+
+    // narrative-add: append a markdown snippet to job.global_assets with
+    // kind='narrative-additions'. No AI call — pure persistence. The
+    // frontend uses this from opportunity threads to capture missing
+    // info the candidate volunteers.
+    if (kind === 'narrative-add') {
+      const snippet = String(body.snippet || '').trim();
+      const sourceRole = String(body.source_role || '').trim();
+      const ask = String(body.ask || '').trim();
+      if (!snippet) return err('snippet required', 400);
+      if (snippet.length > 8 * 1024) return err('snippet exceeds 8KB', 413);
+      const ts = new Date().toISOString();
+      const header = `\n\n### ${ts.slice(0, 10)}${sourceRole ? ` — from ${sourceRole}` : ''}${ask ? `\n_${ask}_` : ''}\n\n`;
+      const blob = header + snippet + '\n';
+      const sql = db();
+      await sql`
+        insert into job.global_assets (kind, content_md, generated_by, edited_at)
+        values ('narrative-additions', ${blob}, 'manual', now())
+        on conflict (kind) do update set
+          content_md = job.global_assets.content_md || ${blob},
+          edited_at = now(),
+          updated_at = now();
+      `;
+      return jsonResp({ ok: true, kind });
+    }
 
     // cover-edit is stateless: take cover letter + comment context +
     // user instruction, return the full revised markdown. No DB write —
@@ -167,7 +193,8 @@ Produce the JSON object now. JSON only.`;
       let parsed: any = null;
       try { parsed = JSON.parse(stripped); } catch { /* ignore */ }
       const highlights = Array.isArray(parsed?.highlights) ? parsed.highlights : [];
-      return jsonResp({ ok: true, kind, highlights });
+      const opportunities = Array.isArray(parsed?.opportunities) ? parsed.opportunities : [];
+      return jsonResp({ ok: true, kind, highlights, opportunities });
     }
 
     // format-resume is stateless: take raw text in, return clean markdown.
