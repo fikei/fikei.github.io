@@ -131,6 +131,7 @@ export class JobRoleDetail extends LitElement {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('selectionchange', this._onSelectionChange);
+    this._teardownBodyObserver();
     // Flush pending autosaves on unmount.
     for (const k of ['resume', 'cover-letter']) {
       if (this._autosaveTimers?.[k]) {
@@ -1240,6 +1241,25 @@ export class JobRoleDetail extends LitElement {
     super.updated?.(changed);
     this._alignComments();
     this._applyEditingShimmer();
+    this._ensureBodyObserver();
+  }
+
+  // Reflow comment cards whenever the body's height changes (window
+  // resize, image load, content paste — anything that can shift marks
+  // without going through Lit's render cycle).
+  _ensureBodyObserver() {
+    const body = this.querySelector('.cover-layout__body');
+    if (!body) { this._teardownBodyObserver(); return; }
+    if (this._bodyObserved === body) return;
+    this._teardownBodyObserver();
+    this._bodyObserver = new ResizeObserver(() => this._alignComments());
+    this._bodyObserver.observe(body);
+    this._bodyObserved = body;
+  }
+  _teardownBodyObserver() {
+    if (this._bodyObserver) { try { this._bodyObserver.disconnect(); } catch {} }
+    this._bodyObserver = null;
+    this._bodyObserved = null;
   }
 
   // Paint a shimmer + sparkle overlay on whichever <mark> (or first text
@@ -1294,6 +1314,10 @@ export class JobRoleDetail extends LitElement {
     }
     if (this._autosaveTimers[kind]) clearTimeout(this._autosaveTimers[kind]);
     this._autosaveTimers[kind] = setTimeout(() => this._autosave(kind), this.AUTOSAVE_DELAY_MS);
+    // Comment cards anchor to mark positions inside the body — typing
+    // moves those marks, so re-align on every keystroke. The cards are
+    // absolutely positioned with a CSS transition, so this stays smooth.
+    if (kind === 'cover-letter') this._alignComments();
   }
 
   async _autosave(kind) {
