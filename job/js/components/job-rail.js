@@ -15,7 +15,7 @@ const ROUTES = [
     ],
   },
   { href: '/job/history/', label: 'Your career', match: /^\/job\/history\/?/ },
-  { href: '/job/vision/',  label: 'Vision',      match: /^\/job\/vision\/?/ }
+  { href: '/job/vision/',  label: 'Search plan', match: /^\/job\/vision\/?/ }
 ];
 
 export class JobRail extends LitElement {
