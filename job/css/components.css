@@ -1761,8 +1761,8 @@
 
 .col-fit    { width: 72px;  min-width: 72px; }
 .col-status { width: 140px; min-width: 120px; }
-.col-role   { width: auto;  max-width: 360px; }
-.col-sector { width: 280px; min-width: 180px; }
+.col-role   { width: 360px; min-width: 240px; max-width: 360px; }
+.col-sector { width: auto;  min-width: 200px; }     /* slack absorber; chips wrap */
 .col-menu   { width: 56px;  min-width: 56px; text-align: right; }
 
 .pipeline-table .col-role .role-cell__inner {
