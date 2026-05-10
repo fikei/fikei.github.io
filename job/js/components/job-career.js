@@ -157,17 +157,31 @@ export class JobCareer extends LitElement {
     history.replaceState(null, '', `/job/history/${qs}`);
   }
 
-  // Upload: extract text and drop it into the draft textarea — does NOT
-  // save. User reviews, optionally runs AI cleanup, then saves.
+  // Upload: extract text, then automatically run it through Claude to
+  // restore structure (headings, bullets) without changing any facts.
+  // Result lands in the draft for review before save. The format-resume
+  // prompt explicitly preserves every fact verbatim — only structure is
+  // touched, so no text is lost. If the cleanup pass fails, fall back to
+  // the raw extracted text so the user can save or retry manually.
   async _onBaseUpload(file) {
     if (!file) return;
     this.baseDraft = { text: '', status: 'reading', error: '' };
+    let raw = '';
     try {
-      const text = await readFileAsText(file);
-      if (!text || !text.trim()) throw new Error('Empty file');
-      this.baseDraft = { text, status: 'idle', error: '' };
+      raw = await readFileAsText(file);
+      if (!raw || !raw.trim()) throw new Error('Empty file');
     } catch (e) {
       this.baseDraft = { text: '', status: 'idle', error: String(e?.message || e) };
+      return;
+    }
+    this.baseDraft = { text: raw, status: 'formatting', error: '' };
+    try {
+      const cleaned = await formatResumeText(raw);
+      this.baseDraft = { text: cleaned, status: 'idle', error: '' };
+    } catch (e) {
+      // Cleanup failed — keep the raw text and surface the error so the
+      // user can retry the AI pass manually or just save as-is.
+      this.baseDraft = { text: raw, status: 'idle', error: `AI cleanup failed (${String(e?.message || e)}). Showing raw text — click "Clean up with AI" to retry.` };
     }
   }
 
@@ -215,6 +229,21 @@ export class JobCareer extends LitElement {
     this.baseResume = { content: '', missing: true, generating: false, error: '' };
   }
 
+  // Run the AI cleanup on the already-saved base resume in place. Useful
+  // when the saved version came from a raw PDF extract and reads poorly.
+  async _onCleanupSaved() {
+    const text = (this.baseResume.content || '').trim();
+    if (!text) return;
+    this.baseResume = { ...this.baseResume, generating: true, error: '' };
+    try {
+      const cleaned = await formatResumeText(text);
+      await writeRoleAsset(BASE_RESUME_SLUG, 'resume', cleaned);
+      this.baseResume = { content: cleaned, missing: false, generating: false, error: '' };
+    } catch (e) {
+      this.baseResume = { ...this.baseResume, generating: false, error: String(e?.message || e) };
+    }
+  }
+
   _renderBase() {
     const b = this.baseResume;
     const d = this.baseDraft;
@@ -237,7 +266,12 @@ export class JobCareer extends LitElement {
             </p>
           </div>
           ${hasContent ? html`
-            <button class="btn btn--sm" ?disabled=${busy} @click=${() => this._onBaseClear()}>Replace</button>
+            <div style="display:flex;gap:var(--space-2);">
+              <button class="btn btn--sm" ?disabled=${busy || b.generating} @click=${() => this._onCleanupSaved()}>
+                ${b.generating ? 'Cleaning up…' : 'Clean up with AI'}
+              </button>
+              <button class="btn btn--sm" ?disabled=${busy || b.generating} @click=${() => this._onBaseClear()}>Replace</button>
+            </div>
           ` : nothing}
         </header>
 
@@ -248,9 +282,11 @@ export class JobCareer extends LitElement {
                      @change=${(e) => this._onBaseUpload(e.target.files?.[0])}
                      ?disabled=${busy}>
               <span class="base-upload__cta">
-                ${d.status === 'reading' ? 'Reading file…' : 'Upload resume'}
+                ${d.status === 'reading' ? 'Reading file…'
+                  : d.status === 'formatting' ? 'Cleaning up with AI…'
+                  : 'Upload resume'}
               </span>
-              <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf — or paste below</span>
+              <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf — auto-formatted on upload, no facts changed</span>
             </label>
 
             <textarea class="asset-editor" style="margin-top: var(--space-4); min-height: 320px;"
