@@ -118,6 +118,13 @@ export class JobRoleDetail extends LitElement {
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
+    // Flush pending autosaves on unmount.
+    for (const k of ['resume', 'cover-letter']) {
+      if (this._autosaveTimers?.[k]) {
+        clearTimeout(this._autosaveTimers[k]);
+        this._flushSave(k);
+      }
+    }
     super.disconnectedCallback();
   }
 
@@ -142,6 +149,9 @@ export class JobRoleDetail extends LitElement {
       document.title = this.role
         ? `${this.role.company} — ${this.role.title} — /job`
         : `${this.slug} — /job`;
+      // Now that base resume is in hand, fold the diff into the resume's
+      // editable HTML so it shows up on first paint.
+      queueMicrotask(() => this._refreshEditHtml('resume'));
       // Auto-generate any missing asset.
       this._autoGenerateMissing();
     } catch (e) {
@@ -153,11 +163,30 @@ export class JobRoleDetail extends LitElement {
   async _loadAsset(kind) {
     try {
       const r = await readRoleAsset(this.slug, kind);
-      if (!r) return { kind, content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: '' };
-      return { kind, content: r.content_md, draft: r.content_md, mode: 'view', saving: false, dirty: false, error: '' };
+      if (!r) return this._emptyAsset(kind);
+      return this._viewAsset(kind, r.content_md);
     } catch (e) {
-      return { kind, content: '', draft: '', mode: 'empty', saving: false, dirty: false, error: String(e) };
+      return { ...this._emptyAsset(kind), error: String(e) };
     }
+  }
+
+  _emptyAsset(kind) {
+    return {
+      kind, content: '', editHtml: '', editHtmlKey: '',
+      mode: 'empty', saveStatus: 'idle', savedAt: 0, saving: false, error: '',
+    };
+  }
+
+  // Build a "view" asset record from saved content. editHtml is the
+  // rendered HTML the contenteditable article binds to. We render plain
+  // markdown here; diffs/comments are layered in via _refreshEditHtml
+  // when rationale + base resume are ready.
+  _viewAsset(kind, content) {
+    const html = renderMarkdown(content || '');
+    return {
+      kind, content: content || '', editHtml: html, editHtmlKey: 'plain',
+      mode: 'view', saveStatus: 'idle', savedAt: Date.now(), saving: false, error: '',
+    };
   }
 
   async _loadBaseResume() {
@@ -206,7 +235,13 @@ export class JobRoleDetail extends LitElement {
     w.document.close();
   }
 
-  _toggleChanges() { this.showChanges = !this.showChanges; }
+  _toggleChanges() {
+    this.showChanges = !this.showChanges;
+    queueMicrotask(() => {
+      this._refreshEditHtml('resume');
+      this._refreshEditHtml('cover-letter');
+    });
+  }
 
   // For the cover-letter tab, pull source phrases out of the analysis JSON
   // for "what was tailored from the JD" highlighting. Returns labeled
@@ -233,23 +268,48 @@ export class JobRoleDetail extends LitElement {
   }
 
   _switchTab(id) {
+    // Flush any pending autosaves so leaving the tab doesn't drop edits.
+    for (const k of ['resume', 'cover-letter']) this._flushSave(k);
     this.activeTab = id;
     const qs = id !== 'details' ? `?tab=${id}` : '';
     history.replaceState(null, '', `/job/jobs/${this.slug}/${qs}`);
   }
 
   async _onGenerate(kind) {
-    const a = this.assets[kind] || { kind };
+    const a = this.assets[kind] || this._emptyAsset(kind);
     this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
     try {
       const res = await generateAsset(this.slug, kind);
-      this.assets = {
-        ...this.assets,
-        [kind]: { kind, content: res.content, draft: res.content, mode: 'view', saving: false, dirty: false, error: '' },
-      };
+      this.assets = { ...this.assets, [kind]: this._viewAsset(kind, res.content) };
     } catch (e) {
       this.assets = { ...this.assets, [kind]: { ...this.assets[kind], saving: false, error: String(e) } };
     }
+  }
+
+  // Recompute the rendered HTML for the contenteditable article when
+  // load-bearing inputs change (showChanges toggle, base resume arrival,
+  // cover rationale arrival, or saved content). We do NOT call this on
+  // every user keystroke — Lit's unsafeHTML only updates DOM when the
+  // string changes, so as long as editHtml is stable across renders the
+  // cursor sticks. We bump editHtml only via this method.
+  _refreshEditHtml(kind) {
+    const a = this.assets[kind];
+    if (!a || !a.content) return;
+    let html;
+    let key;
+    if (kind === 'resume' && this.showChanges && this.baseResume?.content) {
+      html = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
+      key = `diff:${this._fnv(this.baseResume.content)}:${this._fnv(a.content)}`;
+    } else if (kind === 'cover-letter' && this.showChanges) {
+      const { html: marked } = applyAIHighlights(a.content, this.coverRationale.highlights);
+      html = renderMarkdown(marked);
+      key = `cover:${this._fnv(a.content)}:${this._fnv(JSON.stringify(this.coverRationale.highlights))}`;
+    } else {
+      html = renderMarkdown(a.content);
+      key = `plain:${this._fnv(a.content)}`;
+    }
+    if (a.editHtmlKey === key) return;
+    this.assets = { ...this.assets, [kind]: { ...a, editHtml: html, editHtmlKey: key } };
   }
 
   // Old textarea-based edit methods replaced by inline contenteditable —
@@ -548,67 +608,98 @@ export class JobRoleDetail extends LitElement {
         </div>
       `;
     }
-    const canDiff = (kind === 'resume' || kind === 'cover-letter') && a.mode === 'view';
-    const showingChanges = canDiff && this.showChanges;
-
-    let bodyHtml = '';
-    let coverComments = [];
-    let coverLoading = false;
-    if (a.mode === 'view') {
-      if (kind === 'resume' && showingChanges && this.baseResume?.content) {
-        bodyHtml = renderMarkdown(diffMarkdown(this.baseResume.content, a.content));
-      } else if (kind === 'cover-letter' && showingChanges) {
-        // Kick a fetch if our cached rationale doesn't match the current
-        // cover+sources. Render with whatever's in cache right now.
-        const sig = this._coverSig();
-        if (this.coverRationale.sig !== sig && !this.coverRationale.loading) {
-          // Defer to avoid mutating state during render.
-          queueMicrotask(() => this._ensureCoverRationale());
-        }
-        coverLoading = this.coverRationale.loading;
-        const { html: marked, comments } = applyAIHighlights(a.content, this.coverRationale.highlights);
-        bodyHtml = renderMarkdown(marked);
-        coverComments = comments;
-      } else {
-        bodyHtml = renderMarkdown(a.content);
-      }
-    }
 
     const isCover = kind === 'cover-letter';
+    const canDiff = (kind === 'resume' || isCover);
+    const showingChanges = canDiff && this.showChanges;
+
+    // Cover letter rationale is fetched once analysis + cover content are
+    // ready; comments derive from the AI highlights cached in state.
+    let coverComments = [];
+    let coverLoading = false;
+    if (isCover && showingChanges) {
+      const sig = this._coverSig();
+      if (this.coverRationale.sig !== sig && !this.coverRationale.loading) {
+        queueMicrotask(() => this._ensureCoverRationale());
+      }
+      coverLoading = this.coverRationale.loading;
+      ({ comments: coverComments } = applyAIHighlights(a.content, this.coverRationale.highlights));
+    }
 
     return html`
-      ${(kind === 'resume' || kind === 'cover-letter') ? this._renderTailoringCallout(kind) : nothing}
-      ${(kind === 'resume' || kind === 'cover-letter') ? this._renderChangeLog(kind) : nothing}
+      ${this._renderTailoringCallout(kind)}
+      ${this._renderChangeLog(kind)}
       <div class="asset-toolbar">
-        ${a.mode === 'view' ? html`
-          <button class="btn btn--sm" @click=${() => this._enterEdit(kind)}>Edit</button>
-          <button class="btn btn--sm" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
-            ${a.saving ? 'Regenerating…' : 'Regenerate'}
+        ${this._renderSaveStatus(a)}
+        <span class="asset-toolbar__divider" aria-hidden="true"></span>
+        <button class="btn btn--sm" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
+          ${a.saving ? 'Regenerating…' : 'Regenerate'}
+        </button>
+        ${canDiff ? html`
+          <button class="btn btn--sm ${this.showChanges ? 'btn--primary' : ''}" @click=${() => this._toggleChanges()}>
+            ${this.showChanges ? (isCover ? 'Hide comments' : 'Hide changes') : (isCover ? 'Show comments' : 'Show changes')}
           </button>
-          ${canDiff ? html`
-            <button class="btn btn--sm ${this.showChanges ? 'btn--primary' : ''}" @click=${() => this._toggleChanges()}>
-              ${this.showChanges ? (isCover ? 'Hide comments' : 'Hide changes') : (isCover ? 'Show comments' : 'Show changes')}
-            </button>
-          ` : nothing}
-          <button class="btn btn--sm btn--accent" @click=${() => this._downloadAssetPdf(kind)}>
-            Download clean PDF
-          </button>
-          ${kind === 'resume' && this.baseResume?.missing ? html`
-            <span class="muted" style="font-size: var(--font-size-small);">
-              No base resume yet — set one in <a href="/job/history/?tab=base">Career → Base resume</a>.
-            </span>
-          ` : nothing}
-        ` : html`
-          <button class="btn btn--sm btn--primary" ?disabled=${!a.dirty || a.saving} @click=${() => this._saveInlineEdit(kind)}>
-            ${a.saving ? 'Saving…' : 'Save'}
-          </button>
-          <button class="btn btn--sm" @click=${() => this._cancelEdit(kind)}>Cancel</button>
-          <span class="muted" style="font-size: var(--font-size-small);">Editing inline. Cmd/Ctrl+S to save.</span>
-        `}
+        ` : nothing}
+        <button class="btn btn--sm btn--accent" @click=${() => this._downloadAssetPdf(kind)}>
+          Download clean PDF
+        </button>
+        ${kind === 'resume' && this.baseResume?.missing ? html`
+          <span class="muted" style="font-size: var(--font-size-small);">
+            No base resume yet — set one in <a href="/job/history/?tab=base">Career → Base resume</a>.
+          </span>
+        ` : nothing}
         ${a.error ? html`<span class="muted" style="color:var(--error);">${a.error}</span>` : nothing}
       </div>
-      ${a.mode === 'edit'
+
+      ${isCover && showingChanges
         ? html`
+          <div class="cover-layout">
+            <article class="kb-doc asset-doc asset-doc--editing cover-layout__body"
+                     contenteditable="true"
+                     spellcheck="true"
+                     data-edit-kind=${kind}
+                     data-active=${this.activeRationale ?? ''}
+                     @input=${() => this._onContentEditableInput(kind)}
+                     @click=${(e) => {
+                       const m = e.target.closest('mark[data-rationale]');
+                       if (m) this._activateRationale(Number(m.dataset.rationale));
+                     }}
+                     @keydown=${(e) => {
+                       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                         e.preventDefault();
+                         this._flushSave(kind);
+                       }
+                     }}>${unsafeHTML(a.editHtml || '')}</article>
+            <aside class="cover-layout__rail" aria-label="Comments">
+              <header class="cover-rail__head">
+                <h4 class="cover-rail__title">Comments</h4>
+                ${coverLoading ? html`<span class="cover-rail__spin"><span class="dots-anim">Reading</span></span>` : nothing}
+              </header>
+              ${this.coverRationale.error ? html`
+                <p class="muted" style="color:var(--error);padding:0 var(--space-3);">${this.coverRationale.error}</p>
+              ` : nothing}
+              ${!coverLoading && !coverComments.length && !this.coverRationale.error ? html`
+                <p class="cover-rail__empty">No load-bearing phrases yet — try regenerating the cover letter.</p>
+              ` : nothing}
+              <div class="cover-rail__list" data-active=${this.activeRationale ?? ''}>
+                ${coverComments.map(c => html`
+                  <article class="cover-comment ${this.activeRationale === c.id ? 'is-active' : ''}"
+                           data-rationale-id=${c.id}
+                           @click=${() => this._scrollToHighlight(c.id)}
+                           @mouseenter=${() => this._highlightRationale(c.id, true)}
+                           @mouseleave=${() => this._highlightRationale(c.id, false)}>
+                    <header class="cover-comment__head">
+                      <span class="cover-comment__num">${c.id}</span>
+                      <span class="cover-comment__label">${c.label}</span>
+                    </header>
+                    <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
+                  </article>
+                `)}
+              </div>
+            </aside>
+          </div>
+        `
+        : html`
           <article class="kb-doc asset-doc asset-doc--editing"
                    contenteditable="true"
                    spellcheck="true"
@@ -617,50 +708,40 @@ export class JobRoleDetail extends LitElement {
                    @keydown=${(e) => {
                      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
                        e.preventDefault();
-                       this._saveInlineEdit(kind);
+                       this._flushSave(kind);
                      }
                    }}>${unsafeHTML(a.editHtml || '')}</article>
-        `
-        : (isCover && showingChanges
-          ? html`
-            <div class="cover-layout">
-              <article class="kb-doc asset-doc cover-layout__body"
-                       data-active=${this.activeRationale ?? ''}
-                       @click=${(e) => {
-                         const m = e.target.closest('mark[data-rationale]');
-                         if (m) this._activateRationale(Number(m.dataset.rationale));
-                       }}>${unsafeHTML(bodyHtml)}</article>
-              <aside class="cover-layout__rail" aria-label="Rationale">
-                <header class="cover-rail__head">
-                  <h4 class="cover-rail__title">Comments</h4>
-                  ${coverLoading ? html`<span class="cover-rail__spin"><span class="dots-anim">Reading</span></span>` : nothing}
-                </header>
-                ${this.coverRationale.error ? html`
-                  <p class="muted" style="color:var(--error);padding:0 var(--space-3);">${this.coverRationale.error}</p>
-                ` : nothing}
-                ${!coverLoading && !coverComments.length && !this.coverRationale.error ? html`
-                  <p class="cover-rail__empty">No load-bearing phrases yet — try regenerating the cover letter.</p>
-                ` : nothing}
-                <div class="cover-rail__list" data-active=${this.activeRationale ?? ''}>
-                  ${coverComments.map(c => html`
-                    <article class="cover-comment ${this.activeRationale === c.id ? 'is-active' : ''}"
-                             data-rationale-id=${c.id}
-                             @click=${() => this._scrollToHighlight(c.id)}
-                             @mouseenter=${() => this._highlightRationale(c.id, true)}
-                             @mouseleave=${() => this._highlightRationale(c.id, false)}>
-                      <header class="cover-comment__head">
-                        <span class="cover-comment__num">${c.id}</span>
-                        <span class="cover-comment__label">${c.label}</span>
-                      </header>
-                      <div class="cover-comment__body">${unsafeHTML(renderMarkdown(c.text))}</div>
-                    </article>
-                  `)}
-                </div>
-              </aside>
-            </div>
-          `
-          : html`<article class="kb-doc asset-doc">${unsafeHTML(bodyHtml)}</article>`)}
+        `}
     `;
+  }
+
+  // Save-status pill in the toolbar — green dot for "Saved", amber for
+  // "Editing", spinner for "Saving", red for "Error".
+  _renderSaveStatus(a) {
+    const status = a.saveStatus || 'idle';
+    let label = 'Saved';
+    let cls = 'save-status--saved';
+    if (status === 'dirty')   { label = 'Editing'; cls = 'save-status--dirty'; }
+    if (status === 'saving')  { label = 'Saving…'; cls = 'save-status--saving'; }
+    if (status === 'error')   { label = 'Save failed'; cls = 'save-status--error'; }
+    if (status === 'saved' || status === 'idle') {
+      const ago = a.savedAt ? this._timeAgo(a.savedAt) : '';
+      label = ago ? `Saved ${ago}` : 'Saved';
+    }
+    return html`<span class="save-status ${cls}" title=${a.error || ''}>
+      <span class="save-status__dot" aria-hidden="true"></span>
+      <span class="save-status__label">${label}</span>
+    </span>`;
+  }
+
+  _timeAgo(t) {
+    const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (sec < 5) return 'just now';
+    if (sec < 60) return `${sec}s ago`;
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60);
+    return `${h}h ago`;
   }
 
   // Build a stable signature for "this cover letter + these analysis sources"
@@ -700,6 +781,10 @@ export class JobRoleDetail extends LitElement {
       // racing edit + regenerate that finishes after newer state.
       if (this._coverSig() === sig) {
         this.coverRationale = { sig, highlights, loading: false, error: '' };
+        // Fold the new highlights into the editable HTML so they show
+        // inline. The user pauses while we fetch (~3s), so the cursor
+        // jump from re-rendering is acceptable here.
+        this._refreshEditHtml('cover-letter');
       }
     } catch (e) {
       if (this._coverSig() === sig) {
@@ -775,57 +860,63 @@ export class JobRoleDetail extends LitElement {
     this._alignComments();
   }
 
-  // ----- Inline edit (contenteditable + turndown roundtrip) -----------------
+  // ----- Always-on inline editing + autosave --------------------------------
 
-  // Enter edit mode without leaving the rendered article — captures the
-  // current rendered HTML once so subsequent re-renders don't clobber the
-  // contenteditable subtree. We render *plain* markdown (no diffs/marks)
-  // so the editor doesn't show diff junk while the user types.
-  _enterEdit(kind) {
+  // Per-kind autosave debounce timers. Not in component state — they're
+  // imperative DOM-side concerns.
+  _autosaveTimers = { resume: null, 'cover-letter': null };
+  AUTOSAVE_DELAY_MS = 1500;
+
+  // Fires on every keystroke in a contenteditable article. Mark dirty,
+  // schedule an autosave for AUTOSAVE_DELAY_MS from now. Don't touch
+  // editHtml — we want the DOM (including the user's edits) to remain
+  // untouched until the next explicit refresh.
+  _onContentEditableInput(kind) {
     const a = this.assets[kind];
-    if (!a) return;
-    const editHtml = renderMarkdown(a.content || '');
-    this.assets = {
-      ...this.assets,
-      [kind]: { ...a, mode: 'edit', draft: a.content || '', editHtml, dirty: false, error: '' },
-    };
+    if (!a || a.mode !== 'view') return;
+    if (a.saveStatus !== 'dirty') {
+      this.assets = { ...this.assets, [kind]: { ...a, saveStatus: 'dirty', error: '' } };
+    }
+    if (this._autosaveTimers[kind]) clearTimeout(this._autosaveTimers[kind]);
+    this._autosaveTimers[kind] = setTimeout(() => this._autosave(kind), this.AUTOSAVE_DELAY_MS);
   }
 
-  _cancelEdit(kind) {
-    const a = this.assets[kind];
-    this.assets = { ...this.assets, [kind]: { ...a, mode: 'view', draft: a.content, editHtml: '', dirty: false, error: '' } };
-  }
-
-  // Read the contenteditable's HTML, roundtrip back to markdown, persist.
-  async _saveInlineEdit(kind) {
+  async _autosave(kind) {
     const a = this.assets[kind];
     if (!a) return;
     const article = this.querySelector(`article[data-edit-kind="${kind}"]`);
     if (!article) return;
-    this.assets = { ...this.assets, [kind]: { ...a, saving: true, error: '' } };
+    if (a.saveStatus !== 'dirty') return;
+    this.assets = { ...this.assets, [kind]: { ...a, saveStatus: 'saving', error: '' } };
     try {
       const td = await getTurndown();
       const md = td.turndown(article.innerHTML).trim();
       if (!md) throw new Error('empty content');
       await writeRoleAsset(this.slug, kind, md);
-      this.assets = {
-        ...this.assets,
-        [kind]: { ...a, content: md, draft: md, mode: 'view', editHtml: '', dirty: false, saving: false, error: '' },
-      };
+      // Persist content but NOT editHtml — DOM stays as the user typed it.
+      // Highlights refresh next time the user toggles Show comments,
+      // regenerates, or navigates back to the tab.
+      const cur = this.assets[kind];
+      // Skip the commit if the user typed again while saving — we'll
+      // catch up on the next debounce.
+      if (cur.saveStatus === 'saving') {
+        this.assets = { ...this.assets, [kind]: { ...cur, content: md, saveStatus: 'saved', savedAt: Date.now() } };
+      } else {
+        this.assets = { ...this.assets, [kind]: { ...cur, content: md } };
+      }
     } catch (e) {
-      this.assets = { ...this.assets, [kind]: { ...a, saving: false, error: String(e?.message || e) } };
+      this.assets = { ...this.assets, [kind]: { ...this.assets[kind], saveStatus: 'error', error: String(e?.message || e) } };
     }
   }
 
-  // Mark dirty whenever the user types; do NOT mutate editHtml (keeping
-  // its reference stable is what stops Lit from re-rendering the subtree
-  // and clobbering the cursor).
-  _onContentEditableInput(kind) {
-    const a = this.assets[kind];
-    if (!a || a.mode !== 'edit') return;
-    if (!a.dirty) {
-      this.assets = { ...this.assets, [kind]: { ...a, dirty: true } };
+  // Manual save (Cmd/Ctrl+S) — flushes the debounce immediately.
+  _flushSave(kind) {
+    if (this._autosaveTimers[kind]) {
+      clearTimeout(this._autosaveTimers[kind]);
+      this._autosaveTimers[kind] = null;
     }
+    const a = this.assets[kind];
+    if (a?.saveStatus === 'dirty') return this._autosave(kind);
   }
 
   _renderChromeFromPrefill() {
