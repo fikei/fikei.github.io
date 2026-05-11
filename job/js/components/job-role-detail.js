@@ -37,15 +37,19 @@ const BASE_RESUME_SLUG = '__base__';
 
 const TABS = [
   { id: 'details',      label: 'Role details' },
+  { id: 'activity',     label: 'Activity' },
   { id: 'resume',       label: 'Resume' },
   { id: 'cover-letter', label: 'Cover letter' },
 ];
 
 const KIND_BY_TAB = {
   details: 'analysis',
+  activity: null,                  // Activity tab has no role_asset; fetched live.
   resume: 'resume',
   'cover-letter': 'cover-letter',
 };
+
+const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel } = await import('../applicationEvents.js' + V);
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -84,6 +88,10 @@ export class JobRoleDetail extends LitElement {
     selectionPopover: { state: true },// { visible, x, y, text, savedRange } | null — floating "edit selection" UI
     coverHistory: { state: true },    // [{ id, ts, source, content, label, instruction? }] reverse-chrono
     genTick: { state: true },         // 0..n — drives the rotating-word label inside shimmer indicators
+    // Phase 2.0 — Activity timeline.
+    activityState:  { state: true },  // 'idle' | 'loading' | 'loaded' | 'error'
+    activityEvents: { state: true },  // EventRow[]
+    processOutline: { state: true },  // { rounds, expected_total_rounds, source, ... } | null
   };
 
   constructor() {
@@ -109,6 +117,9 @@ export class JobRoleDetail extends LitElement {
     this.selectionPopover = null;
     this.coverHistory = [];
     this.genTick = 0;
+    this.activityState  = 'idle';
+    this.activityEvents = [];
+    this.processOutline = null;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -182,6 +193,10 @@ export class JobRoleDetail extends LitElement {
       document.title = this.role
         ? `${this.role.company} — ${this.role.title} — /job`
         : `${this.slug} — /job`;
+      // Phase 2.0 — fetch activity events + process_outline so the
+      // process-tracker strip + Activity tab paint without waiting for
+      // a tab switch. Fire-and-forget; failure is silent.
+      this._loadActivity();
       // Now that base resume is in hand, fold the diff into the resume's
       // editable HTML so it shows up on first paint.
       queueMicrotask(() => this._refreshEditHtml('resume'));
@@ -344,6 +359,33 @@ export class JobRoleDetail extends LitElement {
     this.activeTab = id;
     const qs = id !== 'details' ? `?tab=${id}` : '';
     history.replaceState(null, '', `/job/jobs/${this.slug}/${qs}`);
+    // Phase 2.0 — lazy-load Activity timeline the first time it opens.
+    if (id === 'activity' && this.activityState === 'idle') this._loadActivity();
+  }
+
+  async _loadActivity() {
+    this.activityState = 'loading';
+    try {
+      const res = await listEvents(this.slug, { withReplyStatus: true });
+      this.activityEvents = res.events || [];
+      this.processOutline = res.process_outline || null;
+      this.activityState = 'loaded';
+    } catch (e) {
+      this.error = (e && e.message) || String(e);
+      this.activityState = 'error';
+    }
+  }
+
+  async _onAckActivityEvent(ev, dom) {
+    dom?.stopPropagation();
+    try {
+      await ackApplicationEvent(ev.id);
+      this.activityEvents = this.activityEvents.map(e =>
+        e.id === ev.id ? { ...e, needs_review: false, reviewed_at: new Date().toISOString() } : e
+      );
+    } catch (e) {
+      console.warn('[role-detail] ack failed:', e.message);
+    }
   }
 
   async _onGenerate(kind) {
@@ -1726,11 +1768,101 @@ export class JobRoleDetail extends LitElement {
         `)}
       </div>
 
+      ${this._renderProcessTracker()}
+
       <section class="asset-panel">
-        ${this.activeTab === 'details' ? this._renderDetails() : this._renderAssetTab(this.activeTab)}
+        ${this.activeTab === 'details'  ? this._renderDetails()
+        : this.activeTab === 'activity' ? this._renderActivityTab()
+        : this._renderAssetTab(this.activeTab)}
       </section>
     `;
   }
+
+  _renderProcessTracker() {
+    const po = this.processOutline;
+    if (!po || !Array.isArray(po.rounds) || !po.rounds.length) return nothing;
+    const rounds = po.rounds.slice().sort((a, b) => a.order - b.order);
+    return html`
+      <div class="process-tracker" title="Source: ${po.source || 'unknown'}">
+        ${rounds.map((r, i) => html`
+          ${i > 0 ? html`<span class="process-tracker__sep">→</span>` : nothing}
+          <span class="process-tracker__pill ${r.completed ? 'process-tracker__pill--done' : ''}">
+            ${r.label}${r.completed ? ' ✓' : ''}
+          </span>
+        `)}
+        <span class="process-tracker__source">${po.source ? po.source.replace(/_/g, ' ') : ''}</span>
+      </div>
+    `;
+  }
+
+  _renderActivityTab() {
+    if (this.activityState === 'loading' || this.activityState === 'idle') {
+      return html`<div class="placeholder"><p class="muted">Loading activity…</p></div>`;
+    }
+    if (this.activityState === 'error') {
+      return html`<div class="placeholder"><p class="muted">Couldn't load activity timeline.</p></div>`;
+    }
+    if (!this.activityEvents.length) {
+      return html`
+        <div class="placeholder">
+          <h2>No activity yet</h2>
+          <p>Emails from this company on a Gmail thread linked to this role will appear here once classified.</p>
+        </div>
+      `;
+    }
+    return html`
+      <div class="activity-timeline">
+        ${this.activityEvents.map(ev => this._renderActivityEvent(ev))}
+      </div>
+    `;
+  }
+
+  _renderActivityEvent(ev) {
+    const cls = 'activity-event'
+      + (ev.auto_applied ? ' activity-event--auto' : '')
+      + (ev.needs_review && !ev.reviewed_at ? ' activity-event--review' : '');
+    const when = fmtRelativeTime(ev.received_at);
+    const gmailUrl = ev.gmail_api_id
+      ? `https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(ev.gmail_thread_id || ev.gmail_api_id)}`
+      : null;
+    return html`
+      <article class=${cls}>
+        <span class="activity-event__rail" aria-hidden="true"></span>
+        <div>
+          <div class="activity-event__head">
+            <span class="activity-event__type">${eventTypeLabel(ev.event_type)}</span>
+            ${ev.round_label ? html`<span class="activity-event__round">${ev.round_label}${ev.round_n ? ` · round ${ev.round_n}` : ''}</span>` : nothing}
+            <span class="activity-event__time" title=${ev.received_at}>${when}</span>
+          </div>
+          <div class="activity-event__summary">${ev.summary || '(no summary)'}</div>
+          <div class="activity-event__meta">
+            ${ev.auto_applied ? html`<span class="muted">Auto-advanced to ${ev.detected_stage || '—'}</span>` : nothing}
+            ${ev.needs_user_reply ? html`<span class="activity-event__reply-flag">⚠ You haven't replied yet</span>` : nothing}
+            ${gmailUrl ? html`<a href=${gmailUrl} target="_blank" rel="noopener noreferrer">📧 Source email</a>` : nothing}
+            ${ev.confidence != null ? html`<span class="muted">Confidence ${(ev.confidence * 100).toFixed(0)}%</span>` : nothing}
+            ${ev.needs_review && !ev.reviewed_at ? html`
+              <button class="activity-event__ack" @click=${(e) => this._onAckActivityEvent(ev, e)}>Mark as seen</button>
+            ` : nothing}
+          </div>
+        </div>
+      </article>
+    `;
+  }
+}
+
+function fmtRelativeTime(iso) {
+  if (!iso) return '';
+  try {
+    const ms = Date.now() - new Date(iso).getTime();
+    const min = Math.round(ms / 60000);
+    if (min < 1) return 'just now';
+    if (min < 60) return `${min}m ago`;
+    const h = Math.round(min / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.round(h / 24);
+    if (d < 14) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+  } catch { return ''; }
 }
 
 customElements.define('job-role-detail', JobRoleDetail);

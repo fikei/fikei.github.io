@@ -5,6 +5,7 @@ const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderFitModal, scoreClass: sharedScoreClass } = await import('./job-fit-modal.js' + V);
+const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
 
@@ -54,6 +55,7 @@ const COLUMNS = [
   { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
   { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
+  { id: 'signal', label: '',       sortKey: null },
   { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
 ];
@@ -122,6 +124,10 @@ export class JobPipeline extends LitElement {
     archiveReason:   { state: true },
     archiveContext:  { state: true },
     archiveSaving:   { state: true },
+    // Phase 2.0 — per-role signals (action_needed / calendar_today /
+    // reply_pending / new_update / stale_14d). Keyed by role slug.
+    roleSignals:     { state: true },
+    liveBanners:     { state: true },
   };
 
   constructor() {
@@ -169,6 +175,11 @@ export class JobPipeline extends LitElement {
     this.archiveReason = null;
     this.archiveContext = '';
     this.archiveSaving = false;
+    this.roleSignals = new Map();
+    this.liveBanners = [];
+    this._dismissedBannerKeys = (() => {
+      try { return new Set(JSON.parse(localStorage.getItem('job:jobs:dismissedBanners') || '[]')); } catch { return new Set(); }
+    })();
     this._lastVisitAt = (() => {
       try { return localStorage.getItem('job:jobs:lastVisitAt') || null; } catch { return null; }
     })();
@@ -267,9 +278,47 @@ export class JobPipeline extends LitElement {
       // this session.
       try { localStorage.setItem('job:jobs:lastVisitAt', new Date().toISOString()); } catch {}
       this.state = 'loaded';
+      // Phase 2.0 — load signals after the table renders so the page
+      // isn't blocked on Gmail/Calendar fetches. Re-render on completion.
+      this._loadSignals();
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
+    }
+  }
+
+  async _loadSignals() {
+    try {
+      const { byRole } = await loadRoleSignals();
+      this.roleSignals = byRole;
+      // Live banner candidates: signals < 30 min old + not previously dismissed.
+      this.liveBanners = [...byRole.values()]
+        .filter(s => s.isLive && !this._dismissedBannerKeys.has(this._bannerKey(s)))
+        .slice(0, 3);
+    } catch (e) {
+      console.warn('[job-pipeline] _loadSignals failed:', e.message);
+    }
+  }
+
+  _bannerKey(s) { return `${s.signal}:${s.eventId || s.receivedAt || ''}`; }
+
+  _dismissBanner(s) {
+    this._dismissedBannerKeys.add(this._bannerKey(s));
+    try { localStorage.setItem('job:jobs:dismissedBanners', JSON.stringify([...this._dismissedBannerKeys])); } catch {}
+    this.liveBanners = this.liveBanners.filter(b => this._bannerKey(b) !== this._bannerKey(s));
+  }
+
+  async _onAckSignal(s, e) {
+    e?.stopPropagation();
+    if (!s.eventId) return;
+    try {
+      await ackEvent(s.eventId);
+      // Drop the signal locally — UI updates without round-tripping.
+      this.roleSignals.delete(s.role_slug || s.roleSlug);
+      this.liveBanners = this.liveBanners.filter(b => b.eventId !== s.eventId);
+      this.requestUpdate();
+    } catch (err) {
+      console.warn('[job-pipeline] ack failed:', err.message);
     }
   }
 
@@ -805,6 +854,7 @@ export class JobPipeline extends LitElement {
             </div>
           </div>
         </td>
+        <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
         <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
@@ -831,6 +881,18 @@ export class JobPipeline extends LitElement {
     `;
   }
 
+  _renderSignalCell(r) {
+    const s = this.roleSignals?.get(r.slug);
+    if (!s) return nothing;
+    const cls = chipClassForSignal(s.signal);
+    return html`<span class=${cls} title=${s.detail}>${s.detail}</span>`;
+  }
+
+  // Update the skeleton row too — silent here, just leave it empty.
+  _renderSkeletonSignalCell() {
+    return html`<td class="col col-signal"></td>`;
+  }
+
   _renderSectorCell(r) {
     const tags = Array.isArray(r.sectorTags) ? r.sectorTags : [];
     if (!tags.length) {
@@ -853,6 +915,7 @@ export class JobPipeline extends LitElement {
           <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
         </td>
+        <td class="col col-signal"></td>
         <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
         <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>
@@ -882,6 +945,86 @@ export class JobPipeline extends LitElement {
         <button class="added-banner__close" @click=${() => this.addedBanner = { roles: [], dismissed: true }} aria-label="Dismiss">×</button>
       </div>
     `;
+  }
+
+  // Phase 2.0 — live-arrival banners. Render at most 3 at a time.
+  // Auto-fade is enforced by `loadRoleSignals` (only includes < 30 min);
+  // dismissal is persisted in localStorage so the same trigger never
+  // re-banners.
+  _renderLiveBanners() {
+    if (!this.liveBanners?.length) return nothing;
+    return html`${this.liveBanners.map(s => html`
+      <div class="live-banner" role="status">
+        <span class="live-banner__icon">${this._iconForSignal(s.signal)}</span>
+        <div class="live-banner__body">
+          <strong>${s.company || ''}${s.company && s.title ? ' · ' : ''}${s.title || ''}</strong>
+          <span class="muted"> ${s.detail || ''}</span>
+        </div>
+        <a class="btn btn--sm" href=${`/job/jobs/${s.role_slug || s.roleSlug}/`}
+           @click=${(ev) => this._onAttentionClick(s, ev)}>Open</a>
+        <button class="live-banner__close" aria-label="Dismiss"
+                @click=${() => this._dismissBanner(s)}>×</button>
+      </div>
+    `)}`;
+  }
+
+  _iconForSignal(signal) {
+    switch (signal) {
+      case 'action_needed':  return '⚠';
+      case 'calendar_today': return '📅';
+      case 'new_update':     return '🔔';
+      default:               return '•';
+    }
+  }
+
+  // Phase 2.0 — Needs-Attention widget. Single card per actionable role,
+  // sorted by priority. Hidden when nothing is actionable.
+  _renderNeedsAttention() {
+    const items = [...(this.roleSignals?.values() || [])].sort((a, b) => a.priority - b.priority);
+    if (!items.length) return nothing;
+    return html`
+      <section class="needs-attention" aria-label="Needs your attention">
+        <div class="needs-attention__header">
+          <strong>Needs your attention</strong>
+          <span>${items.length} ${items.length === 1 ? 'role' : 'roles'}</span>
+        </div>
+        <div class="needs-attention__list">
+          ${items.map(s => html`
+            <a class="needs-attention__card"
+               href=${`/job/jobs/${s.role_slug || s.roleSlug || ''}/`}
+               @click=${(e) => this._onAttentionClick(s, e)}>
+              <div>
+                <div class="needs-attention__title">
+                  ${s.company || s.role_slug}
+                  ${s.title ? html`<span class="muted"> · ${s.title}</span>` : nothing}
+                </div>
+                <div class="needs-attention__detail">${s.detail || ''}</div>
+              </div>
+              <span class="needs-attention__signal ${chipClassForSignal(s.signal)}">${this._signalLabel(s.signal)}</span>
+            </a>
+          `)}
+        </div>
+      </section>
+    `;
+  }
+
+  _signalLabel(signal) {
+    switch (signal) {
+      case 'action_needed':  return 'Action needed';
+      case 'calendar_today': return 'Calendar';
+      case 'reply_pending':  return 'Reply pending';
+      case 'new_update':     return 'New update';
+      case 'stale_14d':      return 'Quiet 14d+';
+      default:               return signal;
+    }
+  }
+
+  _onAttentionClick(s, e) {
+    if (e.metaKey || e.ctrlKey || e.button === 1) return;
+    const slug = s.role_slug || s.roleSlug;
+    if (!slug) return;
+    e.preventDefault();
+    window.location.assign(`/job/jobs/${slug}/`);
   }
 
   _onAddedClick(r, e) {
@@ -921,6 +1064,9 @@ export class JobPipeline extends LitElement {
 
     return html`
       ${this.bucket === 'leads' ? html`<job-recommendations></job-recommendations>` : nothing}
+
+      ${this.bucket === 'active' ? this._renderLiveBanners() : nothing}
+      ${this.bucket === 'active' ? this._renderNeedsAttention() : nothing}
 
       ${showAddedBanner ? this._renderAddedBanner(added) : nothing}
 
