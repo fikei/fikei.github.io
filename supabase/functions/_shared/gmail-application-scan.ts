@@ -103,9 +103,12 @@ export async function scanApplicationResponses(args: {
       left join job.hiring_companies hc
         on hc.name_norm = lower(trim(r.company_name))
      where r.status in ('Active', 'Saved')
-       and (r.applied_at is not null or r.engaged_at is not null)
        and (${args.roleSlug ?? null}::text is null or r.slug = ${args.roleSlug ?? null})
        and r.deleted_at is null
+     order by
+       case when r.status = 'Active' then 0 else 1 end,
+       coalesce(r.engaged_at, r.applied_at) desc nulls last,
+       r.created_at desc
   `;
   if (!roles.length) return out;
 
@@ -166,7 +169,10 @@ export async function scanApplicationResponses(args: {
   // the inbox view. `-in:spam -in:trash` keeps the obvious junk out
   // without losing labeled-but-archived recruiter conversations.
   const NEWSLETTER_NEGATIVES = '-from:linkedin.com -from:wellfound.com -from:otta.com -from:builtin.com -from:hnhiring.com';
-  for (const role of roles.slice(0, 20)) {
+  // Cap covers the whole current pipeline; roles are pre-sorted Active
+  // first, then by most-recent engagement. If the pipeline ever grows
+  // past this, the tail is silently skipped — bump or paginate.
+  for (const role of roles.slice(0, 60)) {
     // Build a candidate-name set per role. Start with company_name when
     // it looks real; add the title-derived company token when it
     // doesn't (rows added via /add-role sometimes land as

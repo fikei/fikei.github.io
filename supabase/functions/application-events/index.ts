@@ -31,8 +31,8 @@ import {
 } from '../_shared/google-tokens.ts';
 import { scanApplicationResponses } from '../_shared/gmail-application-scan.ts';
 
-const VERSION = '1.2.0';
-console.log(`[application-events] v${VERSION} - backfill: title-derived company tokens + label coverage`);
+const VERSION = '1.3.0';
+console.log(`[application-events] v${VERSION} - backfill scans ALL Saved+Active roles so cold recruiter outreach on Saved roles is caught`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
