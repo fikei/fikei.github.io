@@ -20,8 +20,8 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.4.0';
-console.log(`[pull-recommendations] v${VERSION} - Fit v2: mission/domain/skills/arc scoring loaded from vision+skills+companies`);
+const VERSION = '0.4.1';
+console.log(`[pull-recommendations] v${VERSION} - Fit v2 + Gmail sourceLabel = sender (LinkedIn / Wellfound / …) not company`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
