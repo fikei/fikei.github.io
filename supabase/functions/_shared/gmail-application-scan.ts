@@ -220,6 +220,12 @@ export async function scanApplicationResponses(args: {
     const body = extractBody(msg);
     if (!body) continue;
 
+    // Skip user's own outbound messages — those are replies *from* the
+    // candidate, not status updates *about* the application. The thread-
+    // walk in application-events handles outbound detection separately
+    // (for needs_user_reply); here we only want inbound classifications.
+    if (sender.includes(args.userEmail.toLowerCase())) continue;
+
     const senderDomain = extractDomain(sender);
 
     // Step 1 — thread continuity wins. If the thread is already
