@@ -1498,6 +1498,10 @@ export class JobRoleDetail extends LitElement {
           </div>
         </div>
         <div class="role-header__actions">
+          ${r.sourceEmailUrl ? html`
+            <a class="btn btn--sm" href=${r.sourceEmailUrl} target="_blank" rel="noopener noreferrer"
+               title="Open the originating email in Gmail">📧 Source email</a>
+          ` : nothing}
           ${r.url ? html`
             <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
                @click=${() => engageRole(this.slug)}>Apply ↗</a>
@@ -1607,6 +1611,10 @@ export class JobRoleDetail extends LitElement {
           </div>
         </div>
         <div class="role-header__actions">
+          ${r?.sourceEmailUrl ? html`
+            <a class="btn btn--sm" href=${r.sourceEmailUrl} target="_blank" rel="noopener noreferrer"
+               title="Open the originating email in Gmail">📧 Source email</a>
+          ` : nothing}
           ${r?.url ? html`
             <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
                @click=${() => engageRole(this.slug)}>

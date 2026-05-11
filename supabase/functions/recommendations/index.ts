@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.4.0';
-console.log(`[recommendations] v${VERSION} - ?view=all lifts score floor for "Recommended for you" page`);
+const VERSION = '0.5.0';
+console.log(`[recommendations] v${VERSION} - return sourceEmailUrl for Gmail-sourced rows`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -31,7 +31,13 @@ serve(async (req) => {
                r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
                r.description, r.match_bullets as "matchBullets", r.suggested_at as "suggestedAt",
                r.fit_score as "fitScore", r.fit_breakdown as "breakdown",
-               r.hard_fails as "hardFails", r.sector
+               r.hard_fails as "hardFails", r.sector,
+               -- Source-email URL — derived from payload.gmailApiId for
+               -- Gmail-sourced recs so the UI can render a "view source"
+               -- link without parsing the JSON client-side.
+               case when r.source = 'gmail-jobs' and r.payload ? 'gmailApiId'
+                    then 'https://mail.google.com/mail/u/0/#inbox/' || (r.payload->>'gmailApiId')
+                    else null end as "sourceEmailUrl"
         from job.recommended_roles r
         where r.dismissed_at is null
           and r.added_to_pipeline_slug is null

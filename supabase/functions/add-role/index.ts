@@ -10,7 +10,10 @@ import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 
-const VERSION = '0.1.6';
+const VERSION = '0.2.0';
+// Status default: 'Saved' (post-taxonomy collapse).
+// Source-email-link: stash payload.gmailApiId as a Gmail web URL when
+// the rec came from Gmail.
 console.log(`[add-role] v${VERSION} - JSON-LD JobPosting + careerspage.io + URL clean + company case + cleanTitle 'job in X'`);
 
 const URL_RE = /^https?:\/\//i;
@@ -380,7 +383,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, ${companySlug}, ${company}, ${title},
-          ${url}, ${finalSource}, 'New'
+          ${url}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
@@ -399,7 +402,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, null, ${company}, ${title},
-          ${url}, ${finalSource}, 'New'
+          ${url}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
@@ -519,14 +522,30 @@ serve(async (req) => {
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }
 
-    // Wire the recommendation → pipeline link, if any.
+    // Wire the recommendation → pipeline link, if any. Also stash a
+    // back-link to the source email when the rec came from Gmail so the
+    // user can re-open the originating thread from the role detail.
     if (body.fromRecommendationId) {
       try {
+        const recRows = await sql<{ source: string; payload: Record<string, unknown> | null }[]>`
+          select source, payload from job.recommended_roles
+           where id = ${body.fromRecommendationId} limit 1`;
         await sql`
           update job.recommended_roles
           set added_to_pipeline_slug = ${slug}
           where id = ${body.fromRecommendationId};
         `;
+        const rec = recRows[0];
+        const gmailApiId = rec?.source === 'gmail-jobs'
+          ? (rec.payload as Record<string, unknown> | null)?.gmailApiId
+          : null;
+        if (gmailApiId) {
+          await sql`
+            update job.pipeline_roles
+               set source_email_url = ${'https://mail.google.com/mail/u/0/#inbox/' + String(gmailApiId)}
+             where slug = ${slug} and source_email_url is null;
+          `;
+        }
       } catch (e) { console.warn('[add-role] rec link failed', e); }
     }
 
