@@ -5,10 +5,11 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
+  import('./job-fit-modal.js' + V),
 ]);
 
 function relTime(iso) {
@@ -31,6 +32,7 @@ export class JobRecommendations extends LitElement {
     items: { state: true },
     error: { state: true },
     addingId: { state: true },
+    selectedRec: { state: true },
   };
 
   constructor() {
@@ -39,6 +41,7 @@ export class JobRecommendations extends LitElement {
     this.items = [];
     this.error = '';
     this.addingId = null;
+    this.selectedRec = null;
   }
 
   connectedCallback() {
@@ -96,6 +99,17 @@ export class JobRecommendations extends LitElement {
     }
   }
 
+  _openFitModal(rec) {
+    this.selectedRec = {
+      company:   rec.company,
+      title:     rec.title,
+      score:     rec.fitScore,
+      breakdown: rec.breakdown || rec.fitBreakdown || {},
+      hardFails: rec.hardFails || [],
+    };
+  }
+  _closeFitModal() { this.selectedRec = null; }
+
   _fitClass(s) {
     if (s == null) return 'fit-pill fit-pill--poor';
     if (s >= 70) return 'fit-pill fit-pill--strong';
@@ -127,7 +141,11 @@ export class JobRecommendations extends LitElement {
             <div class="rec-card__title-row">
               <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
               ${rec.fitScore != null
-                ? html`<span class=${this._fitClass(rec.fitScore)} title="Fit score">${rec.fitScore}</span>`
+                ? html`<button class=${this._fitClass(rec.fitScore) + ' fit-pill--button'}
+                          title="Tap to see the breakdown"
+                          @click=${(e) => { e.stopPropagation(); this._openFitModal(rec); }}>
+                          ${rec.fitScore}
+                        </button>`
                 : nothing}
             </div>
             ${meta ? html`<p class="rec-card__meta">${meta}</p>` : nothing}
@@ -210,6 +228,7 @@ export class JobRecommendations extends LitElement {
             See all recommendations →
           </a>
         </footer>
+        ${renderFitModal(this.selectedRec, () => this._closeFitModal())}
       </section>
     `;
   }
