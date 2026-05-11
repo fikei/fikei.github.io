@@ -39,6 +39,28 @@ export async function updateRole(role, patch) {
   return res.json();
 }
 
+// Trigger a fit-score rescore scoped to one slug. Fires after analysis
+// regen so fit_score + fit_breakdown pick up any changes in company /
+// title / url / sector without rescoring the whole pipeline.
+const PULL_REC_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/pull-recommendations';
+export async function rescoreRole(slug, { haiku = true } = {}) {
+  if (!slug) return null;
+  try {
+    const headers = await authHeader();
+    const qs = new URLSearchParams({ rescore: '1', slug });
+    if (!haiku) qs.set('haiku', '0');
+    const res = await fetch(`${PULL_REC_URL}?${qs}`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`rescore ${res.status}: ${await res.text()}`);
+    return await res.json();
+  } catch (e) {
+    console.warn(`[pipeline] rescoreRole(${slug}) failed:`, (e && e.message) || e);
+    return null;
+  }
+}
+
 // Stamp engaged_at on a pipeline row. Called from the drill page on
 // open and from Apply-button clicks — a passive signal that drives
 // the "In progress" pill on Saved rows. Idempotent (server only
