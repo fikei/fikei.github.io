@@ -21,14 +21,21 @@ export async function fetchPipeline() {
 }
 
 export async function setStatus(role, status) {
+  return updateRole(role, { status });
+}
+
+// Write status / stage / exit_reason in one request. The server applies
+// the auto-promote rule (any stage set → status='Active') and validates
+// exit_reason on transitions to Archive.
+export async function updateRole(role, patch) {
   const slug = typeof role === 'string' ? role : role.slug;
   const headers = await authHeader();
   const res = await fetch(FN_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slug, status }),
+    body: JSON.stringify({ slug, ...patch }),
   });
-  if (!res.ok) throw new Error(`set-status ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`update-role ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
