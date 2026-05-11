@@ -32,6 +32,24 @@ export async function setStatus(role, status) {
   return res.json();
 }
 
+// Stamp engaged_at on a pipeline row. Called from the drill page on
+// open and from Apply-button clicks — a passive signal that drives
+// the "In progress" pill on Saved rows. Idempotent (server only
+// writes on first call) and keepalive:true so it survives the
+// navigation that follows an Apply tap.
+export async function engageRole(slug) {
+  if (!slug) return;
+  try {
+    const headers = await authHeader();
+    await fetch(FN_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, action: 'engage' }),
+      keepalive: true,
+    });
+  } catch { /* engagement is fire-and-forget */ }
+}
+
 export async function setArchived(slug, archived) {
   const headers = await authHeader();
   const res = await fetch(FN_URL, {
