@@ -279,6 +279,20 @@ export async function linkNarrative(id, linkedCompanySlug) {
   return j.narrative;
 }
 
+// One-shot backfill: read the KB (companies/projects/wins/skills/vision)
+// and extract discrete stories into job.narratives. Idempotent — stories
+// whose normalized titles already exist are skipped.
+export async function extractNarrativesFromKb() {
+  const headers = await authHeader();
+  const res = await fetch(NARRATIVES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ extract: true }),
+  });
+  if (!res.ok) throw new Error(`narratives ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 export async function deleteNarrative(id) {
   const headers = await authHeader();
   const res = await fetch(NARRATIVES_URL, {
@@ -351,7 +365,7 @@ export async function deleteProjectClient(id) {
 
 window.JobPipeline = {
   fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative,
-  fetchNarratives, saveNarrative, linkNarrative, deleteNarrative,
+  fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, extractNarrativesFromKb,
   fetchRoleProjects, saveRoleProject, deleteRoleProject, saveProjectClient, deleteProjectClient,
   fetchCareerOpportunities,
 };

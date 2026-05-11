@@ -6,7 +6,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, fetchCareerOpportunities }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, fetchCareerOpportunities, extractNarrativesFromKb }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -100,6 +100,7 @@ export class JobCareer extends LitElement {
     composing: { state: true },          // { open, title, text, savedId, saving, error } | null
     opportunities: { state: true },      // { items, loading, error } — AI-flagged career gaps
     opportunityThreads: { state: true }, // { [idx]: { messages, sending, error } }
+    extracting: { state: true },         // { running, lastResult, error } for the KB backfill
   };
 
   constructor() {
@@ -118,6 +119,7 @@ export class JobCareer extends LitElement {
     this.composing = null;
     this.opportunities = { items: [], loading: false, error: '' };
     this.opportunityThreads = {};
+    this.extracting = { running: false, lastResult: null, error: '' };
   }
 
   connectedCallback() {
@@ -398,7 +400,18 @@ export class JobCareer extends LitElement {
               Discrete stories the cover-letter generator can draw from. Tags + work-history link are auto-set on save.
             </p>
           </div>
-          <button class="btn btn--sm btn--primary" @click=${() => this._openCompose()}>New story</button>
+          <div style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;">
+            <button class="btn btn--sm" ?disabled=${this.extracting.running} @click=${() => this._extractFromKb()}>
+              ${this.extracting.running ? html`<span class="gen-shimmer">Extracting from KB</span>` : 'Extract from KB'}
+            </button>
+            <button class="btn btn--sm btn--primary" @click=${() => this._openCompose()}>New story</button>
+            ${this.extracting.lastResult ? html`
+              <span class="muted" style="font-size:var(--font-size-caption);">
+                Added ${this.extracting.lastResult.created}${this.extracting.lastResult.skipped ? ` · skipped ${this.extracting.lastResult.skipped} already-present` : ''}
+              </span>
+            ` : nothing}
+            ${this.extracting.error ? html`<span class="muted" style="color:var(--error);font-size:var(--font-size-caption);">${this.extracting.error}</span>` : nothing}
+          </div>
         </header>
 
         ${this.composing?.open ? this._renderComposer() : nothing}
@@ -547,6 +560,25 @@ export class JobCareer extends LitElement {
       this.narratives = this.narratives.filter(n => n.id !== id);
     } catch (e) {
       alert(`Delete failed: ${String(e?.message || e)}`);
+    }
+  }
+
+  // One-shot backfill: extract stories from existing KB (companies,
+  // wins, projects, skills, vision) and persist them. Idempotent.
+  async _extractFromKb() {
+    if (this.extracting.running) return;
+    this.extracting = { running: true, lastResult: null, error: '' };
+    try {
+      const res = await extractNarrativesFromKb();
+      const ns = await fetchNarratives();
+      this.narratives = ns;
+      this.extracting = {
+        running: false,
+        lastResult: { created: (res?.created || []).length, skipped: res?.skipped || 0 },
+        error: '',
+      };
+    } catch (e) {
+      this.extracting = { running: false, lastResult: null, error: String(e?.message || e) };
     }
   }
 
