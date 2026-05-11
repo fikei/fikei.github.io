@@ -112,6 +112,9 @@ export class JobPipeline extends LitElement {
     pasteUrl: { state: true },
     pasteSaving: { state: true },
     pasteError: { state: true },
+    // "N new jobs added" banner. Accumulates entries dispatched via
+    // job:pipeline:added until the user dismisses it.
+    addedBanner: { state: true },
     // Active sub-stage tab filter. null = "All".
     activeStageFilter: { state: true },
     // Archive-flow modal state.
@@ -159,6 +162,7 @@ export class JobPipeline extends LitElement {
     this.pasteUrl = '';
     this.pasteSaving = false;
     this.pasteError = '';
+    this.addedBanner = { roles: [], dismissed: false };
     const stageQ = params.get('stage');
     this.activeStageFilter = STAGES.some(s => s.id === stageQ) ? stageQ : null;
     this.archivingRow = null;
@@ -192,6 +196,20 @@ export class JobPipeline extends LitElement {
       } catch {}
     };
     document.addEventListener('job:pipeline:refresh', this._onRefresh);
+    // Surface added jobs (paste-URL, recs, future batch import) via a
+    // dismissible banner at the top of the table. Accumulates entries
+    // until the user dismisses or navigates away.
+    this._onAdded = (e) => {
+      const role = e.detail?.role;
+      const roles = e.detail?.roles;
+      const next = Array.isArray(roles) ? roles : (role ? [role] : []);
+      if (!next.length) return;
+      // De-dupe by slug so re-fires don't double-count.
+      const existing = new Map((this.addedBanner.roles || []).map(r => [r.slug, r]));
+      for (const r of next) if (r?.slug) existing.set(r.slug, r);
+      this.addedBanner = { roles: Array.from(existing.values()), dismissed: false };
+    };
+    document.addEventListener('job:pipeline:added', this._onAdded);
     this._onPopState = () => {
       const b = new URLSearchParams(location.search).get('bucket') || 'leads';
       if (b !== this.bucket) {
@@ -207,6 +225,7 @@ export class JobPipeline extends LitElement {
     document.removeEventListener('keydown', this._onKey);
     document.removeEventListener('click', this._onDocClick);
     document.removeEventListener('job:pipeline:refresh', this._onRefresh);
+    document.removeEventListener('job:pipeline:added', this._onAdded);
     window.removeEventListener('popstate', this._onPopState);
     super.disconnectedCallback();
   }
@@ -223,8 +242,12 @@ export class JobPipeline extends LitElement {
       this.roles = (data.roles || []).slice();
       this.pasteOpen = false;
       this.pasteUrl = '';
-      // Open the new role's detail page in a new tab so the user can flesh it out.
-      window.open(`/job/jobs/${r.slug}/`, '_blank', 'noopener');
+      // Surface the new role via a banner rather than navigating away.
+      // Dispatch globally so other components (recs table, future batch
+      // import) feed the same banner.
+      document.dispatchEvent(new CustomEvent('job:pipeline:added', {
+        detail: { role: { slug: r.slug, company: r.company, title: r.title } },
+      }));
     } catch (err) {
       this.pasteError = String(err);
     } finally {
@@ -733,8 +756,15 @@ export class JobPipeline extends LitElement {
     // Don't navigate when the click landed on an interactive child
     // (status select, fit pill, View button, triple-dot menu).
     if (e.target.closest('button, select, a, .row-menu, .fit-pill--button')) return;
+    // Cmd/Ctrl-click or middle-click → new tab (browser standard);
+    // plain click → in-page navigation.
     stashRolePrefill(r);
-    window.open(this._detailHref(r), '_blank', 'noopener');
+    const href = this._detailHref(r);
+    if (e.metaKey || e.ctrlKey || e.button === 1) {
+      window.open(href, '_blank', 'noopener');
+    } else {
+      window.location.assign(href);
+    }
   }
 
   _renderRow(r) {
@@ -833,6 +863,34 @@ export class JobPipeline extends LitElement {
     return renderFitModal(this.selectedRow, () => this._closeFitModal());
   }
 
+  // "N new jobs added" banner. Pluralizes correctly, links the most
+  // recent N entries inline (cap 3) and shows a "+M more" tail. Click
+  // a role link → in-page nav to its detail page.
+  _renderAddedBanner(roles) {
+    const total = roles.length;
+    const preview = roles.slice(-3);     // most recent at the end
+    const moreCount = Math.max(0, total - preview.length);
+    return html`
+      <div class="added-banner" role="status">
+        <div class="added-banner__body">
+          <strong>${total} new job${total === 1 ? '' : 's'} added.</strong>
+          <span class="added-banner__roles">
+            ${preview.map((r, i) => html`${i > 0 ? ' · ' : ''}<a href=${`/job/jobs/${r.slug}/`} @click=${(e) => this._onAddedClick(r, e)}>${r.company ? `${r.company}` : r.slug}${r.title ? ` — ${r.title}` : ''}</a>`)}
+            ${moreCount > 0 ? html` <span class="muted">+${moreCount} more</span>` : nothing}
+          </span>
+        </div>
+        <button class="added-banner__close" @click=${() => this.addedBanner = { roles: [], dismissed: true }} aria-label="Dismiss">×</button>
+      </div>
+    `;
+  }
+
+  _onAddedClick(r, e) {
+    if (e.metaKey || e.ctrlKey || e.button === 1) return; // standard new-tab
+    e.preventDefault();
+    stashRolePrefill({ slug: r.slug, company: r.company, title: r.title });
+    window.location.assign(`/job/jobs/${r.slug}/`);
+  }
+
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
       // Render the same shell that the loaded view will use, with skeleton
@@ -858,8 +916,13 @@ export class JobPipeline extends LitElement {
     }
     const rows = this._sorted();
     const bucketLabel = { leads: 'Saved', active: 'Active', archive: 'Archive' }[this.bucket];
+    const added = this.addedBanner?.roles || [];
+    const showAddedBanner = added.length > 0 && !this.addedBanner.dismissed;
+
     return html`
       ${this.bucket === 'leads' ? html`<job-recommendations></job-recommendations>` : nothing}
+
+      ${showAddedBanner ? this._renderAddedBanner(added) : nothing}
 
       ${this.livenessResult && !this.livenessResultDismissed ? html`
         <div class="liveness-banner ${this.livenessResult.closed.length ? 'liveness-banner--closed' : 'liveness-banner--clean'}" role="status">
