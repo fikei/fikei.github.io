@@ -22,8 +22,48 @@ export function scoreClass(s) {
   return 'fit-pill fit-pill--poor';
 }
 
-// Render just the bars + subcopy list — no modal chrome. Used by the
-// role-detail page to embed the v3 breakdown inline in the layout.
+// Render the full fit-card body — score block, optional summary (replaces
+// the static "Out of 100..." sub-explainer when the caller passes one),
+// hard-fail callout, and the breakdown list. Used by both renderFitModal()
+// and the role-detail page so the two surfaces stay structurally
+// identical and any future tweak lands in one place.
+//
+// opts:
+//   summary    string|TemplateResult — replaces the static explainer
+//                                       under "Fit score". Pass markdown
+//                                       html via unsafeHTML if needed.
+//   loading    boolean               — show "drafting summary…" if true
+//                                       and no summary provided.
+export function renderFitCardBody(row, opts = {}) {
+  if (!row) return nothing;
+  const score = row.score ?? row.fitScore ?? null;
+  const hardFails = row.hardFails || [];
+  const { summary = null, loading = false } = opts;
+  const sub = summary
+    ? html`<div class="fit-modal__score-sub">${summary}</div>`
+    : loading
+      ? html`<p class="fit-modal__score-sub muted">Drafting summary…</p>`
+      : html`<p class="fit-modal__score-sub">Out of 100. Values & impact and Role match are the dominant signals; comp and stage are tiebreakers. Hard fails cap at 30.</p>`;
+  return html`
+    <div class="fit-modal__score">
+      <span class=${scoreClass(score)}>${score == null ? '—' : score}</span>
+      <div>
+        <p class="fit-modal__score-label">Fit score</p>
+        ${sub}
+      </div>
+    </div>
+    ${hardFails.length ? html`
+      <div class="fit-modal__fails">
+        <strong>Hard fail${hardFails.length > 1 ? 's' : ''}:</strong>
+        ${hardFails.join(', ')}. Score capped at 30.
+      </div>
+    ` : nothing}
+    ${renderFitBreakdown(row)}
+  `;
+}
+
+// Render just the bars + subcopy list — no header, no score block.
+// Kept exported for callers that only want the bars.
 export function renderFitBreakdown(row) {
   if (!row) return nothing;
   const breakdown = row.breakdown || row.fitBreakdown || {};
@@ -55,8 +95,6 @@ export function renderFitBreakdown(row) {
 // Returns a lit-html template (or `nothing` if row is null).
 export function renderFitModal(row, onClose) {
   if (!row) return nothing;
-  const score = row.score ?? row.fitScore ?? null;
-  const hardFails = row.hardFails || [];
   const onBackdrop = (e) => { if (e.target.classList.contains('fit-modal__backdrop')) onClose(); };
   return html`
     <div class="fit-modal__backdrop" @click=${onBackdrop}>
@@ -68,22 +106,9 @@ export function renderFitModal(row, onClose) {
           </div>
           <button class="fit-modal__close" @click=${() => onClose()} aria-label="Close">×</button>
         </header>
-        <div class="fit-modal__score">
-          <span class=${scoreClass(score)}>${score == null ? '—' : score}</span>
-          <div>
-            <p class="fit-modal__score-label">Fit score</p>
-            <p class="fit-modal__score-sub">Out of 100. Values & impact and Role match are the dominant signals; comp and stage are tiebreakers. Hard fails cap at 30.</p>
-          </div>
-        </div>
-        ${hardFails.length ? html`
-          <div class="fit-modal__fails">
-            <strong>Hard fail${hardFails.length > 1 ? 's' : ''}:</strong>
-            ${hardFails.join(', ')}. Score capped at 30.
-          </div>
-        ` : nothing}
-        ${renderFitBreakdown(row)}
+        ${renderFitCardBody(row)}
         <footer class="fit-modal__foot">
-          <p class="muted">v2 weights: mission/domain/skills/title weighted from your vision + work history.</p>
+          <p class="muted">v3 weights: values/culture/role-match drive the score; mission can dominate.</p>
         </footer>
       </div>
     </div>

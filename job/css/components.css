@@ -1407,33 +1407,38 @@
 .role-card__body .kb-doc p:last-child,
 .role-card__body .kb-doc ul:last-child { margin-bottom: 0; }
 
-/* --- Fit breakdown section on role detail --- */
+/* --- Fit breakdown section on role detail ---
+   The card uses the shared .fit-modal__* sub-structure (score block,
+   hard-fail callout, fit-breakdown list) so the modal and detail page
+   render the same layout. Only the wrapper chrome (backdrop, dialog
+   sizing, close button) differs. These overrides scale the inline
+   version up for full-page reading. */
 .role-card--fit { margin-bottom: var(--space-5); }
-.role-card--fit .fit-pill--lg {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 48px; height: 48px; padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-display); font-weight: var(--fw-semibold);
-  font-size: var(--font-size-title-3); letter-spacing: -0.01em;
+.role-card--fit.fit-modal {
+  width: auto; max-height: none; overflow: visible;
+  animation: none; box-shadow: none;
+  padding: var(--space-5);
 }
-.role-fit__summary { margin: 0 0 var(--space-4); }
-.role-fit__summary p {
+.role-card--fit .fit-modal__score {
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.role-card--fit .fit-modal__score-sub,
+.role-card--fit .fit-modal__score-sub p {
   font-size: var(--font-size-body);
+  color: var(--fg);
   line-height: var(--lh-body);
-  margin: 0 0 var(--space-2);
-  color: var(--text-primary);
+  margin: var(--space-2) 0 0;
 }
-.role-fit__summary p:last-child { margin-bottom: 0; }
+.role-card--fit .fit-modal__score-sub p:last-child { margin-bottom: 0; }
 .role-card--fit .fit-breakdown {
-  list-style: none;
-  margin: 0; padding: 0;
-  display: grid; gap: var(--space-3);
+  display: grid; gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 .role-card--fit .fit-breakdown__row { gap: var(--space-1); }
 .role-card--fit .fit-breakdown__hint {
   font-size: var(--font-size-small);
-  color: var(--text-secondary);
+  color: var(--fg-muted);
   line-height: 1.45;
   margin: 0;
 }

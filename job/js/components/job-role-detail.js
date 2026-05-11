@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitBreakdown, scoreClass }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -449,27 +449,21 @@ export class JobRoleDetail extends LitElement {
     return (lastStop > 0 ? truncated.slice(0, lastStop + 1) : truncated + '…').trim();
   }
 
-  // The v3 fit section: prose summary at the top + the same per-bucket
-  // bars-and-subcopy component that lives in the modal, embedded inline.
+  // The v3 fit section: full modal-style card body — score block, prose
+  // summary as the sub-explainer, hard-fail callout, and bars-with-subcopy.
+  // Renders from the shared renderFitCardBody() so the modal and detail
+  // page stay structurally identical.
   _renderFitSection(parsed, status) {
     const r = this.role;
     if (!r) return nothing;
-    const summary = this._summaryFromWhyFits(parsed?.whyFits) || parsed?.description || '';
-    const score = r.score;
+    const summaryText = this._summaryFromWhyFits(parsed?.whyFits) || parsed?.description || '';
+    const summary = summaryText
+      ? html`<div class="kb-doc">${unsafeHTML(renderMarkdown(summaryText))}</div>`
+      : null;
     return html`
-      <article class="role-card role-card--fit">
-        <header class="role-card__head role-card__head--with-extra">
-          <h3>Fit breakdown</h3>
-          <span class=${scoreClass(score) + ' fit-pill--lg'}>${score == null ? '—' : score}</span>
-        </header>
-        <div class="role-card__body">
-          ${summary
-            ? html`<div class="role-fit__summary kb-doc">${unsafeHTML(renderMarkdown(summary))}</div>`
-            : status === 'loading'
-              ? html`<p class="muted">${this._genLabel()}</p>`
-              : html`<p class="muted">No summary yet — generate the analysis to draft one.</p>`}
-          ${renderFitBreakdown(r)}
-        </div>
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Fit breakdown</h3></header>
+        ${renderFitCardBody(r, { summary, loading: status === 'loading' })}
       </article>
     `;
   }
