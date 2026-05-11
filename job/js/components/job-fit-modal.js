@@ -62,8 +62,17 @@ export function renderFitCardBody(row, opts = {}) {
   `;
 }
 
+// Map a bucket's % of cap to a color tier. The strong/ok/weak class names
+// match the same scale used on fit pills.
+function tierClass(pct) {
+  if (pct >= 70) return 'fit-breakdown__bar--strong';
+  if (pct >= 40) return 'fit-breakdown__bar--ok';
+  return 'fit-breakdown__bar--weak';
+}
+
 // Render just the bars + subcopy list — no header, no score block.
-// Kept exported for callers that only want the bars.
+// Geography is binary (already filtered upstream) — rendered as a check
+// instead of a bar. Other buckets get a colored bar by score tier.
 export function renderFitBreakdown(row) {
   if (!row) return nothing;
   const breakdown = row.breakdown || row.fitBreakdown || {};
@@ -75,13 +84,26 @@ export function renderFitBreakdown(row) {
         const meta = DIM_LABELS[k];
         const v = (breakdown && breakdown[k]) || 0;
         const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
+        if (k === 'geo') {
+          const met = v >= meta.max * 0.5;
+          return html`
+            <li class="fit-breakdown__row fit-breakdown__row--binary">
+              <div class="fit-breakdown__head">
+                <span class="fit-breakdown__label">${meta.label}</span>
+                <span class=${'fit-breakdown__check ' + (met ? 'fit-breakdown__check--met' : 'fit-breakdown__check--unmet')}
+                      aria-label=${met ? 'Met' : 'Not met'}>${met ? '✓' : '✗'}</span>
+              </div>
+              <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
+            </li>
+          `;
+        }
         return html`
           <li class="fit-breakdown__row">
             <div class="fit-breakdown__head">
               <span class="fit-breakdown__label">${meta.label}</span>
               <span class="fit-breakdown__value">${v} / ${meta.max}</span>
             </div>
-            <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
+            <div class=${'fit-breakdown__bar ' + tierClass(pct)}><span style=${`width:${pct}%`}></span></div>
             <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
           </li>
         `;
