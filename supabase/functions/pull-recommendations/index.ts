@@ -16,7 +16,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
-import { verifyJobUser } from '../_shared/job-auth.ts';
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
@@ -51,13 +50,8 @@ serve(async (req) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response('POST only', { status: 405 });
   }
-  // Two auth paths:
-  //   - X-Cron-Secret: the pg_cron schedule + back-end function-to-function calls
-  //   - verifyJobUser: a signed-in user triggering a per-slug rescore from the drill page
   const secret = Deno.env.get('CRON_SECRET');
-  const hasCronSecret = !!secret && req.headers.get('x-cron-secret') === secret;
-  const userEmail = hasCronSecret ? null : await verifyJobUser(req);
-  if (!hasCronSecret && !userEmail) {
+  if (secret && req.headers.get('x-cron-secret') !== secret) {
     return new Response('forbidden', { status: 403 });
   }
 
@@ -141,16 +135,10 @@ serve(async (req) => {
   if (rescoreOnly) {
     const ctx = await loadFitContext(sql);
     const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
-    // ?slug=X → scope rescore to one pipeline_role. Skips the
-    // recommended_roles pass entirely (a single pipeline row doesn't
-    // need the widget rescored). Used by the drill page's
-    // auto-regen-analysis hook so picking up new company/title/url
-    // data refreshes the fit_score without rescoring the whole pipeline.
-    const slugParam = new URL(req.url).searchParams.get('slug')?.trim() || null;
     const force = new URL(req.url).searchParams.get('force') === '1';
-    const rows = slugParam ? [] : await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null }>>`
       select id, title, company, description, sector, investors, salary, source,
-             role_match_score, role_match_rationale, role_match_seniority, role_match_scope
+             role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
     `;
@@ -167,13 +155,15 @@ serve(async (req) => {
       let rationale = r.role_match_rationale;
       let seniority = r.role_match_seniority;
       let scope     = r.role_match_scope;
+      let fitSummary: string | null = r.fit_summary;
       const needsHaiku = useHaiku && (r.description || '').length > 200
-        && (force || roleScore == null || seniority == null);
+        && (force || roleScore == null || seniority == null || !fitSummary);
       if (needsHaiku) {
         const haiku = await haikuRoleMatch(roleRow, ctx);
         if (haiku) {
           roleScore = haiku.score; rationale = haiku.rationale;
           seniority = haiku.seniority; scope = haiku.scope;
+          fitSummary = haiku.fitSummary || null;
           haikuCalls++;
         }
       }
@@ -187,20 +177,16 @@ serve(async (req) => {
                role_match_score     = ${roleScore},
                role_match_rationale = ${rationale},
                role_match_seniority = ${seniority},
-               role_match_scope     = ${scope}
+               role_match_scope     = ${scope},
+               fit_summary          = coalesce(${fitSummary}, fit_summary)
          where id = ${r.id}
       `;
       updated++;
     }
-    const pipeRows = slugParam
-      ? await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
-          select slug, title, company_name, description, sector, investors, salary_range, source,
-                 role_match_score, role_match_rationale, role_match_seniority, role_match_scope
-            from job.pipeline_roles where deleted_at is null and slug = ${slugParam}`
-      : await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
-          select slug, title, company_name, description, sector, investors, salary_range, source,
-                 role_match_score, role_match_rationale, role_match_seniority, role_match_scope
-            from job.pipeline_roles where deleted_at is null`;
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null }>>`
+      select slug, title, company_name, description, sector, investors, salary_range, source,
+             role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary
+        from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
       const roleRow: RoleRow = {
@@ -214,13 +200,15 @@ serve(async (req) => {
       let pipeRationale = r.role_match_rationale;
       let pipeSeniority = r.role_match_seniority;
       let pipeScope     = r.role_match_scope;
+      let pipeFitSummary: string | null = r.fit_summary;
       const needsHaiku = useHaiku && (r.description || '').length > 200
-        && (force || pipeRoleScore == null || pipeSeniority == null);
+        && (force || pipeRoleScore == null || pipeSeniority == null || !pipeFitSummary);
       if (needsHaiku) {
         const haiku = await haikuRoleMatch(roleRow, ctx);
         if (haiku) {
           pipeRoleScore = haiku.score; pipeRationale = haiku.rationale;
           pipeSeniority = haiku.seniority; pipeScope = haiku.scope;
+          pipeFitSummary = haiku.fitSummary || null;
           haikuCalls++;
         }
       }
@@ -234,7 +222,8 @@ serve(async (req) => {
                role_match_score     = ${pipeRoleScore},
                role_match_rationale = ${pipeRationale},
                role_match_seniority = ${pipeSeniority},
-               role_match_scope     = ${pipeScope}
+               role_match_scope     = ${pipeScope},
+               fit_summary          = coalesce(${pipeFitSummary}, fit_summary)
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
@@ -525,11 +514,13 @@ async function enrichAndScoreNewRows(
     let rationale: string | null = null;
     let seniority: string | null = null;
     let scope: string | null = null;
+    let fitSummary: string | null = null;
     if (description.length > 200) {
       const haiku = await haikuRoleMatch(roleRow, ctx);
       if (haiku) {
         roleScore = haiku.score; rationale = haiku.rationale;
         seniority = haiku.seniority; scope = haiku.scope;
+        fitSummary = haiku.fitSummary || null;
       }
     }
     const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale);
@@ -542,7 +533,8 @@ async function enrichAndScoreNewRows(
              role_match_score     = ${roleScore},
              role_match_rationale = ${rationale},
              role_match_seniority = ${seniority},
-             role_match_scope     = ${scope}
+             role_match_scope     = ${scope},
+             fit_summary          = ${fitSummary}
        where id = ${r.id}::uuid`;
   }
 }
@@ -596,7 +588,7 @@ async function fetchJdText(url: string): Promise<string> {
 // single integer 0–25 plus a one-sentence rationale. Returns null on any
 // failure so the caller can fall back to the regex bucket. The score we
 // get back is persisted on the row so rescore doesn't re-pay Haiku.
-async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<{ score: number; rationale: string; seniority: string; scope: string } | null> {
+async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<{ score: number; rationale: string; seniority: string; scope: string; fitSummary: string } | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return null;
   const system = `You grade a job posting against a candidate's profile and return four structured fields.
@@ -612,7 +604,8 @@ Output JSON only:
   "score":      <int 0-25>,
   "rationale":  "<one sentence, max 22 words>",
   "seniority":  "below" | "equivalent" | "above" | "founding",
-  "scope":      "ic" | "ic_player_coach" | "manager"
+  "scope":      "ic" | "ic_player_coach" | "manager",
+  "fitSummary": "<2-4 sentence prose, max 100 words. ONLY explain why this company / role is desirable for the candidate's needs — mission alignment, scope they want, kind of problem they care about, culture traits they care about. DO NOT describe why the candidate is a good fit for the company or what they bring to the role. Speak about the company in third person.>"
 }
 
 Scoring rubric for "score" (real anchors, not platitudes):
@@ -651,7 +644,7 @@ No prose outside the JSON. No bullets. No headers.`;
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 200,
+        max_tokens: 500,
         system,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -661,7 +654,7 @@ No prose outside the JSON. No bullets. No headers.`;
     const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string };
+    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string };
     if (typeof parsed.score !== 'number') return null;
     const seniority = ['below','equivalent','above','founding'].includes((parsed.seniority || '').toLowerCase())
       ? parsed.seniority!.toLowerCase() : 'equivalent';
@@ -672,6 +665,7 @@ No prose outside the JSON. No bullets. No headers.`;
       rationale: String(parsed.rationale || '').slice(0, 400),
       seniority,
       scope,
+      fitSummary: String(parsed.fitSummary || '').slice(0, 1200),
     };
   } catch (e) {
     console.warn(`[pull-recommendations] haiku role-match failed: ${(e as Error).message}`);
