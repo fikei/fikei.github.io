@@ -548,16 +548,8 @@ export class JobRoleDetail extends LitElement {
         </section>
       ` : status === 'loading' ? html`<p class="muted">Drafting summary…</p>` : nothing}
 
-      ${this._renderFitSection(parsed, status)}
-      ${parsed?.risks ? html`
-        <article class="role-card">
-          <header class="role-card__head"><h3>Risks</h3></header>
-          <div class="role-card__body">
-            <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.risks))}</div>
-          </div>
-        </article>
-      ` : nothing}
-      <div class="role-cards">
+      <div class="role-cards role-cards--fit-candidate">
+        ${this._renderFitSection(parsed, status)}
         ${this._renderTwoColCard({
           title: 'Candidate strength',
           headerExtra: this._renderCandidateStoplight(candidate),
@@ -568,6 +560,14 @@ export class JobRoleDetail extends LitElement {
           status,
         })}
       </div>
+      ${parsed?.risks ? html`
+        <article class="role-card">
+          <header class="role-card__head"><h3>Risks</h3></header>
+          <div class="role-card__body">
+            <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.risks))}</div>
+          </div>
+        </article>
+      ` : nothing}
 
       ${a?.error ? html`<p class="muted" style="color:var(--error);">${a.error}</p>` : nothing}
       <div class="asset-toolbar" style="margin-top:var(--space-5);">
