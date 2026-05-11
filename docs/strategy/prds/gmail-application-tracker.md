@@ -250,6 +250,35 @@ User can override anything from the drill page menu (existing flow). Override re
 2. **Stage taxonomy unchanged.** Top-level `stage` stays the 4-value enum. Granularity (which round, what kind) lives in `application_events.round_label` and `pipeline_roles.process_outline`.
 3. **Process detection: 3 sources, ranked.** Recruiter email > JD extract > inferred from events. Higher-confidence source never gets overwritten by a lower one.
 4. **Backfill: 30 days, Active applied roles only.** Process_outline only updated from explicit signals on backfill; inferred-from-events is disabled retroactively.
+5. **Stale-14d nudge is on-open only.** No banner, no push. Renders as a yellow chip on row + Needs-Attention card only when the user lands on /job/jobs/. Reason: banners are reserved for live arrivals in the last 30 min; a 14d-quiet signal is the inverse of live and would dilute the banner contract.
+6. **Calendar read pulled into 2.0 (narrow slice).** `calendar-api` already holds the `calendar` scope from Phase 1. 2.0 adds a single `events.list(timeMin=now, timeMax=now+48h)` query, matched to a role by attendee email domain first, title-token second. No write-back, no recurring-event handling, no calendar-event creation. Ambiguous matches → no chip (silent fail beats wrong chip). Tightening match precision + reply-cadence analytics move to 2.1.
+
+---
+
+## Feedback-loop UI — the five-signal catalog
+
+The UI exposes exactly five signal types per role. Each role surfaces **the single highest-priority signal that applies** — never two chips on one row. Priority (highest → lowest):
+
+| Priority | Signal | Trigger condition | Color | Render surfaces |
+|---|---|---|---|---|
+| 1 | **Action needed** | `application_events.needs_review = true` AND not yet acted on (offer / rejection / low-confidence classification) | red | row chip · Needs-Attention card · banner if live |
+| 2 | **Calendar today/tomorrow** | A calendar event in the next 48h matches this role (attendee-domain or title-token) | blue | row chip · Needs-Attention card · banner if within 2h |
+| 3 | **Reply pending** | Latest inbound event has no outbound message from `fike101@gmail.com` after it on the same thread, and inbound is ≥ 24h old | amber | row chip · Needs-Attention card |
+| 4 | **New update** | An event landed in the last 72h that did NOT auto-advance (informational, rescheduled, follow-up) and user hasn't opened the drill page since | green | row chip · Needs-Attention card · banner if landed in last 30 min |
+| 5 | **Stale — quiet for 14d** | `last_activity_at < now() - 14d` AND `status = 'Active'` | yellow | row chip · Needs-Attention card *(on-open only, no push)* |
+
+### Surface rules
+
+- **Row chip**: single highest-priority signal only. No chip = nothing actionable.
+- **Needs-Attention widget** (above /job/jobs/?bucket=active table): one card per actionable role. Hidden entirely when the actionable set is empty. Cards are clickable → drill page.
+- **Banner**: ONLY for live arrivals in the last 30 min — auto-advance just happened, offer just arrived, or calendar event within 2h. Auto-fades after 30 min. Same trigger never re-banners. Stale + reply-pending are *never* banners (no live arrival).
+- **Auto-advance toast** (sub-case of banner): when auto-advance moves a role forward, the banner names the transition ("Auto-advanced Acme → Interviewing"). User can undo within 30 min.
+
+### Honest-UI guardrails
+
+- `needs_review=true` events remain visible (red chip + Needs-Attention card) until the user explicitly acts. Never silently fade.
+- Rejection events never auto-archive — they always surface as Action-needed so user captures `exit_reason`.
+- A role with `status='Archived'` never produces signals, even if events land afterward.
 
 ---
 

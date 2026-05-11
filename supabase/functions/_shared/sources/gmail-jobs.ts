@@ -36,6 +36,7 @@ import {
   getProfileHistoryId,
   listSinceCursor,
 } from '../gmail.ts';
+import { scanApplicationResponses } from '../gmail-application-scan.ts';
 
 interface GmailJobsCfg {
   allowSenders?: string[];
@@ -368,6 +369,23 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
             last_error = null,
             updated_at = now()
     `;
+
+    // Phase 2.0 — application-tracker scan. Looks at inbox messages from
+    // pipeline-company domains + known ATS-platform senders, classifies
+    // with Haiku, writes application_events, auto-advances forward stages.
+    // Side-effect only — does not contribute to RecommendedRoleInput[].
+    try {
+      const appScan = await scanApplicationResponses({
+        userEmail:   ctx.userEmail,
+        accessToken,
+        mode:        'live',
+      });
+      if (appScan.classified || appScan.inserted) {
+        console.log(`[gmail-jobs] application-scan: ${appScan.inserted}/${appScan.classified} events, ${appScan.autoAdvanced} auto-advanced, ${appScan.needsReview} needs-review`);
+      }
+    } catch (e) {
+      console.warn(`[gmail-jobs] application-scan failed: ${(e as Error).message}`);
+    }
 
     return out;
   },
