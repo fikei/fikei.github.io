@@ -20,8 +20,8 @@ import { computeFit, type RoleRow } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.3.3';
-console.log(`[pull-recommendations] v${VERSION} - Gmail: dedup vs recommended_roles + don't advance cursor when capped`);
+const VERSION = '0.3.4';
+console.log(`[pull-recommendations] v${VERSION} - Gmail: cap counts NEW work only (dedup-hits don't burn budget)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
