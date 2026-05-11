@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -566,6 +566,22 @@ export class JobRoleDetail extends LitElement {
     `;
   }
 
+  // Candidate-strength card — same component layout as Fit, different
+  // data + dimensions. Answers "are you a good candidate for this role?
+  // where are your strengths and weaknesses?" from the hiring manager's
+  // lens. Driven by candidate_breakdown / candidate_rationales /
+  // candidate_summary fields generated alongside the Haiku role-match call.
+  _renderCandidateSection(status) {
+    const r = this.role;
+    if (!r) return nothing;
+    return html`
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Candidate strength</h3></header>
+        ${renderCandidateCardBody(r, { loading: status === 'loading' })}
+      </article>
+    `;
+  }
+
   _renderTwoColCard({ title, headerExtra, sections, status }) {
     return html`
       <article class="role-card">
@@ -609,15 +625,7 @@ export class JobRoleDetail extends LitElement {
 
       <div class="role-cards role-cards--fit-candidate">
         ${this._renderFitSection(parsed, status)}
-        ${this._renderTwoColCard({
-          title: 'Candidate strength',
-          headerExtra: this._renderCandidateStoplight(candidate),
-          sections: [
-            ['Strengths', parsed?.strengths],
-            ['Gaps',      parsed?.gaps],
-          ],
-          status,
-        })}
+        ${this._renderCandidateSection(status)}
       </div>
       ${parsed?.risks ? html`
         <article class="role-card">

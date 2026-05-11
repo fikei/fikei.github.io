@@ -503,17 +503,30 @@ serve(async (req) => {
     // Path B (fresh URL paste): scoreOne() fetches the JD, calls Haiku, and
     //   computes the v3 fit against UserContext just like the cron pull.
     try {
-      let fitOut: { fit: { score: number; breakdown: Record<string, number>; hardFails: string[] }; roleScore: number | null; rationale: string | null; seniority: string | null; scope: string | null; fitSummary: string | null; description: string };
+      type FitOut = Awaited<ReturnType<typeof scoreOne>>;
+      let fitOut: FitOut;
       if (body.fromRecommendationId) {
-        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null }[]>`
-          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary
+        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null; candidate_breakdown: Record<string, number> | null; candidate_rationales: Record<string, string> | null; candidate_summary: string | null; comp_acceptable: boolean | null }[]>`
+          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary,
+                 candidate_score, candidate_breakdown, candidate_rationales, candidate_summary, comp_acceptable
             from job.recommended_roles where id = ${body.fromRecommendationId} limit 1`;
         const src = inherit[0];
         if (src && src.role_match_seniority) {
           const enriched = { status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '', description: src.description || '' };
           const ctxFit = await (await import('../_shared/job-fit-haiku.ts')).loadFitContext(sql);
           const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority, src.role_match_rationale);
-          fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, fitSummary: src.fit_summary, description: src.description || '' };
+          fitOut = {
+            fit, roleScore: src.role_match_score, rationale: src.role_match_rationale,
+            seniority: src.role_match_seniority, scope: src.role_match_scope,
+            fitSummary: src.fit_summary, description: src.description || '',
+            candidate: src.candidate_score != null ? {
+              score: src.candidate_score,
+              breakdown: src.candidate_breakdown as never,
+              rationales: src.candidate_rationales as never,
+              compAcceptable: src.comp_acceptable,
+              summary: src.candidate_summary || '',
+            } : null,
+          };
         } else {
           fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
         }
@@ -533,7 +546,12 @@ serve(async (req) => {
                role_match_rationale = ${fitOut.rationale},
                role_match_seniority = ${fitOut.seniority},
                role_match_scope     = ${fitOut.scope},
-               fit_summary          = ${fitOut.fitSummary}
+               fit_summary          = ${fitOut.fitSummary},
+               candidate_score      = ${fitOut.candidate?.score ?? null},
+               candidate_breakdown  = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.breakdown) : null}::jsonb,
+               candidate_rationales = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.rationales) : null}::jsonb,
+               candidate_summary    = ${fitOut.candidate?.summary ?? null},
+               comp_acceptable      = ${fitOut.candidate?.compAcceptable ?? null}
          where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }

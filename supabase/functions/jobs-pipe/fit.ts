@@ -43,6 +43,8 @@ export interface UserContext {
   pastSectors:       string[];
   arcTags:           string[];
   weights?:          Partial<FitWeights>;
+  // Wins — Haiku-only signal; deterministic scorers don't use them.
+  wins?:             Array<{ headline: string; metric?: string | null }>;
 }
 
 export interface FitWeights {
