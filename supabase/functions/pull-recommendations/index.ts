@@ -20,8 +20,8 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.5.0';
-console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring; Phase 1.5 enrichment writes`);
+const VERSION = '0.5.1';
+console.log(`[pull-recommendations] v${VERSION} - Fit v3 + Phase 1.5 enrichment writes`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
