@@ -151,19 +151,19 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       throw e;
     }
 
-    const ids = listRes.messageIds.slice(0, maxMessages);
-    // True when we capped — there are more messages in the inbox that
-    // we're not touching this run. We deliberately DO NOT advance the
-    // cursor in that case so the next tick re-walks the same window
-    // and picks up the rest. The dedup check at the top of the loop
-    // makes re-walks cheap: already-processed messages skip without a
-    // Haiku call.
-    const cappedRun = listRes.messageIds.length > ids.length;
-    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidate messages (history=${!!state.history_id}, capped=${cappedRun})`);
+    // Iterate the FULL list (don't pre-slice) so cap-by-new-work can
+    // tell whether we've drained the queue or stopped early. Already-
+    // processed messages (dedup-hit) don't count against the cap, so
+    // a re-run of a stalled drain actually makes forward progress.
+    const ids = listRes.messageIds;
+    let newWork = 0;
+    let cappedRun = false;
+    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidates from gmail (history=${!!state.history_id}, cap=${maxMessages})`);
 
     const out: RecommendedRoleInput[] = [];
 
     for (const id of ids) {
+      if (newWork >= maxMessages) { cappedRun = true; break; }
       let msg: GmailMessage;
       try {
         msg = await getMessage(accessToken, id, 'full');
@@ -193,6 +193,11 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
            and (source_id = ${`gmail:${messageId}`} or source_id like ${`gmail:${messageId}:%`})
          limit 1`;
       if (recMatch.length) continue;
+
+      // Past dedup — this message is going to consume real work (Haiku
+      // and / or skip-log writes). Count it against the cap so the next
+      // tick continues past whatever we manage to process here.
+      newWork++;
 
       const sender = (getHeader(msg, 'From') || '').toLowerCase();
       if (blockSenders.some(b => sender.includes(b))) {
