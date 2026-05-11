@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -351,8 +351,30 @@ export class JobRoleDetail extends LitElement {
     try {
       const res = await generateAsset(this.slug, kind);
       this.assets = { ...this.assets, [kind]: this._viewAsset(kind, res.content) };
+      // Analysis carries the signals fit_score depends on (company,
+      // title-match accuracy, sector inference). Trigger a per-slug
+      // rescore so the breakdown picks up changes without waiting for
+      // a manual ?rescore=1 sweep. Fire-and-forget; refresh role data
+      // after it lands so the UI shows the new score.
+      if (kind === 'analysis') this._rescoreAfterAnalysis();
     } catch (e) {
       this.assets = { ...this.assets, [kind]: { ...this.assets[kind], saving: false, error: String(e) } };
+    }
+  }
+
+  async _rescoreAfterAnalysis() {
+    try {
+      const result = await rescoreRole(this.slug);
+      if (!result?.ok) return;
+      // Refresh the role row to pick up the new fit_score + breakdown.
+      const pipeline = await fetchPipeline();
+      const fresh = (pipeline.roles || []).find(r => r.slug === this.slug);
+      if (fresh) {
+        this.role = fresh;
+        this.requestUpdate();
+      }
+    } catch (e) {
+      console.warn('[role-detail] rescoreAfterAnalysis failed:', (e && e.message) || e);
     }
   }
 

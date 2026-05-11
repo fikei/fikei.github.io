@@ -16,12 +16,13 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
+import { verifyJobUser } from '../_shared/job-auth.ts';
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.5.1';
-console.log(`[pull-recommendations] v${VERSION} - Fit v3 + Phase 1.5 enrichment writes`);
+const VERSION = '0.6.0';
+console.log(`[pull-recommendations] v${VERSION} - user-auth rescore + ?slug=X scopes to one pipeline_role`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -47,8 +48,13 @@ serve(async (req) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response('POST only', { status: 405 });
   }
+  // Two auth paths:
+  //   - X-Cron-Secret: the pg_cron schedule + back-end function-to-function calls
+  //   - verifyJobUser: a signed-in user triggering a per-slug rescore from the drill page
   const secret = Deno.env.get('CRON_SECRET');
-  if (secret && req.headers.get('x-cron-secret') !== secret) {
+  const hasCronSecret = !!secret && req.headers.get('x-cron-secret') === secret;
+  const userEmail = hasCronSecret ? null : await verifyJobUser(req);
+  if (!hasCronSecret && !userEmail) {
     return new Response('forbidden', { status: 403 });
   }
 
@@ -74,7 +80,13 @@ serve(async (req) => {
   if (rescoreOnly) {
     const ctx = await loadFitContext(sql);
     const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
-    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null }>>`
+    // ?slug=X → scope rescore to one pipeline_role. Skips the recommended_roles
+    // pass entirely (a single pipeline row doesn't need the widget rescored).
+    // Used by the drill page's auto-regen-analysis hook so picking up new
+    // company/title/url data refreshes the fit_score without rescoring the
+    // whole pipeline.
+    const slugParam = new URL(req.url).searchParams.get('slug')?.trim() || null;
+    const rows = slugParam ? [] : await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null }>>`
       select id, title, company, description, sector, investors, salary, source, role_match_score
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
@@ -108,9 +120,13 @@ serve(async (req) => {
       `;
       updated++;
     }
-    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
-      select slug, title, company_name, sector, investors, salary_range, source, role_match_score
-        from job.pipeline_roles where deleted_at is null`;
+    const pipeRows = slugParam
+      ? await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
+          select slug, title, company_name, sector, investors, salary_range, source, role_match_score
+            from job.pipeline_roles where deleted_at is null and slug = ${slugParam}`
+      : await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
+          select slug, title, company_name, sector, investors, salary_range, source, role_match_score
+            from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
       const roleRow: RoleRow = {
