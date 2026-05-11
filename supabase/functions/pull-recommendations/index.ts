@@ -76,29 +76,49 @@ serve(async (req) => {
   // so a Cloudflare ATS rate-limit can't burn the request budget.
   if (backfillDescriptions) {
     try {
-      const rows = await sql<Array<{ slug: string; url: string | null; title: string | null; company_name: string | null }>>`
-        select slug, url, title, company_name
+      const pipeRows = await sql<Array<{ key: string; url: string | null }>>`
+        select slug as key, url
           from job.pipeline_roles
          where deleted_at is null
            and (description is null or length(description) < 200)
            and url is not null
          limit 50`;
-      const results: Array<{ slug: string; ok: boolean; len?: number; error?: string }> = [];
-      for (const r of rows) {
+      // Cap at 50 so we don't blow the edge-function 150s ceiling on
+      // slow ATSes. Re-running the endpoint picks up the rest.
+      const recRows = await sql<Array<{ key: string; url: string | null }>>`
+        select id::text as key, url
+          from job.recommended_roles
+         where dismissed_at is null
+           and added_to_pipeline_slug is null
+           and (description is null or length(description) < 200)
+           and url is not null
+         limit 50`;
+      const results: Array<{ table: string; key: string; ok: boolean; len?: number; error?: string }> = [];
+      for (const r of pipeRows) {
         try {
           const text = await fetchJdText(r.url!);
-          if (!text || text.length < 200) {
-            results.push({ slug: r.slug, ok: false, error: `short body (${text?.length ?? 0} chars)` });
-            continue;
-          }
-          await sql`update job.pipeline_roles set description = ${text} where slug = ${r.slug}`;
-          results.push({ slug: r.slug, ok: true, len: text.length });
+          if (!text || text.length < 200) { results.push({ table: 'pipeline', key: r.key, ok: false, error: `short body (${text?.length ?? 0} chars)` }); continue; }
+          await sql`update job.pipeline_roles set description = ${text} where slug = ${r.key}`;
+          results.push({ table: 'pipeline', key: r.key, ok: true, len: text.length });
         } catch (e) {
-          results.push({ slug: r.slug, ok: false, error: (e as Error).message });
+          results.push({ table: 'pipeline', key: r.key, ok: false, error: (e as Error).message });
         }
       }
-      return new Response(JSON.stringify({ ok: true, version: VERSION, fetched: results.length, succeeded: results.filter(r => r.ok).length, results }, null, 2),
-        { status: 200, headers: { 'content-type': 'application/json' } });
+      for (const r of recRows) {
+        try {
+          const text = await fetchJdText(r.url!);
+          if (!text || text.length < 200) { results.push({ table: 'recommended', key: r.key, ok: false, error: `short body (${text?.length ?? 0} chars)` }); continue; }
+          await sql`update job.recommended_roles set description = ${text} where id = ${r.key}::uuid`;
+          results.push({ table: 'recommended', key: r.key, ok: true, len: text.length });
+        } catch (e) {
+          results.push({ table: 'recommended', key: r.key, ok: false, error: (e as Error).message });
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, version: VERSION,
+        pipeline: { fetched: pipeRows.length, succeeded: results.filter(r => r.table === 'pipeline' && r.ok).length },
+        recommended: { fetched: recRows.length, succeeded: results.filter(r => r.table === 'recommended' && r.ok).length },
+        results,
+      }, null, 2), { status: 200, headers: { 'content-type': 'application/json' } });
     } catch (outer) {
       console.error('[pull-recommendations] backfill outer error:', (outer as Error).stack || (outer as Error).message);
       return new Response(JSON.stringify({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, null, 2),

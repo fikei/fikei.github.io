@@ -218,7 +218,7 @@ export class JobRecommendations extends LitElement {
     return html`
       <section class="rec-shell" aria-label="Recommendations">
         <header class="rec-shell__head">
-          <h2>Recommended for you</h2>
+          <h2>For You</h2>
           <span class="muted">
             Top ${top.length} of ${total} ${total === 1 ? 'role' : 'roles'}
           </span>

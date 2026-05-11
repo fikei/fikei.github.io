@@ -264,7 +264,7 @@ export class JobRecommendationsTable extends LitElement {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
         <header class="recs-page__head">
-          <h1>Recommended for you</h1>
+          <h1>For You</h1>
         </header>
         <div class="pipeline-table-wrap">
           <table class="pipeline-table">
