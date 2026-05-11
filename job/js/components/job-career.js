@@ -289,8 +289,8 @@ export class JobCareer extends LitElement {
                      @change=${(e) => this._onBaseUpload(e.target.files?.[0])}
                      ?disabled=${busy}>
               <span class="base-upload__cta">
-                ${d.status === 'reading' ? 'Reading file…'
-                  : d.status === 'formatting' ? 'Cleaning up with AI…'
+                ${d.status === 'reading' ? html`<span class="gen-shimmer">Reading file…</span>`
+                  : d.status === 'formatting' ? html`<span class="gen-shimmer">Cleaning up with AI…</span>`
                   : 'Upload resume'}
               </span>
               <span class="muted" style="font-size:var(--font-size-small);">.md, .txt, or .pdf — auto-formatted on upload, no facts changed</span>
@@ -304,10 +304,10 @@ export class JobCareer extends LitElement {
 
             <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3);align-items:center;flex-wrap:wrap;">
               <button class="btn btn--sm" ?disabled=${busy || !d.text.trim()} @click=${() => this._onCleanupDraft()}>
-                ${d.status === 'formatting' ? 'Cleaning up…' : 'Clean up with AI'}
+                ${d.status === 'formatting' ? html`<span class="gen-shimmer">Cleaning up…</span>` : 'Clean up with AI'}
               </button>
               <button class="btn btn--sm btn--primary" ?disabled=${busy || !d.text.trim()} @click=${() => this._onSaveDraft()}>
-                ${d.status === 'saving' ? 'Saving…' : 'Save'}
+                ${d.status === 'saving' ? html`<span class="gen-shimmer">Saving…</span>` : 'Save'}
               </button>
               <span class="muted" style="font-size:var(--font-size-small);">
                 AI rewrites structure (headings, bullets) without changing facts. Review before saving.

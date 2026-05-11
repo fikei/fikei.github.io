@@ -82,6 +82,7 @@ export class JobRoleDetail extends LitElement {
     editingAnchor: { state: true },   // { kind: 'comment'|'selection', commentId?, phrase, instruction? } | null
     selectionPopover: { state: true },// { visible, x, y, text, savedRange } | null — floating "edit selection" UI
     coverHistory: { state: true },    // [{ id, ts, source, content, label, instruction? }] reverse-chrono
+    genTick: { state: true },         // 0..n — drives the rotating-word label inside shimmer indicators
   };
 
   constructor() {
@@ -106,6 +107,7 @@ export class JobRoleDetail extends LitElement {
     this.editingAnchor = null;
     this.selectionPopover = null;
     this.coverHistory = [];
+    this.genTick = 0;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/job\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -132,6 +134,7 @@ export class JobRoleDetail extends LitElement {
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('selectionchange', this._onSelectionChange);
     this._teardownBodyObserver();
+    if (this._genTimer) { clearInterval(this._genTimer); this._genTimer = null; }
     // Flush pending autosaves on unmount.
     for (const k of ['resume', 'cover-letter']) {
       if (this._autosaveTimers?.[k]) {
@@ -440,7 +443,7 @@ export class JobRoleDetail extends LitElement {
           ${headerExtra || nothing}
         </header>
         <div class="role-card__body">
-          ${status === 'loading' ? html`<p class="muted"><span class="dots-anim">Generating</span></p>`
+          ${status === 'loading' ? html`<p class="muted">${this._genLabel()}</p>`
             : status === 'error'  ? html`<p class="muted" style="color:var(--error);">Couldn't load</p>`
             : html`
               <div class="role-card__split">
@@ -619,7 +622,7 @@ export class JobRoleDetail extends LitElement {
     if (!a) return html`<div class="placeholder"><h2>Loading…</h2></div>`;
     if (a.saving && !a.content) {
       return html`<div class="placeholder">
-        <h2><span class="dots-anim">Generating ${kind === 'resume' ? 'resume' : 'cover letter'}</span></h2>
+        <h2>${this._genLabel(kind === 'resume' ? 'resume' : 'cover letter')}</h2>
         <p>Pulling Ian's KB + voice rules. ~10–20s.</p>
       </div>`;
     }
@@ -630,7 +633,7 @@ export class JobRoleDetail extends LitElement {
           <p>Generate one tailored to this role using the career KB and voice rules.</p>
           <div style="margin-top:var(--space-4);display:flex;justify-content:center;">
             <button class="btn btn--primary" ?disabled=${a.saving} @click=${() => this._onGenerate(kind)}>
-              ${a.saving ? html`<span class="dots-anim">Generating</span>` : `Generate ${kind === 'resume' ? 'resume' : 'cover letter'}`}
+              ${a.saving ? this._genLabel() : `Generate ${kind === 'resume' ? 'resume' : 'cover letter'}`}
             </button>
           </div>
           ${a.error ? html`<p class="muted" style="color:var(--error);margin-top:var(--space-3);">${a.error}</p>` : nothing}
@@ -712,7 +715,7 @@ export class JobRoleDetail extends LitElement {
             <aside class="cover-layout__rail" aria-label="Comments">
               <header class="cover-rail__head">
                 <h4 class="cover-rail__title">Comments</h4>
-                ${coverLoading ? html`<span class="cover-rail__spin"><span class="dots-anim">Reading</span></span>` : nothing}
+                ${coverLoading ? html`<span class="cover-rail__spin">${this._genLabel()}</span>` : nothing}
               </header>
               ${this.coverRationale.error ? html`
                 <p class="muted" style="color:var(--error);padding:0 var(--space-3);">${this.coverRationale.error}</p>
@@ -749,7 +752,7 @@ export class JobRoleDetail extends LitElement {
                           `)}
                           ${thread.sending ? html`
                             <li class="cover-thread__msg cover-thread__msg--assistant">
-                              <span class="dots-anim">${isOp ? 'Saving & weaving in' : 'Editing'}</span>
+                              ${this._genLabel(isOp ? 'and weaving in' : 'edit')}
                             </li>
                           ` : nothing}
                           ${thread.error ? html`
@@ -902,7 +905,7 @@ export class JobRoleDetail extends LitElement {
     let label = 'Saved';
     let cls = 'save-status--saved';
     if (status === 'dirty')   { label = 'Editing'; cls = 'save-status--dirty'; }
-    if (status === 'saving')  { label = 'Saving…'; cls = 'save-status--saving'; }
+    if (status === 'saving')  { return html`<span class="save-status save-status--saving"><span class="save-status__dot" aria-hidden="true"></span>${this._genLabel('save')}</span>`; }
     if (status === 'error')   { label = 'Save failed'; cls = 'save-status--error'; }
     if (status === 'saved' || status === 'idle') {
       const ago = a.savedAt ? this._timeAgo(a.savedAt) : '';
@@ -922,6 +925,44 @@ export class JobRoleDetail extends LitElement {
     if (m < 60) return `${m}m ago`;
     const h = Math.round(m / 60);
     return `${h}h ago`;
+  }
+
+  // ----- Shared "generating" indicator: shimmer + rotating word -----------
+  // GEN_WORDS cycle on a single timer driven by genTick; every shimmer label
+  // in the component reads the same index so the page hums in lockstep.
+
+  static get GEN_WORDS() {
+    return ['Generating', 'Drafting', 'Composing', 'Polishing', 'Refining'];
+  }
+
+  // True if anything that should display a shimmer is currently running.
+  _isAnyGenerating() {
+    if (Object.values(this.assets || {}).some(a => a?.saving)) return true;
+    if (this.coverRationale?.loading) return true;
+    if (this.editingAnchor) return true;
+    if (Object.values(this.threads || {}).some(t => t?.sending)) return true;
+    return false;
+  }
+
+  _ensureGenTimer() {
+    const active = this._isAnyGenerating();
+    if (active && !this._genTimer) {
+      this._genTimer = setInterval(() => {
+        this.genTick = (this.genTick + 1) % JobRoleDetail.GEN_WORDS.length;
+      }, 1500);
+    } else if (!active && this._genTimer) {
+      clearInterval(this._genTimer);
+      this._genTimer = null;
+      this.genTick = 0;
+    }
+  }
+
+  // Returns a Lit fragment: "<prefix> <word>…" with shimmer text styling.
+  // `prefix` is the static part (e.g. "Generating resume" → omit prefix and
+  // pass just the kind label like "resume", or skip it entirely).
+  _genLabel(suffix = '') {
+    const word = JobRoleDetail.GEN_WORDS[this.genTick % JobRoleDetail.GEN_WORDS.length];
+    return html`<span class="gen-shimmer">${word}${suffix ? ' ' + suffix : ''}…</span>`;
   }
 
   // Build a stable signature for "this cover letter + these analysis sources"
@@ -1296,6 +1337,7 @@ export class JobRoleDetail extends LitElement {
     this._alignComments();
     this._applyEditingShimmer();
     this._ensureBodyObserver();
+    this._ensureGenTimer();
     // Focus the popover input the first time it appears, so the user
     // can start typing without an extra click.
     if (this.selectionPopover?.visible && !this._popoverFocused) {
