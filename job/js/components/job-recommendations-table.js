@@ -233,6 +233,9 @@ export class JobRecommendationsTable extends LitElement {
         </td>
         <td class="col col-sector" data-label="Source">
           <span class="rec-source">${r.sourceLabel || r.source || ''}</span>
+          ${r.enrichmentStatus === 'unresolved' ? html`
+            <span class="enrichment-badge" title="Still resolving the canonical posting. Aggregator URL in the meantime.">verifying</span>
+          ` : nothing}
           ${r.sourceEmailUrl ? html`
             <a class="rec-source-email" href=${r.sourceEmailUrl} target="_blank" rel="noopener"
                title="Open the originating email in Gmail" @click=${(e) => e.stopPropagation()}>📧</a>
