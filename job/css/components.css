@@ -1781,6 +1781,73 @@
   line-height: var(--lh-body);
 }
 
+/* Career opportunities banner */
+.career-ops {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: rgba(0, 120, 255, 0.04);
+  border: 1px solid rgba(0, 120, 255, 0.18);
+}
+.career-ops__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+.career-ops__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body-lg);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.career-ops__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+.career-op {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+.career-op__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.career-op__scope {
+  font-size: var(--font-size-caption);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 120, 255, 0.1);
+  color: #1e88e5;
+  text-transform: capitalize;
+}
+.career-op__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body);
+  letter-spacing: -0.005em;
+}
+.career-op__gap { margin: 0; font-size: var(--font-size-small); color: var(--fg-muted); line-height: 1.5; }
+.career-op__ask {
+  margin: 0;
+  font-size: var(--font-size-small);
+  font-style: italic;
+  color: var(--fg);
+}
+
 /* "Needs connection" section header */
 .narrative-needs {
   border-left: 3px solid #c98a00;
