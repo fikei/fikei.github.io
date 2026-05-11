@@ -187,6 +187,13 @@ export class JobRoleDetail extends LitElement {
       queueMicrotask(() => this._refreshEditHtml('resume'));
       // Auto-generate any missing asset.
       this._autoGenerateMissing();
+      // Auto-refresh stale analysis. If the role row was updated more
+      // recently than the analysis asset (e.g. company/title/url got
+      // patched after we generated a "(unknown company) / Careers"
+      // analysis), regenerate from the current JD. The user gets a
+      // refresh-banner; resume + cover stay untouched (those have user
+      // edits; regenerating them silently is destructive).
+      this._maybeRefreshStaleAnalysis();
     } catch (e) {
       this.state = 'error';
       this.error = String(e);
@@ -197,7 +204,11 @@ export class JobRoleDetail extends LitElement {
     try {
       const r = await readRoleAsset(this.slug, kind);
       if (!r) return this._emptyAsset(kind);
-      return this._viewAsset(kind, r.content_md);
+      const view = this._viewAsset(kind, r.content_md);
+      // Stash generated_at / updated_at so the stale-check can compare
+      // them against the role row's updated_at on load.
+      view._generatedAt = r.generated_at || r.updated_at || null;
+      return view;
     } catch (e) {
       return { ...this._emptyAsset(kind), error: String(e) };
     }
@@ -298,6 +309,33 @@ export class JobRoleDetail extends LitElement {
       const a = this.assets[kind];
       if (a && a.mode === 'empty' && !a.saving) this._onGenerate(kind);
     }
+  }
+
+  // Re-run analysis when the role row has been touched (URL / company /
+  // title fix, manual edit, enrichment cycle) after the last analysis
+  // was generated. Resume + cover are left alone because the user may
+  // have hand-edited them; regenerating destroys edits.
+  //
+  // Threshold: 30s grace window — `engageRole` itself updates
+  // `pipeline_roles.updated_at`, and we don't want to ping-pong a
+  // regenerate every page open.
+  async _maybeRefreshStaleAnalysis() {
+    if (!this.role) return;
+    const a = this.assets['analysis'];
+    if (!a || a.mode === 'empty' || a.saving) return;     // empty path is handled by _autoGenerateMissing
+    const roleUpdated = Date.parse(this.role.updatedAt || '');
+    // generated_at sits on the asset row but isn't surfaced through
+    // _viewAsset; we hold it on a._generatedAt when present via the
+    // role-asset response.
+    const assetGenerated = Date.parse(a._generatedAt || '');
+    if (!isFinite(roleUpdated) || !isFinite(assetGenerated)) return;
+    if (roleUpdated - assetGenerated < 30_000) return;
+    console.log(`[role-detail] auto-refresh analysis (role +${Math.round((roleUpdated - assetGenerated)/1000)}s newer)`);
+    this._analysisAutoRefreshing = true;
+    this.requestUpdate();
+    await this._onGenerate('analysis');
+    this._analysisAutoRefreshing = false;
+    this.requestUpdate();
   }
 
   _switchTab(id) {

@@ -90,8 +90,12 @@ export class JobRecommendations extends LitElement {
       });
       // Optimistic: pop from the carousel.
       this.items = this.items.filter(x => x.id !== rec.id);
-      // Invite the pipeline to refresh.
+      // Invite the pipeline to refresh + surface the new row in the
+      // "N new jobs added" banner instead of navigating.
       document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
+      document.dispatchEvent(new CustomEvent('job:pipeline:added', {
+        detail: { role: { slug: r.slug, company: r.company || rec.company, title: r.title || rec.title } },
+      }));
     } catch (e) {
       console.warn('[recommendations] add failed', e);
     } finally {

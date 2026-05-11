@@ -6,7 +6,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, fetchCareerOpportunities, extractNarrativesFromKb }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, fetchCareerOpportunities, auditCareerOpportunities, dismissOpportunity, resolveOpportunity, extractNarrativesFromKb }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -117,7 +117,7 @@ export class JobCareer extends LitElement {
     this.narratives = [];
     this.companies = [];
     this.composing = null;
-    this.opportunities = { items: [], loading: false, error: '' };
+    this.opportunities = { items: [], loading: false, auditing: false, stale: false, last_audit_ts: null, error: '' };
     this.opportunityThreads = {};
     this.extracting = { running: false, lastResult: null, error: '' };
   }
@@ -173,6 +173,11 @@ export class JobCareer extends LitElement {
       // than 7 days ago. Keeps the KB in sync as work history grows
       // without requiring the user to click a button.
       this._maybeAutoExtract();
+      // Pull persisted opportunities. Cheap cache hit on every page
+      // load; the server flags stale=true if a narrative has landed
+      // since the last audit, and _loadOpportunities then kicks a
+      // background re-audit.
+      this._loadOpportunities();
       // Companies for the "Needs connection" dropdown — derived from the
       // pipeline tag space isn't enough; we want the actual work history.
       // For now, scrape unique companies from existing narratives' links
@@ -603,56 +608,107 @@ export class JobCareer extends LitElement {
 
   // ----- Career opportunities ---------------------------------------------
 
+  // Page load: pull the cached open opportunities from the BE. If the
+  // server says they're stale (a narrative has landed since the last
+  // audit), trigger a background re-audit so the cards refresh — but
+  // show the cached list immediately so the page doesn't flicker.
   async _loadOpportunities() {
     if (this.opportunities.loading) return;
-    this.opportunities = { items: [], loading: true, error: '' };
+    this.opportunities = { ...this.opportunities, loading: true, error: '' };
     try {
-      const items = await fetchCareerOpportunities();
-      this.opportunities = { items, loading: false, error: '' };
+      const { items, last_audit_ts, stale } = await fetchCareerOpportunities();
+      this.opportunities = { items, loading: false, error: '', stale, last_audit_ts };
+      if (stale) queueMicrotask(() => this._auditOpportunities(/* silent */ true));
     } catch (e) {
-      this.opportunities = { items: [], loading: false, error: String(e?.message || e) };
+      this.opportunities = { items: [], loading: false, error: String(e?.message || e), stale: false, last_audit_ts: null };
     }
   }
 
-  _getOpThread(idx) {
-    return this.opportunityThreads[idx] || { messages: [], sending: false, error: '' };
+  // Force a fresh audit. `silent=true` keeps the existing items visible
+  // while the AI pass runs in the background (used by the stale-refresh
+  // path); `silent=false` shows the standard auditing shimmer.
+  async _auditOpportunities(silent = false) {
+    if (this.opportunities.auditing) return;
+    this.opportunities = { ...this.opportunities, auditing: true, error: '' };
+    try {
+      const { items, last_audit_ts } = await auditCareerOpportunities();
+      this.opportunities = { items, loading: false, auditing: false, error: '', stale: false, last_audit_ts };
+    } catch (e) {
+      this.opportunities = { ...this.opportunities, auditing: false, error: String(e?.message || e) };
+    }
   }
 
-  _setOpThread(idx, t) {
-    this.opportunityThreads = { ...this.opportunityThreads, [idx]: t };
+  async _dismissOpportunity(id) {
+    try {
+      await dismissOpportunity(id);
+      this.opportunities = {
+        ...this.opportunities,
+        items: this.opportunities.items.filter(o => o.id !== id),
+      };
+    } catch (e) {
+      alert(`Dismiss failed: ${String(e?.message || e)}`);
+    }
+  }
+
+  _getOpThread(key) {
+    return this.opportunityThreads[key] || { messages: [], sending: false, error: '' };
+  }
+
+  _setOpThread(key, t) {
+    this.opportunityThreads = { ...this.opportunityThreads, [key]: t };
+  }
+
+  _opAgo(ts) {
+    const sec = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 1000));
+    if (sec < 60) return 'just now';
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60);
+    if (h < 48) return `${h}h ago`;
+    return `${Math.round(h / 24)}d ago`;
   }
 
   // Answering an opportunity creates a new narrative anchored to the
-  // company the opportunity was flagged against. The server's tag pass
-  // will reaffirm the link + assign tags consistent with the vision.
-  async _sendOpportunityAnswer(idx, userText) {
-    const op = this.opportunities.items[idx];
+  // company the opportunity was flagged against. After the narrative
+  // saves, we mark the opportunity resolved so it disappears from the
+  // open set on next reload (and the BE knows which story resolved it).
+  async _sendOpportunityAnswer(op, userText) {
     if (!op) return;
     const text = String(userText || '').trim();
     if (!text) return;
-    const prev = this._getOpThread(idx);
-    this._setOpThread(idx, {
+    const key = op.id || op.title;
+    const prev = this._getOpThread(key);
+    this._setOpThread(key, {
       messages: [...prev.messages, { role: 'user', text }],
       sending: true, error: '',
     });
     try {
-      const title = op.title || `Captured from opportunity #${idx + 1}`;
       const body = `> ${op.ask || op.gap || ''}\n\n${text}`;
-      const saved = await saveNarrative({ title, content_md: body, source_role: op.anchor_company_slug || '' });
+      const saved = await saveNarrative({ title: op.title || 'Captured story', content_md: body, source_role: op.anchor_company_slug || '' });
       this.narratives = [saved, ...this.narratives.filter(n => n.id !== saved.id)];
-      const cur = this._getOpThread(idx);
-      this._setOpThread(idx, {
-        messages: [...cur.messages, { role: 'assistant', text: 'Saved as a new story. Tags and link inferred.' }],
+      // Mark the opportunity resolved on the server so it doesn't come
+      // back on next page load. Best-effort; failure isn't fatal.
+      if (op.id) {
+        try { await resolveOpportunity(op.id, saved.id); } catch {}
+        this.opportunities = {
+          ...this.opportunities,
+          items: this.opportunities.items.filter(o => o.id !== op.id),
+        };
+      }
+      const cur = this._getOpThread(key);
+      this._setOpThread(key, {
+        messages: [...cur.messages, { role: 'assistant', text: 'Saved as a story and resolved this opportunity.' }],
         sending: false, error: '',
       });
     } catch (e) {
-      const cur = this._getOpThread(idx);
-      this._setOpThread(idx, { messages: cur.messages, sending: false, error: String(e?.message || e) });
+      const cur = this._getOpThread(key);
+      this._setOpThread(key, { messages: cur.messages, sending: false, error: String(e?.message || e) });
     }
   }
 
   _renderOpportunities() {
     const o = this.opportunities;
+    const busy = o.loading || o.auditing;
     return html`
       <section class="career-ops">
         <header class="career-ops__head">
@@ -660,10 +716,14 @@ export class JobCareer extends LitElement {
             <h3 class="career-ops__title">✦ Opportunities to strengthen your career KB</h3>
             <p class="muted" style="margin:0;font-size:var(--font-size-small);">
               AI-flagged gaps. Answer in a thread and the response saves as a new story.
+              ${o.stale ? html` <span style="color:var(--accent-strong);">A new story has landed — re-auditing in the background.</span>` : nothing}
+              ${!o.stale && o.last_audit_ts ? html` <span class="muted">Last audited ${this._opAgo(o.last_audit_ts)}.</span>` : nothing}
             </p>
           </div>
-          <button class="btn btn--sm" ?disabled=${o.loading} @click=${() => this._loadOpportunities()}>
-            ${o.loading ? html`<span class="gen-shimmer">Auditing</span>` : (o.items.length ? 'Re-audit' : 'Find opportunities')}
+          <button class="btn btn--sm" ?disabled=${busy} @click=${() => this._auditOpportunities()}>
+            ${o.auditing ? html`<span class="gen-shimmer">Auditing</span>`
+              : o.loading ? html`<span class="gen-shimmer">Loading</span>`
+              : (o.items.length ? 'Re-audit' : 'Find opportunities')}
           </button>
         </header>
         ${o.error ? html`<p class="muted" style="color:var(--error);">${o.error}</p>` : nothing}
@@ -679,12 +739,14 @@ export class JobCareer extends LitElement {
   }
 
   _renderOpportunityCard(op, idx) {
-    const thread = this._getOpThread(idx);
+    const key = op.id || `idx-${idx}`;
+    const thread = this._getOpThread(key);
     return html`
       <article class="career-op">
         <header class="career-op__head">
           <span class="career-op__scope" data-scope=${op.scope || 'narrative'}>${op.scope || 'narrative'}</span>
           <h4 class="career-op__title">${op.title}</h4>
+          ${op.id ? html`<button class="career-op__dismiss" title="Dismiss" @click=${() => this._dismissOpportunity(op.id)}>×</button>` : nothing}
         </header>
         ${op.gap ? html`<p class="career-op__gap">${op.gap}</p>` : nothing}
         ${op.ask ? html`<p class="career-op__ask">${op.ask}</p>` : nothing}
@@ -715,7 +777,7 @@ export class JobCareer extends LitElement {
           const input = e.currentTarget.querySelector('textarea');
           const v = input.value;
           input.value = '';
-          this._sendOpportunityAnswer(idx, v);
+          this._sendOpportunityAnswer(op, v);
         }}>
           <textarea class="cover-thread__input"
                     rows="1"

@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.3.0';
-console.log(`[enrich-job-source] v${VERSION} - Phase 1.5 live; action:backfill batches existing recs`);
+const VERSION = '0.3.1';
+console.log(`[enrich-job-source] v${VERSION} - always set future retry on unresolved (was looping on same rows)`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -124,6 +124,7 @@ serve(async (req) => {
       canonicalUrl: canonical?.url,
       jdText: canonical?.jd,
       reason: canonical ? undefined : 'cached_company_no_title_match',
+      nextRetryAt: canonical ? undefined : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
   }
 
@@ -156,6 +157,7 @@ serve(async (req) => {
       canonicalUrl: canonical?.url,
       jdText: canonical?.jd,
       reason: canonical ? undefined : 'resolved_company_no_title_match',
+      nextRetryAt: canonical ? undefined : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
   }
 
@@ -210,7 +212,11 @@ async function backfillBatch(limit: number): Promise<Response> {
       await sql`
         update job.recommended_roles
            set enrichment_status   = ${enriched.resolved ? 'resolved' : 'unresolved'},
-               enrichment_retry_at = ${enriched.nextRetryAt ?? null},
+               enrichment_retry_at = ${
+                 enriched.resolved
+                   ? null
+                   : (enriched.nextRetryAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())
+               },
                canonical_url       = ${enriched.canonicalUrl ?? null},
                company_id          = ${enriched.companyId ?? null},
                url                 = ${enriched.canonicalUrl ?? r.url}
@@ -263,9 +269,19 @@ async function resolveOne(
     `;
     row = inserted;
   }
+  // 7 days — when the COMPANY is resolved but the title doesn't match
+  // a current posting, we don't want to keep retrying on every drain
+  // pass. The role probably just isn't listed under that exact title.
+  const titleMissRetry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
   if (row.resolution_status === 'resolved' && row.ats_provider && row.ats_slug) {
     const canonical = await resolveCanonicalForTitle(row, title);
-    return { resolved: !!canonical, companyId: row.id, atsProvider: row.ats_provider!, atsSlug: row.ats_slug!, canonicalUrl: canonical?.url, jdText: canonical?.jd };
+    return {
+      resolved: !!canonical, companyId: row.id,
+      atsProvider: row.ats_provider!, atsSlug: row.ats_slug!,
+      canonicalUrl: canonical?.url, jdText: canonical?.jd,
+      nextRetryAt: canonical ? undefined : titleMissRetry,
+    };
   }
   const detected = await detectAts({ company, hintDomain, hintAtsUrl });
   if (detected) {
@@ -277,7 +293,12 @@ async function resolveOne(
        where id = ${row.id}
     `;
     const canonical = await resolveCanonicalForTitle({ ...row, ats_provider: detected.provider, ats_slug: detected.slug }, title);
-    return { resolved: !!canonical, companyId: row.id, atsProvider: detected.provider, atsSlug: detected.slug, canonicalUrl: canonical?.url, jdText: canonical?.jd };
+    return {
+      resolved: !!canonical, companyId: row.id,
+      atsProvider: detected.provider, atsSlug: detected.slug,
+      canonicalUrl: canonical?.url, jdText: canonical?.jd,
+      nextRetryAt: canonical ? undefined : titleMissRetry,
+    };
   }
   const nextCount = (row.retry_count || 0) + 1;
   const retryAt = nextRetry(nextCount);

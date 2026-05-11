@@ -156,6 +156,9 @@ export class JobRecommendationsTable extends LitElement {
       });
       this.items = this.items.filter(x => x.id !== rec.id);
       document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
+      document.dispatchEvent(new CustomEvent('job:pipeline:added', {
+        detail: { role: { slug: r.slug, company: r.company || rec.company, title: r.title || rec.title } },
+      }));
     } catch (e) {
       console.warn('[recs-table] add failed', e);
     } finally {

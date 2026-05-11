@@ -228,18 +228,60 @@ export async function applyCoverEdit({ coverText, instruction, comment }) {
   return j.content;
 }
 
-// Audit the career KB (companies/projects/clients + narratives + vision)
-// and return highest-leverage gaps to fill. Stateless on the server.
+// Persisted career opportunities — backed by job.career_opportunities.
+// GET returns cached open rows + a `stale` flag the UI uses to decide
+// whether to trigger a background re-audit.
+const OPPORTUNITIES_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/opportunities';
+
 export async function fetchCareerOpportunities() {
   const headers = await authHeader();
-  const res = await fetch(GEN_ASSET_URL, {
+  const res = await fetch(OPPORTUNITIES_URL, { headers });
+  if (!res.ok) throw new Error(`opportunities ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return {
+    items:          Array.isArray(j.opportunities) ? j.opportunities : [],
+    last_audit_ts:  j.last_audit_ts || null,
+    stale:          !!j.stale,
+  };
+}
+
+// Force a fresh AI audit; replaces the open set on the server.
+export async function auditCareerOpportunities() {
+  const headers = await authHeader();
+  const res = await fetch(OPPORTUNITIES_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind: 'career-opportunities' }),
+    body: JSON.stringify({ audit: true }),
   });
-  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`opportunities ${res.status}: ${await res.text()}`);
   const j = await res.json();
-  return Array.isArray(j.opportunities) ? j.opportunities : [];
+  return {
+    items:          Array.isArray(j.opportunities) ? j.opportunities : [],
+    last_audit_ts:  j.last_audit_ts || null,
+    stale:          !!j.stale,
+  };
+}
+
+export async function dismissOpportunity(id) {
+  const headers = await authHeader();
+  const res = await fetch(OPPORTUNITIES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dismiss: id }),
+  });
+  if (!res.ok) throw new Error(`opportunities ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function resolveOpportunity(id, narrativeId) {
+  const headers = await authHeader();
+  const res = await fetch(OPPORTUNITIES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolve: id, narrative_id: narrativeId || undefined }),
+  });
+  if (!res.ok) throw new Error(`opportunities ${res.status}: ${await res.text()}`);
+  return res.json();
 }
 
 // ----- Narratives (job.narratives) ----------------------------------------
@@ -367,5 +409,5 @@ window.JobPipeline = {
   fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative,
   fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, extractNarrativesFromKb,
   fetchRoleProjects, saveRoleProject, deleteRoleProject, saveProjectClient, deleteProjectClient,
-  fetchCareerOpportunities,
+  fetchCareerOpportunities, auditCareerOpportunities, dismissOpportunity, resolveOpportunity,
 };
