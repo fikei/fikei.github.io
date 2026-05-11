@@ -489,18 +489,19 @@ export class JobRoleDetail extends LitElement {
 
   // The v3 fit section: full modal-style card body — score block, prose
   // summary as the sub-explainer, hard-fail callout, and bars-with-subcopy.
-  // Renders from the shared renderFitCardBody() so the modal and detail
-  // page stay structurally identical.
-  _renderFitSection(parsed, status) {
+  // The summary reads from r.fitSummary (Haiku-generated, focused strictly
+  // on why this role is desirable for the candidate's needs — not why
+  // they're a good fit FOR the company).
+  _renderFitSection(_parsed, status) {
     const r = this.role;
     if (!r) return nothing;
-    const summaryText = this._summaryFromWhyFits(parsed?.whyFits) || parsed?.description || '';
+    const summaryText = this._summaryFromWhyFits(r.fitSummary);
     const summary = summaryText
       ? html`<div class="kb-doc">${unsafeHTML(renderMarkdown(summaryText))}</div>`
       : null;
     return html`
       <article class="role-card role-card--fit fit-modal">
-        <header class="role-card__head"><h3>Fit breakdown</h3></header>
+        <header class="role-card__head"><h3>Fit</h3></header>
         ${renderFitCardBody(r, { summary, loading: status === 'loading' })}
       </article>
     `;

@@ -503,18 +503,17 @@ serve(async (req) => {
     // Path B (fresh URL paste): scoreOne() fetches the JD, calls Haiku, and
     //   computes the v3 fit against UserContext just like the cron pull.
     try {
-      let fitOut: { fit: { score: number; breakdown: Record<string, number>; hardFails: string[] }; roleScore: number | null; rationale: string | null; seniority: string | null; scope: string | null; description: string };
+      let fitOut: { fit: { score: number; breakdown: Record<string, number>; hardFails: string[] }; roleScore: number | null; rationale: string | null; seniority: string | null; scope: string | null; fitSummary: string | null; description: string };
       if (body.fromRecommendationId) {
-        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }[]>`
-          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope
+        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null }[]>`
+          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary
             from job.recommended_roles where id = ${body.fromRecommendationId} limit 1`;
         const src = inherit[0];
         if (src && src.role_match_seniority) {
-          // Use stored Haiku output — no new API call.
           const enriched = { status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '', description: src.description || '' };
           const ctxFit = await (await import('../_shared/job-fit-haiku.ts')).loadFitContext(sql);
           const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority, src.role_match_rationale);
-          fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, description: src.description || '' };
+          fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, fitSummary: src.fit_summary, description: src.description || '' };
         } else {
           fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
         }
@@ -533,7 +532,8 @@ serve(async (req) => {
                role_match_score     = ${fitOut.roleScore},
                role_match_rationale = ${fitOut.rationale},
                role_match_seniority = ${fitOut.seniority},
-               role_match_scope     = ${fitOut.scope}
+               role_match_scope     = ${fitOut.scope},
+               fit_summary          = ${fitOut.fitSummary}
          where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }
