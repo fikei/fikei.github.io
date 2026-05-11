@@ -4,6 +4,7 @@ import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
+const { renderFitModal, scoreClass: sharedScoreClass } = await import('./job-fit-modal.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
 
@@ -44,18 +45,8 @@ function bucketFor(r) {
   }
 }
 
-const DIM_LABELS = {
-  mission: { label: 'Mission & impact', max: 20, hint: 'Posting text matches your impact themes (health outcomes, cost reduction, education access, AI ethics). Anti-themes zero this out.' },
-  domain:  { label: 'Domain experience', max: 15, hint: 'Posting sector overlaps with companies you have worked at — healthtech, edtech, consumer SaaS surface automatically.' },
-  skills:  { label: 'Skills match',     max: 15, hint: 'Posting mentions skills from your profile (UX, platform thinking, zero-to-one, growth experimentation). Years-weighted.' },
-  title:   { label: 'Title match',      max: 15, hint: 'Founding / Senior / Staff PM scores higher; below seniority hard-fails.' },
-  arc:     { label: 'Career arc',       max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
-  stage:   { label: 'Stage',            max: 10, hint: 'Inferred from investors. Pre-seed → C scores high; public / mega-cap hard-fails.' },
-  geo:     { label: 'Geography',        max: 5,  hint: 'Most geo filtering happens upstream — this is a small bonus.' },
-  comp:    { label: 'Compensation',     max: 5,  hint: 'Top of range ≥ $200k = full marks.' },
-  source:  { label: 'Source',           max: 3,  hint: 'Network > LinkedIn Saved > LinkedIn Recommended > Company Pages.' },
-  network: { label: 'Network',          max: 2,  hint: 'A named contact in the row gets +2.' },
-};
+// Fit modal labels + render helper live in ./job-fit-modal.js so the
+// recommendations carousel can reuse the same tooltip.
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
@@ -839,55 +830,7 @@ export class JobPipeline extends LitElement {
   }
 
   _renderFitModal() {
-    const r = this.selectedRow;
-    if (!r) return nothing;
-    const dims = Object.keys(DIM_LABELS);
-    return html`
-      <div class="fit-modal__backdrop" @click=${this._onBackdropClick}>
-        <div class="fit-modal" role="dialog" aria-modal="true" aria-label="Fit score breakdown">
-          <header class="fit-modal__head">
-            <div>
-              <p class="fit-modal__eyebrow">${r.company}</p>
-              <h2>${r.title || 'Untitled role'}</h2>
-            </div>
-            <button class="fit-modal__close" @click=${() => this._closeFitModal()} aria-label="Close">×</button>
-          </header>
-          <div class="fit-modal__score">
-            <span class=${this._scoreClass(r.score)}>${r.score == null ? '—' : r.score}</span>
-            <div>
-              <p class="fit-modal__score-label">Fit score</p>
-              <p class="fit-modal__score-sub">Out of 100. Sum of seven weighted dimensions; hard fails cap at 30.</p>
-            </div>
-          </div>
-          ${r.hardFails && r.hardFails.length ? html`
-            <div class="fit-modal__fails">
-              <strong>Hard fail${r.hardFails.length > 1 ? 's' : ''}:</strong>
-              ${r.hardFails.join(', ')}. Score capped at 30.
-            </div>
-          ` : nothing}
-          <ul class="fit-breakdown">
-            ${dims.map(k => {
-              const meta = DIM_LABELS[k];
-              const v = (r.breakdown && r.breakdown[k]) || 0;
-              const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
-              return html`
-                <li class="fit-breakdown__row">
-                  <div class="fit-breakdown__head">
-                    <span class="fit-breakdown__label">${meta.label}</span>
-                    <span class="fit-breakdown__value">${v} / ${meta.max}</span>
-                  </div>
-                  <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
-                  <p class="fit-breakdown__hint">${meta.hint}</p>
-                </li>
-              `;
-            })}
-          </ul>
-          <footer class="fit-modal__foot">
-            <p class="muted">Weights are fixed in v1. Tunable in v2 once Vision integration lands.</p>
-          </footer>
-        </div>
-      </div>
-    `;
+    return renderFitModal(this.selectedRow, () => this._closeFitModal());
   }
 
   render() {
