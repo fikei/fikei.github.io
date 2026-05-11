@@ -53,10 +53,10 @@ function bucketFor(r) {
 // sortKey null → header isn't clickable.
 const COLUMNS = [
   { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
-  { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
   { id: 'signal', label: '',       sortKey: null },
   { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
+  { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
 ];
 
@@ -839,7 +839,6 @@ export class JobPipeline extends LitElement {
             ${r.score == null ? '—' : r.score}
           </button>
         </td>
-        ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
             ${this._renderLogo(r, 'sm')}
@@ -856,6 +855,7 @@ export class JobPipeline extends LitElement {
         </td>
         <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
         <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
+        ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
     `;
@@ -910,13 +910,13 @@ export class JobPipeline extends LitElement {
     return html`
       <tr class="skeleton-row">
         <td class="col col-fit"><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
-        ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td class="col col-role">
           <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
         </td>
         <td class="col col-signal"></td>
         <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
+        ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>
     `;
