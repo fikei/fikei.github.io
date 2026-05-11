@@ -57,16 +57,54 @@ serve(async (req) => {
   // trigger a single source from the UI without waiting for cron.
   let forceId: string | null = null;
   let rescoreOnly = false;
+  let backfillDescriptions = false;
   if (req.method === 'POST') {
     try {
       const body = await req.json();
       if (body && typeof body.id === 'string') forceId = body.id;
       if (body && body.rescore === true) rescoreOnly = true;
+      if (body && body.backfillDescriptions === true) backfillDescriptions = true;
     } catch { /* no body, that's fine */ }
   }
   if (new URL(req.url).searchParams.get('rescore') === '1') rescoreOnly = true;
+  if (new URL(req.url).searchParams.get('backfill_descriptions') === '1') backfillDescriptions = true;
 
   const sql = db();
+
+  // Backfill missing JD descriptions on pipeline_roles by re-fetching the
+  // posting URL. Strips HTML to plain text. Bounded to 50 rows per call
+  // so a Cloudflare ATS rate-limit can't burn the request budget.
+  if (backfillDescriptions) {
+    try {
+      const rows = await sql<Array<{ slug: string; url: string | null; title: string | null; company_name: string | null }>>`
+        select slug, url, title, company_name
+          from job.pipeline_roles
+         where deleted_at is null
+           and (description is null or length(description) < 200)
+           and url is not null
+         limit 50`;
+      const results: Array<{ slug: string; ok: boolean; len?: number; error?: string }> = [];
+      for (const r of rows) {
+        try {
+          const text = await fetchJdText(r.url!);
+          if (!text || text.length < 200) {
+            results.push({ slug: r.slug, ok: false, error: `short body (${text?.length ?? 0} chars)` });
+            continue;
+          }
+          await sql`update job.pipeline_roles set description = ${text} where slug = ${r.slug}`;
+          results.push({ slug: r.slug, ok: true, len: text.length });
+        } catch (e) {
+          results.push({ slug: r.slug, ok: false, error: (e as Error).message });
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, version: VERSION, fetched: results.length, succeeded: results.filter(r => r.ok).length, results }, null, 2),
+        { status: 200, headers: { 'content-type': 'application/json' } });
+    } catch (outer) {
+      console.error('[pull-recommendations] backfill outer error:', (outer as Error).stack || (outer as Error).message);
+      return new Response(JSON.stringify({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, null, 2),
+        { status: 500, headers: { 'content-type': 'application/json' } });
+    }
+  }
 
   // Backfill rescore — recompute fit_score and fit_breakdown for every
   // active recommended role using the v2 scorer + UserContext. Useful
@@ -108,8 +146,8 @@ serve(async (req) => {
       `;
       updated++;
     }
-    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
-      select slug, title, company_name, sector, investors, salary_range, source, role_match_score
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
+      select slug, title, company_name, description, sector, investors, salary_range, source, role_match_score
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
@@ -118,14 +156,24 @@ serve(async (req) => {
         company: r.company_name || '', title: r.title || '', url: '',
         source: r.source || '', contact: '', salary: r.salary_range || '',
         sector: r.sector || '', investors: (r.investors || []).join(', '),
-        website: '', crunchbase: '', description: '',
+        website: '', crunchbase: '', description: r.description || '',
       };
-      const fit = computeFit(roleRow, ctx, r.role_match_score);
+      // Same Haiku gating as recommended_roles — only call when we have
+      // a real JD and no stored score yet.
+      let pipeRoleScore = r.role_match_score;
+      let pipeRationale: string | null = null;
+      if (useHaiku && pipeRoleScore == null && (r.description || '').length > 200) {
+        const haiku = await haikuRoleMatch(roleRow, ctx);
+        if (haiku) { pipeRoleScore = haiku.score; pipeRationale = haiku.rationale; haikuCalls++; }
+      }
+      const fit = computeFit(roleRow, ctx, pipeRoleScore);
       await sql`
         update job.pipeline_roles
-           set fit_score     = ${fit.score},
-               fit_breakdown = ${sql.json(fit.breakdown)},
-               hard_fails    = ${fit.hardFails}
+           set fit_score            = ${fit.score},
+               fit_breakdown        = ${sql.json(fit.breakdown)},
+               hard_fails           = ${fit.hardFails},
+               role_match_score     = ${pipeRoleScore},
+               role_match_rationale = coalesce(${pipeRationale}, role_match_rationale)
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
@@ -368,6 +416,50 @@ async function loadFitContext(sql: ReturnType<typeof db>): Promise<FitUserContex
   };
   _fitCtxCache = { ctx, at: Date.now() };
   return ctx;
+}
+
+// ---------- JD description fetcher ----------
+// Re-fetches a posting URL, strips HTML, returns plain text capped at 8KB.
+// Best-effort: returns '' on any failure so the caller can skip without
+// killing the batch.
+async function fetchJdText(url: string): Promise<string> {
+  // Browser-shaped headers — many ATSes (Workday, Greenhouse-on-Cloudflare,
+  // SmartRecruiters) 403 our default bot UA. This matches a real Chrome.
+  const resp = await fetch(url, {
+    redirect: 'follow',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
+    },
+  });
+  if (!resp.ok) throw new Error(`fetch ${resp.status}`);
+  const ct = (resp.headers.get('content-type') || '').toLowerCase();
+  if (!ct.includes('html') && !ct.includes('text')) throw new Error(`unsupported content-type ${ct}`);
+  const html = await resp.text();
+  // Very basic HTML→text: strip script/style blocks, then tags, collapse
+  // whitespace. Good enough for a keyword-match scorer; we're not parsing
+  // for accuracy, just for hit counts.
+  const stripped = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped.slice(0, 8000);
 }
 
 // ---------- Haiku role-match scorer ----------
