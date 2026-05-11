@@ -2553,6 +2553,179 @@
   color: var(--fg-subtle);
 }
 
+/* --- Role projects + clients (Phase 2) --- */
+.rp-section {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border);
+}
+.rp-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+.rp-section__title {
+  margin: 0;
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.rp-empty {
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+.rp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.rp-card {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.rp-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.rp-card__name {
+  flex: 1;
+  font-size: var(--font-size-body);
+  letter-spacing: -0.005em;
+}
+.rp-card__metric {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+}
+.rp-card__del {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-subtle);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+}
+.rp-card__del:hover { background: var(--bg-surface); color: var(--fg); }
+.rp-card__desc { margin: 0; font-size: var(--font-size-small); color: var(--fg-muted); line-height: 1.5; }
+.rp-card__out  { margin: 0; font-size: var(--font-size-small); color: var(--fg); line-height: 1.5; }
+.rp-card__out strong { color: var(--fg-muted); margin-right: 4px; }
+
+.rp-clients {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.rp-client {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+}
+.rp-client__kind {
+  font-size: var(--font-size-caption);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  text-transform: capitalize;
+}
+.rp-client__kind[data-kind="customer"]    { background: rgba(0, 168, 160, 0.12); color: var(--accent-strong); }
+.rp-client__kind[data-kind="partner"]     { background: rgba(255, 213, 79, 0.18); color: #8a5a00; }
+.rp-client__kind[data-kind="stakeholder"] { background: rgba(120, 80, 0, 0.06); color: var(--fg-muted); }
+.rp-client__del {
+  appearance: none; border: 0; background: transparent; color: var(--fg-subtle);
+  cursor: pointer; margin-left: auto;
+}
+.rp-client__del:hover { color: var(--fg); }
+
+.rp-add-client {
+  appearance: none;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.rp-add-client:hover { border-color: var(--accent); color: var(--accent-strong); }
+
+.rp-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  margin-bottom: var(--space-3);
+}
+.rp-composer input,
+.rp-composer textarea,
+.rp-composer__field {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.rp-composer input:focus,
+.rp-composer textarea:focus,
+.rp-composer__field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.rp-composer__name { font-weight: var(--fw-semibold); }
+.rp-composer__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rp-client-composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-2);
+}
+.rp-client-composer input,
+.rp-client-composer select {
+  padding: 6px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.rp-client-composer input[type="text"]:first-of-type { flex: 1 1 180px; }
+.rp-client-composer input[type="text"]:last-of-type  { flex: 1 1 240px; }
+
 .wh-company__footer {
   margin-top: var(--space-5);
   padding-top: var(--space-3);

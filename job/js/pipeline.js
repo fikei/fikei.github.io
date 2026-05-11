@@ -276,7 +276,67 @@ export async function deleteNarrative(id) {
   return res.json();
 }
 
+// ----- Work history projects + clients (job.role_projects / project_clients)
+const WORK_HISTORY_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/work-history';
+
+export async function fetchRoleProjects({ company, role } = {}) {
+  const headers = await authHeader();
+  const params = new URLSearchParams();
+  if (company) params.set('company', company);
+  if (role)    params.set('role', role);
+  const url = params.toString() ? `${WORK_HISTORY_URL}?${params}` : WORK_HISTORY_URL;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`work-history ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.projects) ? j.projects : [];
+}
+
+export async function saveRoleProject(payload) {
+  const headers = await authHeader();
+  const res = await fetch(WORK_HISTORY_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'project', ...payload }),
+  });
+  if (!res.ok) throw new Error(`work-history ${res.status}: ${await res.text()}`);
+  return (await res.json()).project;
+}
+
+export async function deleteRoleProject(id) {
+  const headers = await authHeader();
+  const res = await fetch(WORK_HISTORY_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'project', id, delete: true }),
+  });
+  if (!res.ok) throw new Error(`work-history ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function saveProjectClient(payload) {
+  const headers = await authHeader();
+  const res = await fetch(WORK_HISTORY_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'client', ...payload }),
+  });
+  if (!res.ok) throw new Error(`work-history ${res.status}: ${await res.text()}`);
+  return (await res.json()).client;
+}
+
+export async function deleteProjectClient(id) {
+  const headers = await authHeader();
+  const res = await fetch(WORK_HISTORY_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'client', id, delete: true }),
+  });
+  if (!res.ok) throw new Error(`work-history ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 window.JobPipeline = {
   fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative,
   fetchNarratives, saveNarrative, linkNarrative, deleteNarrative,
+  fetchRoleProjects, saveRoleProject, deleteRoleProject, saveProjectClient, deleteProjectClient,
 };
