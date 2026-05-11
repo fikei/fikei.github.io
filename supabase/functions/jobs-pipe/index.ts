@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.10.1';
-console.log(`[jobs-pipe] v${VERSION} - return sourceEmailUrl for Gmail-sourced rows`);
+const VERSION = '0.10.2';
+console.log(`[jobs-pipe] v${VERSION} - return updatedAt so drill page can auto-regen stale assets`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -54,6 +54,7 @@ async function listRoles() {
       r.liveness_checked_at as "livenessCheckedAt",
       r.engaged_at as "engagedAt",
       r.source_email_url as "sourceEmailUrl",
+      r.updated_at as "updatedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
       coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter",
       coalesce((
@@ -111,9 +112,12 @@ serve(async (req) => {
       if (body.action === 'engage') {
         await sql`
           update job.pipeline_roles
-             set engaged_at = coalesce(engaged_at, now()),
-                 updated_at = now()
+             set engaged_at = coalesce(engaged_at, now())
            where slug = ${slug};
+        -- engage is a passive UI signal; deliberately do NOT touch
+        -- updated_at so the drill page's stale-detection (which uses
+        -- updated_at as a freshness proxy) doesn't ping-pong a
+        -- regenerate on every page open.
         `;
         return jsonResp({ ok: true, slug, engaged: true });
       }
