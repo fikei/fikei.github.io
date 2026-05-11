@@ -18,8 +18,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[narratives] v${VERSION} - CRUD + AI auto-tag/link + KB extract backfill`);
+const VERSION = '0.3.0';
+console.log(`[narratives] v${VERSION} - CRUD + AI auto-tag/link + KB extract (bigger output + cron entry)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -42,7 +42,7 @@ function normalizeTitle(s: string): string {
     .trim();
 }
 
-async function callClaudeJson(system: string, user: string): Promise<any> {
+async function callClaudeJson(system: string, user: string, maxTokens = 1024): Promise<any> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const res = await fetch(ANTHROPIC_URL, {
@@ -54,16 +54,31 @@ async function callClaudeJson(system: string, user: string): Promise<any> {
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system,
       messages: [{ role: 'user', content: user }],
     }),
   });
   if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json() as { content: { type: string; text: string }[] };
+  const data = await res.json() as { content: { type: string; text: string }[]; stop_reason?: string };
   const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
-  const stripped = text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
-  try { return JSON.parse(stripped); } catch { return null; }
+  // Strip a leading ```json fence if present, plus any trailing fence.
+  // Then try to JSON.parse; on failure, also try slicing from the first
+  // '{' to the last '}' which catches "rambling prefix" outputs.
+  let stripped = text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
+  try { return JSON.parse(stripped); } catch { /* fall through */ }
+  const start = stripped.indexOf('{');
+  const end = stripped.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    try { return JSON.parse(stripped.slice(start, end + 1)); } catch { /* */ }
+  }
+  console.warn('[narratives] JSON parse failed', {
+    stop_reason: data.stop_reason,
+    head: text.slice(0, 200),
+    tail: text.slice(-200),
+    length: text.length,
+  });
+  return null;
 }
 
 const EXTRACT_SYSTEM = `You extract discrete career stories from a candidate's knowledge base.
@@ -111,7 +126,9 @@ async function extractFromKb(): Promise<{ title: string; content_md: string; anc
 
   const kbBlock = sections.join('\n\n---\n\n');
   const user = `# Career KB\n\n${kbBlock}\n\n# Ask\n\nProduce the JSON object now. JSON only.`;
-  const parsed = await callClaudeJson(EXTRACT_SYSTEM, user);
+  // 12 stories × ~400 tokens each + JSON overhead → ~6k tokens. Headroom.
+  const parsed = await callClaudeJson(EXTRACT_SYSTEM, user, 8192);
+  console.log('[narratives] extract pass returned', { stories: Array.isArray(parsed?.stories) ? parsed.stories.length : -1 });
   const stories = Array.isArray(parsed?.stories) ? parsed.stories : [];
   return stories.map((s: any) => ({
     title:                String(s.title || '').trim().slice(0, MAX_TITLE),

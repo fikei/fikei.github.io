@@ -168,6 +168,11 @@ export class JobCareer extends LitElement {
         const ns = await fetchNarratives();
         this.narratives = ns;
       } catch { this.narratives = []; }
+      // Auto-extract cadence: run extraction in the background if there
+      // are zero narratives (first visit) OR the last extract was more
+      // than 7 days ago. Keeps the KB in sync as work history grows
+      // without requiring the user to click a button.
+      this._maybeAutoExtract();
       // Companies for the "Needs connection" dropdown — derived from the
       // pipeline tag space isn't enough; we want the actual work history.
       // For now, scrape unique companies from existing narratives' links
@@ -577,9 +582,23 @@ export class JobCareer extends LitElement {
         lastResult: { created: (res?.created || []).length, skipped: res?.skipped || 0 },
         error: '',
       };
+      try { localStorage.setItem('job:lastNarrativeExtract', String(Date.now())); } catch {}
     } catch (e) {
       this.extracting = { running: false, lastResult: null, error: String(e?.message || e) };
     }
+  }
+
+  // Cadence: auto-run extraction if narratives are empty (first time
+  // here) or > 7 days have passed since the last successful run.
+  _maybeAutoExtract() {
+    const AUTO_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+    let last = 0;
+    try { last = Number(localStorage.getItem('job:lastNarrativeExtract') || 0); } catch {}
+    const stale = (Date.now() - last) > AUTO_INTERVAL_MS;
+    const empty = !this.narratives || this.narratives.length === 0;
+    if (!empty && !stale) return;
+    // Fire-and-forget in the background; UI shows the shimmer button.
+    this._extractFromKb();
   }
 
   // ----- Career opportunities ---------------------------------------------
