@@ -23,8 +23,8 @@ import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 // loadFitContext for now. add-role uses the canonical versions in
 // ../_shared/job-fit-haiku.ts. TODO: consolidate to one source of truth.
 
-const VERSION = '0.8.1';
-console.log(`[pull-recommendations] v${VERSION} - Phase 2.0 scan: name-search no longer restricts to in:inbox so labeled/archived recruiter threads land`);
+const VERSION = '0.9.0';
+console.log(`[pull-recommendations] v${VERSION} - Phase 2.0 scan: title-derived company tokens for (unknown company) rows + non-inbox label coverage`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
