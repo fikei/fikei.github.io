@@ -1835,11 +1835,25 @@
 }
 .career-op__title {
   margin: 0;
+  flex: 1;
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
   font-size: var(--font-size-body);
   letter-spacing: -0.005em;
 }
+.career-op__dismiss {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 14px;
+  margin-left: auto;
+}
+.career-op__dismiss:hover { background: var(--bg-surface); color: var(--fg); }
 .career-op__gap { margin: 0; font-size: var(--font-size-small); color: var(--fg-muted); line-height: 1.5; }
 .career-op__ask {
   margin: 0;
