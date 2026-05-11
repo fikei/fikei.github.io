@@ -167,17 +167,22 @@ export async function scanApplicationResponses(args: {
   // without losing labeled-but-archived recruiter conversations.
   const NEWSLETTER_NEGATIVES = '-from:linkedin.com -from:wellfound.com -from:otta.com -from:builtin.com -from:hnhiring.com';
   for (const role of roles.slice(0, 20)) {
-    if (role.company_norm.length < 3) continue;
-    // Quote the name so multi-word companies match exactly. Escape any
-    // embedded quotes for safety.
-    const quoted = `"${role.company_name.replace(/"/g, '\\"')}"`;
-    const nameQuery = `${quoted} -in:spam -in:trash newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
-    try {
-      for (const id of await listMessagesByQuery(args.accessToken, nameQuery, 20)) {
-        idSet.add(id);
+    // Build a candidate-name set per role. Start with company_name when
+    // it looks real; add the title-derived company token when it
+    // doesn't (rows added via /add-role sometimes land as
+    // "(unknown company)" with the actual company sitting in the title
+    // — e.g. "Product Manager, Meridian").
+    const candidates = candidateNamesForSearch(role);
+    for (const candidate of candidates) {
+      const quoted = `"${candidate.replace(/"/g, '\\"')}"`;
+      const nameQuery = `${quoted} -in:spam -in:trash newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
+      try {
+        for (const id of await listMessagesByQuery(args.accessToken, nameQuery, 20)) {
+          idSet.add(id);
+        }
+      } catch (e) {
+        console.warn(`[gmail-app-scan] name-search '${candidate}' failed: ${(e as Error).message}`);
       }
-    } catch (e) {
-      console.warn(`[gmail-app-scan] name-search '${role.company_name}' failed: ${(e as Error).message}`);
     }
   }
 
@@ -223,17 +228,22 @@ export async function scanApplicationResponses(args: {
         : pickByTitleOverlap(candidates, subject, body);
     }
 
-    // Step 3 — company-name-in-body match. Originally gated to ATS
-    // senders, now generalized: applies to ANY sender whose domain we
-    // didn't already match in step 2. Catches direct human emails from
+    // Step 3 — company-name-in-body match. Applies to ANY sender we
+    // couldn't match by domain. Catches direct human emails from
     // recruiter @gmail addresses, hiring-manager @yahoo addresses, and
     // any sender whose company domain we don't have cached. The
     // confidence floor in classifyApplicationMessage still gates poison.
+    //
+    // For sentinel "(unknown company)" rows we also try title-derived
+    // company tokens so the gauntlet matches roles whose real company
+    // sits in the title field.
     if (!matchedRole) {
       const haystack = `${subject}\n${body}`.toLowerCase();
       const hits = roles.filter(r => {
-        const nm = r.company_norm;
-        return nm.length >= 3 && haystack.includes(nm);
+        for (const cand of candidateNamesForSearch(r)) {
+          if (cand.length >= 3 && haystack.includes(cand.toLowerCase())) return true;
+        }
+        return false;
       });
       if (hits.length === 1) matchedRole = hits[0];
       else if (hits.length > 1) matchedRole = pickByTitleOverlap(hits, subject, body);
@@ -362,6 +372,53 @@ async function listMessagesByQuery(accessToken: string, query: string, maxIds: n
 function extractDomain(sender: string): string | null {
   const m = sender.match(/@([a-z0-9.-]+)/i);
   return m ? m[1].toLowerCase() : null;
+}
+
+// Sentinel company names. Rows added without a known company (via
+// /add-role manually or a partial Gmail parse) land with one of these
+// in company_name; the real name often sits in the title instead.
+const UNKNOWN_COMPANY_SENTINELS = new Set([
+  '',
+  '(unknown company)',
+  'unknown company',
+  'unknown',
+  'n/a',
+  '(unknown)',
+]);
+
+function isUnknownCompanyName(name: string | null | undefined): boolean {
+  if (!name) return true;
+  return UNKNOWN_COMPANY_SENTINELS.has(name.trim().toLowerCase());
+}
+
+// Derive candidate company names from a role's title when company_name
+// is missing or sentinel-valued. We split the title on commas / "at" /
+// "@" / em-dash and return non-trivial tail tokens. Example:
+//   "Product Manager, Meridian" → ["Meridian"]
+//   "Senior PM at Stripe"       → ["Stripe"]
+//   "PM — Anthropic"            → ["Anthropic"]
+function titleDerivedCompanies(title: string): string[] {
+  if (!title) return [];
+  const parts = title.split(/\s*(?:,|—|–|@|\bat\b)\s*/i);
+  if (parts.length < 2) return [];
+  const tail = parts.slice(1)
+    .map(s => s.trim())
+    .filter(s => s.length >= 3 && !/^(role|position|opening|opportunity)$/i.test(s));
+  return [...new Set(tail)];
+}
+
+// Per-role candidate names for the Gmail search pass. Prefer the
+// company_name when it looks real; fall through to title-derived
+// tokens otherwise.
+function candidateNamesForSearch(role: PipelineRoleRow): string[] {
+  const out: string[] = [];
+  if (!isUnknownCompanyName(role.company_name) && role.company_name.length >= 3) {
+    out.push(role.company_name);
+  }
+  for (const t of titleDerivedCompanies(role.title || '')) {
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
 }
 
 function isAtsPlatformDomain(domain: string): boolean {
