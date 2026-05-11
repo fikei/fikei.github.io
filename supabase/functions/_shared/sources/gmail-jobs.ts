@@ -195,8 +195,12 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
 
       // Decide single-role vs. digest. Digests get fanned out — one
       // recommended_roles row per role found in the body.
+      // Three signals: known digest sender, known digest subject phrase,
+      // OR body containing >1 distinct job-view links (LinkedIn weekly
+      // emails ship "Senior PM at X" subjects but pack 5+ roles into the
+      // body — only the link-count detector catches those).
       let jobs: ExtractedJob[];
-      const isDigest = looksLikeDigest(subject, sender);
+      const isDigest = looksLikeDigest(subject, sender) || hasMultipleJobLinks(body);
 
       if (isDigest) {
         try {
@@ -306,6 +310,28 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
 
 function mergeAllowlist(extra?: string[]): string[] {
   return [...new Set([...DEFAULT_ALLOW_SENDERS, ...(extra || [])])].map(s => s.toLowerCase());
+}
+
+// Body-based digest detector: multiple distinct job-posting links in
+// the same message → treat as digest regardless of subject. Catches
+// LinkedIn weekly recaps that lead with "Senior PM at X" in the
+// subject but pack 5+ roles into the body, plus aggregator emails
+// that don't match any subject hint.
+function hasMultipleJobLinks(body: string): boolean {
+  const patterns = [
+    /https?:\/\/(?:www\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi,
+    /https?:\/\/(?:www\.)?wellfound\.com\/jobs\/(\d+)/gi,
+    /https?:\/\/(?:www\.)?(?:hellootta|otta)\.com\/jobs\/([^\s"'<>?#)]+)/gi,
+    /https?:\/\/boards\.greenhouse\.io\/[^\/\s"'<>]+\/jobs\/(\d+)/gi,
+    /https?:\/\/jobs\.lever\.co\/[^\/\s"'<>]+\/([0-9a-f-]+)/gi,
+    /https?:\/\/jobs\.ashbyhq\.com\/[^\/\s"'<>]+\/([0-9a-f-]+)/gi,
+  ];
+  const ids = new Set<string>();
+  for (const re of patterns) {
+    for (const m of body.matchAll(re)) ids.add(m[1]);
+    if (ids.size > 1) return true;
+  }
+  return false;
 }
 
 function looksLikeDigest(subject: string, sender: string): boolean {
@@ -554,7 +580,12 @@ function parseLinkedInSubject(subject: string, sender: string, body: string): Ex
   const m = subject.match(/^(.+?)\s+at\s+(.+?)\s*$/i);
   if (!m) return null;
   const title = m[1].trim();
-  const company = m[2].trim();
+  // LinkedIn appends a trailing salary band to many subjects:
+  // "Senior PM at Hinge Health: up to $240K/year". Strip anything from
+  // the first colon onward when it looks like a comp suffix, otherwise
+  // keep the colon (rare but possible in real company names).
+  let company = m[2].trim();
+  company = company.replace(/\s*:\s*(?:up to\s+)?\$[\d,kKmM.\s\-–toupK/year]+$/i, '').trim();
   if (!title || !company) return null;
 
   // Find the first job-view link in the body.

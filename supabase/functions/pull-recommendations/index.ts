@@ -20,8 +20,8 @@ import { computeFit, type RoleRow } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.3.0';
-console.log(`[pull-recommendations] v${VERSION} - Gmail digest fan-out (multi-role messages → N recs)`);
+const VERSION = '0.3.1';
+console.log(`[pull-recommendations] v${VERSION} - Detect digests by body link count + strip salary suffix from company`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
