@@ -8,9 +8,10 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
+  import('./job-fit-modal.js' + V),
 ]);
 
 // Column shape mirrors job-pipeline's COLUMNS: id drives the col class,
@@ -54,6 +55,7 @@ export class JobRecommendationsTable extends LitElement {
     sortKey:  { state: true },
     sortDir:  { state: true },
     addingId: { state: true },
+    selectedRec: { state: true },
   };
 
   constructor() {
@@ -65,7 +67,19 @@ export class JobRecommendationsTable extends LitElement {
     this.sortKey = 'fitScore';
     this.sortDir = 'desc';
     this.addingId = null;
+    this.selectedRec = null;
   }
+
+  _openFitModal(rec) {
+    this.selectedRec = {
+      company:   rec.company,
+      title:     rec.title,
+      score:     rec.fitScore,
+      breakdown: rec.breakdown || rec.fitBreakdown || {},
+      hardFails: rec.hardFails || [],
+    };
+  }
+  _closeFitModal() { this.selectedRec = null; }
 
   connectedCallback() {
     super.connectedCallback();
@@ -191,7 +205,7 @@ export class JobRecommendationsTable extends LitElement {
   }
 
   _onRowClick(r, e) {
-    if (e.target.closest('button, a, .row-menu')) return;
+    if (e.target.closest('button, a, .row-menu, .fit-pill--button')) return;
     if (r.url) window.open(r.url, '_blank', 'noopener');
   }
 
@@ -199,9 +213,11 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <tr class="pipeline-row" @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
-          <span class=${fitClass(r.fitScore)} title="Fit score">
+          <button class=${fitClass(r.fitScore) + ' fit-pill--button'}
+                  title="Tap to see the breakdown"
+                  @click=${(e) => { e.stopPropagation(); this._openFitModal(r); }}>
             ${r.fitScore == null ? '—' : r.fitScore}
-          </span>
+          </button>
         </td>
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
@@ -286,6 +302,7 @@ export class JobRecommendationsTable extends LitElement {
           </table>
         </div>
       `}
+      ${renderFitModal(this.selectedRec, () => this._closeFitModal())}
     `;
   }
 }
