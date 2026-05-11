@@ -10,10 +10,10 @@ import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 
-const VERSION = '0.2.0';
-// Status default: 'Saved' (post-taxonomy collapse).
-// Source-email-link: stash payload.gmailApiId as a Gmail web URL when
-// the rec came from Gmail.
+const VERSION = '0.3.0';
+// ATS-embed shortcut: detect ?ashby_jid= and ?gh_jid= on customer
+// domains and hit the ATS API directly. Saves "Careers" / "(unknown
+// company)" rows when the customer's careers page only embeds a widget.
 console.log(`[add-role] v${VERSION} - JSON-LD JobPosting + careerspage.io + URL clean + company case + cleanTitle 'job in X'`);
 
 const URL_RE = /^https?:\/\//i;
@@ -211,6 +211,77 @@ function inferSector(text: string, company: string): string {
   return Array.from(new Set(tags)).slice(0, 3).join(' / ');
 }
 
+// ATS-embed lookup. Many companies host an Ashby or Greenhouse widget
+// on their own domain (e.g. assorthealth.com/careers?ashby_jid=…) which
+// makes the page <title> useless ("Careers"). Detect the job-ID query
+// param, derive the ATS slug from the hostname, and hit the public ATS
+// API to get the real title + company + canonical URL.
+//
+// Returns null when the URL doesn't carry an embed param, or when the
+// derived slug doesn't match a real ATS tenant. Best-effort: a single
+// API miss here just falls through to the normal extraction.
+async function tryAtsEmbedLookup(urlStr: string): Promise<{
+  title: string;
+  company: string;
+  canonicalUrl: string;
+} | null> {
+  try {
+    const u = new URL(urlStr);
+    const ashbyJid = u.searchParams.get('ashby_jid');
+    const ghJid    = u.searchParams.get('gh_jid');
+
+    // Derive candidate ATS slugs from the hostname. "assorthealth.com" →
+    // ["assorthealth"]; "www.assort-health.com" → ["assort-health",
+    // "assorthealth"]. We try a small set of variations to be tolerant.
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const root = host.split('.')[0];                       // "assorthealth"
+    const candidates = [...new Set([
+      root,
+      root.replace(/-/g, ''),
+    ])].filter(Boolean);
+
+    if (ashbyJid) {
+      for (const slug of candidates) {
+        try {
+          const r = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(slug)}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!r.ok) continue;
+          const data = await r.json() as { jobs?: Array<{ id: string; title: string; jobUrl: string }> };
+          const match = (data.jobs || []).find(j => j.id === ashbyJid);
+          if (match) {
+            return {
+              title:        match.title,
+              company:      spacedTitleCase(slug),
+              canonicalUrl: match.jobUrl,
+            };
+          }
+        } catch { /* try next candidate slug */ }
+      }
+    }
+
+    if (ghJid) {
+      for (const slug of candidates) {
+        try {
+          const r = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs/${encodeURIComponent(ghJid)}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!r.ok) continue;
+          const data = await r.json() as { title?: string; absolute_url?: string; company_name?: string };
+          if (data.title && data.absolute_url) {
+            return {
+              title:        data.title,
+              company:      data.company_name || spacedTitleCase(slug),
+              canonicalUrl: data.absolute_url,
+            };
+          }
+        } catch { /* try next candidate slug */ }
+      }
+    }
+  } catch { /* malformed URL */ }
+  return null;
+}
+
 // "cityblockhealth.wd1.myworkdayjobs.com" → "Cityblock Health".
 // "boards.greenhouse.io/acme" path-based fallback handled by the og:site_name.
 function companyFromHost(urlStr: string): string | null {
@@ -320,6 +391,19 @@ serve(async (req) => {
     let title = String(body.title || '').trim();
     let company = String(body.company || '').trim();
 
+    // ATS-embed shortcut. Customer-domain careers pages that embed an
+    // Ashby or Greenhouse widget put the job ID in a query param
+    // (?ashby_jid=… / ?gh_jid=…). The page's <title> is usually just
+    // "Careers" so the normal extraction path returns "(unknown
+    // company)" — bypass it by hitting the ATS API directly.
+    let canonicalFromAts: string | null = null;
+    const atsHit = await tryAtsEmbedLookup(url);
+    if (atsHit) {
+      if (!title)   title   = atsHit.title;
+      if (!company) company = atsHit.company;
+      canonicalFromAts = atsHit.canonicalUrl;
+    }
+
     // Always pull the page so we have the JD body for salary + sector
     // detection, even if title/company were passed in by the caller.
     const meta = await fetchPageMeta(url);
@@ -356,6 +440,10 @@ serve(async (req) => {
     if (!title) title = '(untitled role)';
     if (!company) company = '(unknown company)';
 
+    // Prefer the canonical ATS URL when we have one — gives a stable
+    // link to the actual posting instead of the customer's widget host.
+    const finalUrl = canonicalFromAts ?? url;
+
     const slug = roleSlug(company, title);
     if (!slug) return err('could not derive slug from title/company', 400);
 
@@ -383,7 +471,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, ${companySlug}, ${company}, ${title},
-          ${url}, ${finalSource}, 'Saved'
+          ${finalUrl}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
@@ -402,7 +490,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, null, ${company}, ${title},
-          ${url}, ${finalSource}, 'Saved'
+          ${finalUrl}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
