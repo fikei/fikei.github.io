@@ -127,30 +127,34 @@ function clampToCap(v: number, cap: number): number {
 // Mission keywords + impact themes are the dominant signal. Anti-mission
 // terms zero the bucket. When mission_required and zero matches → hard fail.
 function scoreValues(r: RoleRow, cap: number, ctx?: UserContext): { v: number; reason: string; fail?: string } {
-  if (!ctx) return { v: Math.round(cap * 0.4), reason: 'No mission profile loaded; scored at neutral.' };
+  if (!ctx) return { v: Math.round(cap * 0.4), reason: 'No read on the mission angle of this role.' };
   const text = postingText(r);
   if (ctx.antiMissionTerms.length) {
     const anti = listMatches(text, ctx.antiMissionTerms, 3);
-    if (anti.length) return { v: 0, fail: 'mission-conflict (anti-theme)', reason: `Anti-theme detected (${anti.join(', ')}); bucket zeroed.` };
+    if (anti.length) return { v: 0, fail: 'mission-conflict (anti-theme)', reason: `This role sits in a space you've ruled out — ${anti.join(', ')}.` };
   }
-  if (!ctx.missionKeywords.length) return { v: Math.round(cap * 0.4), reason: 'No mission keywords on your vision; scored at neutral.' };
+  if (!ctx.missionKeywords.length) return { v: Math.round(cap * 0.4), reason: 'No read on the mission angle of this role.' };
   const hits = listMatches(text, ctx.missionKeywords, 5);
-  if (hits.length === 0) {
-    if (ctx.missionRequired) return { v: 0, fail: 'no mission alignment', reason: 'No impact keywords in title, company, or JD. Mission required = hard fail.' };
-    return { v: Math.round(cap * 0.15), reason: 'No impact keywords found in title, company, or JD text.' };
-  }
+  if (hits.length === 0) return { v: ctx.missionRequired ? 0 : Math.round(cap * 0.15), fail: ctx.missionRequired ? 'no mission alignment' : undefined,
+    reason: 'Nothing in the posting signals the kind of impact work you care about.' };
   const v = clampToCap(Math.round(hits.length * (cap / 6)), cap);
-  return { v, reason: `Matched ${hits.length} impact term${hits.length === 1 ? '' : 's'}: ${hits.slice(0, 4).join(', ')}.` };
+  const head = hits.length >= 4 ? 'Squarely on the impact work you care about'
+             : hits.length >= 2 ? 'Touches the impact work you care about'
+             : 'Some signal toward the impact work you care about';
+  return { v, reason: `${head} — ${hits.slice(0, 4).join(', ')}.` };
 }
 
 // ---------- Culture (cap from weights.culture, default 15) ----------
 function scoreCulture(r: RoleRow, cap: number, ctx?: UserContext): { v: number; reason: string } {
-  if (!ctx || !ctx.cultureKeywords.length) return { v: Math.round(cap * 0.4), reason: 'No culture keywords on your vision; scored at neutral.' };
+  if (!ctx || !ctx.cultureKeywords.length) return { v: Math.round(cap * 0.4), reason: 'No read on the culture from this posting.' };
   const text = postingText(r);
   const hits = listMatches(text, ctx.cultureKeywords, 5);
-  if (hits.length === 0) return { v: Math.round(cap * 0.15), reason: 'No culture cues (autonomy, eng bar, AI-native, mission-led) in JD or About text.' };
+  if (hits.length === 0) return { v: Math.round(cap * 0.15), reason: 'The description doesn\'t surface the culture traits you look for — autonomy, engineering depth, AI-native posture, mission orientation.' };
   const v = clampToCap(Math.round(hits.length * (cap / 4)), cap);
-  return { v, reason: `Matched ${hits.length} culture cue${hits.length === 1 ? '' : 's'}: ${hits.slice(0, 4).join(', ')}.` };
+  const head = hits.length >= 4 ? 'The team signals'
+             : hits.length >= 2 ? 'The team hints at'
+             : 'There\'s some sign of';
+  return { v, reason: `${head} the culture traits you look for — ${hits.slice(0, 4).join(', ')}.` };
 }
 
 // ---------- Role match (cap from weights.role, default 25) ----------
@@ -161,14 +165,14 @@ function scoreRole(r: RoleRow, cap: number, ctx?: UserContext, preComputedRole?:
   if (preComputedRole != null && Number.isFinite(preComputedRole)) {
     return {
       v: clampToCap(Math.round(preComputedRole * (cap / 25)), cap),
-      reason: haikuRationale && haikuRationale.trim().length ? haikuRationale : `Claude Haiku graded role fit at ${preComputedRole}/25.`,
+      reason: haikuRationale && haikuRationale.trim().length ? haikuRationale : 'Role shape and your background line up.',
       fallback: false,
     };
   }
   const t = (r.title || '').toLowerCase();
-  if (!t) return { v: 0, reason: 'No title on this posting; cannot score role.', fallback: true };
+  if (!t) return { v: 0, reason: 'No title on this posting.', fallback: true };
   if (/intern|coordinator|associate|assistant\b/.test(t)) {
-    return { v: 0, fail: 'below seniority floor', reason: `Title "${r.title}" is below your seniority floor; capped at 0.`, fallback: true };
+    return { v: 0, fail: 'below seniority floor', reason: `"${r.title}" sits below the seniority you're targeting.`, fallback: true };
   }
   // Title base (max 40% of cap).
   let titleBase: number;
@@ -182,7 +186,7 @@ function scoreRole(r: RoleRow, cap: number, ctx?: UserContext, preComputedRole?:
   else if (/(^|\W)(pm|product manager)(\W|$)/.test(t)) titleBase = cap * 0.20;
   else titleBase = cap * 0.10;
 
-  if (!ctx) return { v: Math.round(titleBase), reason: `Regex fallback (no JD description). Title "${r.title}" scored ${Math.round(titleBase)}/${cap}.`, fallback: true };
+  if (!ctx) return { v: Math.round(titleBase), reason: `Title sits in your seniority range, but the description isn't available to read deeper.`, fallback: true };
 
   const text = postingText(r);
   const skillHits: string[] = [];
@@ -202,11 +206,11 @@ function scoreRole(r: RoleRow, cap: number, ctx?: UserContext, preComputedRole?:
   const interestPts = Math.min(cap * 0.30, interestHits.length * (cap * 0.06));
   const v = clampToCap(Math.round(titleBase + skillPts + interestPts), cap);
   const parts: string[] = [];
-  if (skillHits.length) parts.push(`skills: ${skillHits.slice(0, 3).join(', ')}`);
-  if (interestHits.length) parts.push(`interests: ${interestHits.slice(0, 2).join(', ')}`);
+  if (skillHits.length) parts.push(`your work in ${skillHits.slice(0, 3).join(', ')}`);
+  if (interestHits.length) parts.push(`interest in ${interestHits.slice(0, 2).join(', ')}`);
   const reason = parts.length
-    ? `Regex fallback (no Haiku grade yet). Title + ${parts.join('; ')}.`
-    : `Regex fallback (no Haiku grade yet). Title "${r.title}" only; no skill or interest hits in JD.`;
+    ? `Title sits in your seniority range and the posting touches ${parts.join(' and ')}. Full job description wasn't reachable, so this is a partial read.`
+    : `Title sits in your seniority range, but nothing in the posting connects to your specific skills or interests.`;
   return { v, reason, fallback: true };
 }
 
@@ -224,22 +228,27 @@ function scoreDomain(r: RoleRow, cap: number, ctx?: UserContext): { v: number; r
   const compounds = ['health tech','healthtech','health care','healthcare','edtech','education','chronic','consumer','platform','marketplace','telehealth','civic'];
   for (const c of compounds) if (ctx.pastSectors.some(s => s.toLowerCase().includes(c))) tokens.add(c);
   const hits = listMatches(text, [...tokens], 5);
+  // Filter out the noisy generic tokens that come from splitting sector blobs
+  // ("multi", "sector", "based") — they leak into rationales and read poorly.
+  const meaningful = hits.filter(h => h.length >= 5 && !['multi','sector','based','focus'].includes(h));
   const tier = hits.length >= 4 ? cap : hits.length === 3 ? Math.round(cap * 0.80) : hits.length === 2 ? Math.round(cap * 0.60) : hits.length === 1 ? Math.round(cap * 0.40) : Math.round(cap * 0.20);
-  const reason = hits.length
-    ? `Overlap with your past sectors: ${hits.slice(0, 4).join(', ')}.`
-    : 'No overlap with your past sectors (Remind, Livongo/Teladoc, consulting) in posting text.';
+  const reason = meaningful.length
+    ? `Adjacent to where you've worked — ${meaningful.slice(0, 4).join(', ')}.`
+    : hits.length
+      ? 'Loosely adjacent to your past sectors.'
+      : 'Outside the healthcare, edtech, and consumer-SaaS surface where you\'ve spent your career.';
   return { v: tier, reason };
 }
 
 function legacySector(s: string, cap: number): { v: number; reason: string } {
   const x = (s || '').toLowerCase();
-  if (!x) return { v: Math.round(cap * 0.40), reason: 'No sector tag on posting; scored at neutral.' };
-  if (/health|medical|clinical|telehealth|civic|public|nonprofit/.test(x)) return { v: cap, reason: `Sector "${s}" maps to healthcare / civic — your strongest past domain.` };
-  if (/edtech|education/.test(x)) return { v: cap, reason: `Sector "${s}" — your Remind edtech experience.` };
-  if (/ai-native|legal ai|productivity|saas|fintech/.test(x)) return { v: Math.round(cap * 0.67), reason: `Sector "${s}" — adjacent to your platform/SaaS work but not core.` };
-  if (/consumer|hardware|retail|marketplace/.test(x)) return { v: Math.round(cap * 0.47), reason: `Sector "${s}" — partial overlap with your consumer-SaaS consulting.` };
-  if (/ad-?tech|crypto|gambling/.test(x)) return { v: 0, reason: `Sector "${s}" is on your deal-breaker list.` };
-  return { v: Math.round(cap * 0.40), reason: `Sector "${s}" doesn't map cleanly to your past domains.` };
+  if (!x) return { v: Math.round(cap * 0.40), reason: 'The posting doesn\'t flag a sector.' };
+  if (/health|medical|clinical|telehealth|civic|public|nonprofit/.test(x)) return { v: cap, reason: `Healthcare or civic — your strongest past domain.` };
+  if (/edtech|education/.test(x)) return { v: cap, reason: `Education — the world you came up in at Remind.` };
+  if (/ai-native|legal ai|productivity|saas|fintech/.test(x)) return { v: Math.round(cap * 0.67), reason: `Adjacent to your platform and SaaS work, but not your core domain.` };
+  if (/consumer|hardware|retail|marketplace/.test(x)) return { v: Math.round(cap * 0.47), reason: `Some overlap with your consumer SaaS consulting.` };
+  if (/ad-?tech|crypto|gambling/.test(x)) return { v: 0, reason: `Sits on your deal-breaker list.` };
+  return { v: Math.round(cap * 0.40), reason: `Doesn't map cleanly to where you've worked.` };
 }
 
 // ---------- Career arc (cap from weights.arc, default 10) ----------
@@ -270,18 +279,29 @@ function scoreArc(r: RoleRow, cap: number, ctx?: UserContext, seniorityHint?: st
   }
 
   let coherence = 0;
-  const cohereParts: string[] = [];
-  if (isFounding && earlyStage) { coherence += cap * 0.4; cohereParts.push('founding × early-stage'); }
-  if (isSeniorScale && !earlyStage && !lateStage) { coherence += cap * 0.2; cohereParts.push(`${seniorityLabel} seniority × scale-up coherence`); }
-  if (isSeniorScale && lateStage) { coherence -= cap * 0.1; cohereParts.push('senior × late-stage penalty'); }
+  const isStrongCoherence = isFounding && earlyStage;
+  const isScaleUpCoherence = isSeniorScale && !earlyStage && !lateStage;
+  const isLateStageMismatch = isSeniorScale && lateStage;
+  if (isStrongCoherence)    coherence += cap * 0.4;
+  if (isScaleUpCoherence)   coherence += cap * 0.2;
+  if (isLateStageMismatch)  coherence -= cap * 0.1;
   const fromHits = Math.min(cap * 0.6, arcHits.length * (cap * 0.2));
   const v = clampToCap(Math.round(fromHits + coherence), cap);
-  const reasonParts: string[] = [];
-  if (arcHits.length) reasonParts.push(`arc signals: ${arcHits.slice(0, 3).join(', ')}`);
-  if (cohereParts.length) reasonParts.push(cohereParts.join(' + '));
-  const reason = reasonParts.length
-    ? reasonParts.join('; ') + '.'
-    : `No arc signals (founding/scale/IPO/0→1) in posting; seniority "${seniorityLabel}" with no stage info.`;
+
+  let reason: string;
+  if (isStrongCoherence) {
+    reason = `A founding seat at an early-stage company — the shape of role you've been pointing toward.`;
+  } else if (isScaleUpCoherence) {
+    reason = arcHits.length
+      ? `A senior IC seat with scale-up language — ${arcHits.slice(0, 2).join(', ')} — on your trajectory from Livongo.`
+      : `A senior IC seat at scale-up stage — on your trajectory from Livongo.`;
+  } else if (isLateStageMismatch) {
+    reason = `Senior IC shape, but the company is past the stage where you've done your best work.`;
+  } else if (arcHits.length) {
+    reason = `Some arc signal — ${arcHits.slice(0, 3).join(', ')} — but the seniority or stage isn't a clean match.`;
+  } else {
+    reason = `Hard to read the trajectory fit from this posting — neither the stage nor the scope is spelled out.`;
+  }
   return { v, reason };
 }
 
@@ -289,36 +309,36 @@ function scoreArc(r: RoleRow, cap: number, ctx?: UserContext, seniorityHint?: st
 function scoreStage(r: RoleRow, cap: number): { v: number; reason: string; fail?: string } {
   const i = (r.investors + ' ' + r.crunchbase).toLowerCase();
   if (/(?:^|\W)(google|meta|amazon|microsoft|apple|salesforce)(?:\W|$)/.test((r.company + ' ' + i).toLowerCase())) {
-    return { v: Math.round(cap * 0.25), fail: 'public / mega-cap', reason: 'Public / mega-cap company; hard-fail cap applied.' };
+    return { v: Math.round(cap * 0.25), fail: 'public / mega-cap', reason: 'Public, mega-cap company — outside the company shape you\'re targeting.' };
   }
-  if (/series d|series e|late stage/.test(i)) return { v: Math.round(cap * 0.5), reason: 'Late-stage (Series D+); past your sweet spot but acceptable.' };
+  if (/series d|series e|late stage/.test(i)) return { v: Math.round(cap * 0.5), reason: 'Later-stage company — past your sweet spot but workable.' };
   if (/series a|series b|series c|seed|pre-seed/.test(i)) {
     const m = i.match(/series [a-c]|seed|pre-seed/);
-    return { v: cap, reason: `${(m?.[0] || 'early stage')} startup — your target stage.` };
+    return { v: cap, reason: `${(m?.[0] || 'Early-stage')} — right in your target band.` };
   }
-  return { v: Math.round(cap * 0.6), reason: 'No investor data on this posting; scored at neutral.' };
+  return { v: Math.round(cap * 0.6), reason: 'Hard to place the stage from this posting — worth checking before a conversation.' };
 }
 
 // ---------- Comp (cap from weights.comp, default 4) ----------
 function scoreComp(s: string, cap: number): { v: number; reason: string } {
-  if (!s) return { v: Math.round(cap * 0.5), reason: 'No compensation disclosed in posting.' };
+  if (!s) return { v: Math.round(cap * 0.5), reason: 'Compensation isn\'t disclosed — worth pinning down early.' };
   const txt = s.toLowerCase().replace(/[,$\s]/g, '');
   const nums = Array.from(txt.matchAll(/(\d+(?:\.\d+)?)(k)?/g)).map(m => {
     const n = parseFloat(m[1]);
     return m[2] === 'k' ? n * 1000 : n;
   });
-  if (!nums.length) return { v: Math.round(cap * 0.5), reason: `Salary text "${s}" couldn't be parsed.` };
+  if (!nums.length) return { v: Math.round(cap * 0.5), reason: 'Salary text didn\'t parse cleanly — worth confirming in writing.' };
   const top = Math.max(...nums);
   const fmt = (n: number) => `$${Math.round(n / 1000)}k`;
-  if (top < 10000) return { v: Math.round(cap * 0.5), reason: `Parsed value (${fmt(top)}) looks too low; likely a percentage. Scored neutral.` };
-  if (top >= 200000) return { v: cap, reason: `Top of range ${fmt(top)} clears your $200k floor.` };
-  if (top >= 170000) return { v: Math.round(cap * 0.6), reason: `Top of range ${fmt(top)} is under your $200k floor.` };
-  return { v: Math.round(cap * 0.2), reason: `Top of range ${fmt(top)} is well under your $200k floor.` };
+  if (top < 10000) return { v: Math.round(cap * 0.5), reason: 'Posted figure looks like a percentage rather than a base — confirm before reading further into it.' };
+  if (top >= 200000) return { v: cap, reason: `Top of range at ${fmt(top)} clears the floor you\'ve set.` };
+  if (top >= 170000) return { v: Math.round(cap * 0.6), reason: `Top of range at ${fmt(top)} comes in under your floor.` };
+  return { v: Math.round(cap * 0.2), reason: `Top of range at ${fmt(top)} is well under your floor.` };
 }
 
 // ---------- Geo (cap from weights.geo, default 2) ----------
 function scoreGeo(_r: RoleRow, cap: number): { v: number; reason: string; fail?: string } {
-  return { v: Math.round(cap * 0.8), reason: 'Geo filtering happens upstream; this is a small fixed bonus.' };
+  return { v: Math.round(cap * 0.8), reason: 'Already inside the locations you\'re open to.' };
 }
 
 // ---------- Compose ----------
