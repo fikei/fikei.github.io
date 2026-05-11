@@ -7,10 +7,11 @@ const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
 
 export interface HaikuRoleMatch {
-  score:     number;
-  rationale: string;
-  seniority: string;
-  scope:     string;
+  score:      number;
+  rationale:  string;
+  seniority:  string;
+  scope:      string;
+  fitSummary: string;
 }
 
 let _fitCtxCache: { ctx: FitUserContext; at: number } | null = null;
@@ -94,7 +95,8 @@ Output JSON only:
   "score":      <int 0-25>,
   "rationale":  "<one sentence, max 22 words>",
   "seniority":  "below" | "equivalent" | "above" | "founding",
-  "scope":      "ic" | "ic_player_coach" | "manager"
+  "scope":      "ic" | "ic_player_coach" | "manager",
+  "fitSummary": "<2-4 sentence prose, max 100 words. ONLY explain why this company / role is desirable for the candidate's needs — mission alignment, scope they want, kind of problem they care about, culture traits they care about. DO NOT describe why the candidate is a good fit for the company or what they bring to the role. Speak about the company in third person.>"
 }
 
 Scoring rubric for "score":
@@ -131,14 +133,14 @@ No prose outside the JSON.`;
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 200, system, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 500, system, messages: [{ role: 'user', content: userPrompt }] }),
     });
     if (!res.ok) throw new Error(`anthropic ${res.status}`);
     const data = await res.json() as { content: Array<{ type: string; text: string }> };
     const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string };
+    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string };
     if (typeof parsed.score !== 'number') return null;
     const seniority = ['below','equivalent','above','founding'].includes((parsed.seniority || '').toLowerCase())
       ? parsed.seniority!.toLowerCase() : 'equivalent';
@@ -148,6 +150,7 @@ No prose outside the JSON.`;
       score: Math.max(0, Math.min(25, Math.round(parsed.score))),
       rationale: String(parsed.rationale || '').slice(0, 400),
       seniority, scope,
+      fitSummary: String(parsed.fitSummary || '').slice(0, 1200),
     };
   } catch (e) {
     console.warn(`[job-fit-haiku] role-match failed: ${(e as Error).message}`);
@@ -165,6 +168,7 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   rationale: string | null;
   seniority: string | null;
   scope: string | null;
+  fitSummary: string | null;
   description: string;
 }> {
   const ctx = await loadFitContext(sql);
@@ -180,13 +184,15 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   let rationale: string | null = null;
   let seniority: string | null = null;
   let scope: string | null = null;
+  let fitSummary: string | null = null;
   if (description.length > 200) {
     const haiku = await haikuRoleMatch(enriched, ctx);
     if (haiku) {
       roleScore = haiku.score; rationale = haiku.rationale;
       seniority = haiku.seniority; scope = haiku.scope;
+      fitSummary = haiku.fitSummary || null;
     }
   }
   const fit = computeFit(enriched, ctx, roleScore, seniority, rationale);
-  return { fit, roleScore, rationale, seniority, scope, description };
+  return { fit, roleScore, rationale, seniority, scope, fitSummary, description };
 }

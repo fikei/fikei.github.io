@@ -46,7 +46,7 @@ async function listRoles() {
       r.stage, r.exit_reason as "exitReason", r.exit_context as "exitContext",
       r.contact, r.salary_range as salary, r.salary_low, r.salary_high,
       r.sector, r.investors, r.fit_score as score, r.fit_breakdown as breakdown,
-      r.fit_rationales as rationales,
+      r.fit_rationales as rationales, r.fit_summary as "fitSummary",
       r.hard_fails as "hardFails", r.applied_at, r.status_changed_at,
       r.first_seen, r.last_seen,
       r.archived_at as "archivedAt",

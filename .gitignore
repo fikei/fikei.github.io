@@ -38,3 +38,4 @@ npm-debug.log*
 # Temporary files
 *.tmp
 *.temp
+.claude/scheduled_tasks*.lock

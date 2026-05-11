@@ -1443,6 +1443,21 @@
   margin: 0;
 }
 
+/* Two-column page layout: Fit on left, Candidate strength on right.
+   Stacks below 880px so the Fit card's bars stay readable. */
+.role-cards--fit-candidate {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: start;
+}
+.role-cards--fit-candidate .role-card--fit { margin-bottom: 0; }
+@media (max-width: 880px) {
+  .role-cards--fit-candidate { grid-template-columns: 1fr; }
+}
+/* Inside the narrower fit column, bars stack to one column. */
+.role-cards--fit-candidate .role-card--fit .fit-breakdown {
+  grid-template-columns: 1fr;
+}
+
 .role-callout {
   border-left: 3px solid var(--accent-strong);
   padding: var(--space-3) var(--space-4);
