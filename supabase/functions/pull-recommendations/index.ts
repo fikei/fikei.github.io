@@ -21,7 +21,7 @@ import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
 const VERSION = '0.5.0';
-console.log(`[pull-recommendations] v${VERSION} - Phase 1.5 enrichment writes (enrichment_status, canonical_url, company_id)`);
+console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring; Phase 1.5 enrichment writes`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -73,57 +73,54 @@ serve(async (req) => {
   // after weight/shape changes so existing rows pick up the new model.
   if (rescoreOnly) {
     const ctx = await loadFitContext(sql);
-    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null }>>`
-      select id, title, company, description, sector, investors, salary, source
+    const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null }>>`
+      select id, title, company, description, sector, investors, salary, source, role_match_score
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
     `;
-    let updated = 0;
+    let updated = 0, haikuCalls = 0;
     for (const r of rows) {
       const roleRow: RoleRow = {
         status: '', rank: '',
-        company:    r.company || '',
-        title:      r.title || '',
-        url:        '',
-        source:     r.source || '',
-        contact:    '',
-        salary:     r.salary || '',
-        sector:     r.sector || '',
-        investors:  (r.investors || []).join(', '),
-        website:    '', crunchbase: '',
-        description: r.description || '',
+        company: r.company || '', title: r.title || '', url: '',
+        source: r.source || '', contact: '', salary: r.salary || '',
+        sector: r.sector || '', investors: (r.investors || []).join(', '),
+        website: '', crunchbase: '', description: r.description || '',
       };
-      const fit = computeFit(roleRow, ctx);
+      // Compute or reuse role-match. Haiku only for rows that don't already
+      // have a score AND have enough JD context to warrant a call.
+      let roleScore = r.role_match_score;
+      let rationale: string | null = null;
+      if (useHaiku && roleScore == null && (r.description || '').length > 200) {
+        const haiku = await haikuRoleMatch(roleRow, ctx);
+        if (haiku) { roleScore = haiku.score; rationale = haiku.rationale; haikuCalls++; }
+      }
+      const fit = computeFit(roleRow, ctx, roleScore);
       await sql`
         update job.recommended_roles
-           set fit_score     = ${fit.score},
-               fit_breakdown = ${sql.json(fit.breakdown)},
-               hard_fails    = ${fit.hardFails}
+           set fit_score            = ${fit.score},
+               fit_breakdown        = ${sql.json(fit.breakdown)},
+               hard_fails           = ${fit.hardFails},
+               role_match_score     = ${roleScore},
+               role_match_rationale = coalesce(${rationale}, role_match_rationale)
          where id = ${r.id}
       `;
       updated++;
     }
-    // Also rescore pipeline_roles so the Saved/Active/Archive table picks
-    // up the v2 breakdown shape and weights.
-    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null }>>`
-      select slug, title, company_name, sector, investors, salary_range, source
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
+      select slug, title, company_name, sector, investors, salary_range, source, role_match_score
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
       const roleRow: RoleRow = {
         status: '', rank: '',
-        company:    r.company_name || '',
-        title:      r.title || '',
-        url:        '',
-        source:     r.source || '',
-        contact:    '',
-        salary:     r.salary_range || '',
-        sector:     r.sector || '',
-        investors:  (r.investors || []).join(', '),
-        website:    '', crunchbase: '',
-        description: '',
+        company: r.company_name || '', title: r.title || '', url: '',
+        source: r.source || '', contact: '', salary: r.salary_range || '',
+        sector: r.sector || '', investors: (r.investors || []).join(', '),
+        website: '', crunchbase: '', description: '',
       };
-      const fit = computeFit(roleRow, ctx);
+      const fit = computeFit(roleRow, ctx, r.role_match_score);
       await sql`
         update job.pipeline_roles
            set fit_score     = ${fit.score},
@@ -132,7 +129,7 @@ serve(async (req) => {
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
-    return new Response(JSON.stringify({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated }, null, 2),
+    return new Response(JSON.stringify({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated, haikuCalls }, null, 2),
       { status: 200, headers: { 'content-type': 'application/json' } });
   }
   const sources = forceId
@@ -342,6 +339,7 @@ async function loadFitContext(sql: ReturnType<typeof db>): Promise<FitUserContex
   if (_fitCtxCache && Date.now() - _fitCtxCache.at < FIT_CTX_CACHE_MS) return _fitCtxCache.ctx;
   const [visionRows, skillRows, companyRows] = await Promise.all([
     sql`select impact_themes, mission_keywords, mission_required, anti_mission_terms,
+               culture_keywords, interest_tags, score_weights,
                coalesce(narrative_arc,'') as narrative_arc
           from job.vision order by updated_at desc limit 1`,
     sql`select name, years_practiced from job.skills`,
@@ -358,15 +356,77 @@ async function loadFitContext(sql: ReturnType<typeof db>): Promise<FitUserContex
     antiMissionTerms:  (v.anti_mission_terms as string[] | null) || [],
     impactThemes:      (v.impact_themes as string[] | null) || [],
     missionRequired:   Boolean(v.mission_required),
+    cultureKeywords:   (v.culture_keywords as string[] | null) || [],
+    interestTags:      (v.interest_tags as string[] | null) || [],
     skills:            (skillRows as Array<Record<string, unknown>>).map(s => ({
       name: String(s.name || ''),
       years: (s.years_practiced as number | null) ?? null,
     })),
     pastSectors: (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
     arcTags,
+    weights:           (v.score_weights as Partial<FitUserContext['weights']>) || undefined,
   };
   _fitCtxCache = { ctx, at: Date.now() };
   return ctx;
+}
+
+// ---------- Haiku role-match scorer ----------
+// Sends the JD + user's skills/interests to Claude Haiku and asks for a
+// single integer 0–25 plus a one-sentence rationale. Returns null on any
+// failure so the caller can fall back to the regex bucket. The score we
+// get back is persisted on the row so rescore doesn't re-pay Haiku.
+async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<{ score: number; rationale: string } | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return null;
+  const system = `You score role-fit on a 0-25 integer scale.
+
+Inputs you will see:
+  - Job posting (title, company, description)
+  - The candidate's skills (with years of practice)
+  - The candidate's interest tags (problem types they want to work on)
+
+Scoring rubric (these are real anchors, not platitudes):
+  0-5   Wrong shape entirely (wrong seniority, wrong function, deal-breaker)
+  6-12  Adjacent — title fits but JD responsibilities barely overlap with skills/interests
+  13-18 Genuine match — multiple skills and at least one interest tag map cleanly to JD responsibilities
+  19-22 Strong — the JD reads like it was written for someone with this exact profile
+  23-25 Reserved for rare alignment across seniority, scope, skills, and explicit interest overlap
+
+Output JSON only: {"score": <int 0-25>, "rationale": "<one sentence, max 22 words>"}.
+No prose outside the JSON. No bullets. No headers.`;
+  const userPrompt = [
+    `# Posting`,
+    `Title: ${r.title}`,
+    `Company: ${r.company}`,
+    `Description (truncated):\n${(r.description || '').slice(0, 2500)}`,
+    `\n# Candidate skills`,
+    ...ctx.skills.map(s => `- ${s.name} (${s.years ?? '?'} yrs)`),
+    `\n# Candidate interest tags`,
+    `- ${(ctx.interestTags || []).join('\n- ')}`,
+  ].join('\n');
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 200,
+        system,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`anthropic ${res.status}`);
+    const data = await res.json() as { content: Array<{ type: string; text: string }> };
+    const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string };
+    if (typeof parsed.score !== 'number') return null;
+    return { score: Math.max(0, Math.min(25, Math.round(parsed.score))), rationale: String(parsed.rationale || '').slice(0, 400) };
+  } catch (e) {
+    console.warn(`[pull-recommendations] haiku role-match failed: ${(e as Error).message}`);
+    return null;
+  }
 }
 
 // Map a RecommendedRoleInput → the RoleRow shape computeFit expects.
