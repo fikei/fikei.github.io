@@ -152,7 +152,14 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     }
 
     const ids = listRes.messageIds.slice(0, maxMessages);
-    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidate messages (history=${!!state.history_id})`);
+    // True when we capped — there are more messages in the inbox that
+    // we're not touching this run. We deliberately DO NOT advance the
+    // cursor in that case so the next tick re-walks the same window
+    // and picks up the rest. The dedup check at the top of the loop
+    // makes re-walks cheap: already-processed messages skip without a
+    // Haiku call.
+    const cappedRun = listRes.messageIds.length > ids.length;
+    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidate messages (history=${!!state.history_id}, capped=${cappedRun})`);
 
     const out: RecommendedRoleInput[] = [];
 
@@ -166,13 +173,26 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       }
       const messageId = getMessageIdHeader(msg);
 
-      // Already seen (skipped or ingested)? The unique (source, source_id)
-      // constraint on recommended_roles handles dedup at insert time, but
-      // we also want to avoid re-processing skipped messages every tick.
-      const already = await sql<{ message_id: string }[]>`
-        select message_id from job.gmail_skipped
-         where user_email = ${ctx.userEmail} and message_id = ${messageId} limit 1`;
-      if (already.length) continue;
+      // Already seen? Check BOTH:
+      //   - gmail_skipped: messages we deliberately didn't ingest
+      //   - recommended_roles: messages already fanned out into recs
+      //     (source_id format is `gmail:{messageId}:{i}` since fan-out
+      //     landed, or `gmail:{messageId}` for the pre-fan-out single
+      //     row. LIKE pattern catches both.)
+      // This makes the source idempotent: timed-out runs can be re-fired
+      // and they pick up where they left off instead of re-Haiku'ing
+      // messages that are already in the DB.
+      const skipMatch = await sql<{ id: string }[]>`
+        select id from job.gmail_skipped
+         where user_email = ${ctx.userEmail} and message_id = ${messageId}
+         limit 1`;
+      if (skipMatch.length) continue;
+      const recMatch = await sql<{ id: string }[]>`
+        select id from job.recommended_roles
+         where source = 'gmail-jobs'
+           and (source_id = ${`gmail:${messageId}`} or source_id like ${`gmail:${messageId}:%`})
+         limit 1`;
+      if (recMatch.length) continue;
 
       const sender = (getHeader(msg, 'From') || '').toLowerCase();
       if (blockSenders.some(b => sender.includes(b))) {
@@ -283,11 +303,24 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       }
     }
 
-    // Persist new cursor. Prefer the historyId Gmail returned;
-    // otherwise stamp last_scan_at = now (we just consumed everything
-    // up to "now" via the timestamp query). On first run with no
-    // history_id, ask Gmail what its current historyId is so the next
-    // tick goes through the cheap path.
+    // Persist new cursor — but ONLY when we drained the whole queue.
+    // If the cap kicked in, leave the cursor where it was so the next
+    // tick re-fetches the same window and picks up the remainder. The
+    // dedup check at the top means already-processed messages skip
+    // without paying for Haiku again.
+    if (cappedRun) {
+      // Leave gmail_scan_state untouched. Stamp last_error=null and
+      // updated_at so we can see the row was touched this tick.
+      await sql`
+        insert into job.gmail_scan_state (user_email, history_id, last_scan_at, last_error, updated_at)
+          values (${ctx.userEmail}, ${state.history_id}, ${state.last_scan_at}, null, now())
+        on conflict (user_email) do update
+          set last_error = null, updated_at = now()
+      `;
+      console.log(`[gmail-jobs] ${ctx.userEmail} → run capped, cursor unchanged (more messages queued)`);
+      return out;
+    }
+
     let nextHistory: string | null = listRes.nextHistoryId;
     if (!nextHistory && !state.history_id) {
       nextHistory = await getProfileHistoryId(accessToken);
