@@ -283,7 +283,11 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
         out.push({
           source:      'gmail-jobs',
           sourceId:    `gmail:${messageId}:${i}`,
-          sourceLabel: `Gmail · ${job.company}`,
+          // Source label is the email sender ("LinkedIn", "Wellfound",
+          // …), not the hiring company. The company name is already
+          // visible in the role row; the source label tells the user
+          // *where* a rec came from, not *who*.
+          sourceLabel: `Gmail · ${senderLabel(sender)}`,
           url,
           company:     job.company,
           title:       job.title,
@@ -370,6 +374,43 @@ function hasMultipleJobLinks(body: string): boolean {
     if (ids.size > 1) return true;
   }
   return false;
+}
+
+// Extract a friendly display name from a Gmail From header.
+//   "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>" → "LinkedIn"
+//   "jobs-noreply@linkedin.com"                            → "LinkedIn"
+//   "Wellfound <hello@wellfound.com>"                      → "Wellfound"
+// We collapse multi-word display names (e.g. "LinkedIn Job Alerts" /
+// "Wellfound Daily Digest") down to the brand root so the source-label
+// chip stays tight.
+const SENDER_BRAND_HINTS: Record<string, string> = {
+  'linkedin':           'LinkedIn',
+  'wellfound':          'Wellfound',
+  'otta':               'Otta',
+  'hellootta':          'Otta',
+  'hnhiring':           'Hacker News',
+  'hackernewsletter':   'Hacker News',
+  'builtin':            'Built In',
+  'workatastartup':     'YC',
+  'yc':                 'YC',
+};
+function senderLabel(sender: string): string {
+  if (!sender) return 'Gmail';
+  // Brand-domain match wins — keeps "LinkedIn Job Alerts" + bare
+  // "jobs-noreply@linkedin.com" rendering identically as "LinkedIn".
+  const domain = sender.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase() || '';
+  for (const [k, label] of Object.entries(SENDER_BRAND_HINTS)) {
+    if (domain.includes(k)) return label;
+  }
+  // No brand hint → use the friendly display name if any.
+  const friendly = sender.match(/^\s*"?([^<"]+?)"?\s*<[^>]+>/)?.[1]?.trim();
+  if (friendly) return friendly;
+  // Last resort — the domain itself, title-cased.
+  if (domain) {
+    const base = domain.split('.').slice(-2, -1)[0] || domain;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  }
+  return sender;
 }
 
 function looksLikeDigest(subject: string, sender: string): boolean {
