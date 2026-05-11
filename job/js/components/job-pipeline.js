@@ -2,26 +2,46 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, setStatus, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
+const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
 
-const STATUS_OPTIONS = ['', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network'];
-const TERMINAL_STATUSES = new Set(['Pass', 'Rejected', 'Closed']);
-const APPLIED_STATUSES = new Set(['Applied', 'Talking']);
+// Status taxonomy (3-value). Bucket name → status name:
+//   leads  → 'Saved'
+//   active → 'Active'  (with sub-stage: drafting/applied/interviewing/offer)
+//   archive→ 'Archive' (with exit_reason)
+const STATUS_OPTIONS = ['Saved', 'Active', 'Archive'];
 
-// Bucket assignment — drives the Leads / Active / Archive subtabs.
-//   archive: archived OR status in {Pass, Rejected, Closed, Not Listed}
-//   leads:   not archive AND status in {'', 'New', 'Nudge / Network'}
-//   active:  everything else not archive (Apply, Applied, Talking, …)
-const ARCHIVE_STATUSES = new Set(['Pass', 'Rejected', 'Closed', 'Not Listed']);
-const LEADS_STATUSES   = new Set(['', 'New', 'Nudge / Network']);
+const STAGES = [
+  { id: 'drafting',     label: 'Drafting' },
+  { id: 'applied',      label: 'Applied' },
+  { id: 'interviewing', label: 'Interviewing' },
+  { id: 'offer',        label: 'Offer' },
+];
+
+// Softer-language exit reasons. Order = "didn't apply" → "applied but
+// didn't progress" → "circumstance" so the user sees the natural
+// branching down the funnel.
+const EXIT_REASONS = [
+  { id: 'changed_mind',             label: "Read the JD again and changed my mind" },
+  { id: 'wrong_comp',               label: "Comp wasn't what I'm looking for" },
+  { id: 'wrong_sector_or_stage',    label: "Sector or stage felt off" },
+  { id: 'wrong_location',           label: "Location or remote situation didn't work" },
+  { id: 'applied_no_response',      label: "I applied but didn't hear back" },
+  { id: 'rejected_after_screen',    label: "Didn't move forward after a screen" },
+  { id: 'rejected_after_interview', label: "Didn't move forward after interviews" },
+  { id: 'role_closed',              label: "Role was filled or closed before I applied" },
+  { id: 'withdrew',                 label: "I stepped away mid-process" },
+  { id: 'other',                    label: "Something else" },
+];
+
 function bucketFor(r) {
-  if (r.archivedAt) return 'archive';
-  if (ARCHIVE_STATUSES.has(r.status || '')) return 'archive';
-  if (LEADS_STATUSES.has(r.status || '')) return 'leads';
-  return 'active';
+  switch (r.status) {
+    case 'Active':  return 'active';
+    case 'Archive': return 'archive';
+    default:        return 'leads';
+  }
 }
 
 const DIM_LABELS = {
@@ -98,6 +118,13 @@ export class JobPipeline extends LitElement {
     pasteUrl: { state: true },
     pasteSaving: { state: true },
     pasteError: { state: true },
+    // Active sub-stage tab filter. null = "All".
+    activeStageFilter: { state: true },
+    // Archive-flow modal state.
+    archivingRow:    { state: true },
+    archiveReason:   { state: true },
+    archiveContext:  { state: true },
+    archiveSaving:   { state: true },
   };
 
   constructor() {
@@ -138,6 +165,12 @@ export class JobPipeline extends LitElement {
     this.pasteUrl = '';
     this.pasteSaving = false;
     this.pasteError = '';
+    const stageQ = params.get('stage');
+    this.activeStageFilter = STAGES.some(s => s.id === stageQ) ? stageQ : null;
+    this.archivingRow = null;
+    this.archiveReason = null;
+    this.archiveContext = '';
+    this.archiveSaving = false;
     this._lastVisitAt = (() => {
       try { return localStorage.getItem('job:jobs:lastVisitAt') || null; } catch { return null; }
     })();
@@ -273,7 +306,14 @@ export class JobPipeline extends LitElement {
   _sorted() {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
-    const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket));
+    const arr = this.roles.filter(r => {
+      if (!isVisibleRole(r) || !bucketFilter(r, this.bucket)) return false;
+      // Active sub-tab filter: when set, only rows whose stage matches.
+      if (this.bucket === 'active' && this.activeStageFilter) {
+        return (r.stage || null) === this.activeStageFilter;
+      }
+      return true;
+    });
     if (key === 'manual') {
       const order = this._manualOrders[this.bucket] || [];
       const idx = new Map(order.map((slug, i) => [slug, i]));
@@ -315,22 +355,45 @@ export class JobPipeline extends LitElement {
   _openFitModal(r) { this.selectedRow = r; }
   _closeFitModal() { this.selectedRow = null; }
 
-  async _changeStatus(r, status) {
-    if (status === r.status) return;
-    const prev = r.status;
-    r.status = status;
+  async _applyPatch(r, patch) {
+    // Optimistic write — mutate local + UI, roll back on error.
+    const prev = { status: r.status, stage: r.stage, exitReason: r.exitReason, exitContext: r.exitContext };
+    if ('status' in patch)       r.status = patch.status;
+    if ('stage' in patch)        r.stage = patch.stage;
+    if ('exit_reason' in patch)  r.exitReason = patch.exit_reason;
+    if ('exit_context' in patch) r.exitContext = patch.exit_context;
+    // Auto-promote mirror (server does the canonical version).
+    if (patch.stage) r.status = 'Active';
     r._saving = true;
     this.requestUpdate();
     try {
-      await setStatus({ slug: r.slug, rowNumber: r.rowNumber }, status);
+      const resp = await updateRole({ slug: r.slug }, patch);
+      // Reflect server's canonical state.
+      r.status      = resp.status      ?? r.status;
+      r.stage       = resp.stage       ?? null;
+      r.exitReason  = resp.exit_reason ?? null;
       r._saving = false;
       r._error = '';
+      document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
     } catch (e) {
-      r.status = prev;
+      r.status      = prev.status;
+      r.stage       = prev.stage;
+      r.exitReason  = prev.exitReason;
+      r.exitContext = prev.exitContext;
       r._saving = false;
       r._error = String(e);
     }
     this.requestUpdate();
+  }
+
+  // Status-only change (used by 3-button status group on Active rows).
+  async _changeStatus(r, status) {
+    if (status === r.status) return;
+    if (status === 'Archive') return this._openArchiveModal(r);
+    // Saved or Active — clear stage when leaving Active, otherwise keep it.
+    const patch = { status, stage: status === 'Active' ? r.stage : null };
+    if (status !== 'Archive') patch.exit_reason = null;
+    await this._applyPatch(r, patch);
   }
 
   _detailHref(r) { return `/job/jobs/${r.slug}/`; }
@@ -344,6 +407,13 @@ export class JobPipeline extends LitElement {
     e.preventDefault();
     if (bucket === this.bucket) return;
     this.bucket = bucket;
+    // Clear stage filter when leaving Active; it's a no-op elsewhere.
+    if (bucket !== 'active') {
+      this.activeStageFilter = null;
+      const qs = new URLSearchParams(location.search);
+      qs.delete('stage');
+      history.replaceState(null, '', `${location.pathname}?${qs}`);
+    }
     // On Saved, prefer manual order if the user has one; otherwise reset to
     // fit-desc. The other buckets always default to fit-desc.
     if (bucket === 'leads' && this._manualOrders.leads.length) {
@@ -462,9 +532,9 @@ export class JobPipeline extends LitElement {
   }
 
   _renderMenuCell(r) {
-    const archived = isArchived(r);
     const menuOpen = this.openMenuSlug === r.slug;
-    const cur = r.status || '';
+    const cur = r.status || 'Saved';
+    const curStage = r.stage || null;
     return html`
       <div class="row-menu">
         <button class="row-menu__trigger" aria-label="Row actions"
@@ -472,19 +542,28 @@ export class JobPipeline extends LitElement {
                 @click=${(e) => this._toggleMenu(r.slug, e)}>⋮</button>
         ${menuOpen ? html`
           <div class="row-menu__panel row-menu__panel--wide" role="menu" @click=${(e) => e.stopPropagation()}>
-            <div class="row-menu__group-label">Set status</div>
+            <div class="row-menu__group-label">Move to</div>
             ${STATUS_OPTIONS.map(s => html`
               <button role="menuitem"
                       class=${'row-menu__item row-menu__item--status' + (cur === s ? ' is-current' : '')}
                       @click=${() => this._changeStatusFromMenu(r, s)}>
                 <span class="row-menu__check" aria-hidden="true">${cur === s ? '✓' : ''}</span>
-                <span>${s || '— (clear)'}</span>
+                <span>${s}</span>
               </button>
             `)}
+            ${cur === 'Active' ? html`
+              <div class="row-menu__divider" role="separator"></div>
+              <div class="row-menu__group-label">Active stage</div>
+              ${STAGES.map(s => html`
+                <button role="menuitem"
+                        class=${'row-menu__item row-menu__item--stage' + (curStage === s.id ? ' is-current' : '')}
+                        @click=${() => this._setStageFromMenu(r, s.id)}>
+                  <span class="row-menu__check" aria-hidden="true">${curStage === s.id ? '✓' : ''}</span>
+                  <span>${s.label}</span>
+                </button>
+              `)}
+            ` : nothing}
             <div class="row-menu__divider" role="separator"></div>
-            <button role="menuitem" class="row-menu__item" @click=${() => this._onArchive(r, !archived)}>
-              ${archived ? 'Unarchive' : 'Archive'}
-            </button>
             <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
               Delete…
             </button>
@@ -499,11 +578,133 @@ export class JobPipeline extends LitElement {
     await this._changeStatus(r, status);
   }
 
-  _renderStatusCell(r) {
-    const s = r.status || '';
-    const cls = 'status-pill status-pill--' + (s ? s.toLowerCase().replace(/[^a-z]+/g, '-') : 'none');
+  // Selecting a stage from the menu auto-promotes status to Active on
+  // a Saved row (mirror of server-side rule). Re-selecting the same
+  // stage clears it.
+  async _setStageFromMenu(r, stage) {
+    this.openMenuSlug = null;
+    const next = r.stage === stage ? null : stage;
+    await this._applyPatch(r, { stage: next, status: 'Active' });
+  }
+
+  _openArchiveModal(r) {
+    this.openMenuSlug = null;
+    this.archivingRow = r;
+    this.archiveReason = null;
+    this.archiveContext = '';
+    this.archiveSaving = false;
+  }
+
+  _closeArchiveModal() {
+    this.archivingRow = null;
+    this.archiveReason = null;
+    this.archiveContext = '';
+    this.archiveSaving = false;
+  }
+
+  async _submitArchive() {
+    const r = this.archivingRow;
+    if (!r || !this.archiveReason) return;
+    this.archiveSaving = true;
+    this.requestUpdate();
+    try {
+      await this._applyPatch(r, {
+        status: 'Archive',
+        stage: null,
+        exit_reason: this.archiveReason,
+        exit_context: this.archiveContext.trim() || null,
+      });
+      this._closeArchiveModal();
+    } catch {
+      // _applyPatch already surfaces the error on the row; just stop the spinner.
+      this.archiveSaving = false;
+    }
+  }
+
+  _renderArchiveModal() {
+    if (!this.archivingRow) return nothing;
+    const r = this.archivingRow;
     return html`
-      <span class=${cls + (r._saving ? ' is-saving' : '')}>${s || '—'}</span>
+      <div class="archive-modal-scrim" @click=${() => this._closeArchiveModal()}></div>
+      <div class="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title">
+        <header class="archive-modal__head">
+          <h2 id="archive-modal-title">Why are you archiving this role?</h2>
+          <p class="muted">No judgment — this helps tune your future recommendations.</p>
+        </header>
+        <ul class="archive-modal__reasons">
+          ${EXIT_REASONS.map(opt => html`
+            <li>
+              <label class=${'archive-modal__reason' + (this.archiveReason === opt.id ? ' is-selected' : '')}>
+                <input type="radio" name="archive-reason" value=${opt.id}
+                       ?checked=${this.archiveReason === opt.id}
+                       @change=${() => { this.archiveReason = opt.id; }}>
+                <span>${opt.label}</span>
+              </label>
+            </li>
+          `)}
+        </ul>
+        <label class="archive-modal__context">
+          <span class="muted">Optional note (what specifically?)</span>
+          <input type="text" maxlength="200" placeholder="Optional — one line"
+                 .value=${this.archiveContext}
+                 @input=${(e) => { this.archiveContext = e.target.value; }}>
+        </label>
+        <footer class="archive-modal__foot">
+          <button class="btn btn--sm" @click=${() => this._closeArchiveModal()}>Cancel</button>
+          <button class="btn btn--sm btn--accent"
+                  ?disabled=${!this.archiveReason || this.archiveSaving}
+                  @click=${() => this._submitArchive()}>
+            ${this.archiveSaving ? 'Archiving…' : 'Archive role'}
+          </button>
+        </footer>
+        <p class="archive-modal__caption muted">${r.title || ''} · ${r.company || ''}</p>
+      </div>
+    `;
+  }
+
+  _setStageFilter(stage, e) {
+    e?.preventDefault?.();
+    this.activeStageFilter = stage;
+    const qs = new URLSearchParams(location.search);
+    if (stage) qs.set('stage', stage);
+    else qs.delete('stage');
+    history.pushState(null, '', `${location.pathname}?${qs}`);
+  }
+
+  _renderActiveStageTabs(rows) {
+    // Count Active rows per stage (including 'unset' bucket). Counts are
+    // taken from this.roles (full set), not the filtered rows, so the
+    // tabs always show totals even when one is active.
+    const allActive = this.roles.filter(r => isVisibleRole(r) && bucketFor(r) === 'active');
+    const counts = { all: allActive.length };
+    for (const s of STAGES) counts[s.id] = allActive.filter(r => (r.stage || null) === s.id).length;
+    const cur = this.activeStageFilter;
+    void rows;
+    return html`
+      <nav class="stage-tabs" aria-label="Active stage filter">
+        <button class=${'stage-tabs__tab' + (cur === null ? ' is-active' : '')}
+                @click=${(e) => this._setStageFilter(null, e)}>
+          All <span class="stage-tabs__count">${counts.all}</span>
+        </button>
+        ${STAGES.map(s => html`
+          <button class=${'stage-tabs__tab' + (cur === s.id ? ' is-active' : '')}
+                  @click=${(e) => this._setStageFilter(s.id, e)}>
+            ${s.label} <span class="stage-tabs__count">${counts[s.id]}</span>
+          </button>
+        `)}
+      </nav>
+    `;
+  }
+
+  _renderStatusCell(r) {
+    const s = r.status || 'Saved';
+    const cls = 'status-pill status-pill--' + s.toLowerCase();
+    const stageObj = r.stage ? STAGES.find(x => x.id === r.stage) : null;
+    const exitObj = r.exitReason ? EXIT_REASONS.find(x => x.id === r.exitReason) : null;
+    return html`
+      <span class=${cls + (r._saving ? ' is-saving' : '')}>${s}</span>
+      ${stageObj ? html`<span class="stage-chip" title="Sub-stage">${stageObj.label}</span>` : nothing}
+      ${exitObj ? html`<span class="exit-chip" title=${exitObj.label}>${exitObj.label}</span>` : nothing}
       ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
     `;
   }
@@ -546,7 +747,7 @@ export class JobPipeline extends LitElement {
     const showStatus = this.bucket !== 'leads';
     const reorder = this._canReorder();
     const cls = 'pipeline-row'
-      + (isArchived(r) ? ' is-archived' : '')
+      + (r.status === 'Archive' ? ' is-archived' : '')
       + (reorder ? ' is-reorderable' : '')
       + (reorder && this._dragSlug === r.slug ? ' is-dragging' : '')
       + (reorder && this._dragOverSlug === r.slug && this._dragSlug && this._dragSlug !== r.slug ? ' is-drop-target' : '');
@@ -777,19 +978,21 @@ export class JobPipeline extends LitElement {
           ${this.pasteError ? html`<span class="muted" style="color:var(--error);font-size:var(--font-size-small);">${this.pasteError}</span>` : nothing}
         </form>
       ` : nothing}
+      ${this.bucket === 'active' ? this._renderActiveStageTabs(rows) : nothing}
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
           <thead>${this._renderHeader()}</thead>
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>
       </div>
+      ${this._renderArchiveModal()}
 
       ${rows.length === 0 ? html`
         <div class="placeholder" style="margin-top:var(--space-4);">
           <h2>No ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'} yet</h2>
           <p>${this.bucket === 'leads' ? 'Add a posting or wait for the crawler to find a fit.'
-              : this.bucket === 'active' ? 'Move a lead to Apply / Applied / Talking via the row menu.'
-              : 'Closed, passed, rejected, and archived roles land here.'}</p>
+              : this.bucket === 'active' ? 'Pick a stage on a Saved role via the row menu — it moves here automatically.'
+              : 'Archived roles land here, with the reason you gave.'}</p>
         </div>
       ` : nothing}
 

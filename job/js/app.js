@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.60.0";
-console.log(`[job] v${VERSION} - Shimmer "Generating…/Drafting…/Polishing…" label everywhere generation runs`);
+const VERSION = "0.61.0";
+console.log(`[job] v${VERSION} - Status taxonomy Saved/Active/Archive + stages + exit modal; plus shimmer-generating label from master`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

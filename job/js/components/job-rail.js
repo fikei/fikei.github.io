@@ -8,15 +8,13 @@ const [{ fetchPipeline, fetchRecommendations }] = await Promise.all([
 ]);
 
 // Bucket-assignment for pipeline rows — mirrors job-pipeline.js exactly.
-// Kept in sync by hand; both places change together when status taxonomy
-// shifts (we add this rule once a quarter at most).
-const ARCHIVE_STATUSES = new Set(['Pass', 'Rejected', 'Closed', 'Not Listed']);
-const LEADS_STATUSES   = new Set(['', 'New', 'Nudge / Network']);
+// Kept in sync by hand. Status taxonomy is now 3 values.
 function bucketFor(r) {
-  if (r.archivedAt) return 'archive';
-  if (ARCHIVE_STATUSES.has(r.status || '')) return 'archive';
-  if (LEADS_STATUSES.has(r.status || '')) return 'leads';
-  return 'active';
+  switch (r.status) {
+    case 'Active':  return 'active';
+    case 'Archive': return 'archive';
+    default:        return 'leads';
+  }
 }
 function isVisibleRole(r) {
   if (!r.url) return false;
