@@ -2344,6 +2344,15 @@
   font-size: var(--font-size-body-sm);
   color: var(--text-muted);
 }
+.rec-source-email {
+  display: inline-block;
+  margin-left: 6px;
+  text-decoration: none;
+  opacity: 0.6;
+  font-size: 14px;
+  vertical-align: middle;
+}
+.rec-source-email:hover { opacity: 1; }
 
 .rec-actions {
   display: inline-flex;

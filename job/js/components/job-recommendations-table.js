@@ -217,6 +217,10 @@ export class JobRecommendationsTable extends LitElement {
         </td>
         <td class="col col-sector" data-label="Source">
           <span class="rec-source">${r.sourceLabel || r.source || ''}</span>
+          ${r.sourceEmailUrl ? html`
+            <a class="rec-source-email" href=${r.sourceEmailUrl} target="_blank" rel="noopener"
+               title="Open the originating email in Gmail" @click=${(e) => e.stopPropagation()}>📧</a>
+          ` : nothing}
         </td>
         <td class="col col-added" data-label="Added">
           <span class="muted">${r.suggestedAt ? relTime(r.suggestedAt) : ''}</span>

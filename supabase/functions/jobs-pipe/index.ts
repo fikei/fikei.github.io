@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.10.0';
-console.log(`[jobs-pipe] v${VERSION} - Saved/Active/Archive taxonomy + stage + exit_reason`);
+const VERSION = '0.10.1';
+console.log(`[jobs-pipe] v${VERSION} - return sourceEmailUrl for Gmail-sourced rows`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -53,6 +53,7 @@ async function listRoles() {
       r.is_live as "isLive",
       r.liveness_checked_at as "livenessCheckedAt",
       r.engaged_at as "engagedAt",
+      r.source_email_url as "sourceEmailUrl",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
       coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter",
       coalesce((
