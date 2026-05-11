@@ -129,20 +129,54 @@ export async function scanApplicationResponses(args: {
     for (const t of r.gmail_thread_ids) threadToRole.set(t, r);
   }
 
-  // Build the Gmail query. Include pipeline-company domains AND known
-  // ATS-platform domains. -in:spam -in:trash to avoid the noisy buckets.
+  // Build the Gmail query set. Three passes — each contributes message
+  // IDs that we then dedup, fetch, and try to classify:
+  //
+  //   1. Sender-domain pass — companies with a known domain in
+  //      hiring_companies, plus the ATS-platform allowlist. Cheap, broad.
+  //   2. Per-role name pass — for each active role, search the inbox
+  //      for the literal company name. Catches direct human emails from
+  //      a recruiter's personal gmail / hiring-manager's @yahoo / any
+  //      sender whose domain we don't have cached. Capped at 20 IDs per
+  //      role and we exclude the obvious noise senders.
+  //
+  // All three streams hit the same matching gauntlet below; Message-ID
+  // dedup against application_events ensures we never re-classify.
   const senderDomains = new Set<string>();
   for (const d of domainToRoles.keys()) senderDomains.add(d);
   for (const d of ATS_PLATFORM_DOMAINS) senderDomains.add(d);
-  if (senderDomains.size === 0) return out;
 
-  const fromClause = [...senderDomains].map(d => `from:${d}`).join(' OR ');
-  const query = `(${fromClause}) -in:spam -in:trash newer_than:${windowDays}d`;
+  const idSet = new Set<string>();
 
-  // List messages. We use messages.list directly here (not historyId)
-  // because the application-scan cursor is independent from the
-  // recs-scan cursor, and Message-ID dedup makes re-listing safe.
-  const ids = await listMessagesByQuery(args.accessToken, query, maxMessages * 3);
+  if (senderDomains.size > 0) {
+    const fromClause = [...senderDomains].map(d => `from:${d}`).join(' OR ');
+    const domainQuery = `(${fromClause}) -in:spam -in:trash newer_than:${windowDays}d`;
+    for (const id of await listMessagesByQuery(args.accessToken, domainQuery, maxMessages * 3)) {
+      idSet.add(id);
+    }
+  }
+
+  // Pass 2: per-role name search. The filter strips aggregator newsletter
+  // senders + the role's own canonical URL — those messages are either
+  // already on the recs path (linkedin alerts) or noisy (job board
+  // newsletters mentioning the company in passing).
+  const NEWSLETTER_NEGATIVES = '-from:linkedin.com -from:wellfound.com -from:otta.com -from:builtin.com -from:hnhiring.com';
+  for (const role of roles.slice(0, 20)) {
+    if (role.company_norm.length < 3) continue;
+    // Quote the name so multi-word companies match exactly. Escape any
+    // embedded quotes for safety.
+    const quoted = `"${role.company_name.replace(/"/g, '\\"')}"`;
+    const nameQuery = `${quoted} in:inbox -in:spam newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
+    try {
+      for (const id of await listMessagesByQuery(args.accessToken, nameQuery, 20)) {
+        idSet.add(id);
+      }
+    } catch (e) {
+      console.warn(`[gmail-app-scan] name-search '${role.company_name}' failed: ${(e as Error).message}`);
+    }
+  }
+
+  const ids = [...idSet];
 
   let processed = 0;
   for (const id of ids) {
@@ -184,9 +218,13 @@ export async function scanApplicationResponses(args: {
         : pickByTitleOverlap(candidates, subject, body);
     }
 
-    // Step 3 — ATS-platform sender: scan the body for pipeline company
-    // name. Require an actual name match to avoid cross-pollination.
-    if (!matchedRole && senderDomain && isAtsPlatformDomain(senderDomain)) {
+    // Step 3 — company-name-in-body match. Originally gated to ATS
+    // senders, now generalized: applies to ANY sender whose domain we
+    // didn't already match in step 2. Catches direct human emails from
+    // recruiter @gmail addresses, hiring-manager @yahoo addresses, and
+    // any sender whose company domain we don't have cached. The
+    // confidence floor in classifyApplicationMessage still gates poison.
+    if (!matchedRole) {
       const haystack = `${subject}\n${body}`.toLowerCase();
       const hits = roles.filter(r => {
         const nm = r.company_norm;

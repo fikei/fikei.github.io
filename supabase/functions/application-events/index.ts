@@ -31,8 +31,8 @@ import {
 } from '../_shared/google-tokens.ts';
 import { scanApplicationResponses } from '../_shared/gmail-application-scan.ts';
 
-const VERSION = '1.0.0';
-console.log(`[application-events] v${VERSION} - Phase 2.0 read + needs-attention + backfill`);
+const VERSION = '1.1.0';
+console.log(`[application-events] v${VERSION} - backfill uses per-role name search to catch direct human emails`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
