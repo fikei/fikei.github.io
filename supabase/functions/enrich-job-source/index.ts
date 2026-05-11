@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.2.0';
-console.log(`[enrich-job-source] v${VERSION} - rename cache to job.hiring_companies (avoid collision with career history)`);
+const VERSION = '0.3.0';
+console.log(`[enrich-job-source] v${VERSION} - Phase 1.5 live; action:backfill batches existing recs`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -78,7 +78,15 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
-  const body = await req.json().catch(() => ({})) as EnrichRequest;
+  const body = await req.json().catch(() => ({})) as EnrichRequest & { action?: string; limit?: number };
+
+  // Backfill mode — walk N pending Gmail-sourced recs (enrichment_status
+  // null or 'unresolved' past retry time), enrich each, write canonical
+  // URL + status back. Lets the user drain after a Phase 1.5 cold-start.
+  if (body.action === 'backfill') {
+    return backfillBatch(Math.max(1, Math.min(15, body.limit ?? 8)));
+  }
+
   const company = (body.company || '').trim();
   if (!company) return json({ error: 'company required' }, 400);
   const title = (body.title || '').trim();
@@ -169,6 +177,118 @@ serve(async (req) => {
     reason: 'ats_unresolved',
   });
 });
+
+// ---------- Backfill ----------
+//
+// Walks N pending recommended_roles rows that don't have a canonical
+// URL yet (enrichment_status null or 'unresolved' past their retry).
+// Calls the same in-process resolve logic per row, writes canonical_url
+// + enrichment_status + company_id back. Capped per call so we stay
+// under Supabase's 150s wall.
+
+async function backfillBatch(limit: number): Promise<Response> {
+  const sql = db();
+  const rows = await sql<Array<{ id: string; company: string | null; title: string | null; url: string; payload: Record<string, unknown> | null }>>`
+    select id, company, title, url, payload
+      from job.recommended_roles
+     where source = 'gmail-jobs'
+       and dismissed_at is null
+       and added_to_pipeline_slug is null
+       and (
+         enrichment_status is null
+         or (enrichment_status = 'unresolved' and (enrichment_retry_at is null or enrichment_retry_at <= now()))
+       )
+     order by suggested_at desc
+     limit ${limit}
+  `;
+
+  const results: Array<{ id: string; resolved: boolean; reason?: string }> = [];
+  for (const r of rows) {
+    if (!r.company || !r.title) { results.push({ id: r.id, resolved: false, reason: 'no_company_or_title' }); continue; }
+    try {
+      const enriched = await resolveOne(r.company, r.title, r.url, r.payload);
+      await sql`
+        update job.recommended_roles
+           set enrichment_status   = ${enriched.resolved ? 'resolved' : 'unresolved'},
+               enrichment_retry_at = ${enriched.nextRetryAt ?? null},
+               canonical_url       = ${enriched.canonicalUrl ?? null},
+               company_id          = ${enriched.companyId ?? null},
+               url                 = ${enriched.canonicalUrl ?? r.url}
+         where id = ${r.id}
+      `;
+      results.push({ id: r.id, resolved: enriched.resolved });
+    } catch (e) {
+      results.push({ id: r.id, resolved: false, reason: (e as Error).message.slice(0, 120) });
+    }
+  }
+
+  const summary = {
+    ok: true,
+    version: VERSION,
+    processed: results.length,
+    resolved:  results.filter(x => x.resolved).length,
+    results,
+  };
+  return new Response(JSON.stringify(summary, null, 2), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+// Same cascade as the public POST handler, but returns the result
+// instead of formatting an HTTP response. Used by backfill to avoid
+// recursing into the function via HTTP.
+async function resolveOne(
+  company: string,
+  title: string,
+  alertUrl: string,
+  payload: Record<string, unknown> | null,
+): Promise<EnrichResponse> {
+  const sql = db();
+  const hintAtsUrl = alertUrl;
+  const hintDomain = (payload && typeof payload === 'object' && payload['sender'])
+    ? String(payload['sender']).match(/@([a-z0-9.-]+)/i)?.[1]
+    : undefined;
+
+  const existing = await sql<CompanyRow[]>`
+    select id, name, domain, ats_provider, ats_slug, careers_url, resolution_status, retry_count
+      from job.hiring_companies
+     where name_norm = lower(trim(${company})) limit 1`;
+  let row = existing[0];
+  if (!row) {
+    const [inserted] = await sql<CompanyRow[]>`
+      insert into job.hiring_companies (name, domain) values (${company}, ${normalizeDomain(hintDomain) || null})
+      on conflict (name_norm) do update set domain = coalesce(job.hiring_companies.domain, excluded.domain), updated_at = now()
+      returning id, name, domain, ats_provider, ats_slug, careers_url, resolution_status, retry_count
+    `;
+    row = inserted;
+  }
+  if (row.resolution_status === 'resolved' && row.ats_provider && row.ats_slug) {
+    const canonical = await resolveCanonicalForTitle(row, title);
+    return { resolved: !!canonical, companyId: row.id, atsProvider: row.ats_provider!, atsSlug: row.ats_slug!, canonicalUrl: canonical?.url, jdText: canonical?.jd };
+  }
+  const detected = await detectAts({ company, hintDomain, hintAtsUrl });
+  if (detected) {
+    await sql`
+      update job.hiring_companies
+         set ats_provider = ${detected.provider}, ats_slug = ${detected.slug},
+             careers_url = ${detected.careersUrl ?? null}, resolution_status = 'resolved',
+             last_resolved_at = now(), retry_count = 0, next_retry_at = null, updated_at = now()
+       where id = ${row.id}
+    `;
+    const canonical = await resolveCanonicalForTitle({ ...row, ats_provider: detected.provider, ats_slug: detected.slug }, title);
+    return { resolved: !!canonical, companyId: row.id, atsProvider: detected.provider, atsSlug: detected.slug, canonicalUrl: canonical?.url, jdText: canonical?.jd };
+  }
+  const nextCount = (row.retry_count || 0) + 1;
+  const retryAt = nextRetry(nextCount);
+  await sql`
+    update job.hiring_companies
+       set resolution_status = 'unresolved', retry_count = ${nextCount},
+           next_retry_at = ${retryAt.toISOString()}, updated_at = now()
+     where id = ${row.id}
+  `;
+  return { resolved: false, companyId: row.id, nextRetryAt: retryAt.toISOString(), reason: 'ats_unresolved' };
+}
 
 // ---------- ATS detection ----------
 

@@ -2354,6 +2354,26 @@
 }
 .rec-source-email:hover { opacity: 1; }
 
+/* "Verifying source" badge — appears on Gmail recs whose canonical
+   posting URL hasn't been resolved yet (enrichment_status='unresolved').
+   Brand: honest UI — tells the user the link is the aggregator, not
+   the canonical ATS. */
+.enrichment-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(237,200,67,0.20);
+  color: #6E5400;
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .rec-actions {
   display: inline-flex;
   align-items: center;

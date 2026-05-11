@@ -21,7 +21,7 @@ import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
 const VERSION = '0.5.0';
-console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring`);
+console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring; Phase 1.5 enrichment writes`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -478,6 +478,10 @@ async function insertNew(
     sector:         r.input.sector ?? null,
     investors:      r.input.investors ?? [],
     payload:        r.input.payload ?? null,
+    enrichment_status:   r.input.enrichmentStatus   ?? null,
+    enrichment_retry_at: r.input.enrichmentRetryAt  ?? null,
+    canonical_url:       r.input.canonicalUrl       ?? null,
+    company_id:          r.input.companyId          ?? null,
   }));
   const inserted = await sql`
     insert into job.recommended_roles ${sql(values)}

@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.5.0';
-console.log(`[recommendations] v${VERSION} - return sourceEmailUrl for Gmail-sourced rows`);
+const VERSION = '0.6.0';
+console.log(`[recommendations] v${VERSION} - return enrichment fields (status, retry, canonical_url)`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -32,6 +32,9 @@ serve(async (req) => {
                r.description, r.match_bullets as "matchBullets", r.suggested_at as "suggestedAt",
                r.fit_score as "fitScore", r.fit_breakdown as "breakdown",
                r.hard_fails as "hardFails", r.sector,
+               r.enrichment_status as "enrichmentStatus",
+               r.enrichment_retry_at as "enrichmentRetryAt",
+               r.canonical_url as "canonicalUrl",
                -- Source-email URL — derived from payload.gmailApiId for
                -- Gmail-sourced recs so the UI can render a "view source"
                -- link without parsing the JSON client-side.

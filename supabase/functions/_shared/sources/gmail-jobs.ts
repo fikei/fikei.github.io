@@ -278,25 +278,50 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       let emitted = 0;
       for (let i = 0; i < jobs.length; i++) {
         const job = jobs[i];
-        const url = job.alertUrl;
-        if (!url || !job.company || !job.title) continue;
+        if (!job.alertUrl || !job.company || !job.title) continue;
+
+        // Phase 1.5 enrichment — resolve to canonical Greenhouse/Lever/
+        // Ashby URL via the cache cascade. Best-effort: failures don't
+        // block emit; we fall back to the aggregator URL and flag
+        // enrichment_status='unresolved' so the widget can be honest.
+        let enriched: EnrichResponse = { resolved: false, companyId: null };
+        try {
+          enriched = await enrichJobSource({
+            company:     job.company,
+            title:       job.title,
+            hintAtsUrl:  job.alertUrl,
+            hintDomain:  senderDomainOf(sender),
+          });
+        } catch (e) {
+          console.warn(`[gmail-jobs] enrich ${job.company} failed: ${(e as Error).message}`);
+        }
+
+        const finalUrl = enriched.canonicalUrl || job.alertUrl;
+        const finalLabel = enriched.resolved && enriched.atsProvider
+          ? `Gmail · ${senderLabel(sender)} → ${enriched.atsProvider}`
+          : `Gmail · ${senderLabel(sender)}`;
+
         out.push({
           source:      'gmail-jobs',
           sourceId:    `gmail:${messageId}:${i}`,
-          // Source label is the email sender ("LinkedIn", "Wellfound",
-          // …), not the hiring company. The company name is already
-          // visible in the role row; the source label tells the user
-          // *where* a rec came from, not *who*.
-          sourceLabel: `Gmail · ${senderLabel(sender)}`,
-          url,
+          sourceLabel: finalLabel,
+          url:         finalUrl,
           company:     job.company,
           title:       job.title,
           location:    job.location,
           postedAt:    msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : undefined,
+          description: enriched.jdText ? enriched.jdText.slice(0, 4000) : undefined,
+          enrichmentStatus:  enriched.resolved ? 'resolved' : 'unresolved',
+          enrichmentRetryAt: enriched.nextRetryAt,
+          canonicalUrl:      enriched.canonicalUrl,
+          companyId:         enriched.companyId || undefined,
           payload: {
             gmailMessageId: messageId,
             gmailApiId:     msg.id,
             alertUrl:       job.alertUrl ?? null,
+            canonicalUrl:   enriched.canonicalUrl ?? null,
+            atsProvider:    enriched.atsProvider ?? null,
+            enrichmentResolved: enriched.resolved,
             sender,
             digest:         isDigest || jobs.length > 1,
             roleIndex:      i,
@@ -411,6 +436,48 @@ function senderLabel(sender: string): string {
     return base.charAt(0).toUpperCase() + base.slice(1);
   }
   return sender;
+}
+
+function senderDomainOf(sender: string): string | undefined {
+  return sender.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase();
+}
+
+// ---------- Phase 1.5 enrichment ----------
+//
+// Resolves a (company, title) pair to a canonical ATS posting via the
+// enrich-job-source function. Cache-backed so the same company across
+// many digests gets resolved once and reused.
+
+interface EnrichResponse {
+  resolved:      boolean;
+  companyId:     string | null;
+  atsProvider?:  string;
+  atsSlug?:      string;
+  canonicalUrl?: string;
+  jdText?:       string;
+  nextRetryAt?:  string;
+  reason?:       string;
+}
+
+const ENRICH_URL =
+  Deno.env.get('ENRICH_JOB_SOURCE_URL') ||
+  'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/enrich-job-source';
+
+async function enrichJobSource(args: {
+  company: string; title: string; hintAtsUrl?: string; hintDomain?: string;
+}): Promise<EnrichResponse> {
+  const r = await fetch(ENRICH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      // Service role bearer so function-to-function calls authenticate.
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
+    },
+    body: JSON.stringify(args),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error(`enrich ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return await r.json() as EnrichResponse;
 }
 
 function looksLikeDigest(subject: string, sender: string): boolean {
