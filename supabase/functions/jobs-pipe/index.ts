@@ -12,8 +12,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.8.0';
-console.log(`[jobs-pipe] v${VERSION} - sheet removed`);
+const VERSION = '0.9.0';
+console.log(`[jobs-pipe] v${VERSION} - engaged_at: record drill-page opens + apply clicks`);
 
 const STATUS_ENUM = new Set([
   '', 'New', 'Apply', 'Talking', 'Applied', 'Pass', 'Rejected', 'Closed', 'Not Listed', 'Nudge / Network',
@@ -33,6 +33,7 @@ async function listRoles() {
       r.closed_detected_at as "closedDetectedAt",
       r.is_live as "isLive",
       r.liveness_checked_at as "livenessCheckedAt",
+      r.engaged_at as "engagedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",
       coalesce(ra_cover.role_slug is not null, false) as "hasCoverLetter",
       coalesce((
@@ -77,6 +78,19 @@ serve(async (req) => {
           where slug = ${slug};
         `;
         return jsonResp({ ok: true, slug, archived });
+      }
+
+      // Engagement signal — drill page open or Apply tap. Stamps
+      // engaged_at so the Saved-bucket row can show an "In progress"
+      // pill. Doesn't alter status; this is a passive signal.
+      if (body.action === 'engage') {
+        await sql`
+          update job.pipeline_roles
+             set engaged_at = coalesce(engaged_at, now()),
+                 updated_at = now()
+           where slug = ${slug};
+        `;
+        return jsonResp({ ok: true, slug, engaged: true });
       }
 
       // Soft delete — row stays in DB but disappears from every list.

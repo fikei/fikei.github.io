@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -160,6 +160,10 @@ export class JobRoleDetail extends LitElement {
       this.assets = { 'resume': resume, 'cover-letter': cover, 'analysis': analysis };
       this.baseResume = baseResume;
       this.state = 'loaded';
+      // Passive engagement signal — opening the drill page counts as
+      // "in progress." Fire-and-forget; the helper is idempotent so
+      // re-opens are no-ops on the server.
+      if (this.role) engageRole(this.slug);
       // Seed history with the loaded cover letter so the user has a
       // baseline to revert to even before they make any edits.
       if (cover?.content) {
@@ -1453,7 +1457,8 @@ export class JobRoleDetail extends LitElement {
         </div>
         <div class="role-header__actions">
           ${r.url ? html`
-            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer">Apply ↗</a>
+            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
+               @click=${() => engageRole(this.slug)}>Apply ↗</a>
           ` : nothing}
         </div>
       </header>
@@ -1561,7 +1566,8 @@ export class JobRoleDetail extends LitElement {
         </div>
         <div class="role-header__actions">
           ${r?.url ? html`
-            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer">
+            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
+               @click=${() => engageRole(this.slug)}>
               Apply ↗
             </a>
           ` : nothing}

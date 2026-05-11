@@ -570,7 +570,12 @@ export class JobPipeline extends LitElement {
           <div class="role-cell__inner">
             ${this._renderLogo(r, 'sm')}
             <div class="role-cell__text">
-              <div class="role-cell__title">${r.title || '(untitled)'}</div>
+              <div class="role-cell__title">
+                ${r.title || '(untitled)'}
+                ${this.bucket === 'leads' && r.engagedAt
+                  ? html`<span class="in-progress-pill" title="You've viewed or applied to this role">In progress</span>`
+                  : nothing}
+              </div>
               <div class="role-cell__company">${r.company || ''}</div>
             </div>
           </div>
