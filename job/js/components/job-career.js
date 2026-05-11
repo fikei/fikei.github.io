@@ -6,7 +6,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline, formatResumeText }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -94,7 +94,10 @@ export class JobCareer extends LitElement {
     promptTags: { state: true },
     baseResume: { state: true },     // saved row: { content, missing, generating, error }
     baseDraft: { state: true },      // editing buffer: { text, status, error } — status in idle|reading|formatting|saving
-    narrativeAdditions: { state: true }, // markdown blob — additions captured via opportunity threads
+    narrativeAdditions: { state: true }, // legacy: appended-blob fallback from older opportunity threads
+    narratives: { state: true },         // [{ id, title, content_md, tags, linked_company_slug, needs_link, ... }]
+    companies: { state: true },          // [{ slug, name, sector }] for the link picker
+    composing: { state: true },          // { open, title, text, savedId, saving, error } | null
   };
 
   constructor() {
@@ -108,6 +111,9 @@ export class JobCareer extends LitElement {
     this.baseResume = { content: '', missing: true, generating: false, error: '' };
     this.baseDraft = { text: '', status: 'idle', error: '' };
     this.narrativeAdditions = '';
+    this.narratives = [];
+    this.companies = [];
+    this.composing = null;
   }
 
   connectedCallback() {
@@ -151,6 +157,25 @@ export class JobCareer extends LitElement {
         const n = await readRoleAsset('__narratives__', 'notes');
         if (n?.content_md) this.narrativeAdditions = n.content_md;
       } catch { /* leave empty */ }
+      // Structured narratives + the company list for the link picker.
+      try {
+        const ns = await fetchNarratives();
+        this.narratives = ns;
+      } catch { this.narratives = []; }
+      // Companies for the "Needs connection" dropdown — derived from the
+      // pipeline tag space isn't enough; we want the actual work history.
+      // For now, scrape unique companies from existing narratives' links
+      // plus the roles' companies in pipeline (best-effort).
+      const companies = new Map();
+      for (const r of (data.roles || [])) {
+        if (r.company) companies.set(r.company.toLowerCase().replace(/[^a-z0-9-]+/g, '-'), { slug: r.company.toLowerCase().replace(/[^a-z0-9-]+/g, '-'), name: r.company });
+      }
+      for (const n of this.narratives) {
+        if (n.linked_company_slug && !companies.has(n.linked_company_slug)) {
+          companies.set(n.linked_company_slug, { slug: n.linked_company_slug, name: n.linked_company_slug });
+        }
+      }
+      this.companies = Array.from(companies.values()).sort((a, b) => a.name.localeCompare(b.name));
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
@@ -354,50 +379,169 @@ export class JobCareer extends LitElement {
         </section>
       `;
     }
+
+    const needsLink = (this.narratives || []).filter(n => n.needs_link);
+    const linked = (this.narratives || []).filter(n => !n.needs_link);
+
     return html`
       <section class="narrative-block">
-        <h2>Narrative arc</h2>
-        <p class="muted">The one-paragraph version Ian tells. Sourced from <code>02-goals-intents/narrative-arc.md</code>.</p>
-        <div class="kb-doc">
-          <p><em>Open the Vision tab to read or edit the live narrative. (Direct fetch lands with the Vision page rebuild.)</em></p>
-        </div>
-      </section>
-
-      <section class="narrative-block">
-        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);">
+        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap;">
           <div>
-            <h2 style="margin:0;">Additions</h2>
+            <h2 style="margin:0;">Stories</h2>
             <p class="muted" style="margin:0;font-size:var(--font-size-small);">
-              New context you've added via cover-letter opportunity threads. Drawn from <code>job.global_assets</code>.
+              Discrete stories the cover-letter generator can draw from. Tags + work-history link are auto-set on save.
             </p>
           </div>
+          <button class="btn btn--sm btn--primary" @click=${() => this._openCompose()}>New story</button>
         </header>
-        ${this.narrativeAdditions
-          ? html`<article class="kb-doc">${unsafeHTML(renderMarkdown(this.narrativeAdditions))}</article>`
-          : html`<p class="muted" style="font-size:var(--font-size-small);">Nothing yet. When you respond to an "Opportunity" comment on a cover letter, the info you provide lands here.</p>`}
+
+        ${this.composing?.open ? this._renderComposer() : nothing}
+
+        ${needsLink.length ? html`
+          <section class="narrative-needs">
+            <h3 class="narrative-needs__title">
+              <span class="narrative-needs__pill">✦ ${needsLink.length}</span>
+              Stories that need a work-history connection
+            </h3>
+            <div class="narrative-grid">
+              ${needsLink.map(n => this._renderNarrativeCard(n))}
+            </div>
+          </section>
+        ` : nothing}
+
+        ${linked.length ? html`
+          <div class="narrative-grid">
+            ${linked.map(n => this._renderNarrativeCard(n))}
+          </div>
+        ` : nothing}
+
+        ${!this.narratives?.length ? html`
+          <p class="muted" style="font-size:var(--font-size-small);">No stories yet. Click "New story" to capture one.</p>
+        ` : nothing}
       </section>
 
-      <section class="narrative-block">
-        <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);">
-          <div>
-            <h2 style="margin:0;">Skill prompts</h2>
-            <p class="muted" style="margin:0;font-size:var(--font-size-small);">Quick-fire prompts for filling in evidence. Tagged by themes that show up most in your live pipeline.</p>
-          </div>
-          ${this.promptTags.length ? html`
-            <span class="muted" style="font-size:var(--font-size-caption);">Top tags: ${this.promptTags.slice(0, 5).map(t => t.name).join(' · ')}</span>
-          ` : nothing}
-        </header>
-        <div class="prompt-carousel" role="list">
-          ${FALLBACK_PROMPTS.map(p => html`
-            <article class="prompt-card" role="listitem">
-              <span class="tag-chip" style="margin-bottom:var(--space-3);">${p.tag}</span>
-              <p>${p.prompt}</p>
-              <button class="btn btn--sm" disabled title="Drafting capture lands with the next pass.">Capture story</button>
-            </article>
-          `)}
-        </div>
-      </section>
+      ${this.narrativeAdditions ? html`
+        <section class="narrative-block">
+          <details>
+            <summary class="muted" style="cursor:pointer;font-size:var(--font-size-small);">
+              Legacy additions (opportunity-thread blob)
+            </summary>
+            <article class="kb-doc" style="margin-top: var(--space-3);">${unsafeHTML(renderMarkdown(this.narrativeAdditions))}</article>
+          </details>
+        </section>
+      ` : nothing}
     `;
+  }
+
+  _renderComposer() {
+    const c = this.composing;
+    return html`
+      <article class="narrative-composer">
+        <input class="narrative-composer__title" type="text" placeholder="Story title (e.g. Scaling Livongo eligibility infra)"
+               .value=${c.title}
+               @input=${(e) => this.composing = { ...this.composing, title: e.target.value }}>
+        <textarea class="narrative-composer__text" placeholder="Write the story. Specific moments, decisions, outcomes."
+                  .value=${c.text}
+                  @input=${(e) => this.composing = { ...this.composing, text: e.target.value }}></textarea>
+        ${c.error ? html`<p class="muted" style="color:var(--error);margin:0;">${c.error}</p>` : nothing}
+        <div class="narrative-composer__actions">
+          <button class="btn btn--sm btn--primary" ?disabled=${c.saving || !c.title.trim() || !c.text.trim()}
+                  @click=${() => this._saveCompose()}>
+            ${c.saving ? html`<span class="gen-shimmer">Saving</span>` : 'Save story'}
+          </button>
+          <button class="btn btn--sm" ?disabled=${c.saving} @click=${() => this.composing = null}>Cancel</button>
+          <span class="muted" style="font-size:var(--font-size-small);">Tags and work-history link are inferred on save.</span>
+        </div>
+      </article>
+    `;
+  }
+
+  _renderNarrativeCard(n) {
+    const co = this.companies.find(c => c.slug === n.linked_company_slug);
+    return html`
+      <article class="narrative-card ${n.needs_link ? 'narrative-card--needs-link' : ''}">
+        <header class="narrative-card__head">
+          <h4 class="narrative-card__title">${n.title}</h4>
+          <button class="narrative-card__del" title="Delete" @click=${() => this._deleteStory(n.id)}>×</button>
+        </header>
+        <div class="narrative-card__tags">
+          ${(n.tags || []).map(t => html`<span class="tag-chip narrative-tag">${t}</span>`)}
+        </div>
+        ${n.needs_link ? html`
+          <div class="narrative-card__link narrative-card__link--needs">
+            <label class="muted" style="font-size:var(--font-size-caption);">Which work experience does this connect to?</label>
+            <div class="narrative-card__link-row">
+              <select @change=${(e) => this._linkStory(n.id, e.target.value || null)}>
+                <option value="">Pick a company…</option>
+                ${this.companies.map(c => html`<option value=${c.slug}>${c.name}</option>`)}
+              </select>
+              <button class="btn btn--sm" @click=${() => this._linkStory(n.id, null, { skip: true })}>Skip</button>
+            </div>
+          </div>
+        ` : html`
+          <div class="narrative-card__link">
+            <span class="muted" style="font-size:var(--font-size-caption);">Linked to</span>
+            <strong>${co?.name || n.linked_company_slug}</strong>
+            <button class="narrative-card__unlink" @click=${() => this._linkStory(n.id, null)} title="Unlink">change</button>
+          </div>
+        `}
+        <div class="narrative-card__body kb-doc">${unsafeHTML(renderMarkdown(this._truncate(n.content_md, 320)))}</div>
+      </article>
+    `;
+  }
+
+  _truncate(s, n) {
+    s = String(s || '');
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  _openCompose() {
+    this.composing = { open: true, title: '', text: '', saving: false, error: '' };
+  }
+
+  async _saveCompose() {
+    const c = this.composing;
+    if (!c) return;
+    this.composing = { ...c, saving: true, error: '' };
+    try {
+      const saved = await saveNarrative({ title: c.title, content_md: c.text });
+      this.narratives = [saved, ...this.narratives.filter(n => n.id !== saved.id)];
+      this.composing = null;
+    } catch (e) {
+      this.composing = { ...c, saving: false, error: String(e?.message || e) };
+    }
+  }
+
+  async _linkStory(id, slug, opts = {}) {
+    // skip=true means "don't show this needs-link prompt anymore, but
+    // leave the link null". Implemented by setting linked_company_slug
+    // to null with a special flag; here we just clear needs_link by
+    // posting null (server treats that as "explicit skip" via slug='').
+    // Simpler v1: send the chosen slug; if null + skip, send empty
+    // string which the server clears + leaves needs_link=true. So we
+    // patch the local state directly to mark "ignored".
+    try {
+      if (opts.skip) {
+        // Mark locally only — no server change.
+        this.narratives = this.narratives.map(n => n.id === id ? { ...n, needs_link: false } : n);
+        return;
+      }
+      const updated = await linkNarrative(id, slug);
+      this.narratives = this.narratives.map(n => n.id === id ? updated : n);
+    } catch (e) {
+      // Surface inline; UI keeps the prompt up.
+      this.narratives = this.narratives.map(n => n.id === id ? { ...n, _error: String(e?.message || e) } : n);
+    }
+  }
+
+  async _deleteStory(id) {
+    if (!confirm('Delete this story?')) return;
+    try {
+      await deleteNarrative(id);
+      this.narratives = this.narratives.filter(n => n.id !== id);
+    } catch (e) {
+      alert(`Delete failed: ${String(e?.message || e)}`);
+    }
   }
 
   render() {
