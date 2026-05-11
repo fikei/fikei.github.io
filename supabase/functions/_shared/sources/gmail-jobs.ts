@@ -481,7 +481,7 @@ async function extractJobsMulti(args: { subject: string; sender: string; body: s
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: EXTRACT_MULTI_SYSTEM,
       messages: [{ role: 'user', content: userPrompt }],
     }),
@@ -509,12 +509,17 @@ async function extractJobsMulti(args: { subject: string; sender: string; body: s
   return out;
 }
 
-// Tolerant JSON array extractor — finds the first balanced [ ... ] block
-// and parses it. Mirrors extractFirstJsonObject for the multi prompt.
+// Tolerant JSON array extractor — first tries a strict parse of the
+// balanced [ ... ] block, then falls back to salvaging individual
+// objects from a truncated array. Haiku occasionally hits max_tokens
+// mid-array on long digest bodies; this still recovers the complete
+// roles it emitted before the cutoff.
 function extractFirstJsonArray(text: string): unknown[] | null {
   const stripped = text.replace(/```json\s*/gi, '').replace(/```/g, '');
   const start = stripped.indexOf('[');
   if (start < 0) return null;
+
+  // Pass 1 — strict balanced parse.
   let depth = 0;
   let inString = false;
   let escape = false;
@@ -531,12 +536,44 @@ function extractFirstJsonArray(text: string): unknown[] | null {
         const candidate = stripped.slice(start, i + 1);
         try {
           const parsed = JSON.parse(candidate);
-          return Array.isArray(parsed) ? parsed : null;
-        } catch { return null; }
+          if (Array.isArray(parsed)) return parsed;
+        } catch { /* fall through to salvage */ }
+        break;
       }
     }
   }
-  return null;
+
+  // Pass 2 — salvage every complete top-level object inside the array.
+  // Walk from after the opening `[`, tracking brace depth at level 0
+  // (inside the array but outside any object). Each completed
+  // top-level `{...}` is parsed individually; trailing partial object
+  // (truncated) is ignored.
+  const out: unknown[] = [];
+  let objStart = -1;
+  let objDepth = 0;
+  inString = false;
+  escape = false;
+  for (let i = start + 1; i < stripped.length; i++) {
+    const c = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') {
+      if (objDepth === 0) objStart = i;
+      objDepth++;
+    } else if (c === '}') {
+      objDepth--;
+      if (objDepth === 0 && objStart >= 0) {
+        const slice = stripped.slice(objStart, i + 1);
+        try { out.push(JSON.parse(slice)); } catch { /* skip malformed */ }
+        objStart = -1;
+      }
+    } else if (c === ']' && objDepth === 0) {
+      break;
+    }
+  }
+  return out.length ? out : null;
 }
 
 // Tolerant JSON extractor: finds the first balanced { ... } block in
