@@ -1407,6 +1407,37 @@
 .role-card__body .kb-doc p:last-child,
 .role-card__body .kb-doc ul:last-child { margin-bottom: 0; }
 
+/* --- Fit breakdown section on role detail --- */
+.role-card--fit { margin-bottom: var(--space-5); }
+.role-card--fit .fit-pill--lg {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 48px; height: 48px; padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display); font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3); letter-spacing: -0.01em;
+}
+.role-fit__summary { margin: 0 0 var(--space-4); }
+.role-fit__summary p {
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+  margin: 0 0 var(--space-2);
+  color: var(--text-primary);
+}
+.role-fit__summary p:last-child { margin-bottom: 0; }
+.role-card--fit .fit-breakdown {
+  list-style: none;
+  margin: 0; padding: 0;
+  display: grid; gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.role-card--fit .fit-breakdown__row { gap: var(--space-1); }
+.role-card--fit .fit-breakdown__hint {
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
 .role-callout {
   border-left: 3px solid var(--accent-strong);
   padding: var(--space-3) var(--space-4);

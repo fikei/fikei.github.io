@@ -22,19 +22,41 @@ export function scoreClass(s) {
   return 'fit-pill fit-pill--poor';
 }
 
+// Render just the bars + subcopy list — no modal chrome. Used by the
+// role-detail page to embed the v3 breakdown inline in the layout.
+export function renderFitBreakdown(row) {
+  if (!row) return nothing;
+  const breakdown = row.breakdown || row.fitBreakdown || {};
+  const rationales = row.rationales || row.fitRationales || {};
+  const dims = Object.keys(DIM_LABELS);
+  return html`
+    <ul class="fit-breakdown">
+      ${dims.map(k => {
+        const meta = DIM_LABELS[k];
+        const v = (breakdown && breakdown[k]) || 0;
+        const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
+        return html`
+          <li class="fit-breakdown__row">
+            <div class="fit-breakdown__head">
+              <span class="fit-breakdown__label">${meta.label}</span>
+              <span class="fit-breakdown__value">${v} / ${meta.max}</span>
+            </div>
+            <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
+            <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
+          </li>
+        `;
+      })}
+    </ul>
+  `;
+}
+
 // Render the modal. `row` is the role-like object — expects { company, title,
 // score, breakdown, hardFails }. `onClose` is called when the user dismisses.
 // Returns a lit-html template (or `nothing` if row is null).
 export function renderFitModal(row, onClose) {
   if (!row) return nothing;
   const score = row.score ?? row.fitScore ?? null;
-  const breakdown = row.breakdown || row.fitBreakdown || {};
-  // Per-bucket rationales generated at score-time. Falls back to the
-  // dimension's generic hint when a rationale hasn't been computed yet
-  // (older rows from before fit_rationales column existed).
-  const rationales = row.rationales || row.fitRationales || {};
   const hardFails = row.hardFails || [];
-  const dims = Object.keys(DIM_LABELS);
   const onBackdrop = (e) => { if (e.target.classList.contains('fit-modal__backdrop')) onClose(); };
   return html`
     <div class="fit-modal__backdrop" @click=${onBackdrop}>
@@ -59,23 +81,7 @@ export function renderFitModal(row, onClose) {
             ${hardFails.join(', ')}. Score capped at 30.
           </div>
         ` : nothing}
-        <ul class="fit-breakdown">
-          ${dims.map(k => {
-            const meta = DIM_LABELS[k];
-            const v = (breakdown && breakdown[k]) || 0;
-            const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
-            return html`
-              <li class="fit-breakdown__row">
-                <div class="fit-breakdown__head">
-                  <span class="fit-breakdown__label">${meta.label}</span>
-                  <span class="fit-breakdown__value">${v} / ${meta.max}</span>
-                </div>
-                <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
-                <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
-              </li>
-            `;
-          })}
-        </ul>
+        ${renderFitBreakdown(row)}
         <footer class="fit-modal__foot">
           <p class="muted">v2 weights: mission/domain/skills/title weighted from your vision + work history.</p>
         </footer>
