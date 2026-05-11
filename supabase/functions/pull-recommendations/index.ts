@@ -179,11 +179,11 @@ serve(async (req) => {
                role_match_seniority = ${seniority},
                role_match_scope     = ${scope},
                fit_summary          = coalesce(${fitSummary}, fit_summary),
-               candidate_score      = ${candidate?.score ?? null},
-               candidate_breakdown  = ${candidate ? sql.json(candidate.breakdown) : null},
-               candidate_rationales = ${candidate ? sql.json(candidate.rationales) : null},
+               candidate_score      = coalesce(${candidate?.score ?? null}, candidate_score),
+               candidate_breakdown  = coalesce(${candidate ? sql.json(candidate.breakdown) : null}, candidate_breakdown),
+               candidate_rationales = coalesce(${candidate ? sql.json(candidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${candidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = ${candidate?.compAcceptable ?? null}
+               comp_acceptable      = coalesce(${candidate?.compAcceptable ?? null}, comp_acceptable)
          where id = ${r.id}
       `;
       updated++;
@@ -231,11 +231,11 @@ serve(async (req) => {
                role_match_seniority = ${pipeSeniority},
                role_match_scope     = ${pipeScope},
                fit_summary          = coalesce(${pipeFitSummary}, fit_summary),
-               candidate_score      = ${pipeCandidate?.score ?? null},
-               candidate_breakdown  = ${pipeCandidate ? sql.json(pipeCandidate.breakdown) : null},
-               candidate_rationales = ${pipeCandidate ? sql.json(pipeCandidate.rationales) : null},
+               candidate_score      = coalesce(${pipeCandidate?.score ?? null}, candidate_score),
+               candidate_breakdown  = coalesce(${pipeCandidate ? sql.json(pipeCandidate.breakdown) : null}, candidate_breakdown),
+               candidate_rationales = coalesce(${pipeCandidate ? sql.json(pipeCandidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${pipeCandidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = ${pipeCandidate?.compAcceptable ?? null}
+               comp_acceptable      = coalesce(${pipeCandidate?.compAcceptable ?? null}, comp_acceptable)
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
