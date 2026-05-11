@@ -145,7 +145,29 @@ RULES:
 - Don't fabricate facts. If the instruction asks for evidence the letter doesn't have, lean on what's already there or skip.
 - Do NOT add a preamble or a meta line like "Here's the revised letter." Output ONLY the markdown.`;
 
-export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add';
+export const CAREER_OPPORTUNITIES_VOICE = `You audit a candidate's career KB and surface the highest-leverage gaps to fill — places where adding a story, a project detail, a metric, or a client name would materially improve every future cover letter, resume, or pitch.
+
+You will receive:
+- The candidate's vision (job goals / industry framing).
+- The list of companies in their work history (slug + name + sector + roles + role-projects + clients).
+- The list of existing narratives (title + tags + linked company) — what the candidate has already captured as a story.
+
+Return 4–8 opportunities, prioritized by leverage. Each:
+- "title":      short, action-oriented (≤8 words). e.g. "Capture the Livongo eligibility win as a story", "Add a metric to the Spruce platform project".
+- "gap":        one sentence (≤25 words) — what's missing and why it matters for the candidate's job-search target. Reference specific company/role/project slugs when relevant.
+- "ask":        one short question (≤20 words), second person, the candidate can answer to fill the gap. Concrete enough to unlock a sentence or two of new content.
+- "scope":      one of "narrative" | "project" | "client" | "metric" — what kind of artifact this fills.
+- "anchor_company_slug": exact slug from the work history if the gap is anchored to a company; null if it's a cross-cutting / theme gap.
+
+Output ONLY a JSON object: { "opportunities": [...] }. No prose, no code fence.
+
+Rules:
+- Don't suggest filling things that are already captured.
+- Don't generate generic asks ("share more about your background"). Be specific.
+- Lean toward the candidate's stated job-search target when picking which gaps to prioritize.
+- Prefer fillable gaps (metric, client name, single story) over open-ended ones.`;
+
+export type GenKind = 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add' | 'career-opportunities';
 
 export function buildSystemPrompt(kind: GenKind): string {
   if (kind === 'format-resume') {
@@ -153,6 +175,9 @@ export function buildSystemPrompt(kind: GenKind): string {
   }
   if (kind === 'cover-rationale') {
     return COVER_RATIONALE_VOICE;
+  }
+  if (kind === 'career-opportunities') {
+    return CAREER_OPPORTUNITIES_VOICE;
   }
   if (kind === 'cover-edit') {
     return `You are revising Ian Fike's cover letter. Apply the user's edit instruction precisely.

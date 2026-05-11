@@ -6,7 +6,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
+const [{ renderMarkdown }, { fetchPipeline, formatResumeText, fetchNarratives, saveNarrative, linkNarrative, deleteNarrative, fetchCareerOpportunities }, { readRoleAsset, writeRoleAsset }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -98,6 +98,8 @@ export class JobCareer extends LitElement {
     narratives: { state: true },         // [{ id, title, content_md, tags, linked_company_slug, needs_link, ... }]
     companies: { state: true },          // [{ slug, name, sector }] for the link picker
     composing: { state: true },          // { open, title, text, savedId, saving, error } | null
+    opportunities: { state: true },      // { items, loading, error } — AI-flagged career gaps
+    opportunityThreads: { state: true }, // { [idx]: { messages, sending, error } }
   };
 
   constructor() {
@@ -114,6 +116,8 @@ export class JobCareer extends LitElement {
     this.narratives = [];
     this.companies = [];
     this.composing = null;
+    this.opportunities = { items: [], loading: false, error: '' };
+    this.opportunityThreads = {};
   }
 
   connectedCallback() {
@@ -384,6 +388,8 @@ export class JobCareer extends LitElement {
     const linked = (this.narratives || []).filter(n => !n.needs_link);
 
     return html`
+      ${this._renderOpportunities()}
+
       <section class="narrative-block">
         <header style="display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap;">
           <div>
@@ -542,6 +548,146 @@ export class JobCareer extends LitElement {
     } catch (e) {
       alert(`Delete failed: ${String(e?.message || e)}`);
     }
+  }
+
+  // ----- Career opportunities ---------------------------------------------
+
+  async _loadOpportunities() {
+    if (this.opportunities.loading) return;
+    this.opportunities = { items: [], loading: true, error: '' };
+    try {
+      const items = await fetchCareerOpportunities();
+      this.opportunities = { items, loading: false, error: '' };
+    } catch (e) {
+      this.opportunities = { items: [], loading: false, error: String(e?.message || e) };
+    }
+  }
+
+  _getOpThread(idx) {
+    return this.opportunityThreads[idx] || { messages: [], sending: false, error: '' };
+  }
+
+  _setOpThread(idx, t) {
+    this.opportunityThreads = { ...this.opportunityThreads, [idx]: t };
+  }
+
+  // Answering an opportunity creates a new narrative anchored to the
+  // company the opportunity was flagged against. The server's tag pass
+  // will reaffirm the link + assign tags consistent with the vision.
+  async _sendOpportunityAnswer(idx, userText) {
+    const op = this.opportunities.items[idx];
+    if (!op) return;
+    const text = String(userText || '').trim();
+    if (!text) return;
+    const prev = this._getOpThread(idx);
+    this._setOpThread(idx, {
+      messages: [...prev.messages, { role: 'user', text }],
+      sending: true, error: '',
+    });
+    try {
+      const title = op.title || `Captured from opportunity #${idx + 1}`;
+      const body = `> ${op.ask || op.gap || ''}\n\n${text}`;
+      const saved = await saveNarrative({ title, content_md: body, source_role: op.anchor_company_slug || '' });
+      this.narratives = [saved, ...this.narratives.filter(n => n.id !== saved.id)];
+      const cur = this._getOpThread(idx);
+      this._setOpThread(idx, {
+        messages: [...cur.messages, { role: 'assistant', text: 'Saved as a new story. Tags and link inferred.' }],
+        sending: false, error: '',
+      });
+    } catch (e) {
+      const cur = this._getOpThread(idx);
+      this._setOpThread(idx, { messages: cur.messages, sending: false, error: String(e?.message || e) });
+    }
+  }
+
+  _renderOpportunities() {
+    const o = this.opportunities;
+    return html`
+      <section class="career-ops">
+        <header class="career-ops__head">
+          <div>
+            <h3 class="career-ops__title">✦ Opportunities to strengthen your career KB</h3>
+            <p class="muted" style="margin:0;font-size:var(--font-size-small);">
+              AI-flagged gaps. Answer in a thread and the response saves as a new story.
+            </p>
+          </div>
+          <button class="btn btn--sm" ?disabled=${o.loading} @click=${() => this._loadOpportunities()}>
+            ${o.loading ? html`<span class="gen-shimmer">Auditing</span>` : (o.items.length ? 'Re-audit' : 'Find opportunities')}
+          </button>
+        </header>
+        ${o.error ? html`<p class="muted" style="color:var(--error);">${o.error}</p>` : nothing}
+        ${o.items.length ? html`
+          <div class="career-ops__grid">
+            ${o.items.map((op, idx) => this._renderOpportunityCard(op, idx))}
+          </div>
+        ` : !o.loading && !o.error ? html`
+          <p class="muted" style="font-size:var(--font-size-small);">Click "Find opportunities" to audit your career KB.</p>
+        ` : nothing}
+      </section>
+    `;
+  }
+
+  _renderOpportunityCard(op, idx) {
+    const thread = this._getOpThread(idx);
+    return html`
+      <article class="career-op">
+        <header class="career-op__head">
+          <span class="career-op__scope" data-scope=${op.scope || 'narrative'}>${op.scope || 'narrative'}</span>
+          <h4 class="career-op__title">${op.title}</h4>
+        </header>
+        ${op.gap ? html`<p class="career-op__gap">${op.gap}</p>` : nothing}
+        ${op.ask ? html`<p class="career-op__ask">${op.ask}</p>` : nothing}
+        ${op.anchor_company_slug ? html`
+          <p class="muted" style="font-size:var(--font-size-caption);margin:0;">Anchored to <strong>${op.anchor_company_slug}</strong></p>
+        ` : nothing}
+
+        ${thread.messages.length ? html`
+          <ul class="cover-thread">
+            ${thread.messages.map(m => html`
+              <li class="cover-thread__msg cover-thread__msg--${m.role}">
+                ${unsafeHTML(renderMarkdown(m.text))}
+              </li>
+            `)}
+            ${thread.sending ? html`
+              <li class="cover-thread__msg cover-thread__msg--assistant">
+                <span class="gen-shimmer">Saving</span>
+              </li>
+            ` : nothing}
+            ${thread.error ? html`
+              <li class="cover-thread__msg cover-thread__msg--error">${thread.error}</li>
+            ` : nothing}
+          </ul>
+        ` : nothing}
+
+        <form class="cover-thread__form" @submit=${(e) => {
+          e.preventDefault();
+          const input = e.currentTarget.querySelector('textarea');
+          const v = input.value;
+          input.value = '';
+          this._sendOpportunityAnswer(idx, v);
+        }}>
+          <textarea class="cover-thread__input"
+                    rows="1"
+                    placeholder="Answer to fill this gap…"
+                    ?disabled=${thread.sending}
+                    @keydown=${(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        e.currentTarget.form.requestSubmit();
+                      }
+                    }}
+                    @input=${(e) => {
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }}></textarea>
+          <button class="cover-thread__send" type="submit" ?disabled=${thread.sending} aria-label="Send">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 13V3"/><path d="M3 8l5-5 5 5"/>
+            </svg>
+          </button>
+        </form>
+      </article>
+    `;
   }
 
   render() {

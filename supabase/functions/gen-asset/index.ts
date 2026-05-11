@@ -10,8 +10,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
-const VERSION = '0.7.0';
-console.log(`[gen-asset] v${VERSION} - cover opportunities + narrative-add to job.global_assets`);
+const VERSION = '0.8.0';
+console.log(`[gen-asset] v${VERSION} - career-opportunities kind: AI audit of work history + narratives`);
 
 const BASE_RESUME_SLUG = '__base__';
 
@@ -101,7 +101,7 @@ serve(async (req) => {
     const slugIn = body.slug ? String(body.slug).toLowerCase() : null;
     const rowIn = Number.isInteger(Number(body.rowNumber)) ? Number(body.rowNumber) : null;
     const kindIn = body.kind;
-    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add' | null =
+    const kind: 'resume' | 'cover-letter' | 'analysis' | 'base-resume' | 'format-resume' | 'cover-rationale' | 'cover-edit' | 'narrative-add' | 'career-opportunities' | null =
       kindIn === 'cover-letter' ? 'cover-letter'
       : kindIn === 'resume'     ? 'resume'
       : kindIn === 'analysis'   ? 'analysis'
@@ -110,6 +110,7 @@ serve(async (req) => {
       : kindIn === 'cover-rationale' ? 'cover-rationale'
       : kindIn === 'cover-edit' ? 'cover-edit'
       : kindIn === 'narrative-add' ? 'narrative-add'
+      : kindIn === 'career-opportunities' ? 'career-opportunities'
       : null;
     if (!kind) return err('kind must be a known value', 400);
 
@@ -195,6 +196,50 @@ Produce the JSON object now. JSON only.`;
       const highlights = Array.isArray(parsed?.highlights) ? parsed.highlights : [];
       const opportunities = Array.isArray(parsed?.opportunities) ? parsed.opportunities : [];
       return jsonResp({ ok: true, kind, highlights, opportunities });
+    }
+
+    // career-opportunities: audit work history + narratives + KB and
+    // return the highest-leverage gaps to fill. Stateless — frontend
+    // shows them as callouts and persists the answers via narrative-add
+    // or project upserts as appropriate.
+    if (kind === 'career-opportunities') {
+      const sql = db();
+      const [vision, companies, projects, clients, narratives] = await Promise.all([
+        sql`select narrative_arc, raw_md from job.vision where id = 1`,
+        sql`select slug, name, sector, body_md from job.companies`,
+        sql`select id, company_slug, role_title, name, description, outcome, metric from job.role_projects`,
+        sql`select project_id, name, kind, description from job.project_clients`,
+        sql`select id, title, tags, linked_company_slug, content_md from job.narratives`,
+      ]);
+      const visionText = (vision[0]?.narrative_arc || vision[0]?.raw_md || '').slice(0, 6000);
+      const clientsByProject = new Map<string, any[]>();
+      for (const c of clients) {
+        if (!clientsByProject.has(c.project_id)) clientsByProject.set(c.project_id, []);
+        clientsByProject.get(c.project_id)!.push(c);
+      }
+      const projectsByCompany = new Map<string, any[]>();
+      for (const p of projects) {
+        if (!projectsByCompany.has(p.company_slug)) projectsByCompany.set(p.company_slug, []);
+        projectsByCompany.get(p.company_slug)!.push({ ...p, clients: clientsByProject.get(p.id) || [] });
+      }
+      const companyBlocks = companies.map((c: any) => {
+        const ps = (projectsByCompany.get(c.slug) || []).map((p: any) =>
+          `  - Project ${p.id}: ${p.name}${p.metric ? ` (metric: ${p.metric})` : ''}${p.outcome ? ` — outcome: ${p.outcome.slice(0, 160)}` : ''}${p.clients.length ? ` — clients: ${p.clients.map((c: any) => `${c.name} [${c.kind}]`).join(', ')}` : ''}`
+        ).join('\n');
+        return `## ${c.slug}: ${c.name}${c.sector ? ` — ${c.sector}` : ''}\n${ps || '  (no projects captured)'}`;
+      }).join('\n\n');
+      const narrativeBlocks = narratives.map((n: any) =>
+        `- ${n.id}: "${n.title}" — tags: ${(n.tags || []).join(', ') || '(none)'} — linked: ${n.linked_company_slug || '(unlinked)'}`
+      ).join('\n');
+
+      const system = buildSystemPrompt(kind);
+      const user = `# Vision\n\n${visionText || '(no vision recorded)'}\n\n# Work history\n\n${companyBlocks || '(no companies)'}\n\n# Existing narratives\n\n${narrativeBlocks || '(no narratives yet)'}\n\n# Ask\n\nProduce the JSON object now. JSON only.`;
+      const raw = await callClaude(system, user);
+      const stripped = raw.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+      let parsedOps: any = null;
+      try { parsedOps = JSON.parse(stripped); } catch { /* ignore */ }
+      const opportunities = Array.isArray(parsedOps?.opportunities) ? parsedOps.opportunities : [];
+      return jsonResp({ ok: true, kind, opportunities });
     }
 
     // format-resume is stateless: take raw text in, return clean markdown.

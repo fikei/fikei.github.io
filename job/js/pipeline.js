@@ -228,6 +228,20 @@ export async function applyCoverEdit({ coverText, instruction, comment }) {
   return j.content;
 }
 
+// Audit the career KB (companies/projects/clients + narratives + vision)
+// and return highest-leverage gaps to fill. Stateless on the server.
+export async function fetchCareerOpportunities() {
+  const headers = await authHeader();
+  const res = await fetch(GEN_ASSET_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'career-opportunities' }),
+  });
+  if (!res.ok) throw new Error(`gen-asset ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.opportunities) ? j.opportunities : [];
+}
+
 // ----- Narratives (job.narratives) ----------------------------------------
 const NARRATIVES_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/narratives';
 
@@ -339,4 +353,5 @@ window.JobPipeline = {
   fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative,
   fetchNarratives, saveNarrative, linkNarrative, deleteNarrative,
   fetchRoleProjects, saveRoleProject, deleteRoleProject, saveProjectClient, deleteProjectClient,
+  fetchCareerOpportunities,
 };
