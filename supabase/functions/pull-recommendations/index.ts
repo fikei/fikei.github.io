@@ -24,8 +24,8 @@ import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 // loadFitContext for now. add-role uses the canonical versions in
 // ../_shared/job-fit-haiku.ts. TODO: consolidate to one source of truth.
 
-const VERSION = '0.6.1';
-console.log(`[pull-recommendations] v${VERSION} - user-auth rescore + ?slug=X scope; Fit v3 + Phase 1.5 enrichment writes`);
+const VERSION = '0.7.0';
+console.log(`[pull-recommendations] v${VERSION} - Phase 2.0 application-tracker scan side-effect in gmail-jobs source`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

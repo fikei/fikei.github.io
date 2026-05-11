@@ -6,11 +6,12 @@
 // POST /functions/v1/calendar-api
 // Body: { action, ... }
 
-const VERSION = '1.4.0'
-console.log(`[calendar-api] v${VERSION} - google calendar integration`)
+const VERSION = '1.5.0'
+console.log(`[calendar-api] v${VERSION} - Phase 2.0 role-matched-events action`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { db as jobDb } from '../_shared/job-db.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -713,6 +714,96 @@ serve(async (req) => {
         }))
 
       return json({ events })
+    }
+
+    // ── role-matched-events: 48h window matched to pipeline roles ──
+    // Phase 2.0 of the application tracker. Returns events that match a
+    // pipeline role by attendee email domain or title-token overlap.
+    // Narrow scope: read-only, ambiguous matches → no result (silent
+    // fail beats wrong chip). Caller renders a "📅 Today 10am" chip.
+    if (action === 'role-matched-events') {
+      const userId = await getUserId(req)
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+
+      const accessToken = await getAccessToken(db, userId)
+      if (!accessToken) return json({ matches: [], disconnected: true })
+
+      const windowHours = Math.max(1, Math.min(168, Number(body.windowHours) || 48))
+      const timeMin = new Date().toISOString()
+      const timeMax = new Date(Date.now() + windowHours * 60 * 60 * 1000).toISOString()
+
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '50',
+      })
+      const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!resp.ok) {
+        console.error('[calendar-api] role-matched-events fetch error:', await resp.text())
+        return json({ matches: [] })
+      }
+      const data = await resp.json() as { items?: Array<{ id: string; summary?: string; start?: { dateTime?: string }; end?: { dateTime?: string }; attendees?: Array<{ email?: string }>; hangoutLink?: string; htmlLink?: string }> }
+
+      const sql = jobDb()
+      const roles = await sql<Array<{ slug: string; company_name: string; company_norm: string; title: string; hiring_domain: string | null; status: string }>>`
+        select r.slug, r.company_name,
+               lower(trim(r.company_name)) as company_norm,
+               r.title, hc.domain as hiring_domain, r.status
+          from job.pipeline_roles r
+          left join job.hiring_companies hc
+            on hc.name_norm = lower(trim(r.company_name))
+         where r.status in ('Active', 'Saved')
+           and r.deleted_at is null`
+
+      type Match = { event_id: string; role_slug: string; company: string; title: string; summary: string; start: string; end: string; link: string | null }
+      const matches: Match[] = []
+
+      for (const ev of (data.items || [])) {
+        if (!ev.start?.dateTime) continue
+        const summary = (ev.summary || '').toLowerCase()
+        const attendeeDomains = (ev.attendees || [])
+          .map(a => (a.email || '').toLowerCase().split('@')[1])
+          .filter(Boolean)
+
+        // Step 1: attendee domain match.
+        let matched = roles.find(r => r.hiring_domain && attendeeDomains.includes(r.hiring_domain.toLowerCase()))
+
+        // Step 2: title-token / company-token in event summary.
+        if (!matched) {
+          const candidates = roles.filter(r => r.company_norm.length >= 3 && summary.includes(r.company_norm))
+          if (candidates.length === 1) matched = candidates[0]
+          else if (candidates.length > 1) {
+            // Disambiguate by title-token overlap; bail if still ambiguous.
+            let best: typeof candidates[number] | undefined
+            let bestScore = 0
+            for (const c of candidates) {
+              const tokens = c.title.toLowerCase().split(/[\s\-/_]+/).filter(t => t.length >= 4)
+              let hits = 0
+              for (const t of tokens) if (summary.includes(t)) hits++
+              if (hits > bestScore) { bestScore = hits; best = c }
+            }
+            if (best && bestScore >= 1) matched = best
+          }
+        }
+
+        if (!matched) continue
+        matches.push({
+          event_id:    ev.id,
+          role_slug:   matched.slug,
+          company:     matched.company_name,
+          title:       matched.title,
+          summary:     ev.summary || '(no title)',
+          start:       ev.start.dateTime,
+          end:         ev.end?.dateTime || ev.start.dateTime,
+          link:        ev.hangoutLink || ev.htmlLink || null,
+        })
+      }
+
+      return json({ version: VERSION, matches })
     }
 
     return json({ error: `Unknown action: ${action}` }, 400)
