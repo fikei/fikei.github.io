@@ -18,8 +18,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[narratives] v${VERSION} - CRUD + AI auto-tag/link`);
+const VERSION = '0.2.0';
+console.log(`[narratives] v${VERSION} - CRUD + AI auto-tag/link + KB extract backfill`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -30,6 +30,16 @@ const MAX_TITLE = 256;
 
 function newId(): string {
   return Math.random().toString(36).slice(2, 12);
+}
+
+// Loose title key for dedupe on backfill — lowercases, strips punct,
+// collapses whitespace so casing/punctuation drift doesn't double-create.
+function normalizeTitle(s: string): string {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 async function callClaudeJson(system: string, user: string): Promise<any> {
@@ -54,6 +64,60 @@ async function callClaudeJson(system: string, user: string): Promise<any> {
   const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
   const stripped = text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
   try { return JSON.parse(stripped); } catch { return null; }
+}
+
+const EXTRACT_SYSTEM = `You extract discrete career stories from a candidate's knowledge base.
+
+You will receive a markdown dump of their KB: companies, projects, skills, wins, and goal/vision text. Each company block usually contains role-level "Key achievements" bullets and a "Roles" section. Wins are headline + body.
+
+Your job: surface the strongest STAND-ALONE stories — moments that read as a single arc with a beginning, decision, outcome. Return 6–12 stories. Each:
+- "title":      short, evocative (≤9 words). Pick the moment, not the topic. e.g. "Killing the eligibility migration before launch", "Scaling Livongo onboarding from 12% to 38%".
+- "content_md": 4–8 sentences of markdown. Use the candidate's own language and facts from the KB — DO NOT invent metrics, clients, dates, or tooling. If a metric is in the KB, keep it verbatim. Write in first person if the KB does; otherwise stay neutral.
+- "anchor_company_slug": exact slug from the KB if the story belongs to one company; null if cross-cutting.
+
+Output ONLY a JSON object: { "stories": [...] }. No prose, no code fence.
+
+Rules:
+- Each story must be supported by something in the KB. No fabrication.
+- Pick UNIQUE arcs — don't extract two stories that say the same thing.
+- Skip thin bullets ("Built X to do Y") unless the KB has enough surrounding context to flesh into a real story.
+- Prefer stories that show judgement (a decision, a tradeoff, an unexpected outcome) over generic accomplishments.
+- Stay tight — quality beats quantity.`;
+
+async function extractFromKb(): Promise<{ title: string; content_md: string; anchor_company_slug: string | null }[]> {
+  const sql = db();
+  const [companies, projects, skills, wins, vision] = await Promise.all([
+    sql`select slug, name, sector, body_md from job.companies`,
+    sql`select slug, title, role, body_md, metric_value, company_slug from job.projects`,
+    sql`select slug, name, type, level, body_md from job.skills`,
+    sql`select slug, headline, body_md, metric_value, company_slug from job.wins`,
+    sql`select narrative_arc, raw_md from job.vision where id = 1`,
+  ]);
+
+  const sections: string[] = [];
+  if (vision[0]?.narrative_arc) sections.push(`## Vision / narrative arc\n\n${vision[0].narrative_arc}`);
+  for (const c of companies) {
+    sections.push(`## Company: ${c.name} (${c.slug})${c.sector ? ` — ${c.sector}` : ''}\n\n${c.body_md || '(no body)'}`);
+  }
+  for (const w of wins) {
+    sections.push(`## Win: ${w.headline} (${w.slug}) — company=${w.company_slug || 'n/a'}${w.metric_value ? ` — metric=${w.metric_value}` : ''}\n\n${w.body_md || ''}`);
+  }
+  for (const p of projects) {
+    sections.push(`## Project: ${p.title} (${p.slug}) — company=${p.company_slug || 'n/a'}${p.metric_value ? ` — metric=${p.metric_value}` : ''}\n\n${p.body_md || ''}`);
+  }
+  for (const s of skills) {
+    sections.push(`## Skill: ${s.name} (${s.slug})${s.level ? ` — ${s.level}` : ''}\n\n${s.body_md || ''}`);
+  }
+
+  const kbBlock = sections.join('\n\n---\n\n');
+  const user = `# Career KB\n\n${kbBlock}\n\n# Ask\n\nProduce the JSON object now. JSON only.`;
+  const parsed = await callClaudeJson(EXTRACT_SYSTEM, user);
+  const stories = Array.isArray(parsed?.stories) ? parsed.stories : [];
+  return stories.map((s: any) => ({
+    title:                String(s.title || '').trim().slice(0, MAX_TITLE),
+    content_md:           String(s.content_md || '').trim().slice(0, MAX_CONTENT),
+    anchor_company_slug:  typeof s.anchor_company_slug === 'string' ? s.anchor_company_slug : null,
+  })).filter((s) => s.title && s.content_md);
 }
 
 const TAG_SYSTEM = `You tag a candidate's career story for indexing.
@@ -116,6 +180,57 @@ serve(async (req) => {
     if (req.method !== 'POST') return err('GET or POST only', 405);
 
     const body = await req.json().catch(() => ({}));
+
+    // Backfill branch — pull discrete stories out of the existing KB
+    // (companies, wins, projects, skills, vision) and persist each via
+    // the same tag pipeline so they land tagged + linked. Idempotent
+    // via title hash: stories whose normalized titles already exist are
+    // skipped so re-runs don't double up.
+    if (body.extract === true) {
+      const candidates = await extractFromKb();
+      const existing = await sql`select title from job.narratives`;
+      const seen = new Set(existing.map((r: any) => normalizeTitle(String(r.title || ''))));
+      const created: any[] = [];
+      for (const cand of candidates) {
+        const key = normalizeTitle(cand.title);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let tags: string[] = [];
+        let linkedSlug: string | null = null;
+        let needsLink = true;
+        // If the extractor anchored to a company, take that as a strong
+        // hint — skip the tag pass's link inference and just use it.
+        if (cand.anchor_company_slug) {
+          const ok = await sql`select 1 from job.companies where slug = ${cand.anchor_company_slug} limit 1`;
+          if (ok.length > 0) {
+            linkedSlug = cand.anchor_company_slug;
+            needsLink = false;
+          }
+        }
+        try {
+          const ai = await tagNarrative(cand.content_md, { title: cand.title });
+          tags = ai.tags;
+          if (!linkedSlug && ai.linked_company_slug && ai.confidence >= LINK_CONFIDENCE_FLOOR) {
+            const ok = await sql`select 1 from job.companies where slug = ${ai.linked_company_slug} limit 1`;
+            if (ok.length > 0) {
+              linkedSlug = ai.linked_company_slug;
+              needsLink = false;
+            }
+          }
+        } catch (e) {
+          console.warn('[narratives] tag pass failed during extract', e);
+        }
+        const id = newId();
+        const rows = await sql`
+          insert into job.narratives (id, title, content_md, tags, linked_company_slug, needs_link, source_role)
+          values (${id}, ${cand.title}, ${cand.content_md}, ${tags}, ${linkedSlug}, ${needsLink}, 'extracted-from-kb')
+          returning id, title, content_md, tags, linked_company_slug, needs_link,
+                    source_role, created_at, updated_at;
+        `;
+        created.push(rows[0]);
+      }
+      return jsonResp({ ok: true, created, skipped: candidates.length - created.length });
+    }
 
     // Delete branch
     if (body.delete === true) {
