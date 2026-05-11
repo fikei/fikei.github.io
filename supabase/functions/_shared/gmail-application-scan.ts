@@ -160,13 +160,18 @@ export async function scanApplicationResponses(args: {
   // senders + the role's own canonical URL — those messages are either
   // already on the recs path (linkedin alerts) or noisy (job board
   // newsletters mentioning the company in passing).
+  //
+  // NOTE: we do NOT restrict to `in:inbox`. Many recruiter threads get
+  // filed into labels (e.g. Career/Networking) which removes them from
+  // the inbox view. `-in:spam -in:trash` keeps the obvious junk out
+  // without losing labeled-but-archived recruiter conversations.
   const NEWSLETTER_NEGATIVES = '-from:linkedin.com -from:wellfound.com -from:otta.com -from:builtin.com -from:hnhiring.com';
   for (const role of roles.slice(0, 20)) {
     if (role.company_norm.length < 3) continue;
     // Quote the name so multi-word companies match exactly. Escape any
     // embedded quotes for safety.
     const quoted = `"${role.company_name.replace(/"/g, '\\"')}"`;
-    const nameQuery = `${quoted} in:inbox -in:spam newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
+    const nameQuery = `${quoted} -in:spam -in:trash newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
     try {
       for (const id of await listMessagesByQuery(args.accessToken, nameQuery, 20)) {
         idSet.add(id);
