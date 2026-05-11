@@ -573,6 +573,12 @@ Improvements flagged while shipping the /job product (PRs #633–#645). Tracked 
 | **Multi-vision support** — Save multiple Vision configurations (e.g. "fractional only", "founding PM only") and switch the active one to see how the pipeline reranks. | Pending |
 | **Fit-score tuning UI** — Sliders to adjust the seven dimension weights, persisted in Vision. Deferred from v1. | Pending |
 
+### Narratives
+
+| Story | Status |
+|-------|--------|
+| **Persist Career Opportunities in BE** — Save AI-flagged opportunities to a `job.*` table so they survive page reload. On load, only re-audit when a new narrative (or work-history change) since the last audit could plausibly satisfy one of the open opportunities; otherwise serve the cached list. Mark opportunities `resolved` when a matching story lands. | Pending |
+
 ### Drilldown polish
 
 | Story | Status |
