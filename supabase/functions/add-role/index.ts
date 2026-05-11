@@ -9,12 +9,13 @@ import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '..
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
+import { scoreOne } from '../_shared/job-fit-haiku.ts';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
-console.log(`[add-role] v${VERSION} - JSON-LD JobPosting + careerspage.io + URL clean + company case + cleanTitle 'job in X'`);
+console.log(`[add-role] v${VERSION} - v3 fit at insert time: inherit Haiku from source rec OR fetch+grade fresh URLs`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -496,29 +497,42 @@ serve(async (req) => {
       } catch { /* best effort */ }
     }
 
-    // --- Compute fit score so the row paints with a real pill. ---
+    // --- Compute fit score using the v3 stack. ---
+    // Path A (from a rec card): copy the rec's Haiku output + description so
+    //   the pipeline row inherits the same score, no extra Anthropic call.
+    // Path B (fresh URL paste): scoreOne() fetches the JD, calls Haiku, and
+    //   computes the v3 fit against UserContext just like the cron pull.
     try {
-      const fit = computeFit({
-        status: 'New',
-        rank: '',
-        company,
-        title,
-        url,
-        source: finalSource,
-        contact: '',
-        salary: sal.range || '',
-        sector: sector || '',
-        investors: '',
-        website: '',
-        crunchbase: '',
-      });
-      const breakdownJson = JSON.stringify(fit.breakdown);
+      let fitOut: { fit: { score: number; breakdown: Record<string, number>; hardFails: string[] }; roleScore: number | null; rationale: string | null; seniority: string | null; scope: string | null; description: string };
+      if (body.fromRecommendationId) {
+        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }[]>`
+          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope
+            from job.recommended_roles where id = ${body.fromRecommendationId} limit 1`;
+        const src = inherit[0];
+        if (src && src.role_match_seniority) {
+          // Use stored Haiku output — no new API call.
+          const enriched = { status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '', description: src.description || '' };
+          const ctxFit = await (await import('../_shared/job-fit-haiku.ts')).loadFitContext(sql);
+          const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority);
+          fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, description: src.description || '' };
+        } else {
+          fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
+        }
+      } else {
+        fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
+      }
+      const breakdownJson = JSON.stringify(fitOut.fit.breakdown);
       await sql`
         update job.pipeline_roles
-        set fit_score = ${fit.score},
-            fit_breakdown = ${breakdownJson}::jsonb,
-            hard_fails = ${fit.hardFails}
-        where slug = ${slug};
+           set fit_score            = ${fitOut.fit.score},
+               fit_breakdown        = ${breakdownJson}::jsonb,
+               hard_fails           = ${fitOut.fit.hardFails},
+               description          = ${fitOut.description || null},
+               role_match_score     = ${fitOut.roleScore},
+               role_match_rationale = ${fitOut.rationale},
+               role_match_seniority = ${fitOut.seniority},
+               role_match_scope     = ${fitOut.scope}
+         where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }
 

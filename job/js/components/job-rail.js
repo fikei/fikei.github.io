@@ -94,7 +94,9 @@ export class JobRail extends LitElement {
     try {
       const [pipe, recs] = await Promise.all([
         fetchPipeline().catch(() => null),
-        fetchRecommendations().catch(() => null),
+        // view=all so the For You count reflects every candidate JD,
+        // not just the >=50-fit subset the carousel shows.
+        fetchRecommendations({ view: 'all' }).catch(() => null),
       ]);
       const roles = (pipe?.roles || []).filter(isVisibleRole);
       const leads  = roles.filter(r => bucketFor(r) === 'leads').length;

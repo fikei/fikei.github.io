@@ -19,6 +19,9 @@ import { db } from '../_shared/job-db.ts';
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
+// pull-recommendations keeps a local copy of fetchJdText / haikuRoleMatch /
+// loadFitContext for now. add-role uses the canonical versions in
+// ../_shared/job-fit-haiku.ts. TODO: consolidate to one source of truth.
 
 const VERSION = '0.5.0';
 console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring; Phase 1.5 enrichment writes`);
