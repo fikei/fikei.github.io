@@ -513,7 +513,7 @@ serve(async (req) => {
           // Use stored Haiku output — no new API call.
           const enriched = { status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '', description: src.description || '' };
           const ctxFit = await (await import('../_shared/job-fit-haiku.ts')).loadFitContext(sql);
-          const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority);
+          const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority, src.role_match_rationale);
           fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, description: src.description || '' };
         } else {
           fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
@@ -522,10 +522,12 @@ serve(async (req) => {
         fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
       }
       const breakdownJson = JSON.stringify(fitOut.fit.breakdown);
+      const rationalesJson = JSON.stringify(fitOut.fit.rationales);
       await sql`
         update job.pipeline_roles
            set fit_score            = ${fitOut.fit.score},
                fit_breakdown        = ${breakdownJson}::jsonb,
+               fit_rationales       = ${rationalesJson}::jsonb,
                hard_fails           = ${fitOut.fit.hardFails},
                description          = ${fitOut.description || null},
                role_match_score     = ${fitOut.roleScore},

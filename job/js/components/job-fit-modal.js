@@ -29,6 +29,10 @@ export function renderFitModal(row, onClose) {
   if (!row) return nothing;
   const score = row.score ?? row.fitScore ?? null;
   const breakdown = row.breakdown || row.fitBreakdown || {};
+  // Per-bucket rationales generated at score-time. Falls back to the
+  // dimension's generic hint when a rationale hasn't been computed yet
+  // (older rows from before fit_rationales column existed).
+  const rationales = row.rationales || row.fitRationales || {};
   const hardFails = row.hardFails || [];
   const dims = Object.keys(DIM_LABELS);
   const onBackdrop = (e) => { if (e.target.classList.contains('fit-modal__backdrop')) onClose(); };
@@ -67,7 +71,7 @@ export function renderFitModal(row, onClose) {
                   <span class="fit-breakdown__value">${v} / ${meta.max}</span>
                 </div>
                 <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
-                <p class="fit-breakdown__hint">${meta.hint}</p>
+                <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
               </li>
             `;
           })}

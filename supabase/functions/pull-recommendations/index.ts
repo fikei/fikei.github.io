@@ -136,9 +136,9 @@ serve(async (req) => {
     const ctx = await loadFitContext(sql);
     const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
     const force = new URL(req.url).searchParams.get('force') === '1';
-    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
       select id, title, company, description, sector, investors, salary, source,
-             role_match_score, role_match_seniority, role_match_scope
+             role_match_score, role_match_rationale, role_match_seniority, role_match_scope
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
     `;
@@ -152,10 +152,9 @@ serve(async (req) => {
         website: '', crunchbase: '', description: r.description || '',
       };
       let roleScore = r.role_match_score;
-      let rationale: string | null = null;
+      let rationale = r.role_match_rationale;
       let seniority = r.role_match_seniority;
       let scope     = r.role_match_scope;
-      // Haiku-grade when missing OR when force=1 (after a rubric change).
       const needsHaiku = useHaiku && (r.description || '').length > 200
         && (force || roleScore == null || seniority == null);
       if (needsHaiku) {
@@ -166,23 +165,24 @@ serve(async (req) => {
           haikuCalls++;
         }
       }
-      const fit = computeFit(roleRow, ctx, roleScore, seniority);
+      const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale);
       await sql`
         update job.recommended_roles
            set fit_score            = ${fit.score},
                fit_breakdown        = ${sql.json(fit.breakdown)},
+               fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
                role_match_score     = ${roleScore},
-               role_match_rationale = coalesce(${rationale}, role_match_rationale),
+               role_match_rationale = ${rationale},
                role_match_seniority = ${seniority},
                role_match_scope     = ${scope}
          where id = ${r.id}
       `;
       updated++;
     }
-    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
       select slug, title, company_name, description, sector, investors, salary_range, source,
-             role_match_score, role_match_seniority, role_match_scope
+             role_match_score, role_match_rationale, role_match_seniority, role_match_scope
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
@@ -194,7 +194,7 @@ serve(async (req) => {
         website: '', crunchbase: '', description: r.description || '',
       };
       let pipeRoleScore = r.role_match_score;
-      let pipeRationale: string | null = null;
+      let pipeRationale = r.role_match_rationale;
       let pipeSeniority = r.role_match_seniority;
       let pipeScope     = r.role_match_scope;
       const needsHaiku = useHaiku && (r.description || '').length > 200
@@ -207,14 +207,15 @@ serve(async (req) => {
           haikuCalls++;
         }
       }
-      const fit = computeFit(roleRow, ctx, pipeRoleScore, pipeSeniority);
+      const fit = computeFit(roleRow, ctx, pipeRoleScore, pipeSeniority, pipeRationale);
       await sql`
         update job.pipeline_roles
            set fit_score            = ${fit.score},
                fit_breakdown        = ${sql.json(fit.breakdown)},
+               fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
                role_match_score     = ${pipeRoleScore},
-               role_match_rationale = coalesce(${pipeRationale}, role_match_rationale),
+               role_match_rationale = ${pipeRationale},
                role_match_seniority = ${pipeSeniority},
                role_match_scope     = ${pipeScope}
          where slug = ${r.slug}`;
@@ -514,11 +515,12 @@ async function enrichAndScoreNewRows(
         seniority = haiku.seniority; scope = haiku.scope;
       }
     }
-    const fit = computeFit(roleRow, ctx, roleScore, seniority);
+    const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale);
     await sql`
       update job.recommended_roles
          set fit_score            = ${fit.score},
              fit_breakdown        = ${sql.json(fit.breakdown)},
+             fit_rationales       = ${sql.json(fit.rationales)},
              hard_fails           = ${fit.hardFails},
              role_match_score     = ${roleScore},
              role_match_rationale = ${rationale},

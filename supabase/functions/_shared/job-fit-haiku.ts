@@ -187,6 +187,6 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
       seniority = haiku.seniority; scope = haiku.scope;
     }
   }
-  const fit = computeFit(enriched, ctx, roleScore, seniority);
+  const fit = computeFit(enriched, ctx, roleScore, seniority, rationale);
   return { fit, roleScore, rationale, seniority, scope, description };
 }
