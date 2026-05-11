@@ -156,6 +156,9 @@ export class JobRecommendations extends LitElement {
                 <span class="rec-card__source-icon" aria-hidden="true">🌐</span>
                 <a href=${rec.url} target="_blank" rel="noopener" class="link-subtle">${rec.sourceLabel}</a>
               ` : nothing}
+              ${rec.enrichmentStatus === 'unresolved' ? html`
+                <span class="enrichment-badge" title="Still resolving the canonical posting on the company's ATS. Link points to the aggregator for now.">verifying source</span>
+              ` : nothing}
               ${rec.sourceEmailUrl ? html`
                 <span aria-hidden="true"> · </span>
                 <a href=${rec.sourceEmailUrl} target="_blank" rel="noopener" class="link-subtle" title="Open the originating email in Gmail">📧 source email</a>

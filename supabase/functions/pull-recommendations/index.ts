@@ -20,8 +20,8 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.4.1';
-console.log(`[pull-recommendations] v${VERSION} - Fit v2 + Gmail sourceLabel = sender (LinkedIn / Wellfound / …) not company`);
+const VERSION = '0.5.0';
+console.log(`[pull-recommendations] v${VERSION} - Phase 1.5 enrichment writes (enrichment_status, canonical_url, company_id)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -418,6 +418,10 @@ async function insertNew(
     sector:         r.input.sector ?? null,
     investors:      r.input.investors ?? [],
     payload:        r.input.payload ?? null,
+    enrichment_status:   r.input.enrichmentStatus   ?? null,
+    enrichment_retry_at: r.input.enrichmentRetryAt  ?? null,
+    canonical_url:       r.input.canonicalUrl       ?? null,
+    company_id:          r.input.companyId          ?? null,
   }));
   const inserted = await sql`
     insert into job.recommended_roles ${sql(values)}
