@@ -139,6 +139,22 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 | Keep CORS proxies as anonymous-user fallback | Pending |
 | Add scrape health monitoring (success rates per domain) | Pending |
 
+### Headless-Browser JD Fetcher for `/job` Fit Scoring
+
+The current `fetchJdText()` in `_shared/job-fit-haiku.ts` does a static HTML fetch with browser-shaped headers. It works for ~75% of postings but fails on:
+- **Cloudflare bot challenges** — Code for America (now fetched but flaky), Harvey, Sully.ai
+- **Client-side rendered SPAs** — Abridge careers, Heidi, Cityblock, secondary Ambience postings — return a ~50-byte skeleton with no JD text
+- **Workday job pages** — often render the JD body via XHR after page load
+
+Without descriptions, the values/culture/role/arc buckets all fall back to title+company keyword hits and the Haiku role-match call is skipped (gated on `description.length > 200`). About 14 hand-curated Saved roles currently sit at 30–40 instead of their true 55–80.
+
+| Story | Status |
+|-------|--------|
+| **Headless browser fetch path** — Playwright or Puppeteer endpoint (likely on a small Railway/Fly worker since edge functions can't run Chromium) that renders the JD URL and returns the post-JS HTML | Pending |
+| Per-ATS JSON fallbacks — Greenhouse `/boards-api/v1/boards/{org}/jobs/{id}`, Lever `https://api.lever.co/v0/postings/{org}/{id}`, Ashby — use these before headless when the URL pattern is recognizable | Pending |
+| `fetchJdText()` cascades static → ATS JSON → headless, returns first non-skeleton result | Pending |
+| Re-run backfill after the new fetcher lands; expected lift: ~14 Saved rows + 19 recommended_roles into the 55+ band | Pending |
+
 ### Client Modularization (R2)
 
 | Story | Status |
@@ -578,6 +594,7 @@ Improvements flagged while shipping the /job product (PRs #633–#645). Tracked 
 | Story | Status |
 |-------|--------|
 | **Persist Career Opportunities in BE** — Save AI-flagged opportunities to a `job.*` table so they survive page reload. On load, only re-audit when a new narrative (or work-history change) since the last audit could plausibly satisfy one of the open opportunities; otherwise serve the cached list. Mark opportunities `resolved` when a matching story lands. | Pending |
+
 
 ### Drilldown polish
 

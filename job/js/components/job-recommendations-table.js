@@ -209,7 +209,13 @@ export class JobRecommendationsTable extends LitElement {
 
   _onRowClick(r, e) {
     if (e.target.closest('button, a, .row-menu, .fit-pill--button')) return;
-    if (r.url) window.open(r.url, '_blank', 'noopener');
+    if (!r.url) return;
+    // Plain click → in-page; Cmd/Ctrl/middle → new tab (browser standard).
+    if (e.metaKey || e.ctrlKey || e.button === 1) {
+      window.open(r.url, '_blank', 'noopener');
+    } else {
+      window.location.assign(r.url);
+    }
   }
 
   _renderRow(r) {
@@ -267,7 +273,7 @@ export class JobRecommendationsTable extends LitElement {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
         <header class="recs-page__head">
-          <h1>Recommended for you</h1>
+          <h1>For You</h1>
         </header>
         <div class="pipeline-table-wrap">
           <table class="pipeline-table">
