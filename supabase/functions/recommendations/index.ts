@@ -31,6 +31,7 @@ serve(async (req) => {
                r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
                r.description, r.match_bullets as "matchBullets", r.suggested_at as "suggestedAt",
                r.fit_score as "fitScore", r.fit_breakdown as "breakdown",
+               r.fit_rationales as "rationales",
                r.hard_fails as "hardFails", r.sector,
                r.enrichment_status as "enrichmentStatus",
                r.enrichment_retry_at as "enrichmentRetryAt",

@@ -9,12 +9,13 @@ import { verifyJobUser, jsonResp, err, corsHeaders, slugify, roleSlug } from '..
 import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
+import { scoreOne } from '../_shared/job-fit-haiku.ts';
 
 const VERSION = '0.3.0';
-// ATS-embed shortcut: detect ?ashby_jid= and ?gh_jid= on customer
-// domains and hit the ATS API directly. Saves "Careers" / "(unknown
-// company)" rows when the customer's careers page only embeds a widget.
-console.log(`[add-role] v${VERSION} - JSON-LD JobPosting + careerspage.io + URL clean + company case + cleanTitle 'job in X'`);
+// Status default: 'Saved' (post-taxonomy collapse).
+// Source-email-link: stash payload.gmailApiId as a Gmail web URL when
+// the rec came from Gmail.
+console.log(`[add-role] v${VERSION} - v3 fit at insert time: inherit Haiku from source rec OR fetch+grade fresh URLs`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -211,77 +212,6 @@ function inferSector(text: string, company: string): string {
   return Array.from(new Set(tags)).slice(0, 3).join(' / ');
 }
 
-// ATS-embed lookup. Many companies host an Ashby or Greenhouse widget
-// on their own domain (e.g. assorthealth.com/careers?ashby_jid=…) which
-// makes the page <title> useless ("Careers"). Detect the job-ID query
-// param, derive the ATS slug from the hostname, and hit the public ATS
-// API to get the real title + company + canonical URL.
-//
-// Returns null when the URL doesn't carry an embed param, or when the
-// derived slug doesn't match a real ATS tenant. Best-effort: a single
-// API miss here just falls through to the normal extraction.
-async function tryAtsEmbedLookup(urlStr: string): Promise<{
-  title: string;
-  company: string;
-  canonicalUrl: string;
-} | null> {
-  try {
-    const u = new URL(urlStr);
-    const ashbyJid = u.searchParams.get('ashby_jid');
-    const ghJid    = u.searchParams.get('gh_jid');
-
-    // Derive candidate ATS slugs from the hostname. "assorthealth.com" →
-    // ["assorthealth"]; "www.assort-health.com" → ["assort-health",
-    // "assorthealth"]. We try a small set of variations to be tolerant.
-    const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    const root = host.split('.')[0];                       // "assorthealth"
-    const candidates = [...new Set([
-      root,
-      root.replace(/-/g, ''),
-    ])].filter(Boolean);
-
-    if (ashbyJid) {
-      for (const slug of candidates) {
-        try {
-          const r = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(slug)}`, {
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) continue;
-          const data = await r.json() as { jobs?: Array<{ id: string; title: string; jobUrl: string }> };
-          const match = (data.jobs || []).find(j => j.id === ashbyJid);
-          if (match) {
-            return {
-              title:        match.title,
-              company:      spacedTitleCase(slug),
-              canonicalUrl: match.jobUrl,
-            };
-          }
-        } catch { /* try next candidate slug */ }
-      }
-    }
-
-    if (ghJid) {
-      for (const slug of candidates) {
-        try {
-          const r = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs/${encodeURIComponent(ghJid)}`, {
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) continue;
-          const data = await r.json() as { title?: string; absolute_url?: string; company_name?: string };
-          if (data.title && data.absolute_url) {
-            return {
-              title:        data.title,
-              company:      data.company_name || spacedTitleCase(slug),
-              canonicalUrl: data.absolute_url,
-            };
-          }
-        } catch { /* try next candidate slug */ }
-      }
-    }
-  } catch { /* malformed URL */ }
-  return null;
-}
-
 // "cityblockhealth.wd1.myworkdayjobs.com" → "Cityblock Health".
 // "boards.greenhouse.io/acme" path-based fallback handled by the og:site_name.
 function companyFromHost(urlStr: string): string | null {
@@ -391,19 +321,6 @@ serve(async (req) => {
     let title = String(body.title || '').trim();
     let company = String(body.company || '').trim();
 
-    // ATS-embed shortcut. Customer-domain careers pages that embed an
-    // Ashby or Greenhouse widget put the job ID in a query param
-    // (?ashby_jid=… / ?gh_jid=…). The page's <title> is usually just
-    // "Careers" so the normal extraction path returns "(unknown
-    // company)" — bypass it by hitting the ATS API directly.
-    let canonicalFromAts: string | null = null;
-    const atsHit = await tryAtsEmbedLookup(url);
-    if (atsHit) {
-      if (!title)   title   = atsHit.title;
-      if (!company) company = atsHit.company;
-      canonicalFromAts = atsHit.canonicalUrl;
-    }
-
     // Always pull the page so we have the JD body for salary + sector
     // detection, even if title/company were passed in by the caller.
     const meta = await fetchPageMeta(url);
@@ -440,10 +357,6 @@ serve(async (req) => {
     if (!title) title = '(untitled role)';
     if (!company) company = '(unknown company)';
 
-    // Prefer the canonical ATS URL when we have one — gives a stable
-    // link to the actual posting instead of the customer's widget host.
-    const finalUrl = canonicalFromAts ?? url;
-
     const slug = roleSlug(company, title);
     if (!slug) return err('could not derive slug from title/company', 400);
 
@@ -471,7 +384,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, ${companySlug}, ${company}, ${title},
-          ${finalUrl}, ${finalSource}, 'Saved'
+          ${url}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
@@ -490,7 +403,7 @@ serve(async (req) => {
           slug, company_slug, company_name, title, url, source, status
         ) values (
           ${slug}, null, ${company}, ${title},
-          ${finalUrl}, ${finalSource}, 'Saved'
+          ${url}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
@@ -584,29 +497,44 @@ serve(async (req) => {
       } catch { /* best effort */ }
     }
 
-    // --- Compute fit score so the row paints with a real pill. ---
+    // --- Compute fit score using the v3 stack. ---
+    // Path A (from a rec card): copy the rec's Haiku output + description so
+    //   the pipeline row inherits the same score, no extra Anthropic call.
+    // Path B (fresh URL paste): scoreOne() fetches the JD, calls Haiku, and
+    //   computes the v3 fit against UserContext just like the cron pull.
     try {
-      const fit = computeFit({
-        status: 'New',
-        rank: '',
-        company,
-        title,
-        url,
-        source: finalSource,
-        contact: '',
-        salary: sal.range || '',
-        sector: sector || '',
-        investors: '',
-        website: '',
-        crunchbase: '',
-      });
-      const breakdownJson = JSON.stringify(fit.breakdown);
+      let fitOut: { fit: { score: number; breakdown: Record<string, number>; hardFails: string[] }; roleScore: number | null; rationale: string | null; seniority: string | null; scope: string | null; description: string };
+      if (body.fromRecommendationId) {
+        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null }[]>`
+          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope
+            from job.recommended_roles where id = ${body.fromRecommendationId} limit 1`;
+        const src = inherit[0];
+        if (src && src.role_match_seniority) {
+          // Use stored Haiku output — no new API call.
+          const enriched = { status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '', description: src.description || '' };
+          const ctxFit = await (await import('../_shared/job-fit-haiku.ts')).loadFitContext(sql);
+          const fit = computeFit(enriched, ctxFit, src.role_match_score, src.role_match_seniority, src.role_match_rationale);
+          fitOut = { fit, roleScore: src.role_match_score, rationale: src.role_match_rationale, seniority: src.role_match_seniority, scope: src.role_match_scope, description: src.description || '' };
+        } else {
+          fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
+        }
+      } else {
+        fitOut = await scoreOne({ status: 'New', rank: '', company, title, url, source: finalSource, contact: '', salary: sal.range || '', sector: sector || '', investors: '', website: '', crunchbase: '' }, sql);
+      }
+      const breakdownJson = JSON.stringify(fitOut.fit.breakdown);
+      const rationalesJson = JSON.stringify(fitOut.fit.rationales);
       await sql`
         update job.pipeline_roles
-        set fit_score = ${fit.score},
-            fit_breakdown = ${breakdownJson}::jsonb,
-            hard_fails = ${fit.hardFails}
-        where slug = ${slug};
+           set fit_score            = ${fitOut.fit.score},
+               fit_breakdown        = ${breakdownJson}::jsonb,
+               fit_rationales       = ${rationalesJson}::jsonb,
+               hard_fails           = ${fitOut.fit.hardFails},
+               description          = ${fitOut.description || null},
+               role_match_score     = ${fitOut.roleScore},
+               role_match_rationale = ${fitOut.rationale},
+               role_match_seniority = ${fitOut.seniority},
+               role_match_scope     = ${fitOut.scope}
+         where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }
 

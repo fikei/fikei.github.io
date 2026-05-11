@@ -24,12 +24,13 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
   import('../logo.js' + V),
   import('../diff.js' + V),
+  import('./job-fit-modal.js' + V),
 ]);
 
 const BASE_RESUME_SLUG = '__base__';
@@ -495,6 +496,38 @@ export class JobRoleDetail extends LitElement {
     return html`<span class="stoplight stoplight--${score}">${labels[score] || score}</span>`;
   }
 
+  // Trim a prose blob to ~100 words at a sentence boundary so the fit
+  // summary stays scannable. Falls back to the raw text if the source
+  // is already short.
+  _summaryFromWhyFits(text) {
+    if (!text) return '';
+    const flat = String(text).replace(/\s+/g, ' ').trim();
+    const words = flat.split(' ');
+    if (words.length <= 100) return flat;
+    const truncated = words.slice(0, 100).join(' ');
+    const lastStop = Math.max(truncated.lastIndexOf('. '), truncated.lastIndexOf('? '), truncated.lastIndexOf('! '));
+    return (lastStop > 0 ? truncated.slice(0, lastStop + 1) : truncated + '…').trim();
+  }
+
+  // The v3 fit section: full modal-style card body — score block, prose
+  // summary as the sub-explainer, hard-fail callout, and bars-with-subcopy.
+  // Renders from the shared renderFitCardBody() so the modal and detail
+  // page stay structurally identical.
+  _renderFitSection(parsed, status) {
+    const r = this.role;
+    if (!r) return nothing;
+    const summaryText = this._summaryFromWhyFits(parsed?.whyFits) || parsed?.description || '';
+    const summary = summaryText
+      ? html`<div class="kb-doc">${unsafeHTML(renderMarkdown(summaryText))}</div>`
+      : null;
+    return html`
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Fit breakdown</h3></header>
+        ${renderFitCardBody(r, { summary, loading: status === 'loading' })}
+      </article>
+    `;
+  }
+
   _renderTwoColCard({ title, headerExtra, sections, status }) {
     return html`
       <article class="role-card">
@@ -536,16 +569,16 @@ export class JobRoleDetail extends LitElement {
         </section>
       ` : status === 'loading' ? html`<p class="muted">Drafting summary…</p>` : nothing}
 
+      ${this._renderFitSection(parsed, status)}
+      ${parsed?.risks ? html`
+        <article class="role-card">
+          <header class="role-card__head"><h3>Risks</h3></header>
+          <div class="role-card__body">
+            <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.risks))}</div>
+          </div>
+        </article>
+      ` : nothing}
       <div class="role-cards">
-        ${this._renderTwoColCard({
-          title: 'Role fit',
-          headerExtra: this._renderStoplight(roleFit),
-          sections: [
-            ['Why it fits', parsed?.whyFits],
-            ['Risks',       parsed?.risks],
-          ],
-          status,
-        })}
         ${this._renderTwoColCard({
           title: 'Candidate strength',
           headerExtra: this._renderCandidateStoplight(candidate),
