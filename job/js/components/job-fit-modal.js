@@ -4,16 +4,14 @@
 import { html, nothing } from 'https://esm.run/lit@3';
 
 export const DIM_LABELS = {
-  mission: { label: 'Mission & impact', max: 20, hint: 'Posting text matches your impact themes (health outcomes, cost reduction, education access, AI ethics). Anti-themes zero this out.' },
-  domain:  { label: 'Domain experience', max: 15, hint: 'Posting sector overlaps with companies you have worked at — healthtech, edtech, consumer SaaS surface automatically.' },
-  skills:  { label: 'Skills match',     max: 15, hint: 'Posting mentions skills from your profile (UX, platform thinking, zero-to-one, growth experimentation). Years-weighted.' },
-  title:   { label: 'Title match',      max: 15, hint: 'Founding / Senior / Staff PM scores higher; below seniority hard-fails.' },
-  arc:     { label: 'Career arc',       max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
-  stage:   { label: 'Stage',            max: 10, hint: 'Inferred from investors. Pre-seed → C scores high; public / mega-cap hard-fails.' },
-  geo:     { label: 'Geography',        max: 5,  hint: 'Most geo filtering happens upstream — this is a small bonus.' },
-  comp:    { label: 'Compensation',     max: 5,  hint: 'Top of range ≥ $200k = full marks.' },
-  source:  { label: 'Source',           max: 3,  hint: 'Network > LinkedIn Saved > LinkedIn Recommended > Company Pages.' },
-  network: { label: 'Network',          max: 2,  hint: 'A named contact in the row gets +2.' },
+  values:  { label: 'Values & impact',   max: 25, hint: 'Mission keywords + impact themes (healthcare outcomes, cost reduction, education access, AI ethics, civic / social good). Anti-themes (gambling, crypto, surveillance) zero this out. Allowed to dominate the score.' },
+  culture: { label: 'Culture fit',       max: 15, hint: 'JD/About text matches your culture pool: AI-native, strong eng bar / principal engineer, autonomy / IC / player-coach, mission-led.' },
+  role:    { label: 'Role match',        max: 25, hint: 'JD responsibilities vs your skills + interest tags (clinician experience, platform infra, behavioral loops, billing/cost reduction, public benefit). Claude Haiku grades JDs with full descriptions; regex fallback otherwise.' },
+  domain:  { label: 'Domain experience', max: 15, hint: 'Posting sector overlaps with companies you have worked at — healthtech, edtech, consumer SaaS, civic.' },
+  arc:     { label: 'Career arc',        max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
+  stage:   { label: 'Stage',             max: 4,  hint: 'Tiebreaker only. Pre-seed → C scores high; public / mega-cap hard-fails.' },
+  comp:    { label: 'Compensation',      max: 4,  hint: 'Top of range ≥ $200k = full marks. Floor signal, not a ranker.' },
+  geo:     { label: 'Geography',         max: 2,  hint: 'Most geo filtering happens upstream — this is a small bonus.' },
 };
 
 export function scoreClass(s) {
@@ -48,7 +46,7 @@ export function renderFitModal(row, onClose) {
           <span class=${scoreClass(score)}>${score == null ? '—' : score}</span>
           <div>
             <p class="fit-modal__score-label">Fit score</p>
-            <p class="fit-modal__score-sub">Out of 100. Sum of ten weighted dimensions; hard fails cap at 30.</p>
+            <p class="fit-modal__score-sub">Out of 100. Values & impact and Role match are the dominant signals; comp and stage are tiebreakers. Hard fails cap at 30.</p>
           </div>
         </div>
         ${hardFails.length ? html`
