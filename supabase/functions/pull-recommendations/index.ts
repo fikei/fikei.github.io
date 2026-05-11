@@ -16,12 +16,12 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
-import { computeFit, type RoleRow } from '../jobs-pipe/fit.ts';
+import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 
-const VERSION = '0.3.4';
-console.log(`[pull-recommendations] v${VERSION} - Gmail: cap counts NEW work only (dedup-hits don't burn budget)`);
+const VERSION = '0.4.0';
+console.log(`[pull-recommendations] v${VERSION} - Fit v2: mission/domain/skills/arc scoring loaded from vision+skills+companies`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -56,14 +56,85 @@ serve(async (req) => {
   // bypasses both the enabled flag and the schedule, so the user can
   // trigger a single source from the UI without waiting for cron.
   let forceId: string | null = null;
+  let rescoreOnly = false;
   if (req.method === 'POST') {
     try {
       const body = await req.json();
       if (body && typeof body.id === 'string') forceId = body.id;
+      if (body && body.rescore === true) rescoreOnly = true;
     } catch { /* no body, that's fine */ }
   }
+  if (new URL(req.url).searchParams.get('rescore') === '1') rescoreOnly = true;
 
   const sql = db();
+
+  // Backfill rescore — recompute fit_score and fit_breakdown for every
+  // active recommended role using the v2 scorer + UserContext. Useful
+  // after weight/shape changes so existing rows pick up the new model.
+  if (rescoreOnly) {
+    const ctx = await loadFitContext(sql);
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null }>>`
+      select id, title, company, description, sector, investors, salary, source
+        from job.recommended_roles
+       where dismissed_at is null and added_to_pipeline_slug is null
+    `;
+    let updated = 0;
+    for (const r of rows) {
+      const roleRow: RoleRow = {
+        status: '', rank: '',
+        company:    r.company || '',
+        title:      r.title || '',
+        url:        '',
+        source:     r.source || '',
+        contact:    '',
+        salary:     r.salary || '',
+        sector:     r.sector || '',
+        investors:  (r.investors || []).join(', '),
+        website:    '', crunchbase: '',
+        description: r.description || '',
+      };
+      const fit = computeFit(roleRow, ctx);
+      await sql`
+        update job.recommended_roles
+           set fit_score     = ${fit.score},
+               fit_breakdown = ${sql.json(fit.breakdown)},
+               hard_fails    = ${fit.hardFails}
+         where id = ${r.id}
+      `;
+      updated++;
+    }
+    // Also rescore pipeline_roles so the Saved/Active/Archive table picks
+    // up the v2 breakdown shape and weights.
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null }>>`
+      select slug, title, company_name, sector, investors, salary_range, source
+        from job.pipeline_roles where deleted_at is null`;
+    let pipeUpdated = 0;
+    for (const r of pipeRows) {
+      const roleRow: RoleRow = {
+        status: '', rank: '',
+        company:    r.company_name || '',
+        title:      r.title || '',
+        url:        '',
+        source:     r.source || '',
+        contact:    '',
+        salary:     r.salary_range || '',
+        sector:     r.sector || '',
+        investors:  (r.investors || []).join(', '),
+        website:    '', crunchbase: '',
+        description: '',
+      };
+      const fit = computeFit(roleRow, ctx);
+      await sql`
+        update job.pipeline_roles
+           set fit_score     = ${fit.score},
+               fit_breakdown = ${sql.json(fit.breakdown)},
+               hard_fails    = ${fit.hardFails}
+         where slug = ${r.slug}`;
+      pipeUpdated++;
+    }
+    return new Response(JSON.stringify({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated }, null, 2),
+      { status: 200, headers: { 'content-type': 'application/json' } });
+  }
   const sources = forceId
     ? await sql<UserSourceRow[]>`
         select id, user_email, type, config, schedule_cron, min_score, last_run_at
@@ -100,7 +171,8 @@ serve(async (req) => {
         ? onTarget.filter(r => geoMatches(r.location || '', targetGeos))
         : onTarget;
       const droppedOffGeo = onTarget.length - inGeo.length;
-      const { kept, dropped } = scoreAndFilter(inGeo, src.min_score);
+      const fitCtx = await loadFitContext(sql);
+      const { kept, dropped } = scoreAndFilter(inGeo, src.min_score, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -246,15 +318,55 @@ interface ScoredRow {
   hardFails: string[];
 }
 
-function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number): { kept: ScoredRow[]; dropped: number } {
+function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: FitUserContext): { kept: ScoredRow[]; dropped: number } {
   const kept: ScoredRow[] = [];
   let dropped = 0;
   for (const r of rows) {
-    const fit = computeFit(toRoleRow(r));
+    const fit = computeFit(toRoleRow(r), ctx);
     if (fit.hardFails.length || fit.score < minScore) { dropped++; continue; }
     kept.push({ input: r, fitScore: fit.score, breakdown: fit.breakdown as unknown as Record<string, number>, hardFails: fit.hardFails });
   }
   return { kept, dropped };
+}
+
+// ---------- Fit context loader ----------
+// Pulls everything computeFit needs to score against the user's profile:
+//   - mission keywords + anti-mission terms + missionRequired from job.vision
+//   - skill names + years from job.skills
+//   - past sector blobs from job.companies
+//   - arc tags derived from narrative_arc (light keyword extraction)
+let _fitCtxCache: { ctx: FitUserContext; at: number } | null = null;
+const FIT_CTX_CACHE_MS = 60_000;
+
+async function loadFitContext(sql: ReturnType<typeof db>): Promise<FitUserContext> {
+  if (_fitCtxCache && Date.now() - _fitCtxCache.at < FIT_CTX_CACHE_MS) return _fitCtxCache.ctx;
+  const [visionRows, skillRows, companyRows] = await Promise.all([
+    sql`select impact_themes, mission_keywords, mission_required, anti_mission_terms,
+               coalesce(narrative_arc,'') as narrative_arc
+          from job.vision order by updated_at desc limit 1`,
+    sql`select name, years_practiced from job.skills`,
+    sql`select coalesce(sector,'') as sector from job.companies`,
+  ]);
+  const v = (visionRows as Array<Record<string, unknown>>)[0] || {};
+  const arcSrc = (v.narrative_arc as string || '').toLowerCase();
+  const arcTags: string[] = [];
+  for (const tag of ['founding','zero-to-one','zero to one','platform','scale','scaled','ipo','acquisition','fractional','pmf','product-market fit','growth','greenfield']) {
+    if (arcSrc.includes(tag)) arcTags.push(tag);
+  }
+  const ctx: FitUserContext = {
+    missionKeywords:   (v.mission_keywords as string[] | null) || [],
+    antiMissionTerms:  (v.anti_mission_terms as string[] | null) || [],
+    impactThemes:      (v.impact_themes as string[] | null) || [],
+    missionRequired:   Boolean(v.mission_required),
+    skills:            (skillRows as Array<Record<string, unknown>>).map(s => ({
+      name: String(s.name || ''),
+      years: (s.years_practiced as number | null) ?? null,
+    })),
+    pastSectors: (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
+    arcTags,
+  };
+  _fitCtxCache = { ctx, at: Date.now() };
+  return ctx;
 }
 
 // Map a RecommendedRoleInput → the RoleRow shape computeFit expects.
@@ -274,6 +386,7 @@ function toRoleRow(r: RecommendedRoleInput): RoleRow {
     investors:  (r.investors || []).join(', '),
     website:    '',
     crunchbase: '',
+    description: r.description || '',
   };
 }
 

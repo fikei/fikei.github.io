@@ -45,13 +45,16 @@ function bucketFor(r) {
 }
 
 const DIM_LABELS = {
-  title:   { label: 'Title match',   max: 25, hint: 'Founding/Senior/Staff PM scores higher; below seniority hard-fails.' },
-  stage:   { label: 'Stage',         max: 20, hint: 'Inferred from investors. Pre-seed → C scores high; public/mega-cap hard-fails.' },
-  sector:  { label: 'Sector',        max: 20, hint: 'Health and EdTech are top; AI-native / SaaS / Fintech middle.' },
-  geo:     { label: 'Geography',     max: 15, hint: 'Sheet has no geo column — neutral default for now.' },
-  comp:    { label: 'Compensation',  max: 10, hint: 'Top of range ≥ $200k = full marks.' },
-  source:  { label: 'Source',        max: 5,  hint: 'Network > LinkedIn Saved > LinkedIn Recommended > Company Pages > Manual.' },
-  network: { label: 'Network',       max: 5,  hint: 'A named contact in the row gets +5.' },
+  mission: { label: 'Mission & impact', max: 20, hint: 'Posting text matches your impact themes (health outcomes, cost reduction, education access, AI ethics). Anti-themes zero this out.' },
+  domain:  { label: 'Domain experience', max: 15, hint: 'Posting sector overlaps with companies you have worked at — healthtech, edtech, consumer SaaS surface automatically.' },
+  skills:  { label: 'Skills match',     max: 15, hint: 'Posting mentions skills from your profile (UX, platform thinking, zero-to-one, growth experimentation). Years-weighted.' },
+  title:   { label: 'Title match',      max: 15, hint: 'Founding / Senior / Staff PM scores higher; below seniority hard-fails.' },
+  arc:     { label: 'Career arc',       max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
+  stage:   { label: 'Stage',            max: 10, hint: 'Inferred from investors. Pre-seed → C scores high; public / mega-cap hard-fails.' },
+  geo:     { label: 'Geography',        max: 5,  hint: 'Most geo filtering happens upstream — this is a small bonus.' },
+  comp:    { label: 'Compensation',     max: 5,  hint: 'Top of range ≥ $200k = full marks.' },
+  source:  { label: 'Source',           max: 3,  hint: 'Network > LinkedIn Saved > LinkedIn Recommended > Company Pages.' },
+  network: { label: 'Network',          max: 2,  hint: 'A named contact in the row gets +2.' },
 };
 
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
