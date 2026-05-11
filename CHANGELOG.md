@@ -6,6 +6,30 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-05-11] - Gmail Application Tracker (Phase 2.0)
+
+### Added
+- **Gmail Application Tracker (Phase 15 — first cut)** — second-pass scan over the inbox classifies progress signals on open applications and surfaces them in the pipeline UI.
+  - Migration 069: `job.application_events` (event_type enum, confidence, round_label/round_n, auto_applied, needs_review, source) + `pipeline_roles.gmail_thread_ids` / `last_activity_at` / `process_outline` columns.
+  - `_shared/gmail-application-classifier.ts` — Haiku prompt with 9-value event-type enum, per-type confidence floors, tolerant JSON parsing. Forward-only auto-advance map; offers + rejections always need_review.
+  - `_shared/gmail-application-scan.ts` — match (thread continuity → sender domain → ATS-platform fallback) → classify → insert event → forward-only auto-advance → update last_activity_at / gmail_thread_ids (poison-resistant at conf ≥ 0.8) / process_outline (recruiter_email > jd_extract > inferred ranking).
+  - Side-effect call wired into `gmail-jobs.ts` source plugin; runs every `pull-recommendations` tick.
+  - New `application-events` edge function with `list` / `needs-attention` / `ack` / `backfill` actions. `needs_user_reply` derived per-thread on demand by walking the Gmail thread for outbound messages from fike101@gmail.com (24h grace, 10-thread cap). Backfill self-paced batches of 5 (PRs #783, #785).
+  - `calendar-api` v1.5.0 — new `role-matched-events` action: 48h events.list matched to pipeline roles by attendee email domain → title-token. Ambiguous matches → no chip (silent fail beats wrong chip).
+  - **UI** — pipeline rows get a single highest-priority signal chip (red Action-needed > blue Calendar today/tomorrow > amber Reply-pending > green New-update > yellow Stale-14d). Needs-Attention widget above the Active table (hidden when 0 actionables). Live-arrival banners for items < 30 min old with persisted dismissal. Drill page Activity tab — reverse-chron event list with source-email link, ack button on review-needed events. Process-tracker strip below role header.
+  - Locked decisions: forward-only auto-advance, top-level stage taxonomy unchanged, 3-source process-detection ranking, 30-day backfill explicit-signals-only, stale-14d on-open only (no push), narrow calendar read pulled into 2.0 (precision tightening deferred to 2.1).
+
+### Changed
+- `pull-recommendations` v0.7.0 — fires application-scan side-effect.
+- Pipeline table gains a `signal` column between Role and Sector.
+- /job cache-bust to v=0.75.0 across all /job pages; app.js VERSION bumped to match so dynamic imports refresh component graph.
+
+### Infrastructure
+- Three edge functions deployed: `pull-recommendations`, `application-events`, `calendar-api`.
+- Migration 069 applied via Supabase MCP.
+
+---
+
 ## [2026-02-21] - Categorization Cleanup & Lookback MVPs
 
 ### Added
