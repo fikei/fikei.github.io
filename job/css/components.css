@@ -1636,6 +1636,177 @@
 
 /* --- Your Career: narrative blocks + prompt carousel --- */
 .narrative-block { margin-bottom: var(--space-7); }
+
+/* Story composer */
+.narrative-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  margin-bottom: var(--space-5);
+}
+.narrative-composer__title,
+.narrative-composer__text {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+  transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+.narrative-composer__title { font-weight: var(--fw-semibold); font-size: var(--font-size-body-lg); }
+.narrative-composer__text  { min-height: 180px; resize: vertical; line-height: var(--lh-body); }
+.narrative-composer__title:focus,
+.narrative-composer__text:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.narrative-composer__actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Story grid + cards */
+.narrative-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.narrative-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+.narrative-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.narrative-card--needs-link {
+  border-color: rgba(201, 138, 0, 0.5);
+  background: rgba(255, 213, 79, 0.05);
+}
+.narrative-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.narrative-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body-lg);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+.narrative-card__del {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--fg-subtle);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+}
+.narrative-card__del:hover { background: var(--bg-surface); color: var(--fg); }
+.narrative-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.narrative-tag {
+  font-size: var(--font-size-caption);
+  padding: 2px 8px;
+}
+.narrative-card__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+.narrative-card__link--needs {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  background: transparent;
+  padding: 0;
+}
+.narrative-card__link-row {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+.narrative-card__link-row select {
+  flex: 1;
+  padding: 6px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.narrative-card__unlink {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: var(--font-size-caption);
+  text-decoration: underline;
+  margin-left: auto;
+}
+.narrative-card__body {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  line-height: var(--lh-body);
+}
+
+/* "Needs connection" section header */
+.narrative-needs {
+  border-left: 3px solid #c98a00;
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 213, 79, 0.05);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+}
+.narrative-needs__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--font-size-body);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+}
+.narrative-needs__pill {
+  font-size: var(--font-size-caption);
+  padding: 2px 8px;
+  background: #c98a00;
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-weight: var(--fw-semibold);
+}
 .narrative-block h2 {
   margin: 0 0 var(--space-2);
   font-family: var(--font-display);

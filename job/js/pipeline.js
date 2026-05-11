@@ -228,4 +228,55 @@ export async function applyCoverEdit({ coverText, instruction, comment }) {
   return j.content;
 }
 
-window.JobPipeline = { fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative };
+// ----- Narratives (job.narratives) ----------------------------------------
+const NARRATIVES_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/narratives';
+
+export async function fetchNarratives() {
+  const headers = await authHeader();
+  const res = await fetch(NARRATIVES_URL, { headers });
+  if (!res.ok) throw new Error(`narratives ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.narratives) ? j.narratives : [];
+}
+
+// Upsert a narrative. Server runs an AI tag/link pass on write.
+export async function saveNarrative({ id, title, content_md, source_role }) {
+  const headers = await authHeader();
+  const res = await fetch(NARRATIVES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, title, content_md, source_role }),
+  });
+  if (!res.ok) throw new Error(`narratives ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return j.narrative;
+}
+
+// Set/clear the company link on a narrative without re-running tagging.
+export async function linkNarrative(id, linkedCompanySlug) {
+  const headers = await authHeader();
+  const res = await fetch(NARRATIVES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, linked_company_slug: linkedCompanySlug }),
+  });
+  if (!res.ok) throw new Error(`narratives ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return j.narrative;
+}
+
+export async function deleteNarrative(id) {
+  const headers = await authHeader();
+  const res = await fetch(NARRATIVES_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, delete: true }),
+  });
+  if (!res.ok) throw new Error(`narratives ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+window.JobPipeline = {
+  fetchPipeline, setStatus, generateAsset, formatResumeText, fetchCoverRationale, applyCoverEdit, addNarrative,
+  fetchNarratives, saveNarrative, linkNarrative, deleteNarrative,
+};
