@@ -132,8 +132,10 @@ serve(async (req) => {
   if (rescoreOnly) {
     const ctx = await loadFitContext(sql);
     const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
-    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null }>>`
-      select id, title, company, description, sector, investors, salary, source, role_match_score
+    const force = new URL(req.url).searchParams.get('force') === '1';
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
+      select id, title, company, description, sector, investors, salary, source,
+             role_match_score, role_match_seniority, role_match_scope
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
     `;
@@ -146,28 +148,38 @@ serve(async (req) => {
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
-      // Compute or reuse role-match. Haiku only for rows that don't already
-      // have a score AND have enough JD context to warrant a call.
       let roleScore = r.role_match_score;
       let rationale: string | null = null;
-      if (useHaiku && roleScore == null && (r.description || '').length > 200) {
+      let seniority = r.role_match_seniority;
+      let scope     = r.role_match_scope;
+      // Haiku-grade when missing OR when force=1 (after a rubric change).
+      const needsHaiku = useHaiku && (r.description || '').length > 200
+        && (force || roleScore == null || seniority == null);
+      if (needsHaiku) {
         const haiku = await haikuRoleMatch(roleRow, ctx);
-        if (haiku) { roleScore = haiku.score; rationale = haiku.rationale; haikuCalls++; }
+        if (haiku) {
+          roleScore = haiku.score; rationale = haiku.rationale;
+          seniority = haiku.seniority; scope = haiku.scope;
+          haikuCalls++;
+        }
       }
-      const fit = computeFit(roleRow, ctx, roleScore);
+      const fit = computeFit(roleRow, ctx, roleScore, seniority);
       await sql`
         update job.recommended_roles
            set fit_score            = ${fit.score},
                fit_breakdown        = ${sql.json(fit.breakdown)},
                hard_fails           = ${fit.hardFails},
                role_match_score     = ${roleScore},
-               role_match_rationale = coalesce(${rationale}, role_match_rationale)
+               role_match_rationale = coalesce(${rationale}, role_match_rationale),
+               role_match_seniority = ${seniority},
+               role_match_scope     = ${scope}
          where id = ${r.id}
       `;
       updated++;
     }
-    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null }>>`
-      select slug, title, company_name, description, sector, investors, salary_range, source, role_match_score
+    const pipeRows = await sql<Array<{ slug: string; title: string | null; company_name: string | null; description: string | null; sector: string | null; investors: string[] | null; salary_range: string | null; source: string | null; role_match_score: number | null; role_match_seniority: string | null; role_match_scope: string | null }>>`
+      select slug, title, company_name, description, sector, investors, salary_range, source,
+             role_match_score, role_match_seniority, role_match_scope
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
@@ -178,22 +190,30 @@ serve(async (req) => {
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
-      // Same Haiku gating as recommended_roles — only call when we have
-      // a real JD and no stored score yet.
       let pipeRoleScore = r.role_match_score;
       let pipeRationale: string | null = null;
-      if (useHaiku && pipeRoleScore == null && (r.description || '').length > 200) {
+      let pipeSeniority = r.role_match_seniority;
+      let pipeScope     = r.role_match_scope;
+      const needsHaiku = useHaiku && (r.description || '').length > 200
+        && (force || pipeRoleScore == null || pipeSeniority == null);
+      if (needsHaiku) {
         const haiku = await haikuRoleMatch(roleRow, ctx);
-        if (haiku) { pipeRoleScore = haiku.score; pipeRationale = haiku.rationale; haikuCalls++; }
+        if (haiku) {
+          pipeRoleScore = haiku.score; pipeRationale = haiku.rationale;
+          pipeSeniority = haiku.seniority; pipeScope = haiku.scope;
+          haikuCalls++;
+        }
       }
-      const fit = computeFit(roleRow, ctx, pipeRoleScore);
+      const fit = computeFit(roleRow, ctx, pipeRoleScore, pipeSeniority);
       await sql`
         update job.pipeline_roles
            set fit_score            = ${fit.score},
                fit_breakdown        = ${sql.json(fit.breakdown)},
                hard_fails           = ${fit.hardFails},
                role_match_score     = ${pipeRoleScore},
-               role_match_rationale = coalesce(${pipeRationale}, role_match_rationale)
+               role_match_rationale = coalesce(${pipeRationale}, role_match_rationale),
+               role_match_seniority = ${pipeSeniority},
+               role_match_scope     = ${pipeScope}
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
@@ -253,9 +273,17 @@ serve(async (req) => {
       });
       const droppedToPipeline = kept.length - filtered.length;
       const inserted = await insertNew(sql, src, filtered);
+      // Productize the v3 fit pipeline: every NEW recommendation gets a
+      // JD fetch (if the plugin didn't provide one) + Haiku-graded role
+      // match + a v3 rescore using the structured fields. Cron pulls feed
+      // straight into the same scoring stack the manual rescore uses, so
+      // a posting that lands at 3am scores the same as one we re-graded.
+      if (inserted.length) {
+        await enrichAndScoreNewRows(sql, inserted.map(r => r.id), fitCtx);
+      }
       // Bullets for newly-inserted rows AND any older active row that
-      // never got bullets (e.g. from a prior failed run). Capped per
-      // tick so one Anthropic outage doesn't burn the whole budget.
+      // never got bullets. Capped per tick so one Anthropic outage doesn't
+      // burn the whole budget.
       const stale = await sql`
         select id, company, title, url, fit_score as "fitScore", fit_breakdown as "breakdown", payload
           from job.recommended_roles
@@ -438,6 +466,65 @@ async function loadFitContext(sql: ReturnType<typeof db>): Promise<FitUserContex
   return ctx;
 }
 
+// ---------- Productize: enrich + Haiku-grade + rescore new inserts ----------
+// Each new row from a cron pull walks the same pipeline as the manual
+// /rescore endpoint, so cron-fed recommendations score the same as
+// hand-rescored ones. JD backfill is best-effort; Haiku is best-effort;
+// the final computeFit uses whatever fields we ended up with.
+async function enrichAndScoreNewRows(
+  sql: ReturnType<typeof db>,
+  ids: string[],
+  ctx: FitUserContext,
+): Promise<void> {
+  if (!ids.length) return;
+  const rows = await sql<Array<{ id: string; url: string | null; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null }>>`
+    select id, url, title, company, description, sector, investors, salary, source
+      from job.recommended_roles
+     where id = any(${ids}::uuid[])`;
+  for (const r of rows) {
+    let description = r.description || '';
+    // Best-effort JD backfill if the plugin didn't provide one.
+    if (description.length < 200 && r.url) {
+      try {
+        const text = await fetchJdText(r.url);
+        if (text && text.length >= 200) {
+          description = text;
+          await sql`update job.recommended_roles set description = ${text} where id = ${r.id}::uuid`;
+        }
+      } catch { /* best effort */ }
+    }
+    const roleRow: RoleRow = {
+      status: '', rank: '',
+      company: r.company || '', title: r.title || '', url: r.url || '',
+      source: r.source || '', contact: '', salary: r.salary || '',
+      sector: r.sector || '', investors: (r.investors || []).join(', '),
+      website: '', crunchbase: '', description,
+    };
+    let roleScore: number | null = null;
+    let rationale: string | null = null;
+    let seniority: string | null = null;
+    let scope: string | null = null;
+    if (description.length > 200) {
+      const haiku = await haikuRoleMatch(roleRow, ctx);
+      if (haiku) {
+        roleScore = haiku.score; rationale = haiku.rationale;
+        seniority = haiku.seniority; scope = haiku.scope;
+      }
+    }
+    const fit = computeFit(roleRow, ctx, roleScore, seniority);
+    await sql`
+      update job.recommended_roles
+         set fit_score            = ${fit.score},
+             fit_breakdown        = ${sql.json(fit.breakdown)},
+             hard_fails           = ${fit.hardFails},
+             role_match_score     = ${roleScore},
+             role_match_rationale = ${rationale},
+             role_match_seniority = ${seniority},
+             role_match_scope     = ${scope}
+       where id = ${r.id}::uuid`;
+  }
+}
+
 // ---------- JD description fetcher ----------
 // Re-fetches a posting URL, strips HTML, returns plain text capped at 8KB.
 // Best-effort: returns '' on any failure so the caller can skip without
@@ -487,24 +574,44 @@ async function fetchJdText(url: string): Promise<string> {
 // single integer 0–25 plus a one-sentence rationale. Returns null on any
 // failure so the caller can fall back to the regex bucket. The score we
 // get back is persisted on the row so rescore doesn't re-pay Haiku.
-async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<{ score: number; rationale: string } | null> {
+async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<{ score: number; rationale: string; seniority: string; scope: string } | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return null;
-  const system = `You score role-fit on a 0-25 integer scale.
+  const system = `You grade a job posting against a candidate's profile and return four structured fields.
 
 Inputs you will see:
   - Job posting (title, company, description)
   - The candidate's skills (with years of practice)
   - The candidate's interest tags (problem types they want to work on)
+  - The candidate's target seniority: Senior PM, Staff PM, Principal PM, Lead PM, Product Lead, Head of Product, Founding PM. Manager-of-managers (Director, VP) is "above"; Senior PM IC is "equivalent"; below Senior is "below".
 
-Scoring rubric (these are real anchors, not platitudes):
+Output JSON only:
+{
+  "score":      <int 0-25>,
+  "rationale":  "<one sentence, max 22 words>",
+  "seniority":  "below" | "equivalent" | "above" | "founding",
+  "scope":      "ic" | "ic_player_coach" | "manager"
+}
+
+Scoring rubric for "score" (real anchors, not platitudes):
   0-5   Wrong shape entirely (wrong seniority, wrong function, deal-breaker)
   6-12  Adjacent — title fits but JD responsibilities barely overlap with skills/interests
   13-18 Genuine match — multiple skills and at least one interest tag map cleanly to JD responsibilities
-  19-22 Strong — the JD reads like it was written for someone with this exact profile
+  19-22 Strong — JD reads like it was written for someone with this exact profile
   23-25 Reserved for rare alignment across seniority, scope, skills, and explicit interest overlap
 
-Output JSON only: {"score": <int 0-25>, "rationale": "<one sentence, max 22 words>"}.
+Seniority guidance — title shape NOT just string-match:
+  - "Lead PM" / "Lead Product Manager" at a civic/nonprofit/PBC → equivalent (same scope as Staff/Principal at venture-backed)
+  - "Group PM" / "GPM" → equivalent
+  - "Director, Product" with 0-1 reports → equivalent; with multi-team org → above
+  - "Founding PM" → founding
+  - "PM I/II/III" / "Associate PM" / "APM" → below
+
+Scope:
+  - ic              Pure individual contributor, no reports
+  - ic_player_coach IC with 1-2 reports max, hands-on
+  - manager         3+ reports, primarily managing
+
 No prose outside the JSON. No bullets. No headers.`;
   const userPrompt = [
     `# Posting`,
@@ -532,9 +639,18 @@ No prose outside the JSON. No bullets. No headers.`;
     const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string };
+    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string };
     if (typeof parsed.score !== 'number') return null;
-    return { score: Math.max(0, Math.min(25, Math.round(parsed.score))), rationale: String(parsed.rationale || '').slice(0, 400) };
+    const seniority = ['below','equivalent','above','founding'].includes((parsed.seniority || '').toLowerCase())
+      ? parsed.seniority!.toLowerCase() : 'equivalent';
+    const scope = ['ic','ic_player_coach','manager'].includes((parsed.scope || '').toLowerCase())
+      ? parsed.scope!.toLowerCase() : 'ic';
+    return {
+      score: Math.max(0, Math.min(25, Math.round(parsed.score))),
+      rationale: String(parsed.rationale || '').slice(0, 400),
+      seniority,
+      scope,
+    };
   } catch (e) {
     console.warn(`[pull-recommendations] haiku role-match failed: ${(e as Error).message}`);
     return null;

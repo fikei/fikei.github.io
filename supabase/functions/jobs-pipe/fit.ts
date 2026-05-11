@@ -142,7 +142,9 @@ function scoreRole(r: RoleRow, cap: number, ctx?: UserContext, preComputedRole?:
   let titleBase: number;
   if (/founding (pm|product)/.test(t)) titleBase = cap * 0.40;
   else if (/(?:^|\s)(product lead|head of product)\b/.test(t)) titleBase = cap * 0.36;
-  else if (/principal pm|principal product manager|staff pm|staff product manager/.test(t)) titleBase = cap * 0.32;
+  // Lead PM / Lead Product Manager — same scope/seniority as Staff/Principal
+  // IC. Civic and nonprofit orgs use "Lead" where scale-ups use "Staff".
+  else if (/principal pm|principal product manager|staff pm|staff product manager|lead pm|lead product manager/.test(t)) titleBase = cap * 0.32;
   else if (/group product manager|group pm|senior pm|senior product manager|sr\.? pm/.test(t)) titleBase = cap * 0.30;
   else if (/director, product|director of product/.test(t)) titleBase = cap * 0.24;
   else if (/(^|\W)(pm|product manager)(\W|$)/.test(t)) titleBase = cap * 0.20;
@@ -203,7 +205,10 @@ function legacySector(s: string, cap: number): number {
 }
 
 // ---------- Career arc (cap from weights.arc, default 10) ----------
-function scoreArc(r: RoleRow, cap: number, ctx?: UserContext): number {
+// Seniority recognition is Haiku-driven when a role-match call has run
+// (seniorityHint passed from the cached row). Title-string regex is the
+// fallback only — and only for postings we haven't graded yet.
+function scoreArc(r: RoleRow, cap: number, ctx?: UserContext, seniorityHint?: string | null): number {
   const text = postingText(r);
   const arcSignals = (ctx?.arcTags?.length ? ctx.arcTags : [
     'zero to one','zero-to-one','founding','platform','scale','scaled','ipo','acquisition','growth','pmf','product-market fit','greenfield','0 to 1'
@@ -212,8 +217,19 @@ function scoreArc(r: RoleRow, cap: number, ctx?: UserContext): number {
   const investors = (r.investors + ' ' + r.crunchbase).toLowerCase();
   const earlyStage = /seed|series a|series b|pre-seed/.test(investors);
   const lateStage = /series d|series e|late stage|public/.test(investors);
-  const isFounding = /founding (pm|product)/.test(r.title.toLowerCase());
-  const isSeniorScale = /senior|staff|principal|head of|director|vp/.test(r.title.toLowerCase());
+
+  // Prefer Haiku-derived seniority; fall back to regex only if absent.
+  let isSeniorScale: boolean, isFounding: boolean;
+  if (seniorityHint) {
+    const h = seniorityHint.toLowerCase();
+    isFounding    = h === 'above' || h === 'founding';
+    isSeniorScale = h === 'equivalent' || h === 'above' || h === 'founding';
+  } else {
+    const t = r.title.toLowerCase();
+    isFounding    = /founding (pm|product)/.test(t);
+    isSeniorScale = /senior|staff|principal|head of|director|vp|\blead\b/.test(t);
+  }
+
   let coherence = 0;
   if (isFounding && earlyStage) coherence += cap * 0.4;
   if (isSeniorScale && !earlyStage && !lateStage) coherence += cap * 0.2;
@@ -255,13 +271,13 @@ function scoreGeo(_r: RoleRow, cap: number): { v: number; fail?: string } {
 }
 
 // ---------- Compose ----------
-export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: number | null): FitResult {
+export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: number | null, seniorityHint?: string | null): FitResult {
   const w: FitWeights = { ...DEFAULT_WEIGHTS, ...(ctx?.weights || {}) };
   const values  = scoreValues(r, w.values, ctx);
   const culture = scoreCulture(r, w.culture, ctx);
   const role    = scoreRole(r, w.role, ctx, preComputedRole);
   const domain  = scoreDomain(r, w.domain, ctx);
-  const arc     = scoreArc(r, w.arc, ctx);
+  const arc     = scoreArc(r, w.arc, ctx, seniorityHint);
   const stage   = scoreStage(r, w.stage);
   const geo     = scoreGeo(r, w.geo);
   const comp    = scoreComp(r.salary, w.comp);
