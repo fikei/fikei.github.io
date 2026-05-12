@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[onboard] v${VERSION} - parse/bundle/insights/extract/finalize`);
+const VERSION = '0.3.0';
+console.log(`[onboard] v${VERSION} - extract returns reflection + nextQuestionCopy (chat rev)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -257,11 +257,32 @@ const QUESTIONS: Record<string, QuestionSpec> = {
   },
 };
 
-async function modeExtract(questionId: string, answer: string): Promise<unknown> {
+async function modeExtract(questionId: string, answer: string, nextQuestionLabel?: string): Promise<unknown> {
   const q = QUESTIONS[questionId];
   if (!q) throw new Error(`unknown questionId: ${questionId}`);
-  const system = `You extract structured tags from a user's freeform answer to a single onboarding question. The question was: "${q.label}". Return ONLY JSON matching this shape:\n${q.schema}\n${q.notes || ''}\n\nBe specific and concise. Empty array > guessed value. Echo the user's own language where possible — do not impose vocabulary they didn't use.`;
-  return await callClaudeJson(system, answer.slice(0, 8000), 1500);
+  // The extracted tags use the per-question schema. We also generate a short
+  // reflection paragraph that interprets what we heard (not echoes it) so the
+  // chat surface feels like a conversation. If a next question is provided
+  // we rewrite it in voice so it flows from the reflection naturally.
+  const system = `You are the host of a calm, generative career-onboarding conversation. The user just answered the question: "${q.label}".
+
+Return ONLY JSON matching:
+{
+  "tags": ${q.schema},
+  "reflection": string,
+  "nextQuestionCopy": string|null
+}
+
+Rules for "tags": ${q.notes || 'extract per the schema above'}. Empty arrays beat guesses. Echo their own words; don't impose vocabulary they didn't use.
+
+Rules for "reflection": one or two sentences that *interpret* what they said — name a trait, surface a pattern, distill it. Don't just echo their words back. Sentence case. No emoji. Em-dashes welcome. Examples of good shape:
+  - "That's a purpose-driven direction — sounds like you want the work to leave a fingerprint."
+  - "Building something yourself while interviewing says you're comfortable with ambiguity."
+  - "Engagement loops + benefits navigation is a specific kind of taste."
+Tone: warm, observational, a little opinionated. Avoid corporate ("Great answer!", "Thanks for sharing"). 25 words max.
+
+Rules for "nextQuestionCopy": ${nextQuestionLabel ? `the next question is fixed as: "${nextQuestionLabel}". Rewrite it ONLY if a small lead-in would make it flow from the reflection — otherwise return it verbatim. Never change the substance of the question.` : 'return null.'}`;
+  return await callClaudeJson(system, answer.slice(0, 8000), 2000);
 }
 
 // ---------- finalize: commit profile ----------
@@ -327,7 +348,7 @@ serve(async (req: Request) => {
   const user = await verifyJobUserDetailed(req);
   if (!user) return err('unauthorized', 401);
 
-  let body: { mode?: string; text?: string; questionId?: string; answer?: string; profile?: Partial<DraftProfile>; demo?: boolean };
+  let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; profile?: Partial<DraftProfile>; demo?: boolean };
   try { body = await req.json(); } catch { return err('invalid json'); }
 
   try {
@@ -349,8 +370,8 @@ serve(async (req: Request) => {
       }
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');
-        const tags = await modeExtract(body.questionId, body.answer);
-        return jsonResp({ tags });
+        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel) as { tags?: unknown; reflection?: string; nextQuestionCopy?: string | null };
+        return jsonResp({ tags: out?.tags, reflection: out?.reflection, nextQuestionCopy: out?.nextQuestionCopy });
       }
       case 'finalize': {
         if (!body.profile) return err('profile required');
