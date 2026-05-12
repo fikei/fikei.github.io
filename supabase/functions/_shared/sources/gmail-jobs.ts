@@ -780,6 +780,14 @@ function parseLinkedInSubject(subject: string, sender: string, body: string): Ex
   if (!/linkedin\.com/i.test(sender)) return null;
   // Exclude obvious digest/recap subjects.
   if (/\b(jobs for you|top jobs|jobs of the week|recap|roundup)\b/i.test(subject)) return null;
+  // Digest signal: subject ends with "and more" (LinkedIn rollup format
+  // "Ian, apply to X at Y and more"). Single-role parser corrupts these
+  // — title gets the "Ian, apply to" prefix and company gets the "and
+  // more" suffix. Bail to the digest extractor instead.
+  if (/\band more\s*$/i.test(subject)) return null;
+  // Same intent for the "Ian, apply to …" prefix that LinkedIn uses on
+  // their Easy Apply digest emails. These are always multi-role.
+  if (/^Ian,\s+apply to\b/i.test(subject)) return null;
   const m = subject.match(/^(.+?)\s+at\s+(.+?)\s*$/i);
   if (!m) return null;
   const title = m[1].trim();

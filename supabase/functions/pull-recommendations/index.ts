@@ -22,8 +22,8 @@ import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 
-const VERSION = '0.13.0';
-console.log(`[pull-recommendations] v${VERSION} - Fit v3 + Candidate Strength + word-boundary keyword matching`);
+const VERSION = '0.15.0';
+console.log(`[pull-recommendations] v${VERSION} - surface all recs (no off-target/geo/min drops) + LinkedIn 'and more' digest detection`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -278,22 +278,13 @@ serve(async (req) => {
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
-      // Drop anything whose title doesn't match the user's target titles.
-      const targetTitles = await loadTargetTitles(sql);
-      const onTarget = targetTitles.length
-        ? pulled.filter(r => titleMatches(r.title || '', targetTitles))
-        : pulled;
-      const droppedOffTarget = pulled.length - onTarget.length;
-      // Drop anything whose location isn't one the user wants. Postings
-      // with no location (rare on ATS; common on RSS) get the benefit of
-      // the doubt — kept and flagged for the user via the bullet.
-      const targetGeos = await loadTargetGeographies(sql);
-      const inGeo = targetGeos.length
-        ? onTarget.filter(r => geoMatches(r.location || '', targetGeos))
-        : onTarget;
-      const droppedOffGeo = onTarget.length - inGeo.length;
+      // Surface every rec — don't drop at off-target / off-geo / min_score.
+      // The fit_score breakdown already factors sector/geo/experience
+      // mismatch into the score itself, so a poor match just gets a low
+      // score and surfaces low in the sorted list. UI filters at read
+      // time. Pipeline-dedup stays (don't show roles already tracked).
       const fitCtx = await loadFitContext(sql);
-      const { kept, dropped } = scoreAndFilter(inGeo, src.min_score, fitCtx);
+      const { kept } = scoreAndFilter(pulled, /* minScore */ 0, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -335,8 +326,8 @@ serve(async (req) => {
         const ctx = await loadUserContext(sql);
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
-      await markRun(sql, src.id, { count: inserted.length, dropped: dropped + droppedToPipeline + droppedOffTarget + droppedOffGeo, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, droppedOffTarget, droppedOffGeo, kept: kept.length, dropped, droppedToPipeline, inserted: inserted.length });
+      await markRun(sql, src.id, { count: inserted.length, dropped: droppedToPipeline, error: null });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, droppedToPipeline, inserted: inserted.length });
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
@@ -452,7 +443,10 @@ function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: Fi
   let dropped = 0;
   for (const r of rows) {
     const fit = computeFit(toRoleRow(r), ctx);
-    if (fit.hardFails.length || fit.score < minScore) { dropped++; continue; }
+    // Surface-all-recs: only drop when min_score floor is set AND not met.
+    // Hard-fails are kept with their flag so they show in the UI rather
+    // than vanish silently.
+    if (minScore > 0 && fit.score < minScore) { dropped++; continue; }
     kept.push({ input: r, fitScore: fit.score, breakdown: fit.breakdown as unknown as Record<string, number>, hardFails: fit.hardFails });
   }
   return { kept, dropped };
