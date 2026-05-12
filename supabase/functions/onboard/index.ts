@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[onboard] v${VERSION} - parse/extract/finalize for /job onboarding`);
+const VERSION = '0.2.0';
+console.log(`[onboard] v${VERSION} - parse/bundle/insights/extract/finalize`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -150,6 +150,65 @@ async function modeParse(text: string): Promise<unknown> {
   return await callClaudeJson(PARSE_SYSTEM, trimmed, 3000);
 }
 
+// ---------- insights: profile → "what you bring" celebration narrative ----------
+//
+// Three distinct translation tracks so the user sees what kind of move each
+// piece of their background unlocks. Domains (what industries you know) ≠
+// work areas (what flows/problems you've shipped) ≠ craft (PM/IC skills).
+// Each track lists what they HAVE and what it TRANSLATES TO so adjacent
+// sectors become legible without claiming they have experience they don't.
+
+const INSIGHTS_SYSTEM = `You generate a celebration / sector-translation insight card for a job-seeker's onboarding flow. Given their parsed profile (history, sectors, skills, scope lines), return ONLY JSON in this shape:
+
+{
+  "hero": string,
+  "domains":   [{ "have": string, "translatesTo": [string] }],
+  "workAreas": [{ "have": string, "translatesTo": [string] }],
+  "skills":    [{ "have": string, "translatesTo": [string] }]
+}
+
+Rules:
+- hero: one ≤ 60-word paragraph in Wise's voice (sentence case, warm, specific). Quote at least one number from their history. End by naming 2-3 directions their experience unlocks.
+- domains: industries / verticals they've operated in. translatesTo lists adjacent verticals that hire that domain knowledge ("public-benefit navigation", "civic-tech eligibility", "patient onboarding for DTC mental health"). 2-4 entries max.
+- workAreas: specific problem-spaces / flows / capabilities they've shipped — *not* industries ("user onboarding", "eligibility verification", "engagement loops", "retention", "growth experimentation"). translatesTo lists what that ships into next ("ID verification flows", "benefits applications", "conversion funnels for healthtech DTC"). 2-4 entries max.
+- skills: craft they bring — *not* domains, *not* workflows ("product management", "growth experimentation", "user research", "team leadership"). translatesTo lists role shapes their craft unlocks next ("founding PM at seed civic-tech", "head of product at public-benefit org", "growth lead at DTC health"). 2-4 entries max.
+
+Keep these three tracks DISTINCT. A "domain" is a vertical, a "work area" is a problem/flow, a "skill" is a craft. Do not mix them. If you can't fill one track confidently from their data, return [] for that track rather than padding.`;
+
+async function modeInsights(profile: unknown): Promise<unknown> {
+  const userText = `Parsed profile:\n${JSON.stringify(profile, null, 2)}`;
+  return await callClaudeJson(INSIGHTS_SYSTEM, userText, 2000);
+}
+
+// ---------- bundle: multi-doc context pass ----------
+//
+// Resume text is the primary "parse" input; everything else (cover letters,
+// writing samples, LLM transcripts, project descriptions, dream JDs) goes
+// through this pass which pulls voice, values signals, projects, and
+// dream-role tells without re-parsing structured history.
+
+const BUNDLE_SYSTEM = `You read a bundle of supporting documents a job-seeker has uploaded (cover letters, writing samples, LLM-generated career docs, project descriptions, dream job descriptions, notes-to-self). Return ONLY JSON:
+
+{
+  "voiceSample":     string,
+  "values":          [string],
+  "projects":        [{ "title": string, "summary": string, "metric": string|null }],
+  "dreamRoleSignals":[string],
+  "wins":            [{ "headline": string, "metric": string|null }]
+}
+
+Rules:
+- voiceSample: ≤ 200 words verbatim or lightly stitched from THEIR words — the cover-letter agent uses this for voice. Choose the most distinctive 2-3 sentences.
+- values: 3-6 short phrases capturing what they care about ("public benefit", "high-agency teams", "research-led product").
+- projects: anything they describe as a project/initiative they led. summary ≤ 25 words. metric null when no number stated.
+- dreamRoleSignals: if any dream JDs are present, pull 3-5 short phrases describing the shape of role they want.
+- wins: numbered accomplishments mentioned. Empty array if none.`;
+
+async function modeBundle(text: string): Promise<unknown> {
+  const trimmed = text.slice(0, MAX_INPUT_CHARS);
+  return await callClaudeJson(BUNDLE_SYSTEM, trimmed, 2500);
+}
+
 // ---------- extract: per-question tag extraction ----------
 
 interface QuestionSpec {
@@ -277,6 +336,16 @@ serve(async (req: Request) => {
         if (!body.text) return err('text required');
         const draft = await modeParse(body.text);
         return jsonResp({ draft });
+      }
+      case 'bundle': {
+        if (!body.text) return err('text required');
+        const bundle = await modeBundle(body.text);
+        return jsonResp({ bundle });
+      }
+      case 'insights': {
+        if (!body.profile) return err('profile required');
+        const insights = await modeInsights(body.profile);
+        return jsonResp({ insights });
       }
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');

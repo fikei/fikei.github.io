@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.80.0";
-console.log(`[job] v${VERSION} - Onboarding flow Phase 2/3: <job-onboarding> + settings entry`);
+const VERSION = "0.81.0";
+console.log(`[job] v${VERSION} - Onboarding rev: insight hero, chat UX, tailor groups, multi-doc upload, ?debug=1`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
