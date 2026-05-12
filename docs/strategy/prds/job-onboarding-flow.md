@@ -157,6 +157,51 @@ Commits to `vision/*.md`, `narratives` table, `user_profile` JSON; flips `onboar
 
 ---
 
+## Structured vs. freeform — capture mode per field
+
+Guiding rule: **structured wherever a finite taxonomy exists, freeform wherever the prose itself is the signal.** Every freeform field has a "tags we extracted" preview the user can click-edit. Every chip palette has "Add custom" so the taxonomy never locks them in.
+
+| Field | Mode | Stage |
+|---|---|---|
+| Name, email, phone, LinkedIn, portfolio | Structured | 2 |
+| City | Structured (autocomplete) | 2 |
+| Region / country / timezone | Inferred (read-only + override) | 2 |
+| Remote / hybrid / onsite | Structured (segmented) | 4 |
+| Willing to relocate | Structured (chip palette) | 4 |
+| Work auth | Structured chips + "Other" | 4 |
+| Target roles | Hybrid (chips + write-in) | 4 |
+| Target sectors | Structured (chip palette + custom) | 4 |
+| Stage preference | Structured (multi-select chips) | 4 |
+| Comp floor | Structured (slider + $ override) | 4 |
+| Skills + years | Structured (chip + years selector) | 2 pre-fill / 4 |
+| Job history (company, title, dates) | Structured (form rows) | 2 |
+| Job history scope (1-line per role) | Freeform | 2 |
+| Arc tags | Structured (chip palette) | 4 |
+| Dealbreakers | Hybrid (chips: defense / gambling / crypto / adtech / surveillance / fossil + "anything else") | 4 |
+| Mission alignment required | Structured (toggle) | 4 |
+| Culture keywords | Hybrid (chip palette + Q2 prose auto-tagging) | 4 |
+| Q1 "problem to spend 5 yrs on" | Freeform → extracts `missionKeywords`, `impactThemes`, `targetSectors` | 3 |
+| Q2 "felt most yourself" | Freeform → Narrative + `cultureKeywords`, `arcTags` | 3 |
+| Q3 wins (×2) | Hybrid (freeform headline + structured metric field) | 3 |
+| Q4 walk-away criteria | Freeform → `antiMissionTerms` + anti-culture | 3 |
+| Q5 titles to hunt | Hybrid (chips + "or describe") | 3 |
+| Q6 location (fallback if Stage 2 didn't capture) | Freeform → extracts city, relocate, remote pref | 3 |
+
+**Two design rules that fall out of this:**
+1. Every freeform field surfaces an "we heard:" tag strip after the user types. They click-remove any wrong ones — closes the loop without forcing manual chip work.
+2. Every chip palette ships an "Add custom" inline text input. Never lock the user into our taxonomy.
+
+**Net effect on flow:** Stage 3 stays *focused on freeform stories* (the magic moment). All structured chips, sliders, toggles consolidate into **Stage 4 — Fast knobs**, which is now meatier. Stage 2 confirm cards stay structured.
+
+## Settings access for existing users
+
+So Ian (and any user with `onboarding_complete_at IS NOT NULL`) can re-test the flow without losing their committed data:
+
+- New rail link **"Settings"** (subdued, bottom of `<job-rail>`) → `/job/settings/`.
+- `/job/settings/` lists profile fields with an "Edit your profile" link to `/job/onboarding/?demo=1`.
+- `?demo=1` query param tells the onboarding component to enter **demo mode**: stepping through works exactly the same, but Stage 5's commit is replaced by a "this would commit X" preview that does not write to `user_profile` or flip `onboarding_complete_at`. localStorage draft state still persists so the user can step in and out.
+- Without `?demo=1`, the page enforces the live commit path.
+
 ## Design language
 
 **Reference:** [wise.design](https://wise.design) — form patterns, stepper, inline help text.

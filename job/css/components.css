@@ -3729,3 +3729,318 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   font-style: italic;
 }
 
+
+/* ============================================================== */
+/* Onboarding flow (/job/onboarding)                                */
+/* New primitives + page-specific layout. Promote primitives        */
+/* (.stepper .dropzone .chat-prompt .chip-palette .segmented)       */
+/* back to the rest of /job whenever a second consumer shows up.    */
+/* ============================================================== */
+
+.onboard {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.onboard__stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.onboard__stage h1 {
+  font-size: var(--font-size-title-1);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: var(--lh-title);
+  margin: 0;
+}
+.onboard__stage h2 {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0;
+}
+.onboard__stage p.lede {
+  font-size: var(--font-size-body-lg);
+  color: var(--fg-muted);
+  line-height: var(--lh-body);
+  margin: 0;
+}
+.onboard__hint {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+}
+.onboard__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.onboard__nav .btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+}
+.onboard__nav .btn--ghost:hover { color: var(--fg); }
+.onboard__demo-banner {
+  background: color-mix(in srgb, var(--accent-strong) 18%, transparent);
+  border: 1px solid var(--accent-strong);
+  color: var(--fg);
+  border-radius: 16px;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-small);
+}
+
+/* Stepper — current = accent-strong fill, complete = accent outline, future = muted. */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-caption);
+  flex-wrap: wrap;
+}
+.stepper__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+}
+.stepper__dot {
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  flex: none;
+}
+.stepper__item--current .stepper__dot {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+.stepper__item--complete .stepper__dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.stepper__item--current  { color: var(--fg); }
+.stepper__item--complete { color: var(--fg-muted); }
+.stepper__sep {
+  width: 24px; height: 1px;
+  background: var(--border);
+}
+
+/* Dropzone — used for paste-resume + (future) file upload. */
+.dropzone {
+  border: 1.5px dashed var(--border);
+  border-radius: 30px;
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--bg-surface);
+  transition: border-color 120ms, background 120ms;
+}
+.dropzone:hover, .dropzone--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
+}
+.dropzone__title { font-weight: 600; margin-bottom: var(--space-2); }
+.dropzone__hint  { color: var(--fg-muted); font-size: var(--font-size-small); }
+.dropzone textarea {
+  width: 100%;
+  min-height: 180px;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+}
+.dropzone textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+
+/* Chat-prompt — the freeform Stage 3 questions. */
+.chat-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.chat-prompt__label {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+.chat-prompt__help {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  margin: 0;
+}
+.chat-prompt textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.chat-prompt textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.chat-prompt__extracted {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: var(--space-3) var(--space-4);
+}
+.chat-prompt__extracted-title {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.chat-prompt__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.chat-prompt__row-label {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  min-width: 90px;
+}
+
+/* Chip palette — multi-select chip group with "Add custom" inline. */
+.chip-palette {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.chip-palette__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chip-palette__add {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.chip-palette__add input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.chip-palette__add input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+
+/* Editable chip — extends .chip with an inline remove affordance. */
+.chip--editable {
+  cursor: default;
+  padding-right: var(--space-2);
+}
+.chip--editable button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  font: inherit;
+  opacity: 0.6;
+}
+.chip--editable button:hover { opacity: 1; }
+
+/* Segmented control — for remote / hybrid / onsite. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  background: var(--bg-surface);
+}
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--accent-strong);
+  color: var(--accent-strong-fg);
+}
+
+/* Confirm cards (Stage 2) — reuse .company-card vibes but lighter. */
+.onboard-card {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.onboard-card__title {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0;
+}
+.onboard-card__row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+}
+.onboard-card__row label {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+}
+.onboard-card__row input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.onboard-card__row input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.onboard-card__row .read-only {
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+}
+
+/* Stage 5 preview block. */
+.onboard-preview {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.onboard-preview pre {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+}
