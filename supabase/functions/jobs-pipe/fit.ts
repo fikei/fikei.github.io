@@ -104,12 +104,30 @@ function postingText(r: RoleRow): string {
     .filter(Boolean).join(' ').toLowerCase();
 }
 
+// Escape regex metacharacters in a keyword so it can be safely embedded
+// in a RegExp source string.
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Single-word keywords ≤ 12 chars are matched with word boundaries so
+// "rag" doesn't fire on "fragment", "tech" doesn't fire on "technology",
+// "care" doesn't fire on "career". Multi-word keywords ("public benefit",
+// "civic tech") are matched as substrings since they're unique enough.
+function keywordMatches(haystack: string, k: string): boolean {
+  if (!k) return false;
+  const isShortSingleWord = !k.includes(' ') && !k.includes('-') && k.length <= 12;
+  if (isShortSingleWord) {
+    return new RegExp(`\\b${escapeRegex(k)}\\b`).test(haystack);
+  }
+  return haystack.includes(k);
+}
+
 function countMatches(haystack: string, needles: string[]): number {
   let n = 0;
   for (const t of needles) {
     const k = t.trim().toLowerCase();
-    if (!k) continue;
-    if (haystack.includes(k)) n++;
+    if (k && keywordMatches(haystack, k)) n++;
   }
   return n;
 }
@@ -120,7 +138,7 @@ function listMatches(haystack: string, needles: string[], maxReturn = 4): string
   const hits = new Set<string>();
   for (const t of needles) {
     const k = t.trim().toLowerCase();
-    if (k && haystack.includes(k)) hits.add(k);
+    if (k && keywordMatches(haystack, k)) hits.add(k);
     if (hits.size >= maxReturn) break;
   }
   return [...hits];
@@ -232,11 +250,24 @@ function scoreDomain(r: RoleRow, cap: number, ctx?: UserContext): { v: number; r
   }
   const text = postingText(r);
   const stop = new Set(['the','a','and','of','for','in','to','with','on','at','via','then','from','an','or']);
+  // Generic words that survive splitting but match anywhere on the
+  // open web — "technology" fires on every tech company, "platform"
+  // on every PM role, "consumer" on every B2C posting, etc. Filtering
+  // these here keeps domain matches semantic.
+  const tooGeneric = new Set([
+    'technology','tech','consumer','platform','condition','based','focus',
+    'multi','sector','company','companies','startup','startups','product',
+    'products','service','services','industry','industries','market','markets',
+    'business','businesses','enterprise','team','teams','growth','scale',
+    'scaling','data','digital','online','internet','solutions','solution',
+    'tools','tool','app','apps','application','applications','customer',
+    'customers','user','users','people','work','working','remote','hybrid',
+  ]);
   const tokenize = (blobs: string[]) => {
     const toks = new Set<string>();
     for (const blob of blobs) {
       for (const raw of blob.toLowerCase().split(/[^a-z0-9+]+/)) {
-        if (raw.length >= 4 && !stop.has(raw)) toks.add(raw);
+        if (raw.length >= 4 && !stop.has(raw) && !tooGeneric.has(raw)) toks.add(raw);
       }
     }
     return toks;

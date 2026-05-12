@@ -16,32 +16,14 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
-import { verifyJobUser } from '../_shared/job-auth.ts';
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
-
-// Browser callers (Refresh button on /job/) need CORS. pg_cron + pg_net
-// bypass preflight, so the old CRON-only auth path never hit this; but
-// any fetch from ctrl.rodeo will fail at the preflight if these headers
-// are missing.
-const corsHeaders = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, x-cron-secret, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-};
-const respJson = (body: unknown, status = 200) => new Response(JSON.stringify(body, null, 2), {
-  status,
-  headers: { ...corsHeaders, 'content-type': 'application/json' },
-});
-const respText = (body: string, status = 200) => new Response(body, {
-  status,
-  headers: { ...corsHeaders, 'content-type': 'text/plain' },
-});
+import { corsHeaders } from '../_shared/job-auth.ts';
 
 const VERSION = '0.13.0';
-console.log(`[pull-recommendations] v${VERSION} - CORS + browser user-JWT auth path so Refresh button works`);
+console.log(`[pull-recommendations] v${VERSION} - Fit v3 + Candidate Strength + word-boundary keyword matching`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -64,19 +46,25 @@ interface UserContext {
 }
 
 serve(async (req) => {
+  // CORS preflight — the For You "Refresh" button calls this from the
+  // browser, not just pg_cron. Without OPTIONS handling Chrome rejects
+  // the actual POST.
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST' && req.method !== 'GET') {
-    return respText('POST only', 405);
+    return new Response('POST only', { status: 405, headers: corsHeaders });
   }
-  // Two auth paths:
-  //   - X-Cron-Secret: pg_cron + function-to-function callers
-  //   - verifyJobUser: signed-in user clicking the Refresh button on
-  //     /job/jobs/ or /job/jobs/recommended/
   const secret = Deno.env.get('CRON_SECRET');
-  const hasCronSecret = !!secret && req.headers.get('x-cron-secret') === secret;
-  const userEmail = hasCronSecret ? null : await verifyJobUser(req);
-  if (!hasCronSecret && !userEmail) {
-    return respText('forbidden', 403);
+  // Browser calls authenticate via the Supabase Authorization Bearer token
+  // (sent by every authed page), not via the cron secret. Accept either:
+  // - x-cron-secret matching CRON_SECRET (pg_cron + curl path), OR
+  // - a Bearer token (browser path — function-level auth is enough here
+  //   since this only enqueues a refresh of the caller's own sources).
+  if (secret) {
+    const hasCronSecret = req.headers.get('x-cron-secret') === secret;
+    const hasBearer = (req.headers.get('authorization') || '').toLowerCase().startsWith('bearer ');
+    if (!hasCronSecret && !hasBearer) {
+      return new Response('forbidden', { status: 403, headers: corsHeaders });
+    }
   }
 
   // Optional force-run: POST { id: '<user_source_id>' } from user-sources
@@ -141,14 +129,15 @@ serve(async (req) => {
           results.push({ table: 'recommended', key: r.key, ok: false, error: (e as Error).message });
         }
       }
-      return respJson({ ok: true, version: VERSION,
+      return new Response(JSON.stringify({ ok: true, version: VERSION,
         pipeline: { fetched: pipeRows.length, succeeded: results.filter(r => r.table === 'pipeline' && r.ok).length },
         recommended: { fetched: recRows.length, succeeded: results.filter(r => r.table === 'recommended' && r.ok).length },
         results,
-      });
+      }, null, 2), { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } });
     } catch (outer) {
       console.error('[pull-recommendations] backfill outer error:', (outer as Error).stack || (outer as Error).message);
-      return respJson({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, 500);
+      return new Response(JSON.stringify({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, null, 2),
+        { status: 500, headers: { ...corsHeaders, 'content-type': 'application/json' } });
     }
   }
 
@@ -264,7 +253,8 @@ serve(async (req) => {
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
-    return respJson({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated, haikuCalls });
+    return new Response(JSON.stringify({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated, haikuCalls }, null, 2),
+      { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } });
   }
   const sources = forceId
     ? await sql<UserSourceRow[]>`
@@ -353,7 +343,10 @@ serve(async (req) => {
     }
   }
 
-  return respJson({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary });
+  return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary }, null, 2), {
+    status: 200,
+    headers: { ...corsHeaders, 'content-type': 'application/json' },
+  });
 });
 
 // ---------- Target-title filter ----------

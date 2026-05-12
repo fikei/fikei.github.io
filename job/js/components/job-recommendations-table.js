@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./job-fit-modal.js' + V),
@@ -55,9 +55,10 @@ export class JobRecommendationsTable extends LitElement {
     sortKey:  { state: true },
     sortDir:  { state: true },
     addingId: { state: true },
-    selectedRec: { state: true },
-    _refreshing:      { state: true },
-    _refreshFeedback: { state: true },
+    selectedRec:         { state: true },
+    selectedScoreWhich:  { state: true },
+    _refreshing:         { state: true },
+    _refreshFeedback:    { state: true },
   };
 
   constructor() {
@@ -100,16 +101,25 @@ export class JobRecommendationsTable extends LitElement {
     }
   }
 
-  _openFitModal(rec) {
+  _openFitModal(rec)       { this._setSelected(rec); this.selectedScoreWhich = 'fit'; }
+  _openCandidateModal(rec) { this._setSelected(rec); this.selectedScoreWhich = 'candidate'; }
+  _closeFitModal()         { this.selectedRec = null; this.selectedScoreWhich = null; }
+  _setSelected(rec) {
+    // Forward the full row so renderScoreModal can read either the Fit
+    // or Candidate fields.
     this.selectedRec = {
-      company:   rec.company,
-      title:     rec.title,
-      score:     rec.fitScore,
-      breakdown: rec.breakdown || rec.fitBreakdown || {},
-      hardFails: rec.hardFails || [],
+      company:             rec.company,
+      title:               rec.title,
+      score:               rec.fitScore,
+      breakdown:           rec.breakdown || rec.fitBreakdown || {},
+      rationales:          rec.rationales || rec.fitRationales || {},
+      hardFails:           rec.hardFails || [],
+      candidateScore:      rec.candidateScore ?? null,
+      candidateBreakdown:  rec.candidateBreakdown || {},
+      candidateRationales: rec.candidateRationales || {},
+      compAcceptable:      rec.compAcceptable ?? null,
     };
   }
-  _closeFitModal() { this.selectedRec = null; }
 
   connectedCallback() {
     super.connectedCallback();
@@ -150,6 +160,9 @@ export class JobRecommendationsTable extends LitElement {
   }
 
   _sorted() {
+    // Defensive: bad refresh response or transient state can leave
+    // this.items as something other than an array. Don't crash render.
+    if (!Array.isArray(this.items)) return [];
     const col = COLUMNS.find(c => c.sortKey === this.sortKey);
     if (!col) return this.items;
     const dir = this.sortDir === 'asc' ? 1 : -1;
@@ -252,11 +265,12 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <tr class="pipeline-row" @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
-          <button class=${fitClass(r.fitScore) + ' fit-pill--button'}
-                  title="Tap to see the breakdown"
-                  @click=${(e) => { e.stopPropagation(); this._openFitModal(r); }}>
-            ${r.fitScore == null ? '—' : r.fitScore}
-          </button>
+          ${renderScorePair(r, {
+            onFit:       (row) => this._openFitModal(row),
+            onCandidate: (row) => this._openCandidateModal(row),
+            fitClass,
+            candClass: fitClass,
+          })}
         </td>
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
@@ -350,7 +364,7 @@ export class JobRecommendationsTable extends LitElement {
           </table>
         </div>
       `}
-      ${renderFitModal(this.selectedRec, () => this._closeFitModal())}
+      ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
     `;
   }
 }

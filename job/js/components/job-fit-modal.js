@@ -164,12 +164,19 @@ export function renderFitBreakdown(row) {
 // Render the modal. `row` is the role-like object — expects { company, title,
 // score, breakdown, hardFails }. `onClose` is called when the user dismisses.
 // Returns a lit-html template (or `nothing` if row is null).
-export function renderFitModal(row, onClose) {
+// `which` selects between the Fit and Candidate Strength views. Both
+// modals share the same chrome; only the body differs.
+export function renderScoreModal(row, onClose, which = 'fit') {
   if (!row) return nothing;
   const onBackdrop = (e) => { if (e.target.classList.contains('fit-modal__backdrop')) onClose(); };
+  const ariaLabel = which === 'candidate' ? 'Candidate strength breakdown' : 'Fit score breakdown';
+  const foot = which === 'candidate'
+    ? html`<p class="muted">Hiring manager's lens — can the candidate do the job, and how much of a reach is it?</p>`
+    : html`<p class="muted">v3 weights: values/culture/role-match drive the score; mission can dominate.</p>`;
+  const body = which === 'candidate' ? renderCandidateCardBody(row) : renderFitCardBody(row);
   return html`
     <div class="fit-modal__backdrop" @click=${onBackdrop}>
-      <div class="fit-modal" role="dialog" aria-modal="true" aria-label="Fit score breakdown">
+      <div class="fit-modal" role="dialog" aria-modal="true" aria-label=${ariaLabel}>
         <header class="fit-modal__head">
           <div>
             <p class="fit-modal__eyebrow">${row.company}</p>
@@ -177,11 +184,40 @@ export function renderFitModal(row, onClose) {
           </div>
           <button class="fit-modal__close" @click=${() => onClose()} aria-label="Close">×</button>
         </header>
-        ${renderFitCardBody(row)}
-        <footer class="fit-modal__foot">
-          <p class="muted">v3 weights: values/culture/role-match drive the score; mission can dominate.</p>
-        </footer>
+        ${body}
+        <footer class="fit-modal__foot">${foot}</footer>
       </div>
+    </div>
+  `;
+}
+
+// Backwards-compat wrapper. Existing callers pass (row, onClose).
+export function renderFitModal(row, onClose) {
+  return renderScoreModal(row, onClose, 'fit');
+}
+
+// Stacked pair of clickable score pills — Fit on top, Candidate below.
+// Used everywhere a job appears in a list (pipeline table, recommended
+// table, carousel card). Each pill opens its own modal. The pair stops
+// propagation so row clicks still work for cells around it.
+export function renderScorePair(row, opts) {
+  const { onFit, onCandidate, fitClass, candClass, fitTitle = 'Tap to see the Fit breakdown', candTitle = 'Tap to see the Candidate Strength breakdown' } = opts;
+  const fit = row.score ?? row.fitScore ?? null;
+  const cand = row.candidateScore ?? null;
+  return html`
+    <div class="score-pair">
+      <button class=${fitClass(fit) + ' fit-pill--button score-pair__fit'}
+              title=${fitTitle}
+              @click=${(e) => { e.stopPropagation(); onFit(row); }}>
+        ${fit == null ? '—' : fit}
+      </button>
+      ${cand == null
+        ? html`<span class="score-pair__cand score-pair__cand--empty" title="Candidate strength not graded yet">—</span>`
+        : html`<button class=${candClass(cand) + ' fit-pill--button score-pair__cand'}
+                       title=${candTitle}
+                       @click=${(e) => { e.stopPropagation(); onCandidate(row); }}>
+                 ${cand}
+               </button>`}
     </div>
   `;
 }

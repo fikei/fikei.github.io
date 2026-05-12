@@ -5,7 +5,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -32,9 +32,10 @@ export class JobRecommendations extends LitElement {
     items: { state: true },
     error: { state: true },
     addingId: { state: true },
-    selectedRec: { state: true },
-    _refreshing:      { state: true },
-    _refreshFeedback: { state: true },
+    selectedRec:        { state: true },
+    selectedScoreWhich: { state: true },
+    _refreshing:        { state: true },
+    _refreshFeedback:   { state: true },
   };
 
   constructor() {
@@ -134,16 +135,23 @@ export class JobRecommendations extends LitElement {
     }
   }
 
-  _openFitModal(rec) {
+  _openFitModal(rec)       { this._setSelected(rec); this.selectedScoreWhich = 'fit'; }
+  _openCandidateModal(rec) { this._setSelected(rec); this.selectedScoreWhich = 'candidate'; }
+  _closeFitModal()         { this.selectedRec = null; this.selectedScoreWhich = null; }
+  _setSelected(rec) {
     this.selectedRec = {
-      company:   rec.company,
-      title:     rec.title,
-      score:     rec.fitScore,
-      breakdown: rec.breakdown || rec.fitBreakdown || {},
-      hardFails: rec.hardFails || [],
+      company:             rec.company,
+      title:               rec.title,
+      score:               rec.fitScore,
+      breakdown:           rec.breakdown || rec.fitBreakdown || {},
+      rationales:          rec.rationales || rec.fitRationales || {},
+      hardFails:           rec.hardFails || [],
+      candidateScore:      rec.candidateScore ?? null,
+      candidateBreakdown:  rec.candidateBreakdown || {},
+      candidateRationales: rec.candidateRationales || {},
+      compAcceptable:      rec.compAcceptable ?? null,
     };
   }
-  _closeFitModal() { this.selectedRec = null; }
 
   _fitClass(s) {
     if (s == null) return 'fit-pill fit-pill--poor';
@@ -175,13 +183,12 @@ export class JobRecommendations extends LitElement {
           <div class="rec-card__title-block">
             <div class="rec-card__title-row">
               <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
-              ${rec.fitScore != null
-                ? html`<button class=${this._fitClass(rec.fitScore) + ' fit-pill--button'}
-                          title="Tap to see the breakdown"
-                          @click=${(e) => { e.stopPropagation(); this._openFitModal(rec); }}>
-                          ${rec.fitScore}
-                        </button>`
-                : nothing}
+              ${renderScorePair(rec, {
+                onFit:       (row) => this._openFitModal(row),
+                onCandidate: (row) => this._openCandidateModal(row),
+                fitClass:    (s) => this._fitClass(s),
+                candClass:   (s) => this._fitClass(s),
+              })}
             </div>
             ${meta ? html`<p class="rec-card__meta">${meta}</p>` : nothing}
             <p class="rec-card__source">
@@ -272,7 +279,7 @@ export class JobRecommendations extends LitElement {
             See all recommendations →
           </a>
         </footer>
-        ${renderFitModal(this.selectedRec, () => this._closeFitModal())}
+        ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
       </section>
     `;
   }
