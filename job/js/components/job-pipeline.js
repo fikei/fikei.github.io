@@ -2,7 +2,7 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole } = await import('../pipeline.js' + V);
+const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderFitModal, scoreClass: sharedScoreClass } = await import('./job-fit-modal.js' + V);
 const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
@@ -128,6 +128,9 @@ export class JobPipeline extends LitElement {
     // reply_pending / new_update / stale_14d). Keyed by role slug.
     roleSignals:     { state: true },
     liveBanners:     { state: true },
+    // Refresh button feedback.
+    _refreshing:      { state: true },
+    _refreshFeedback: { state: true },
   };
 
   constructor() {
@@ -177,6 +180,8 @@ export class JobPipeline extends LitElement {
     this.archiveSaving = false;
     this.roleSignals = new Map();
     this.liveBanners = [];
+    this._refreshing = false;
+    this._refreshFeedback = '';
     this._dismissedBannerKeys = (() => {
       try { return new Set(JSON.parse(localStorage.getItem('job:jobs:dismissedBanners') || '[]')); } catch { return new Set(); }
     })();
@@ -281,9 +286,42 @@ export class JobPipeline extends LitElement {
       // Phase 2.0 — load signals after the table renders so the page
       // isn't blocked on Gmail/Calendar fetches. Re-render on completion.
       this._loadSignals();
+      // Kick a sources refresh in the background. Server-side gates by
+      // schedule_cron + last_run_at, so frequent kicks are no-ops when
+      // nothing is due. Client-side throttle in refreshSources() avoids
+      // tab-hop hammering.
+      refreshSources({ silent: true });
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
+    }
+  }
+
+  async _onRefreshSources() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    this.requestUpdate();
+    try {
+      const r = await refreshSources();
+      // Refresh isn't synchronous on the server — show a brief toast and
+      // re-fetch the pipeline so any newly-landed events surface as the
+      // user keeps interacting. Signals refresh too.
+      this._refreshFeedback = r.throttled
+        ? 'Recently refreshed — try again in a few minutes.'
+        : 'Scanning Gmail for updates…';
+      setTimeout(async () => {
+        try {
+          const data = await fetchPipeline();
+          this.roles = (data.roles || []).slice();
+        } catch { /* keep stale state */ }
+        this._loadSignals();
+        this.requestUpdate();
+      }, 8000);
+    } finally {
+      this._refreshing = false;
+      this.requestUpdate();
+      // Auto-dismiss the toast after ~10s.
+      setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
     }
   }
 
@@ -1112,6 +1150,11 @@ export class JobPipeline extends LitElement {
         ${this.bucket === 'leads' && this.sortKey !== 'manual' && !this._manualOrders.leads.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Arrange manually</button>
         ` : nothing}
+        <button class="btn btn--sm" ?disabled=${this._refreshing}
+                title="Scan Gmail for new role alerts and application updates"
+                @click=${() => this._onRefreshSources()}>
+          ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
+        </button>
         <button class="btn btn--sm" ?disabled=${this.livenessChecking}
                 @click=${() => this._onCheckLiveness()}>
           ${this.livenessChecking ? 'Checking…' : 'Check liveness'}
@@ -1120,6 +1163,7 @@ export class JobPipeline extends LitElement {
                 @click=${() => { this.pasteOpen = !this.pasteOpen; this.pasteError = ''; }}>
           ${this.pasteOpen ? 'Cancel' : '＋ Add a role'}
         </button>
+        ${this._refreshFeedback ? html`<span class="muted" style="margin-left:var(--space-3);font-size:var(--font-size-caption);">${this._refreshFeedback}</span>` : nothing}
       </div>
 
       ${this.pasteOpen ? html`
