@@ -40,7 +40,12 @@ interface TheirStackConfig {
 // Default seniority + exclusion floor. Same intent as the title
 // keyword filter the worker applies, just pushed down to the API so
 // the 25-result page budget isn't wasted on junior roles.
-const DEFAULT_SENIORITY    = ['senior', 'staff', 'principal', 'director', 'vp', 'cxo'];
+//
+// theirstack's API only accepts: c_level | staff | senior | junior |
+// mid_level. We used to pass 'principal' / 'director' / 'vp' / 'cxo'
+// which returned a 422 every tick. Mapping: principal/director/vp/cxo
+// → c_level (closest equivalent in their taxonomy).
+const DEFAULT_SENIORITY    = ['senior', 'staff', 'c_level'];
 const DEFAULT_TITLE_NOT    = ['junior', 'intern', 'associate', 'contract', 'apprentice'];
 const DEFAULT_INDUSTRY_NOT = ['Staffing and Recruiting', 'Government Administration', 'Defense & Space'];
 
