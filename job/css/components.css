@@ -305,8 +305,10 @@
 .pipeline-table-wrap {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  overflow: auto;
+  overflow-x: auto;
   background: var(--bg-elevated);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .pipeline-table {
@@ -3356,14 +3358,18 @@
   margin: 4px 0;
 }
 
-/* --- Pipeline table column sizing + cell shape --- */
-.pipeline-table { table-layout: fixed; }
+/* --- Pipeline table column sizing + cell shape ---
+   table-layout: auto so columns size to content; the table tries to fill
+   100% but won't blow the wrap. Min-widths are minimal — just enough to
+   keep pills + selects from clipping. Total min cols ≈ 600px so the
+   table comfortably fits any tablet+ viewport without horizontal scroll. */
+.pipeline-table { table-layout: auto; width: 100%; }
 
-.col-fit    { width: 72px;  min-width: 72px; }
-.col-status { width: 140px; min-width: 120px; }
-.col-role   { width: 360px; min-width: 240px; max-width: 360px; }
-.col-sector { width: auto;  min-width: 200px; }     /* slack absorber; chips wrap */
-.col-menu   { width: 56px;  min-width: 56px; text-align: right; }
+.col-fit    { width: 1%;   min-width: 60px; white-space: nowrap; }
+.col-status { width: 1%;   min-width: 120px; }
+.col-role   { min-width: 200px; max-width: 360px; }
+.col-sector { min-width: 140px; }
+.col-menu   { width: 1%;   min-width: 48px; text-align: right; }
 
 .pipeline-table .col-role .role-cell__inner {
   display: flex;
@@ -3384,8 +3390,10 @@
   overflow: hidden;
 }
 
-/* --- Mobile (< 720px): stack each row as a card --- */
-@media (max-width: 720px) {
+/* --- Mobile / narrow (< 820px): stack each row as a card.
+   Was 720px but the table cumulative min-width of ~600px plus padding
+   meant 720-820px viewports got a cramped horizontal scroll. */
+@media (max-width: 820px) {
   .pipeline-table-wrap {
     border: 0;
     background: transparent;
