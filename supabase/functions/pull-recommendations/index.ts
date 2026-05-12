@@ -21,8 +21,8 @@ import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
 
-const VERSION = '0.6.0';
-console.log(`[pull-recommendations] v${VERSION} - Fit v3: values/culture/role-match with Haiku-graded role scoring; Phase 1.5 enrichment writes`);
+const VERSION = '0.12.0';
+console.log(`[pull-recommendations] v${VERSION} - cappedRun unstuck + drop 'informational' app events (newsletter noise)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

@@ -31,7 +31,7 @@ import {
 } from '../_shared/google-tokens.ts';
 import { scanApplicationResponses } from '../_shared/gmail-application-scan.ts';
 
-const VERSION = '1.3.1';
+const VERSION = '1.4.0';
 console.log(`[application-events] v${VERSION} - backfill skips user's own outbound messages`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
