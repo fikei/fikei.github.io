@@ -4168,19 +4168,53 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
 /* Chat (Stage 3) */
 /* Chat surface — apt-inspired scrolling log. AI turns are plain inline
    text (no bubble). User turns are outlined cards, right-aligned. */
+/* Chat surface — full-screen, ChatGPT-inspired, minimal.
+   Two states:
+     .chat--landing  — empty log; composer + first question centered.
+     .chat--active   — log fills, composer pinned bottom.
+   Distinction between user and AI is alignment + subtle color shift only.
+   No bubble cards, no borders around messages, no surface cards. */
+
 .chat {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  height: calc(100vh - 240px);
-  min-height: 480px;
-}
-.chat__progress-bar {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 3px;
-  background: var(--border);
-  border-radius: 999px;
-  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  padding-top: env(safe-area-inset-top);
+  gap: 0;
+}
+
+/* Full-bleed when the chat stage is active. */
+job-onboarding { display: contents; }
+.onboard:has(.chat) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  flex: 1;
+  min-height: 100dvh;
+}
+.onboard:has(.chat) > .stepper,
+.onboard:has(.chat) > .onboard__demo-banner {
+  max-width: 720px;
+  margin: var(--space-3) auto 0;
+  padding: 0 var(--space-4);
+}
+.onboard:has(.chat) > .onboard__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat__progress-bar {
+  flex: none;
+  width: 100%;
+  height: 2px;
+  background: transparent;
 }
 .chat__progress-bar > span {
   display: block;
@@ -4188,37 +4222,75 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   background: var(--accent-strong);
   transition: width 240ms ease-out;
 }
+
 .chat__log {
   flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  padding: var(--space-3) 0 var(--space-4);
+  gap: var(--space-6);
   scroll-behavior: smooth;
 }
+
+/* Landing state: log becomes a vertically centered hero with no scrolling. */
+.chat--landing .chat__log {
+  overflow: hidden;
+  justify-content: center;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
+.chat__hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+}
+.chat__hero-question {
+  font-size: var(--font-size-title-2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-title);
+  color: var(--fg);
+  margin: 0;
+}
+
+/* AI + user turns — same body size, no containers. Distinction is
+   alignment + color. */
+.chat__ai,
+.chat__user {
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+  font-weight: 400;
+  margin: 0;
+  max-width: 100%;
+}
 .chat__ai {
-  max-width: 720px;
+  align-self: flex-start;
+  color: var(--fg);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  color: var(--fg);
-  line-height: var(--lh-body);
+}
+.chat__ai-reflection,
+.chat__ai-question {
+  margin: 0;
 }
 .chat__ai-reflection {
   color: var(--fg-muted);
-  margin: 0;
 }
 .chat__ai-question {
-  font-size: var(--font-size-title-3);
-  font-weight: 600;
-  line-height: var(--lh-title);
-  margin: 0;
   color: var(--fg);
+  font-weight: 500;
 }
 .chat__ai--thinking {
   color: var(--fg-muted);
-  font-size: var(--font-size-title-3);
   letter-spacing: 0.15em;
   animation: chat-thinking 1.2s ease-in-out infinite;
 }
@@ -4228,55 +4300,90 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
 }
 .chat__user {
   align-self: flex-end;
-  max-width: 70%;
-  border: 1px solid var(--border-strong);
-  border-radius: 24px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg);
+  text-align: right;
   color: var(--fg);
-  line-height: var(--lh-body);
+  white-space: pre-wrap;
+}
+
+/* Composer — sticky to bottom in active, centered hero in landing. */
+.chat__composer-wrap {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  background: var(--bg);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.chat--landing .chat__composer-wrap {
+  position: static;
+  padding-top: 0;
+}
+.chat__composer-wrap > * {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .chat__composer {
-  position: sticky;
-  bottom: var(--space-3);
   display: grid;
-  grid-template-columns: 40px 1fr 40px;
+  grid-template-columns: 36px 1fr 36px;
   gap: var(--space-2);
   align-items: end;
   background: var(--bg);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 6px 8px;
+}
+.chat__composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
 }
 .chat__attach {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border);
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  background: var(--bg);
+  background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   font-size: 22px;
   line-height: 1;
 }
-.chat__attach:hover { border-color: var(--border-strong); color: var(--fg); }
+.chat__attach:hover { color: var(--fg); }
 .chat__composer textarea {
   width: 100%;
-  min-height: 44px;
+  min-height: 36px;
   max-height: 200px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  background: var(--bg);
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
   color: var(--fg);
   font: inherit;
+  font-size: var(--font-size-body);
   line-height: var(--lh-body);
-  resize: vertical;
+  resize: none;
+  outline: none;
 }
-.chat__composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.chat__send {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat__send:disabled { opacity: 0.35; cursor: default; }
 .chat__composer-row {
   display: flex;
   justify-content: space-between;
@@ -4290,15 +4397,14 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
 .chat__pill {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-3);
+  border: 0;
+  padding: 4px var(--space-2);
   font: inherit;
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-caption);
   color: var(--fg-muted);
   cursor: pointer;
 }
-.chat__pill:hover { border-color: var(--border-strong); color: var(--fg); }
+.chat__pill:hover { color: var(--fg); text-decoration: underline; }
 .btn--send {
   width: 40px;
   height: 40px;

@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.82.0";
-console.log(`[job] v${VERSION} - Chat rev: scrolling log, reflections, mid-flow attach (apt-inspired)`);
+const VERSION = "0.83.0";
+console.log(`[job] v${VERSION} - Chat takeover: full-screen, minimal, ChatGPT landing pattern, mobile-safe`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -162,6 +162,11 @@ setTimeout(() => {
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('signin-btn');
   if (btn) btn.addEventListener('click', () => window.CtrlAuth.openLoginModal());
+  // Onboarding is its own full-screen takeover and works pre-auth. Suppress
+  // the auto-open sign-in modal on those routes; the component opens auth
+  // explicitly at finalize time.
+  const onOnboardingRoute = location.pathname.startsWith('/job/onboarding');
+  if (onOnboardingRoute) return;
   setTimeout(() => {
     if (document.body.dataset.authState !== 'in') {
       window.CtrlAuth.openLoginModal();
