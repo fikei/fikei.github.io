@@ -129,9 +129,6 @@ export class JobPipeline extends LitElement {
     // reply_pending / new_update / stale_14d). Keyed by role slug.
     roleSignals:     { state: true },
     liveBanners:     { state: true },
-    // Refresh button feedback.
-    _refreshing:      { state: true },
-    _refreshFeedback: { state: true },
   };
 
   constructor() {
@@ -181,8 +178,6 @@ export class JobPipeline extends LitElement {
     this.archiveSaving = false;
     this.roleSignals = new Map();
     this.liveBanners = [];
-    this._refreshing = false;
-    this._refreshFeedback = '';
     this._dismissedBannerKeys = (() => {
       try { return new Set(JSON.parse(localStorage.getItem('job:jobs:dismissedBanners') || '[]')); } catch { return new Set(); }
     })();
@@ -292,37 +287,51 @@ export class JobPipeline extends LitElement {
       // nothing is due. Client-side throttle in refreshSources() avoids
       // tab-hop hammering.
       refreshSources({ silent: true });
+      // Saved bucket: auto-check liveness of every saved role in the
+      // background. Debounced via localStorage so we don't hammer ATSes
+      // on every page load. Replaces the explicit "Check liveness"
+      // button — list reflects whatever's still posted at the URL.
+      if (this.bucket === 'leads') this._maybeAutoLiveness();
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
     }
   }
 
-  async _onRefreshSources() {
-    if (this._refreshing) return;
-    this._refreshing = true;
+  // 1h debounce for the Saved-bucket auto-liveness sweep. Stored as ISO
+  // string in localStorage; treat parse failures as "stale, run now".
+  _autoLivenessDue() {
+    try {
+      const last = Number(localStorage.getItem('job:lastLivenessAt') || 0);
+      return Date.now() - last > 60 * 60 * 1000;
+    } catch { return true; }
+  }
+
+  async _maybeAutoLiveness() {
+    if (!this._autoLivenessDue()) return;
+    if (this.livenessChecking) return;
+    this.livenessChecking = true;
+    this.livenessResult = null;
+    this.livenessResultDismissed = false;
     this.requestUpdate();
     try {
-      const r = await refreshSources();
-      // Refresh isn't synchronous on the server — show a brief toast and
-      // re-fetch the pipeline so any newly-landed events surface as the
-      // user keeps interacting. Signals refresh too.
-      this._refreshFeedback = r.throttled
-        ? 'Recently refreshed — try again in a few minutes.'
-        : 'Scanning Gmail for updates…';
-      setTimeout(async () => {
-        try {
-          const data = await fetchPipeline();
-          this.roles = (data.roles || []).slice();
-        } catch { /* keep stale state */ }
-        this._loadSignals();
-        this.requestUpdate();
-      }, 8000);
+      const res = await checkLiveness();
+      const data = await fetchPipeline();
+      this.roles = (data.roles || []).slice();
+      this._computeClosedSinceLastVisit();
+      // Only show the banner when something actually flipped to closed —
+      // silent runs shouldn't pop a "✓ all live" toast on every load.
+      const closed = Array.isArray(res?.closed) ? res.closed : [];
+      if (closed.length) {
+        this.livenessResult = { checked: res.checked || 0, closed };
+        this.bannerDismissed = false;
+      }
+      try { localStorage.setItem('job:lastLivenessAt', String(Date.now())); } catch {}
+    } catch (e) {
+      console.warn('[pipeline] auto-liveness failed:', e?.message || e);
     } finally {
-      this._refreshing = false;
+      this.livenessChecking = false;
       this.requestUpdate();
-      // Auto-dismiss the toast after ~10s.
-      setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
     }
   }
 
@@ -366,30 +375,6 @@ export class JobPipeline extends LitElement {
     this.closedSinceLastVisit = this.roles.filter(r =>
       r.closedDetectedAt && Date.parse(r.closedDetectedAt) > cutoff
     );
-  }
-
-  async _onCheckLiveness() {
-    if (this.livenessChecking) return;
-    this.livenessChecking = true;
-    this.livenessResult = null;
-    this.livenessResultDismissed = false;
-    this.requestUpdate();
-    try {
-      const res = await checkLiveness();
-      const data = await fetchPipeline();
-      this.roles = (data.roles || []).slice();
-      this._computeClosedSinceLastVisit();
-      this.livenessResult = {
-        checked: res.checked || 0,
-        closed: Array.isArray(res.closed) ? res.closed : [],
-      };
-      if (this.livenessResult.closed.length) this.bannerDismissed = false;
-    } catch (e) {
-      this.error = String(e);
-    } finally {
-      this.livenessChecking = false;
-      this.requestUpdate();
-    }
   }
 
   _onSortClick(col) {
@@ -1154,20 +1139,11 @@ export class JobPipeline extends LitElement {
         ${this.bucket === 'leads' && this.sortKey !== 'manual' && !this._manualOrders.leads.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Arrange manually</button>
         ` : nothing}
-        <button class="btn btn--sm" ?disabled=${this._refreshing}
-                title="Scan Gmail for new role alerts and application updates"
-                @click=${() => this._onRefreshSources()}>
-          ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
-        </button>
-        <button class="btn btn--sm" ?disabled=${this.livenessChecking}
-                @click=${() => this._onCheckLiveness()}>
-          ${this.livenessChecking ? 'Checking…' : 'Check liveness'}
-        </button>
         <button class="btn btn--sm btn--accent"
                 @click=${() => { this.pasteOpen = !this.pasteOpen; this.pasteError = ''; }}>
           ${this.pasteOpen ? 'Cancel' : '＋ Add a role'}
         </button>
-        ${this._refreshFeedback ? html`<span class="muted" style="margin-left:var(--space-3);font-size:var(--font-size-caption);">${this._refreshFeedback}</span>` : nothing}
+        ${this.livenessChecking ? html`<span class="muted" style="margin-left:var(--space-3);font-size:var(--font-size-caption);">Checking which roles are still live…</span>` : nothing}
       </div>
 
       ${this.pasteOpen ? html`

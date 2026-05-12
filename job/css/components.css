@@ -591,6 +591,7 @@
 .fit-breakdown__check--met   { background: rgba(47,157,77,0.15); color: var(--success, #2f9d4d); }
 .fit-breakdown__check--unmet { background: rgba(196,56,42,0.15); color: var(--error,   #c4382a); }
 
+<<<<<<< HEAD
 /* Score pair — Fit pill on top, Candidate pill below, used everywhere
    a row appears in a list. Each is independently clickable. */
 .score-pair {
@@ -619,6 +620,8 @@
   font-weight: var(--fw-medium); opacity: 0.6;
 }
 
+=======
+>>>>>>> origin/master
 .fit-modal__foot {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
@@ -2243,7 +2246,7 @@
 .rec-shell__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
@@ -2254,6 +2257,9 @@
   font-size: var(--font-size-title-3);
   letter-spacing: -0.01em;
 }
+.rec-shell__head > .muted { margin-right: auto; }
+.rec-shell__refresh { align-self: center; }
+.rec-shell__refresh-status { font-size: var(--font-size-caption); }
 .rec-row {
   display: grid;
   grid-auto-flow: column;
@@ -2469,7 +2475,7 @@
 .recs-page__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -2478,6 +2484,9 @@
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
 }
+.recs-page__head > .muted { margin-right: auto; }
+.recs-page__refresh { align-self: center; }
+.recs-page__refresh-status { font-size: var(--font-size-caption); }
 
 /* Columns specific to the recs table — sizes mirror existing pipeline
    col-* declarations (around line 2500). */

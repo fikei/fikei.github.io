@@ -286,6 +286,14 @@ export async function scanApplicationResponses(args: {
     // with low-confidence guesses.
     if (classified.confidence < PERSIST_CONFIDENCE_FLOOR) continue;
 
+    // 'informational' events are signal-free by definition — newsletters,
+    // LinkedIn job-alert digests that mention the company in passing,
+    // newsletter pieces about industry news. The per-role name search
+    // surfaces these because the company appears somewhere in the body,
+    // but they don't represent application progress. Skip them entirely
+    // rather than polluting the Activity timeline with newsletter noise.
+    if (classified.event_type === 'informational') continue;
+
     // Decide auto-advance + needs_review per the locked policy.
     const adv = FORWARD_AUTO_ADVANCE[classified.event_type];
     const currentRank = STAGE_RANK[matchedRole.stage ?? ''] ?? 0;
