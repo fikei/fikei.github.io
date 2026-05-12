@@ -4044,3 +4044,250 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   max-height: 320px;
   overflow: auto;
 }
+
+/* ============================================================== */
+/* Onboarding rev: insight hero, chat, tailor groups                */
+/* ============================================================== */
+
+.onboard__busy {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-4);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  border: 1px dashed var(--accent);
+  border-radius: 16px;
+}
+
+/* Multi-file dropzone */
+.dropzone--multi { cursor: pointer; display: block; }
+.dropzone__files {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+}
+.dropzone__files li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+  color: var(--fg);
+}
+
+/* Insight hero + tracks */
+.insight-hero {
+  font-size: var(--font-size-body-lg);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+  border: 1px solid var(--accent-strong);
+  border-radius: 30px;
+  padding: var(--space-5) var(--space-6);
+}
+
+.insight-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.insight-track__head h2 {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+.insight-track__rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.insight-track__rows li {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(200px, 2fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.insight-track__have {
+  font-weight: 600;
+  color: var(--fg);
+}
+.insight-track__arrow {
+  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+}
+.insight-track__to {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 600px) {
+  .insight-track__rows li {
+    grid-template-columns: 1fr;
+  }
+  .insight-track__arrow { display: none; }
+}
+
+/* Collapsible edit footer */
+.insight-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.insight-edit__toggle {
+  appearance: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.insight-edit__toggle:hover { border-color: var(--border-strong); color: var(--fg); }
+.insight-edit__toggle strong { color: var(--fg); font-weight: 600; }
+.insight-edit__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Chat (Stage 3) */
+.chat {
+  min-height: 60vh;
+  position: relative;
+  padding-bottom: 200px; /* leave room for the fixed composer */
+}
+.chat__progress {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  text-transform: none;
+}
+.chat__ack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.chat__ack-prefix {
+  color: var(--fg-muted);
+  font-size: var(--font-size-caption);
+}
+.chat__question {
+  font-size: var(--font-size-title-2);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-title);
+  color: var(--fg);
+  padding: var(--space-4) 0;
+}
+.chat__composer {
+  position: sticky;
+  bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--bg);
+  padding-top: var(--space-3);
+}
+.chat__composer textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.chat__composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+.chat__composer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chat__composer-pills {
+  display: flex;
+  gap: var(--space-2);
+}
+.chat__pill {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.chat__pill:hover { border-color: var(--border-strong); color: var(--fg); }
+.btn--send {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat__composer-hint {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  text-align: right;
+}
+
+/* Tailor groups (Stage 4) */
+.tailor-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: var(--space-5);
+  background: var(--bg-surface);
+}
+.tailor-group__head h2 {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+.tailor-group__excerpt {
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  margin: 0;
+  font-style: italic;
+  line-height: var(--lh-body);
+}
+.tailor-group__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.tailor-group__label {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+}
