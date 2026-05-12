@@ -36,22 +36,25 @@ const STAGES = [
   { id: 4, label: 'Tailor' },
 ];
 
+// Question copy is intentionally short and direct. Haiku may rewrite the
+// label as `nextQuestionCopy` (via extract mode) so it flows from the prior
+// reflection — but the substance stays fixed.
 const QUESTIONS = [
-  { id: 'q1_mission',   label: 'What problem do you want to spend the next five years on?',
-    placeholder: 'I want to make public services feel less like waiting rooms…',
-    ack: 'Got it.' },
-  { id: 'q2_self',      label: 'Describe a time at work where you felt most yourself.',
-    placeholder: 'Six months at a tiny civic-tech team — I was rebuilding a benefits tool…',
-    ack: 'That helps a lot — the voice carries through to the cover letters.' },
-  { id: 'q3_win',       label: 'A win you\'re proud of — ideally with a number attached.',
-    placeholder: 'Took retention from 41% to 67% in eight months by rebuilding the first-week experience.',
-    ack: 'Noted.' },
-  { id: 'q4_walkaway',  label: 'What would make you walk away from a great offer?',
-    placeholder: 'Anything in surveillance or defense. No patience for hustle-culture leadership.',
-    ack: 'These become hard filters.' },
-  { id: 'q5_titles',    label: 'What roles and titles should we be hunting for? Anything off-limits?',
-    placeholder: 'Head of Product, Founding PM, VP Product at seed-to-A startups. No people-manager-only roles.',
-    ack: 'On it.' },
+  { id: 'q1_mission',
+    label: 'What problem do you want to spend the next five years on?',
+    placeholder: 'I want to make public services feel less like waiting rooms…' },
+  { id: 'q2_self',
+    label: 'Describe a time at work where you felt most yourself.',
+    placeholder: 'Six months at a tiny civic-tech team rebuilding a benefits tool…' },
+  { id: 'q3_win',
+    label: 'A win you\'re proud of — ideally with a number attached.',
+    placeholder: 'Took retention from 41% to 67% in eight months by rebuilding the first-week experience.' },
+  { id: 'q4_walkaway',
+    label: 'What would make you walk away from a great offer?',
+    placeholder: 'Anything in surveillance or defense. No patience for hustle-culture leadership.' },
+  { id: 'q5_titles',
+    label: 'What roles and titles should we be hunting for? Anything off-limits?',
+    placeholder: 'Head of Product, Founding PM, VP Product at seed-to-A startups. No people-manager-only roles.' },
 ];
 
 const SECTORS_PALETTE = ['climate', 'civic-tech', 'healthtech', 'fintech', 'edtech', 'consumer-social', 'developer-tools', 'AI-infrastructure', 'biotech', 'space', 'public-benefit'];
@@ -72,7 +75,20 @@ function emptyDraft() {
     narratives: [],
     insights: null,
     bundle: null,
-    _meta: { stage: 0, questionIdx: 0, answers: {}, extractions: {}, uploadedFiles: [], editOpen: false },
+    _meta: {
+      stage: 0,
+      questionIdx: 0,
+      answers: {},
+      extractions: {},
+      uploadedFiles: [],
+      editOpen: false,
+      // Chat log: ordered list of turns. Each turn is either:
+      //   { role: 'ai',   reflection?: string, question: string, qid: string }
+      //   { role: 'user', text: string, qid: string }
+      // The latest AI turn carries the active question. We add the first AI
+      // turn lazily when the chat stage mounts.
+      chatLog: [],
+    },
   };
 }
 
@@ -239,33 +255,105 @@ export class JobOnboarding extends LitElement {
   _toggleEdit() { this.draft._meta.editOpen = !this.draft._meta.editOpen; this._commit(); }
 
   // -------- Stage 3: chat questions --------
+  //
+  // Chat log model: every AI turn carries the active question; every user
+  // turn carries their answer (or a synthetic "let's skip this one" message).
+  // We re-render the full log every update; latest turn auto-scrolls into
+  // view via _afterRender. The fixed QUESTIONS list still drives the slot
+  // sequence — Haiku just generates the reflection + (optional) question
+  // rewrite on top of it.
 
-  async _submitAnswer() {
-    const i = this.draft._meta.questionIdx;
-    const q = QUESTIONS[i];
-    const ta = this.querySelector('#chat-input');
-    const answer = (ta?.value || '').trim();
-    if (!answer) {
-      // Empty submit = skip
-      this._nextQuestion();
-      return;
+  _ensureChatSeeded() {
+    if ((this.draft._meta.chatLog || []).length === 0) {
+      this.draft._meta.chatLog.push({
+        role: 'ai',
+        qid: QUESTIONS[0].id,
+        question: QUESTIONS[0].label,
+      });
+      this.draft._meta.questionIdx = 0;
+      this._commit();
     }
-    this.draft._meta.answers[q.id] = answer;
-    this._commit();
+  }
+
+  _activeQuestion() {
+    const log = this.draft._meta.chatLog || [];
+    // The last AI turn is always the active question.
+    for (let i = log.length - 1; i >= 0; i--) if (log[i].role === 'ai') return log[i];
+    return null;
+  }
+
+  async _submitAnswer(opts = {}) {
+    const isSkip = !!opts.skip;
+    const ta = this.querySelector('#chat-input');
+    const typed = (ta?.value || '').trim();
+    const active = this._activeQuestion();
+    if (!active) return;
+
+    // Synthetic skip message keeps the conversation continuous.
+    const userText = isSkip
+      ? (typed || "Let's skip this one.")
+      : typed;
+    if (!userText) return; // empty + not skip = no-op
+
+    // Append user turn.
+    this.draft._meta.chatLog.push({ role: 'user', qid: active.qid, text: userText });
+    if (!isSkip) this.draft._meta.answers[active.qid] = userText;
+    if (ta) ta.value = '';
     this.error = '';
-    this.busy = true; this.busyLabel = 'Pulling out the signal…';
+    this.busy = true; this.busyLabel = '';
+    this._commit();
+
+    // Look up the next question label (so the AI can rewrite it inline).
+    const i = QUESTIONS.findIndex(q => q.id === active.qid);
+    const next = QUESTIONS[i + 1] || null;
+
     try {
+      // Skip: post a soft AI ack and pivot. Don't call extract.
+      if (isSkip) {
+        this.draft._meta.chatLog.push({
+          role: 'ai',
+          qid: next ? next.id : active.qid,
+          reflection: 'Got it — we can switch gears.',
+          question: next ? next.label : null,
+        });
+        if (next) this.draft._meta.questionIdx = i + 1;
+        this._commit();
+        if (!next) this._setStage(4);
+        return;
+      }
+
       const token = await this._token();
+      // Token can be null in pre-auth mode; the edge fn will reject if it
+      // requires it. For extract we treat null as ok for now; Phase 7 will
+      // unauth-gate extract on the server.
       if (!token) throw new Error('Not signed in.');
-      const { tags } = await callOnboard(token, { mode: 'extract', questionId: q.id, answer });
-      this.draft._meta.extractions[q.id] = tags;
-      this._applyExtraction(q.id, tags);
-      if (ta) ta.value = '';
-      this._nextQuestion();
+      const { tags, reflection, nextQuestionCopy } = await callOnboard(token, {
+        mode: 'extract',
+        questionId: active.qid,
+        answer: userText,
+        nextQuestionLabel: next?.label || null,
+      });
+      this.draft._meta.extractions[active.qid] = tags;
+      if (tags) this._applyExtraction(active.qid, tags);
+
+      // Append AI turn.
+      this.draft._meta.chatLog.push({
+        role: 'ai',
+        qid: next ? next.id : active.qid,
+        reflection: reflection || null,
+        question: next ? (nextQuestionCopy || next.label) : null,
+      });
+      if (next) this.draft._meta.questionIdx = i + 1;
+      this._commit();
+      if (!next) this._setStage(4);
     } catch (e) {
       this.error = e.message;
+      // Roll back the user turn so they can retry.
+      this.draft._meta.chatLog.pop();
+      this._commit();
     } finally {
       this.busy = false; this.busyLabel = '';
+      this._afterRender();
     }
   }
 
@@ -291,19 +379,31 @@ export class JobOnboarding extends LitElement {
     this._commit();
   }
 
-  _nextQuestion() {
-    const i = this.draft._meta.questionIdx;
-    if (i < QUESTIONS.length - 1) {
-      this.draft._meta.questionIdx = i + 1;
-      this._commit();
-    } else {
-      this._setStage(4);
-    }
+  // Auto-scroll to bottom of chat after re-render.
+  _afterRender() {
+    const log = this.querySelector('.chat__log');
+    if (log) log.scrollTop = log.scrollHeight;
   }
-  _prevQuestion() {
-    const i = this.draft._meta.questionIdx;
-    if (i > 0) { this.draft._meta.questionIdx = i - 1; this._commit(); }
-    else { this._setStage(2); }
+
+  // Mid-flow attach handler. Reuses upload path; routes back to chat
+  // afterwards with the same questionIdx so the user resumes where they were.
+  async _handleAttach(fileList) {
+    const idxBefore = this.draft._meta.questionIdx;
+    const stageBefore = this.draft._meta.stage;
+    await this._handleFiles(fileList);
+    // _handleFiles set stage=2. If they were in chat, route them back.
+    if (stageBefore === 3) {
+      this.draft._meta.stage = 3;
+      this.draft._meta.questionIdx = idxBefore;
+      // Inject a synthetic AI turn acknowledging the attach.
+      this.draft._meta.chatLog.push({
+        role: 'ai',
+        qid: this._activeQuestion()?.qid || QUESTIONS[idxBefore].id,
+        reflection: 'Thanks — I pulled what I could from that. Picking back up:',
+        question: this._activeQuestion()?.question || QUESTIONS[idxBefore].label,
+      });
+      this._commit();
+    }
   }
 
   // -------- Stage 4: tailor --------
@@ -518,34 +618,36 @@ export class JobOnboarding extends LitElement {
     `;
   }
 
-  // -------- Stage 3: chat --------
+  // -------- Stage 3: chat (scrolling log, apt-style) --------
 
   _renderChat() {
-    const i = this.draft._meta.questionIdx || 0;
-    const q = QUESTIONS[i];
-    const lastQid = i > 0 ? QUESTIONS[i - 1].id : null;
-    const lastExtraction = lastQid ? this.draft._meta.extractions[lastQid] : null;
+    this._ensureChatSeeded();
+    const log = this.draft._meta.chatLog || [];
+    const totalSlots = QUESTIONS.length;
+    const answeredCount = Object.keys(this.draft._meta.answers || {}).length;
+    const pct = Math.min(100, Math.round((answeredCount / totalSlots) * 100));
+
     return html`
       <section class="onboard__stage chat">
-        <div class="chat__progress">Question ${i + 1} of ${QUESTIONS.length}</div>
-        ${lastExtraction ? html`
-          <div class="chat__ack">
-            <span class="chat__ack-prefix">We heard:</span>
-            ${this._renderExtractionChips(lastQid, lastExtraction)}
-          </div>
-        ` : nothing}
-        <div class="chat__question">${q.label}</div>
+        <div class="chat__progress-bar"><span style="width:${pct}%"></span></div>
+
+        <div class="chat__log">
+          ${log.map(turn => turn.role === 'ai' ? this._renderAiTurn(turn) : this._renderUserTurn(turn))}
+          ${this.busy ? html`<div class="chat__ai chat__ai--thinking">…</div>` : nothing}
+        </div>
 
         <div class="chat__composer">
-          <textarea id="chat-input" placeholder=${q.placeholder}
+          <label for="chat-attach" class="chat__attach" title="Attach a resume or writing sample">+</label>
+          <input id="chat-attach" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                 style="display:none" @change=${(e) => this._handleAttach(e.target.files)}/>
+          <textarea id="chat-input" placeholder="Type your answer…"
                     @keydown=${(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this._submitAnswer(); } }}></textarea>
-          <div class="chat__composer-actions">
-            <div class="chat__composer-pills">
-              <button class="chat__pill" @click=${() => this._submitAnswer()} title="Or just leave it blank">Skip</button>
-              ${i > 0 ? html`<button class="chat__pill" @click=${() => this._prevQuestion()}>Back</button>` : nothing}
-            </div>
-            <button class="btn btn--primary btn--send" ?disabled=${this.busy} @click=${() => this._submitAnswer()}
-                    aria-label="Send">↑</button>
+          <button class="btn btn--primary btn--send" ?disabled=${this.busy} @click=${() => this._submitAnswer()}
+                  aria-label="Send">↑</button>
+        </div>
+        <div class="chat__composer-row">
+          <div class="chat__composer-pills">
+            <button class="chat__pill" @click=${() => this._submitAnswer({ skip: true })}>Skip</button>
           </div>
           <div class="chat__composer-hint">⌘+Enter to send</div>
         </div>
@@ -553,22 +655,19 @@ export class JobOnboarding extends LitElement {
     `;
   }
 
-  _renderExtractionChips(qid, tags) {
-    const items = [];
-    if (qid === 'q1_mission') {
-      items.push(...(tags.missionKeywords || []), ...(tags.impactThemes || []), ...(tags.targetSectors || []));
-    } else if (qid === 'q2_self') {
-      items.push(...(tags.cultureKeywords || []), ...(tags.arcTags || []));
-    } else if (qid === 'q3_win') {
-      if (tags.headline) items.push(tags.headline + (tags.metric ? ` · ${tags.metric}` : ''));
-    } else if (qid === 'q4_walkaway') {
-      items.push(...(tags.antiMissionTerms || []), ...(tags.antiCulture || []));
-    } else if (qid === 'q5_titles') {
-      items.push(...(tags.targetRoles || []), ...(tags.stagePreference || []));
-    }
-    if (!items.length) return html`<span class="onboard__hint">noted.</span>`;
-    return html`${items.map(t => html`<span class="chip chip--on">${t}</span>`)}`;
+  _renderAiTurn(turn) {
+    return html`
+      <div class="chat__ai">
+        ${turn.reflection ? html`<p class="chat__ai-reflection">${turn.reflection}</p>` : nothing}
+        ${turn.question ? html`<p class="chat__ai-question">${turn.question}</p>` : nothing}
+      </div>
+    `;
   }
+  _renderUserTurn(turn) {
+    return html`<div class="chat__user">${turn.text}</div>`;
+  }
+
+  updated() { this._afterRender(); }
 
   // -------- Stage 4: tailor --------
 
