@@ -789,9 +789,22 @@ export class JobPipeline extends LitElement {
 
   _renderStatusCell(r) {
     const s = r.status || 'Saved';
-    const cls = 'status-pill status-pill--' + s.toLowerCase();
     const stageObj = r.stage ? STAGES.find(x => x.id === r.stage) : null;
     const exitObj = r.exitReason ? EXIT_REASONS.find(x => x.id === r.exitReason) : null;
+
+    // On the Active bucket the high-level status is always "Active" — the
+    // useful information is the current interview step. Promote the stage
+    // to the primary pill; fall back to the Active pill only when no
+    // stage is set yet (e.g. just-promoted row awaiting first stage).
+    if (this.bucket === 'active' && stageObj) {
+      const stageCls = 'status-pill status-pill--stage-' + stageObj.id;
+      return html`
+        <span class=${stageCls + (r._saving ? ' is-saving' : '')}>${stageObj.label}</span>
+        ${r._error ? html`<span class="status-cell__err" title=${r._error}>!</span>` : nothing}
+      `;
+    }
+
+    const cls = 'status-pill status-pill--' + s.toLowerCase();
     return html`
       <span class=${cls + (r._saving ? ' is-saving' : '')}>${s}</span>
       ${stageObj ? html`<span class="stage-chip" title="Sub-stage">${stageObj.label}</span>` : nothing}
@@ -802,7 +815,11 @@ export class JobPipeline extends LitElement {
 
   _visibleColumns() {
     // Status column is meaningless on Leads (it's always New/empty there).
-    return COLUMNS.filter(c => !(c.id === 'status' && this.bucket === 'leads'));
+    // On the Active bucket the column shows the interview stage, so the
+    // header reads "Stage" rather than "Status".
+    return COLUMNS
+      .filter(c => !(c.id === 'status' && this.bucket === 'leads'))
+      .map(c => (c.id === 'status' && this.bucket === 'active') ? { ...c, label: 'Stage', sortKey: 'stage' } : c);
   }
 
   _renderHeader() {
