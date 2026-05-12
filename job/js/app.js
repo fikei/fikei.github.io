@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.79.0";
-console.log(`[job] v${VERSION} - Multi-user gate: user_profile row check + onboarding redirect`);
+const VERSION = "0.80.0";
+console.log(`[job] v${VERSION} - Onboarding flow Phase 2/3: <job-onboarding> + settings entry`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -33,6 +33,12 @@ if (location.pathname.startsWith('/job/jobs/drill')) {
 }
 if (location.pathname.startsWith('/job/vision')) {
   import('./components/job-vision.js' + V);
+}
+if (location.pathname.startsWith('/job/onboarding')) {
+  import('./components/job-onboarding.js' + V);
+}
+if (location.pathname.startsWith('/job/settings')) {
+  import('./components/job-settings.js' + V);
 }
 
 async function applySignedInState(email) {

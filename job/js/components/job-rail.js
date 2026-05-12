@@ -43,8 +43,9 @@ const ROUTES = [
       { href: '/job/jobs/?bucket=archive',   label: 'Archive',              bucket: 'archive' },
     ],
   },
-  { href: '/job/history/', label: 'Your career', match: /^\/job\/history\/?/ },
-  { href: '/job/vision/',  label: 'Search plan', match: /^\/job\/vision\/?/ }
+  { href: '/job/history/',  label: 'Your career', match: /^\/job\/history\/?/ },
+  { href: '/job/vision/',   label: 'Search plan', match: /^\/job\/vision\/?/ },
+  { href: '/job/settings/', label: 'Settings',    match: /^\/job\/settings\/?/ }
 ];
 
 export class JobRail extends LitElement {
