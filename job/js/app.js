@@ -2,7 +2,7 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.78.1";
+const VERSION = "0.78.2";
 console.log(`[job] v${VERSION} - Active bucket shows interview stage as the primary pill`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
