@@ -43,6 +43,11 @@ export interface UserContext {
   pastSectors:       string[];
   arcTags:           string[];
   weights?:          Partial<FitWeights>;
+  // Target sectors — domains the user wants to operate in, even without
+  // direct shipping history. The domain scorer treats these as adjacent
+  // to past sectors so civic-tech / public-benefit / etc. roles get
+  // proper credit without requiring the user to have worked there.
+  targetSectors?:    string[];
   // Wins — Haiku-only signal; deterministic scorers don't use them.
   wins?:             Array<{ headline: string; metric?: string | null }>;
 }
@@ -217,28 +222,63 @@ function scoreRole(r: RoleRow, cap: number, ctx?: UserContext, preComputedRole?:
 }
 
 // ---------- Domain (cap from weights.domain, default 15) ----------
+// Counts both pastSectors (where the user has shipped) and targetSectors
+// (where the user wants to ship). Past sectors are stronger signal — the
+// rationale flags whether the match is "where you've worked" or "where
+// you want to work".
 function scoreDomain(r: RoleRow, cap: number, ctx?: UserContext): { v: number; reason: string } {
-  if (!ctx || !ctx.pastSectors.length) return legacySector(r.sector, cap);
+  if (!ctx || (!ctx.pastSectors.length && !(ctx.targetSectors || []).length)) {
+    return legacySector(r.sector, cap);
+  }
   const text = postingText(r);
   const stop = new Set(['the','a','and','of','for','in','to','with','on','at','via','then','from','an','or']);
-  const tokens = new Set<string>();
-  for (const blob of ctx.pastSectors) {
-    for (const raw of blob.toLowerCase().split(/[^a-z0-9+]+/)) {
-      if (raw.length >= 4 && !stop.has(raw)) tokens.add(raw);
+  const tokenize = (blobs: string[]) => {
+    const toks = new Set<string>();
+    for (const blob of blobs) {
+      for (const raw of blob.toLowerCase().split(/[^a-z0-9+]+/)) {
+        if (raw.length >= 4 && !stop.has(raw)) toks.add(raw);
+      }
     }
+    return toks;
+  };
+  const pastTokens = tokenize(ctx.pastSectors);
+  const targetTokens = tokenize(ctx.targetSectors || []);
+  // Compound phrases — multi-word sector names that single-token split
+  // would lose. Past + target share this list.
+  const compounds = ['health tech','healthtech','health care','healthcare','edtech','education','chronic','consumer','platform','marketplace','telehealth','civic','civic tech','civic technology','gov tech','gov-tech','public benefit','public sector','nonprofit','social enterprise'];
+  for (const c of compounds) {
+    if (ctx.pastSectors.some(s => s.toLowerCase().includes(c))) pastTokens.add(c);
+    if ((ctx.targetSectors || []).some(s => s.toLowerCase().includes(c))) targetTokens.add(c);
   }
-  const compounds = ['health tech','healthtech','health care','healthcare','edtech','education','chronic','consumer','platform','marketplace','telehealth','civic'];
-  for (const c of compounds) if (ctx.pastSectors.some(s => s.toLowerCase().includes(c))) tokens.add(c);
-  const hits = listMatches(text, [...tokens], 5);
-  // Filter out the noisy generic tokens that come from splitting sector blobs
-  // ("multi", "sector", "based") — they leak into rationales and read poorly.
-  const meaningful = hits.filter(h => h.length >= 5 && !['multi','sector','based','focus'].includes(h));
-  const tier = hits.length >= 4 ? cap : hits.length === 3 ? Math.round(cap * 0.80) : hits.length === 2 ? Math.round(cap * 0.60) : hits.length === 1 ? Math.round(cap * 0.40) : Math.round(cap * 0.20);
-  const reason = meaningful.length
-    ? `Adjacent to where you've worked — ${meaningful.slice(0, 4).join(', ')}.`
-    : hits.length
-      ? 'Loosely adjacent to your past sectors.'
-      : 'Outside the healthcare, edtech, and consumer-SaaS surface where you\'ve spent your career.';
+  const pastHits = listMatches(text, [...pastTokens], 5);
+  const targetHits = listMatches(text, [...targetTokens], 5);
+  const noise = new Set(['multi','sector','based','focus']);
+  const meaningfulPast   = pastHits.filter(h => h.length >= 5 && !noise.has(h));
+  const meaningfulTarget = targetHits.filter(h => h.length >= 5 && !noise.has(h) && !pastHits.includes(h));
+
+  // Weight past matches fully, target matches at 0.75. Each side maxes
+  // out at the cap independently; total clamped.
+  const pastUnits = pastHits.length;
+  const targetUnits = targetHits.filter(h => !pastHits.includes(h)).length * 0.75;
+  const totalUnits = pastUnits + targetUnits;
+  const tier = totalUnits >= 4 ? cap
+             : totalUnits >= 3 ? Math.round(cap * 0.80)
+             : totalUnits >= 2 ? Math.round(cap * 0.60)
+             : totalUnits >= 1 ? Math.round(cap * 0.40)
+             : Math.round(cap * 0.20);
+
+  let reason: string;
+  if (meaningfulPast.length && meaningfulTarget.length) {
+    reason = `Adjacent to where you've worked (${meaningfulPast.slice(0, 3).join(', ')}) and a target domain (${meaningfulTarget.slice(0, 2).join(', ')}).`;
+  } else if (meaningfulPast.length) {
+    reason = `Adjacent to where you've worked — ${meaningfulPast.slice(0, 4).join(', ')}.`;
+  } else if (meaningfulTarget.length) {
+    reason = `Outside your shipping history but inside your target domains — ${meaningfulTarget.slice(0, 4).join(', ')}.`;
+  } else if (pastHits.length || targetHits.length) {
+    reason = 'Loosely adjacent to your past or target sectors.';
+  } else {
+    reason = 'Outside the healthcare, edtech, consumer-SaaS, and civic-tech surface you operate in or target.';
+  }
   return { v: tier, reason };
 }
 

@@ -39,7 +39,7 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
   if (_fitCtxCache && Date.now() - _fitCtxCache.at < FIT_CTX_CACHE_MS) return _fitCtxCache.ctx;
   const [visionRows, skillRows, companyRows, winRows] = await Promise.all([
     sql`select impact_themes, mission_keywords, mission_required, anti_mission_terms,
-               culture_keywords, interest_tags, score_weights,
+               culture_keywords, interest_tags, target_sectors, score_weights,
                coalesce(narrative_arc,'') as narrative_arc
           from job.vision order by updated_at desc limit 1`,
     sql`select name, years_practiced from job.skills`,
@@ -63,7 +63,8 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
       name: String(s.name || ''),
       years: (s.years_practiced as number | null) ?? null,
     })),
-    pastSectors: (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
+    pastSectors:   (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
+    targetSectors: (v.target_sectors as string[] | null) || [],
     arcTags,
     // Wins are surfaced to Haiku only; the scoring functions don't use
     // them. Cast pattern keeps FitUserContext interface tight while we
@@ -224,8 +225,10 @@ No prose outside the JSON.`;
     `Compensation (parsed): ${r.salary || '(not disclosed)'}`,
     `\n# Candidate skills (years of practice in parens)`,
     ...ctx.skills.map(s => `- ${s.name} (${s.years ?? '?'} yrs)`),
-    `\n# Candidate past sectors`,
+    `\n# Candidate past sectors (where they have actually shipped)`,
     ...ctx.pastSectors.map(s => `- ${s}`),
+    `\n# Candidate target sectors (where they want to operate, even without prior shipping)`,
+    ...(ctx.targetSectors || []).map(s => `- ${s}`),
     `\n# Candidate interest tags`,
     `- ${(ctx.interestTags || []).join('\n- ')}`,
     `\n# Candidate wins (recent, abbreviated)`,
