@@ -174,8 +174,12 @@ BUCKET-LEVEL CALIBRATION — bucket caps are top scores, not defaults. Apply rut
   outcome (0-15)  Cap reserved for "has shipped THE SPECIFIC OUTCOME in their JD in the last
                   3 years." Adjacent outcomes → 8-11. Generic 'shipped product' → 5-8.
 
-  domain (0-15)   Cap = recent shipping in EXACTLY this sector/problem space. Adjacent
-                  sector → 8-12. No prior shipping in their domain → 3-6.
+  domain (0-15)   IMPORTANT: this bucket counts ACTUAL SHIPPING HISTORY ONLY. Use
+                  the "Candidate past sectors" list. DO NOT credit "target sectors"
+                  here — a sector the candidate aspires to but has never shipped in
+                  earns 3-6 at most, even if the role is in that target domain.
+                  Cap = recent shipping in EXACTLY this sector/problem space.
+                  Adjacent past sector → 8-12. No prior shipping → 3-6.
 
   stretch (0-15)  Bidirectional. 12-15 = healthy stretch (mild reach up in scope or domain).
                   8-11 = comfort zone (could be boring or perceived as overqualified).
