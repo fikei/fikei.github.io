@@ -298,7 +298,7 @@ export class JobOnboarding extends LitElement {
     // Append user turn.
     this.draft._meta.chatLog.push({ role: 'user', qid: active.qid, text: userText });
     if (!isSkip) this.draft._meta.answers[active.qid] = userText;
-    if (ta) ta.value = '';
+    if (ta) { ta.value = ''; this._autoSize(ta); }
     this.error = '';
     this.busy = true; this.busyLabel = '';
     this._commit();
