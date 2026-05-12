@@ -87,13 +87,10 @@ export class JobRecommendationsTable extends LitElement {
       setTimeout(async () => {
         try {
           const data = await fetchRecommendations({ view: 'all' });
-          // API returns { recommendations: [...] }. The earlier `data.items
-          // || data || []` fallback assigned the raw object to this.items
-          // when neither key was present, blowing up _sorted() with a
-          // "not iterable" TypeError.
-          this.items = (data && Array.isArray(data.recommendations)) ? data.recommendations
-                     : (data && Array.isArray(data.items)) ? data.items
-                     : [];
+          // /functions/v1/recommendations returns { recommendations: [...] }
+          // — same shape _maybeLoad uses. Wrong field name made
+          // this.items become an object and _sorted() crash next render.
+          this.items = Array.isArray(data?.recommendations) ? data.recommendations : [];
         } catch { /* keep stale */ }
         this.requestUpdate();
       }, 8000);
