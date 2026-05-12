@@ -5,7 +5,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -33,6 +33,8 @@ export class JobRecommendations extends LitElement {
     error: { state: true },
     addingId: { state: true },
     selectedRec: { state: true },
+    _refreshing:      { state: true },
+    _refreshFeedback: { state: true },
   };
 
   constructor() {
@@ -42,6 +44,34 @@ export class JobRecommendations extends LitElement {
     this.error = '';
     this.addingId = null;
     this.selectedRec = null;
+    this._refreshing = false;
+    this._refreshFeedback = '';
+  }
+
+  async _onRefresh() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    this.requestUpdate();
+    try {
+      const r = await refreshSources();
+      this._refreshFeedback = r.throttled
+        ? 'Recently refreshed — try again in a few minutes.'
+        : 'Scanning Gmail for new roles…';
+      // Re-fetch recs after the server has had time to land new rows.
+      // The function runs async; 8s is enough for a typical tick of
+      // gmail-jobs + ATS sources to settle.
+      setTimeout(async () => {
+        try {
+          const data = await fetchRecommendations();
+          this.items = data.items || data || [];
+        } catch { /* keep stale */ }
+        this.requestUpdate();
+      }, 8000);
+    } finally {
+      this._refreshing = false;
+      this.requestUpdate();
+      setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
+    }
   }
 
   connectedCallback() {
@@ -226,6 +256,12 @@ export class JobRecommendations extends LitElement {
           <span class="muted">
             Top ${top.length} of ${total} ${total === 1 ? 'role' : 'roles'}
           </span>
+          <button class="btn btn--sm rec-shell__refresh" ?disabled=${this._refreshing}
+                  title="Scan Gmail for new role alerts and application updates"
+                  @click=${() => this._onRefresh()}>
+            ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
+          </button>
+          ${this._refreshFeedback ? html`<span class="muted rec-shell__refresh-status">${this._refreshFeedback}</span>` : nothing}
         </header>
         <div class="rec-row" role="list">
           ${top.map(r => this._renderCard(r))}
