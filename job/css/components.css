@@ -4242,6 +4242,9 @@ job-onboarding { display: contents; }
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  /* Latest message hugs the composer (anchor to bottom). When content
+     exceeds the log height, older messages scroll up. */
+  justify-content: flex-end;
   gap: var(--space-6);
   scroll-behavior: smooth;
 }
@@ -4313,8 +4316,9 @@ job-onboarding { display: contents; }
 }
 .chat__user {
   align-self: flex-end;
-  text-align: right;
-  color: var(--fg);
+  max-width: 75%;
+  text-align: left;
+  color: var(--fg-muted);
   white-space: pre-wrap;
 }
 
@@ -4343,11 +4347,11 @@ job-onboarding { display: contents; }
   display: grid;
   grid-template-columns: 36px 1fr 36px;
   gap: var(--space-2);
-  align-items: end;
+  align-items: center;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 24px;
-  padding: 6px 8px;
+  padding: 6px 10px;
 }
 .chat__composer:focus-within {
   border-color: var(--accent);
@@ -4369,17 +4373,19 @@ job-onboarding { display: contents; }
 .chat__attach:hover { color: var(--fg); }
 .chat__composer textarea {
   width: 100%;
-  min-height: 36px;
+  height: 28px;
+  min-height: 28px;
   max-height: 200px;
-  padding: 8px 4px;
+  padding: 4px 0;
   border: 0;
   background: transparent;
   color: var(--fg);
   font: inherit;
   font-size: var(--font-size-body);
-  line-height: var(--lh-body);
+  line-height: 1.4;
   resize: none;
   outline: none;
+  overflow-y: auto;
 }
 .chat__send {
   appearance: none;
