@@ -2199,7 +2199,7 @@
 .rec-shell__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
@@ -2210,6 +2210,9 @@
   font-size: var(--font-size-title-3);
   letter-spacing: -0.01em;
 }
+.rec-shell__head > .muted { margin-right: auto; }
+.rec-shell__refresh { align-self: center; }
+.rec-shell__refresh-status { font-size: var(--font-size-caption); }
 .rec-row {
   display: grid;
   grid-auto-flow: column;
