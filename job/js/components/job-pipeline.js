@@ -4,7 +4,7 @@ import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
-const { renderFitModal, scoreClass: sharedScoreClass } = await import('./job-fit-modal.js' + V);
+const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./job-fit-modal.js' + V);
 const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./job-recommendations.js' + V);
@@ -102,7 +102,8 @@ export class JobPipeline extends LitElement {
     roles: { state: true },
     sortKey: { state: true },
     sortDir: { state: true },
-    selectedRow: { state: true },
+    selectedRow:          { state: true },
+    selectedScoreWhich:   { state: true },
     bucket: { state: true },         // 'leads' | 'active' | 'archive'
     openMenuSlug: { state: true },
     livenessChecking: { state: true },
@@ -456,8 +457,9 @@ export class JobPipeline extends LitElement {
     return 'fit-pill fit-pill--poor';
   }
 
-  _openFitModal(r) { this.selectedRow = r; }
-  _closeFitModal() { this.selectedRow = null; }
+  _openFitModal(r)       { this.selectedRow = r; this.selectedScoreWhich = 'fit'; }
+  _openCandidateModal(r) { this.selectedRow = r; this.selectedScoreWhich = 'candidate'; }
+  _closeFitModal()       { this.selectedRow = null; this.selectedScoreWhich = null; }
 
   async _applyPatch(r, patch) {
     // Optimistic write — mutate local + UI, roll back on error.
@@ -872,10 +874,12 @@ export class JobPipeline extends LitElement {
           @dragend=${() => this._onDragEnd()}
           @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
-          <button class=${this._scoreClass(r.score) + ' fit-pill--button'}
-            title="Tap to see the breakdown" @click=${(e) => { e.stopPropagation(); this._openFitModal(r); }}>
-            ${r.score == null ? '—' : r.score}
-          </button>
+          ${renderScorePair(r, {
+            onFit:       (row) => this._openFitModal(row),
+            onCandidate: (row) => this._openCandidateModal(row),
+            fitClass:    (s) => this._scoreClass(s),
+            candClass:   (s) => this._scoreClass(s),
+          })}
         </td>
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
@@ -961,7 +965,7 @@ export class JobPipeline extends LitElement {
   }
 
   _renderFitModal() {
-    return renderFitModal(this.selectedRow, () => this._closeFitModal());
+    return renderScoreModal(this.selectedRow, () => this._closeFitModal(), this.selectedScoreWhich || 'fit');
   }
 
   // "N new jobs added" banner. Pluralizes correctly, links the most

@@ -591,6 +591,34 @@
 .fit-breakdown__check--met   { background: rgba(47,157,77,0.15); color: var(--success, #2f9d4d); }
 .fit-breakdown__check--unmet { background: rgba(196,56,42,0.15); color: var(--error,   #c4382a); }
 
+/* Score pair — Fit pill on top, Candidate pill below, used everywhere
+   a row appears in a list. Each is independently clickable. */
+.score-pair {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.score-pair__fit  { /* keeps existing fit-pill styling */ }
+.score-pair__cand {
+  font-size: var(--font-size-small);
+  padding: 1px 8px;
+  opacity: 0.85;
+  position: relative;
+}
+.score-pair__cand::before {
+  content: 'C'; margin-right: 4px;
+  font-weight: var(--fw-medium); opacity: 0.6;
+  font-size: 0.85em;
+}
+.score-pair__cand--empty {
+  display: inline-flex; align-items: center;
+  padding: 1px 8px; border-radius: var(--radius-pill);
+  font-size: var(--font-size-small); color: var(--fg-subtle);
+  background: var(--bg-surface);
+}
+.score-pair__cand--empty::before {
+  content: 'C'; margin-right: 4px;
+  font-weight: var(--fw-medium); opacity: 0.6;
+}
+
 .fit-modal__foot {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
