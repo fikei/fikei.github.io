@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, addRole }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderFitModal }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./job-fit-modal.js' + V),
@@ -56,6 +56,8 @@ export class JobRecommendationsTable extends LitElement {
     sortDir:  { state: true },
     addingId: { state: true },
     selectedRec: { state: true },
+    _refreshing:      { state: true },
+    _refreshFeedback: { state: true },
   };
 
   constructor() {
@@ -68,6 +70,31 @@ export class JobRecommendationsTable extends LitElement {
     this.sortDir = 'desc';
     this.addingId = null;
     this.selectedRec = null;
+    this._refreshing = false;
+    this._refreshFeedback = '';
+  }
+
+  async _onRefresh() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    this.requestUpdate();
+    try {
+      const r = await refreshSources();
+      this._refreshFeedback = r.throttled
+        ? 'Recently refreshed — try again in a few minutes.'
+        : 'Scanning Gmail for new roles…';
+      setTimeout(async () => {
+        try {
+          const data = await fetchRecommendations({ view: 'all' });
+          this.items = data.items || data || [];
+        } catch { /* keep stale */ }
+        this.requestUpdate();
+      }, 8000);
+    } finally {
+      this._refreshing = false;
+      this.requestUpdate();
+      setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
+    }
   }
 
   _openFitModal(rec) {
@@ -300,6 +327,12 @@ export class JobRecommendationsTable extends LitElement {
       <header class="recs-page__head">
         <h1>Recommended for you</h1>
         <span class="muted">${rows.length} ${rows.length === 1 ? 'role' : 'roles'}</span>
+        <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
+                title="Scan Gmail for new role alerts and application updates"
+                @click=${() => this._onRefresh()}>
+          ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
+        </button>
+        ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
       </header>
       ${rows.length === 0 ? html`
         <div class="placeholder">
