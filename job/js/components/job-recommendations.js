@@ -63,7 +63,8 @@ export class JobRecommendations extends LitElement {
       setTimeout(async () => {
         try {
           const data = await fetchRecommendations();
-          this.items = data.items || data || [];
+          // Same shape as _maybeLoad uses: { recommendations: [...] }
+          this.items = Array.isArray(data?.recommendations) ? data.recommendations : [];
         } catch { /* keep stale */ }
         this.requestUpdate();
       }, 8000);

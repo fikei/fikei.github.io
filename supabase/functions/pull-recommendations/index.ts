@@ -16,13 +16,32 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
+import { verifyJobUser } from '../_shared/job-auth.ts';
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
 
-const VERSION = '0.12.0';
-console.log(`[pull-recommendations] v${VERSION} - cappedRun unstuck + drop 'informational' app events (newsletter noise)`);
+// Browser callers (Refresh button on /job/) need CORS. pg_cron + pg_net
+// bypass preflight, so the old CRON-only auth path never hit this; but
+// any fetch from ctrl.rodeo will fail at the preflight if these headers
+// are missing.
+const corsHeaders = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, x-cron-secret, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+const respJson = (body: unknown, status = 200) => new Response(JSON.stringify(body, null, 2), {
+  status,
+  headers: { ...corsHeaders, 'content-type': 'application/json' },
+});
+const respText = (body: string, status = 200) => new Response(body, {
+  status,
+  headers: { ...corsHeaders, 'content-type': 'text/plain' },
+});
+
+const VERSION = '0.13.0';
+console.log(`[pull-recommendations] v${VERSION} - CORS + browser user-JWT auth path so Refresh button works`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -45,12 +64,19 @@ interface UserContext {
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST' && req.method !== 'GET') {
-    return new Response('POST only', { status: 405 });
+    return respText('POST only', 405);
   }
+  // Two auth paths:
+  //   - X-Cron-Secret: pg_cron + function-to-function callers
+  //   - verifyJobUser: signed-in user clicking the Refresh button on
+  //     /job/jobs/ or /job/jobs/recommended/
   const secret = Deno.env.get('CRON_SECRET');
-  if (secret && req.headers.get('x-cron-secret') !== secret) {
-    return new Response('forbidden', { status: 403 });
+  const hasCronSecret = !!secret && req.headers.get('x-cron-secret') === secret;
+  const userEmail = hasCronSecret ? null : await verifyJobUser(req);
+  if (!hasCronSecret && !userEmail) {
+    return respText('forbidden', 403);
   }
 
   // Optional force-run: POST { id: '<user_source_id>' } from user-sources
@@ -115,15 +141,14 @@ serve(async (req) => {
           results.push({ table: 'recommended', key: r.key, ok: false, error: (e as Error).message });
         }
       }
-      return new Response(JSON.stringify({ ok: true, version: VERSION,
+      return respJson({ ok: true, version: VERSION,
         pipeline: { fetched: pipeRows.length, succeeded: results.filter(r => r.table === 'pipeline' && r.ok).length },
         recommended: { fetched: recRows.length, succeeded: results.filter(r => r.table === 'recommended' && r.ok).length },
         results,
-      }, null, 2), { status: 200, headers: { 'content-type': 'application/json' } });
+      });
     } catch (outer) {
       console.error('[pull-recommendations] backfill outer error:', (outer as Error).stack || (outer as Error).message);
-      return new Response(JSON.stringify({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, null, 2),
-        { status: 500, headers: { 'content-type': 'application/json' } });
+      return respJson({ ok: false, error: (outer as Error).message, stack: (outer as Error).stack }, 500);
     }
   }
 
@@ -239,8 +264,7 @@ serve(async (req) => {
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
-    return new Response(JSON.stringify({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated, haikuCalls }, null, 2),
-      { status: 200, headers: { 'content-type': 'application/json' } });
+    return respJson({ ok: true, version: VERSION, rescored: updated, pipelineRescored: pipeUpdated, haikuCalls });
   }
   const sources = forceId
     ? await sql<UserSourceRow[]>`
@@ -329,10 +353,7 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary }, null, 2), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
+  return respJson({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary });
 });
 
 // ---------- Target-title filter ----------
