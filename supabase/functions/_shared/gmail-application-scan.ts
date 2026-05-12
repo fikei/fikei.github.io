@@ -103,9 +103,12 @@ export async function scanApplicationResponses(args: {
       left join job.hiring_companies hc
         on hc.name_norm = lower(trim(r.company_name))
      where r.status in ('Active', 'Saved')
-       and (r.applied_at is not null or r.engaged_at is not null)
        and (${args.roleSlug ?? null}::text is null or r.slug = ${args.roleSlug ?? null})
        and r.deleted_at is null
+     order by
+       case when r.status = 'Active' then 0 else 1 end,
+       coalesce(r.engaged_at, r.applied_at) desc nulls last,
+       r.created_at desc
   `;
   if (!roles.length) return out;
 
@@ -129,20 +132,67 @@ export async function scanApplicationResponses(args: {
     for (const t of r.gmail_thread_ids) threadToRole.set(t, r);
   }
 
-  // Build the Gmail query. Include pipeline-company domains AND known
-  // ATS-platform domains. -in:spam -in:trash to avoid the noisy buckets.
+  // Build the Gmail query set. Three passes — each contributes message
+  // IDs that we then dedup, fetch, and try to classify:
+  //
+  //   1. Sender-domain pass — companies with a known domain in
+  //      hiring_companies, plus the ATS-platform allowlist. Cheap, broad.
+  //   2. Per-role name pass — for each active role, search the inbox
+  //      for the literal company name. Catches direct human emails from
+  //      a recruiter's personal gmail / hiring-manager's @yahoo / any
+  //      sender whose domain we don't have cached. Capped at 20 IDs per
+  //      role and we exclude the obvious noise senders.
+  //
+  // All three streams hit the same matching gauntlet below; Message-ID
+  // dedup against application_events ensures we never re-classify.
   const senderDomains = new Set<string>();
   for (const d of domainToRoles.keys()) senderDomains.add(d);
   for (const d of ATS_PLATFORM_DOMAINS) senderDomains.add(d);
-  if (senderDomains.size === 0) return out;
 
-  const fromClause = [...senderDomains].map(d => `from:${d}`).join(' OR ');
-  const query = `(${fromClause}) -in:spam -in:trash newer_than:${windowDays}d`;
+  const idSet = new Set<string>();
 
-  // List messages. We use messages.list directly here (not historyId)
-  // because the application-scan cursor is independent from the
-  // recs-scan cursor, and Message-ID dedup makes re-listing safe.
-  const ids = await listMessagesByQuery(args.accessToken, query, maxMessages * 3);
+  if (senderDomains.size > 0) {
+    const fromClause = [...senderDomains].map(d => `from:${d}`).join(' OR ');
+    const domainQuery = `(${fromClause}) -in:spam -in:trash newer_than:${windowDays}d`;
+    for (const id of await listMessagesByQuery(args.accessToken, domainQuery, maxMessages * 3)) {
+      idSet.add(id);
+    }
+  }
+
+  // Pass 2: per-role name search. The filter strips aggregator newsletter
+  // senders + the role's own canonical URL — those messages are either
+  // already on the recs path (linkedin alerts) or noisy (job board
+  // newsletters mentioning the company in passing).
+  //
+  // NOTE: we do NOT restrict to `in:inbox`. Many recruiter threads get
+  // filed into labels (e.g. Career/Networking) which removes them from
+  // the inbox view. `-in:spam -in:trash` keeps the obvious junk out
+  // without losing labeled-but-archived recruiter conversations.
+  const NEWSLETTER_NEGATIVES = '-from:linkedin.com -from:wellfound.com -from:otta.com -from:builtin.com -from:hnhiring.com';
+  // Cap covers the whole current pipeline; roles are pre-sorted Active
+  // first, then by most-recent engagement. If the pipeline ever grows
+  // past this, the tail is silently skipped — bump or paginate.
+  for (const role of roles.slice(0, 60)) {
+    // Build a candidate-name set per role. Start with company_name when
+    // it looks real; add the title-derived company token when it
+    // doesn't (rows added via /add-role sometimes land as
+    // "(unknown company)" with the actual company sitting in the title
+    // — e.g. "Product Manager, Meridian").
+    const candidates = candidateNamesForSearch(role);
+    for (const candidate of candidates) {
+      const quoted = `"${candidate.replace(/"/g, '\\"')}"`;
+      const nameQuery = `${quoted} -in:spam -in:trash newer_than:${windowDays}d ${NEWSLETTER_NEGATIVES}`;
+      try {
+        for (const id of await listMessagesByQuery(args.accessToken, nameQuery, 20)) {
+          idSet.add(id);
+        }
+      } catch (e) {
+        console.warn(`[gmail-app-scan] name-search '${candidate}' failed: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  const ids = [...idSet];
 
   let processed = 0;
   for (const id of ids) {
@@ -170,6 +220,12 @@ export async function scanApplicationResponses(args: {
     const body = extractBody(msg);
     if (!body) continue;
 
+    // Skip user's own outbound messages — those are replies *from* the
+    // candidate, not status updates *about* the application. The thread-
+    // walk in application-events handles outbound detection separately
+    // (for needs_user_reply); here we only want inbound classifications.
+    if (sender.includes(args.userEmail.toLowerCase())) continue;
+
     const senderDomain = extractDomain(sender);
 
     // Step 1 — thread continuity wins. If the thread is already
@@ -184,13 +240,22 @@ export async function scanApplicationResponses(args: {
         : pickByTitleOverlap(candidates, subject, body);
     }
 
-    // Step 3 — ATS-platform sender: scan the body for pipeline company
-    // name. Require an actual name match to avoid cross-pollination.
-    if (!matchedRole && senderDomain && isAtsPlatformDomain(senderDomain)) {
+    // Step 3 — company-name-in-body match. Applies to ANY sender we
+    // couldn't match by domain. Catches direct human emails from
+    // recruiter @gmail addresses, hiring-manager @yahoo addresses, and
+    // any sender whose company domain we don't have cached. The
+    // confidence floor in classifyApplicationMessage still gates poison.
+    //
+    // For sentinel "(unknown company)" rows we also try title-derived
+    // company tokens so the gauntlet matches roles whose real company
+    // sits in the title field.
+    if (!matchedRole) {
       const haystack = `${subject}\n${body}`.toLowerCase();
       const hits = roles.filter(r => {
-        const nm = r.company_norm;
-        return nm.length >= 3 && haystack.includes(nm);
+        for (const cand of candidateNamesForSearch(r)) {
+          if (cand.length >= 3 && haystack.includes(cand.toLowerCase())) return true;
+        }
+        return false;
       });
       if (hits.length === 1) matchedRole = hits[0];
       else if (hits.length > 1) matchedRole = pickByTitleOverlap(hits, subject, body);
@@ -319,6 +384,53 @@ async function listMessagesByQuery(accessToken: string, query: string, maxIds: n
 function extractDomain(sender: string): string | null {
   const m = sender.match(/@([a-z0-9.-]+)/i);
   return m ? m[1].toLowerCase() : null;
+}
+
+// Sentinel company names. Rows added without a known company (via
+// /add-role manually or a partial Gmail parse) land with one of these
+// in company_name; the real name often sits in the title instead.
+const UNKNOWN_COMPANY_SENTINELS = new Set([
+  '',
+  '(unknown company)',
+  'unknown company',
+  'unknown',
+  'n/a',
+  '(unknown)',
+]);
+
+function isUnknownCompanyName(name: string | null | undefined): boolean {
+  if (!name) return true;
+  return UNKNOWN_COMPANY_SENTINELS.has(name.trim().toLowerCase());
+}
+
+// Derive candidate company names from a role's title when company_name
+// is missing or sentinel-valued. We split the title on commas / "at" /
+// "@" / em-dash and return non-trivial tail tokens. Example:
+//   "Product Manager, Meridian" → ["Meridian"]
+//   "Senior PM at Stripe"       → ["Stripe"]
+//   "PM — Anthropic"            → ["Anthropic"]
+function titleDerivedCompanies(title: string): string[] {
+  if (!title) return [];
+  const parts = title.split(/\s*(?:,|—|–|@|\bat\b)\s*/i);
+  if (parts.length < 2) return [];
+  const tail = parts.slice(1)
+    .map(s => s.trim())
+    .filter(s => s.length >= 3 && !/^(role|position|opening|opportunity)$/i.test(s));
+  return [...new Set(tail)];
+}
+
+// Per-role candidate names for the Gmail search pass. Prefer the
+// company_name when it looks real; fall through to title-derived
+// tokens otherwise.
+function candidateNamesForSearch(role: PipelineRoleRow): string[] {
+  const out: string[] = [];
+  if (!isUnknownCompanyName(role.company_name) && role.company_name.length >= 3) {
+    out.push(role.company_name);
+  }
+  for (const t of titleDerivedCompanies(role.title || '')) {
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
 }
 
 function isAtsPlatformDomain(domain: string): boolean {

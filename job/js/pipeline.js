@@ -3,6 +3,43 @@ const FN_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/jobs-pipe'
 const LIVENESS_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/check-liveness';
 const ADD_ROLE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/add-role';
 const REC_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recommendations';
+const PULL_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/pull-recommendations';
+
+// Soft client-side rate limit so first-load auto-fire doesn't hammer the
+// endpoint when the user tab-hops. Server-side gating is the source of
+// truth (user_sources.schedule_cron vs last_run_at).
+const PULL_MIN_INTERVAL_MS = 5 * 60 * 1000;     // 5 min — half the server's 15-min cadence
+
+export async function refreshSources({ silent = false } = {}) {
+  // Throttle: if we kicked a pull within PULL_MIN_INTERVAL_MS, skip.
+  try {
+    const lastTs = Number(localStorage.getItem('job:lastPullKickAt') || 0);
+    if (Date.now() - lastTs < PULL_MIN_INTERVAL_MS) {
+      return { kicked: false, throttled: true, lastKickAt: new Date(lastTs).toISOString() };
+    }
+    localStorage.setItem('job:lastPullKickAt', String(Date.now()));
+  } catch { /* ignore */ }
+
+  const headers = await authHeader();
+  // Fire-and-forget. The function can take 30–90s on a backlog drain;
+  // keepalive lets the browser deliver even if the user navigates. The
+  // page never blocks on this — fresh recs / events show up after the
+  // next fetchPipeline() / Activity refresh.
+  let kickedOk = true;
+  try {
+    fetch(PULL_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      // No body → all enabled+due user_sources run, same as the cron path.
+      body: JSON.stringify({}),
+      keepalive: true,
+    }).catch(() => { /* fire-and-forget; server completes its own work */ });
+  } catch (e) {
+    kickedOk = false;
+    if (!silent) console.warn('[refreshSources] kick failed:', e.message);
+  }
+  return { kicked: kickedOk, throttled: false };
+}
 
 async function authHeader() {
   const supabase = window.CtrlAuth?.getSupabaseClient?.();

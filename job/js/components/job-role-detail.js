@@ -551,6 +551,7 @@ export class JobRoleDetail extends LitElement {
     return (lastStop > 0 ? truncated.slice(0, lastStop + 1) : truncated + '…').trim();
   }
 
+<<<<<<< HEAD
   // The v3 fit section: full modal-style card body — score block, the
   // static "what this measures" sub-explainer, hard-fail callout, and
   // bars-with-subcopy. The Haiku-generated fit_summary is exposed via
@@ -578,6 +579,24 @@ export class JobRoleDetail extends LitElement {
       <article class="role-card role-card--fit fit-modal">
         <header class="role-card__head"><h3>Candidate strength</h3></header>
         ${renderCandidateCardBody(r, { loading: status === 'loading' })}
+=======
+  // The v3 fit section: full modal-style card body — score block, prose
+  // summary as the sub-explainer, hard-fail callout, and bars-with-subcopy.
+  // The summary reads from r.fitSummary (Haiku-generated, focused strictly
+  // on why this role is desirable for the candidate's needs — not why
+  // they're a good fit FOR the company).
+  _renderFitSection(_parsed, status) {
+    const r = this.role;
+    if (!r) return nothing;
+    const summaryText = this._summaryFromWhyFits(r.fitSummary);
+    const summary = summaryText
+      ? html`<div class="kb-doc">${unsafeHTML(renderMarkdown(summaryText))}</div>`
+      : null;
+    return html`
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Fit</h3></header>
+        ${renderFitCardBody(r, { summary, loading: status === 'loading' })}
+>>>>>>> origin/master
       </article>
     `;
   }
@@ -625,7 +644,19 @@ export class JobRoleDetail extends LitElement {
 
       <div class="role-cards role-cards--fit-candidate">
         ${this._renderFitSection(parsed, status)}
+<<<<<<< HEAD
         ${this._renderCandidateSection(status)}
+=======
+        ${this._renderTwoColCard({
+          title: 'Candidate strength',
+          headerExtra: this._renderCandidateStoplight(candidate),
+          sections: [
+            ['Strengths', parsed?.strengths],
+            ['Gaps',      parsed?.gaps],
+          ],
+          status,
+        })}
+>>>>>>> origin/master
       </div>
       ${parsed?.risks ? html`
         <article class="role-card">

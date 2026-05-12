@@ -195,22 +195,24 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
          limit 1`;
       if (recMatch.length) continue;
 
-      // Past dedup — this message is going to consume real work (Haiku
-      // and / or skip-log writes). Count it against the cap so the next
-      // tick continues past whatever we manage to process here.
-      newWork++;
-
       const sender = (getHeader(msg, 'From') || '').toLowerCase();
       if (blockSenders.some(b => sender.includes(b))) {
         await logSkipped(sql, ctx.userEmail, msg, messageId, 'blocked_sender');
         continue;
       }
       if (!allowSenders.some(a => sender.includes(a.toLowerCase()))) {
-        // Out of allowlist — silently skip. Don't fill gmail_skipped
-        // with every newsletter the user gets; only log when we tried
-        // and failed.
+        // Out of allowlist — silently skip. history.list returns ALL
+        // messageAdded events regardless of sender, so on a busy inbox
+        // most of what we see here is unrelated mail; counting it
+        // toward newWork would fill the cap before we reach any actual
+        // job alert and the cursor would never advance.
         continue;
       }
+
+      // Past dedup AND allowlist — this message is going to consume real
+      // work (Haiku and / or skip-log writes). Count it against the cap
+      // so the next tick continues past whatever we manage to process.
+      newWork++;
 
       const subject = getHeader(msg, 'Subject') || '';
       const body = extractBody(msg);
@@ -338,6 +340,23 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       }
     }
 
+    // Phase 2.0 — application-tracker scan runs UNCONDITIONALLY (before
+    // the cap-vs-drain split). It does its own Gmail query, independent
+    // of the recs cursor, so keeping it inside the capped-run early
+    // return would silently mute the application timeline on busy inboxes.
+    try {
+      const appScan = await scanApplicationResponses({
+        userEmail:   ctx.userEmail,
+        accessToken,
+        mode:        'live',
+      });
+      if (appScan.classified || appScan.inserted) {
+        console.log(`[gmail-jobs] application-scan: ${appScan.inserted}/${appScan.classified} events, ${appScan.autoAdvanced} auto-advanced, ${appScan.needsReview} needs-review`);
+      }
+    } catch (e) {
+      console.warn(`[gmail-jobs] application-scan failed: ${(e as Error).message}`);
+    }
+
     // Persist new cursor — but ONLY when we drained the whole queue.
     // If the cap kicked in, leave the cursor where it was so the next
     // tick re-fetches the same window and picks up the remainder. The
@@ -369,23 +388,6 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
             last_error = null,
             updated_at = now()
     `;
-
-    // Phase 2.0 — application-tracker scan. Looks at inbox messages from
-    // pipeline-company domains + known ATS-platform senders, classifies
-    // with Haiku, writes application_events, auto-advances forward stages.
-    // Side-effect only — does not contribute to RecommendedRoleInput[].
-    try {
-      const appScan = await scanApplicationResponses({
-        userEmail:   ctx.userEmail,
-        accessToken,
-        mode:        'live',
-      });
-      if (appScan.classified || appScan.inserted) {
-        console.log(`[gmail-jobs] application-scan: ${appScan.inserted}/${appScan.classified} events, ${appScan.autoAdvanced} auto-advanced, ${appScan.needsReview} needs-review`);
-      }
-    } catch (e) {
-      console.warn(`[gmail-jobs] application-scan failed: ${(e as Error).message}`);
-    }
 
     return out;
   },
