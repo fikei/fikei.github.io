@@ -2444,7 +2444,7 @@
 .recs-page__head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -2453,6 +2453,9 @@
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
 }
+.recs-page__head > .muted { margin-right: auto; }
+.recs-page__refresh { align-self: center; }
+.recs-page__refresh-status { font-size: var(--font-size-caption); }
 
 /* Columns specific to the recs table — sizes mirror existing pipeline
    col-* declarations (around line 2500). */
