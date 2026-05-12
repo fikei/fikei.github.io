@@ -3182,6 +3182,13 @@
 .status-pill--active  { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .status-pill--archive { background: rgba(168,32,13,0.10); color: var(--error); border-color: transparent; }
 
+/* Stage pills on the Active bucket — funnel progression from
+   muted (drafting) → accent (applied/interviewing) → strong-green (offer). */
+.status-pill--stage-drafting     { background: rgba(110,84,0,0.12); color: #6E5400; border-color: transparent; }
+.status-pill--stage-applied      { background: var(--accent-muted); color: var(--accent); border-color: transparent; }
+.status-pill--stage-interviewing { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.status-pill--stage-offer        { background: rgba(47,157,77,0.18); color: var(--success, #2f9d4d); border-color: transparent; font-weight: var(--fw-bold); }
+
 /* Stage chip — sub-stage on Active rows (Drafting / Applied / Interviewing / Offer). */
 .stage-chip {
   display: inline-block;
