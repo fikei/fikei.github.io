@@ -136,7 +136,14 @@ export const theirstackSource: Source<TheirStackConfig> = {
       job_seniority_or:        DEFAULT_SENIORITY,
       job_title_pattern_not:   DEFAULT_TITLE_NOT,
       industry_not:            DEFAULT_INDUSTRY_NOT,
-      property_exists_or:      ['salary'],   // require comp present so scoring fires
+      // property_exists_or used to filter for 'salary' but theirstack's
+      // API now only accepts a fixed list (company_object.domain |
+      // company_object.linkedin_url | final_url | hiring_team |
+      // employment_statuses). Use 'final_url' to require an actual
+      // apply link — postings without one are unusable for the user
+      // regardless of comp. The fit-score already weights comp, so
+      // filtering for comp-present at API level is no longer needed.
+      property_exists_or:      ['final_url'],
       // From the convenience config (or fallback).
       job_title_or:            cfg.job_title_or && cfg.job_title_or.length ? cfg.job_title_or : ['product manager'],
       ...(cfg.job_location_or?.length ? { job_location_or: cfg.job_location_or } : {}),
