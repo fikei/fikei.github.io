@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Jobs — /job</title>
+  <title>Welcome to /job</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
   <link rel="stylesheet" href="/job/css/base.css?v=0.79.0">
+  <link rel="stylesheet" href="/job/css/components.css?v=0.79.0">
   <script src="/job/js/theme.js?v=0.79.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
@@ -16,19 +17,19 @@
   <section id="signin-gate" class="gate">
     <div class="gate__card">
       <h1>/job</h1>
-      <p>Ian's career knowledge base and pipeline. Sign in to continue.</p>
-      <button class="btn btn--primary" id="signin-btn">Sign in</button>
+      <p>Your career operating system. Upload what you've already written, answer a few open questions, and we'll start pulling roles that match what you actually want — and draft the cover letters too.</p>
+      <button class="btn btn--primary" id="signin-btn">Sign in to get started</button>
       <div id="ctrl-auth-root"></div>
     </div>
   </section>
 
   <div class="app">
-    <job-rail></job-rail>
     <main class="app__main">
-      <header class="page-header">
-        <h1>Jobs</h1>
-      </header>
-      <job-pipeline></job-pipeline>
+      <section class="onboarding-placeholder">
+        <h1>Welcome to /job</h1>
+        <p>The onboarding flow is being built. For now, your account is set up — check back soon.</p>
+        <p class="muted">PRD: <code>docs/strategy/prds/job-onboarding-flow.md</code></p>
+      </section>
     </main>
   </div>
 

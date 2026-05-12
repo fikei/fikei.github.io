@@ -2,14 +2,18 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.78.2";
-console.log(`[job] v${VERSION} - Active bucket shows interview stage as the primary pill`);
+const VERSION = "0.79.0";
+console.log(`[job] v${VERSION} - Multi-user gate: user_profile row check + onboarding redirect`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
-const ALLOWED_EMAIL = 'fike101@gmail.com';
+
+// Auth model: any signed-in user with a user_profile row is allowed. Users
+// without a row are routed to /job/onboarding. Row is created lazily there.
+// The legacy ALLOWED_EMAIL hardcode is gone — see migrations/070_user_profile.sql.
+const ONBOARDING_PATH = '/job/onboarding';
 
 import('./components/job-rail.js' + V);
 import('./components/job-footer.js' + V);
@@ -31,13 +35,31 @@ if (location.pathname.startsWith('/job/vision')) {
   import('./components/job-vision.js' + V);
 }
 
-function applySignedInState(email) {
-  if (email !== ALLOWED_EMAIL) {
-    location.replace('/job/not-authorized.html');
+async function applySignedInState(email) {
+  const sb = window.CtrlAuth?.getSupabaseClient?.();
+  // Gate: user must have a user_profile row with onboarding_complete_at set.
+  // No row → first-time user; redirect to onboarding (which will create one).
+  // Row but not complete → resume onboarding.
+  // Already on the onboarding page → let it render regardless of status.
+  const onOnboarding = location.pathname.startsWith(ONBOARDING_PATH);
+  let profile = null;
+  if (sb) {
+    try {
+      const { data, error } = await sb
+        .from('user_profile')
+        .select('onboarding_complete_at')
+        .maybeSingle();
+      if (error) console.warn('[job] user_profile query failed', error);
+      profile = data;
+    } catch (e) {
+      console.warn('[job] user_profile query threw', e);
+    }
+  }
+  if (!onOnboarding && (!profile || !profile.onboarding_complete_at)) {
+    location.replace(ONBOARDING_PATH + '/');
     return;
   }
   document.body.dataset.authState = 'in';
-  // Notify components that may have mounted before the event arrived.
   document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
   injectFooter();
   injectMobileBar();
@@ -118,7 +140,6 @@ window.CtrlAuth.init({
   supabaseUrl: SUPABASE_URL,
   supabaseAnonKey: SUPABASE_ANON_KEY,
   redirectTo: window.location.origin + window.location.pathname,
-  adminEmails: [ALLOWED_EMAIL],
   mountTo: '#ctrl-auth-root'
 });
 
