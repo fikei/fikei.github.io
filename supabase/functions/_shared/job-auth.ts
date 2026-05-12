@@ -1,9 +1,21 @@
 // Shared auth check for /job product Edge Functions.
+//
+// Multi-user since Phase 1 of the onboarding flow: any signed-in user with a
+// public.user_profile row is authorized. The legacy single-tenant email
+// allowlist is gone — see migrations/070_user_profile.sql and
+// docs/strategy/prods/job-onboarding-flow.md.
+//
+// Returns the user's email when authorized so existing call sites that pass
+// it along to the per-user KB path (fikei/job/...) keep working. Edge
+// functions that need the user UUID can call verifyJobUserDetailed().
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
 
-const ALLOWLIST = ['fike101@gmail.com'];
+export interface JobUser {
+  id: string;
+  email: string;
+}
 
-export async function verifyJobUser(req: Request): Promise<string | null> {
+export async function verifyJobUserDetailed(req: Request): Promise<JobUser | null> {
   const auth = req.headers.get('Authorization') || '';
   const token = auth.replace(/^Bearer\s+/i, '');
   if (!token) return null;
@@ -14,10 +26,22 @@ export async function verifyJobUser(req: Request): Promise<string | null> {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data?.user?.email) return null;
-  const email = data.user.email.toLowerCase();
-  if (!ALLOWLIST.includes(email)) return null;
-  return email;
+  if (error || !data?.user?.id || !data?.user?.email) return null;
+  // Authorization gate: user must have a user_profile row. RLS scopes the
+  // query to auth.uid(), so a row coming back proves both existence and
+  // ownership without us having to filter by id.
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profile')
+    .select('user_id')
+    .maybeSingle();
+  if (profileError) return null;
+  if (!profile) return null;
+  return { id: data.user.id, email: data.user.email.toLowerCase() };
+}
+
+export async function verifyJobUser(req: Request): Promise<string | null> {
+  const u = await verifyJobUserDetailed(req);
+  return u?.email ?? null;
 }
 
 export const corsHeaders = {
