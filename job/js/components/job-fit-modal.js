@@ -3,6 +3,8 @@
 // everywhere a fit pill appears.
 import { html, nothing } from 'https://esm.run/lit@3';
 
+// Fit-side: "Is this company a good fit for me?" — driven by user's
+// stated needs (mission, culture, interests, etc.).
 export const DIM_LABELS = {
   values:  { label: 'Values & impact',   max: 25, hint: 'Mission keywords + impact themes (healthcare outcomes, cost reduction, education access, AI ethics, civic / social good). Anti-themes (gambling, crypto, surveillance) zero this out. Allowed to dominate the score.' },
   culture: { label: 'Culture fit',       max: 15, hint: 'JD/About text matches your culture pool: AI-native, strong eng bar / principal engineer, autonomy / IC / player-coach, mission-led.' },
@@ -11,7 +13,19 @@ export const DIM_LABELS = {
   arc:     { label: 'Career arc',        max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
   stage:   { label: 'Stage',             max: 4,  hint: 'Tiebreaker only. Pre-seed → C scores high; public / mega-cap hard-fails.' },
   comp:    { label: 'Compensation',      max: 4,  hint: 'Top of range ≥ $200k = full marks. Floor signal, not a ranker.' },
-  geo:     { label: 'Geography',         max: 2,  hint: 'Most geo filtering happens upstream — this is a small bonus.' },
+  geo:     { label: 'Geography',         max: 2,  hint: 'Most geo filtering happens upstream — this is a small bonus.', binary: true },
+};
+
+// Candidate-side: "Am I a strong candidate for this role?" — biased
+// toward "can you do the job" and "is this a reach in either direction".
+export const CANDIDATE_DIM_LABELS = {
+  skills:  { label: 'Job-ready skills',    max: 25, hint: 'Share of the day-1 work executable without ramp vs. needing learning.' },
+  scope:   { label: 'Scope readiness',     max: 20, hint: 'Team size, ownership, and decision scale relative to what you have operated at.' },
+  outcome: { label: 'Outcome track record', max: 15, hint: 'Have you shipped the kind of outcome this role hires for — growth, platform, 0→1, scale?' },
+  domain:  { label: 'Domain familiarity',  max: 15, hint: 'Worked in their sector before or domain on-ramp.' },
+  stretch: { label: 'Stretch level',       max: 15, hint: 'Healthy stretch vs. comfort zone vs. risky reach.' },
+  reach:   { label: 'Reach factors',       max: 10, hint: 'Specific things a hiring manager could push on — missing specialty, gaps, overqualification.' },
+  comp:    { label: 'Compensation',        max: 1,  hint: 'No money-mismatch risk — range clears your floor.', binary: true },
 };
 
 export function scoreClass(s) {
@@ -22,33 +36,60 @@ export function scoreClass(s) {
   return 'fit-pill fit-pill--poor';
 }
 
-// Render the full fit-card body — score block, optional summary (replaces
-// the static "Out of 100..." sub-explainer when the caller passes one),
-// hard-fail callout, and the breakdown list. Used by both renderFitModal()
-// and the role-detail page so the two surfaces stay structurally
-// identical and any future tweak lands in one place.
-//
-// opts:
-//   summary    string|TemplateResult — replaces the static explainer
-//                                       under "Fit score". Pass markdown
-//                                       html via unsafeHTML if needed.
-//   loading    boolean               — show "drafting summary…" if true
-//                                       and no summary provided.
+// Score-card-body: shared between Fit and Candidate-Strength views.
+// opts.which selects which dimension set + data fields to render.
+//   'fit'       → DIM_LABELS,           row.score / breakdown / rationales
+//   'candidate' → CANDIDATE_DIM_LABELS, row.candidateScore / candidateBreakdown / candidateRationales
+const VIEWS = {
+  fit: {
+    dims:        DIM_LABELS,
+    label:       'Fit score',
+    sub:         'Out of 100. Values & impact and Role match are the dominant signals; comp and stage are tiebreakers. Hard fails cap at 30.',
+    scoreOf:     (row) => row.score ?? row.fitScore ?? null,
+    breakdownOf: (row) => row.breakdown || row.fitBreakdown || {},
+    rationalesOf:(row) => row.rationales || row.fitRationales || {},
+    hardFailsOf: (row) => row.hardFails || [],
+    binaryOf:    (row, k) => k === 'geo' ? ((row.breakdown || {})[k] || 0) >= 1 : null,
+  },
+  candidate: {
+    dims:        CANDIDATE_DIM_LABELS,
+    label:       'Candidate strength',
+    sub:         'Out of 100. Can you do this job day-1? How much of a reach is it in either direction? Bars answer the questions a hiring manager actually asks.',
+    scoreOf:     (row) => row.candidateScore ?? null,
+    breakdownOf: (row) => row.candidateBreakdown || {},
+    rationalesOf:(row) => row.candidateRationales || {},
+    hardFailsOf: (_row) => [],
+    binaryOf:    (row, k) => k === 'comp' ? Boolean(row.compAcceptable) : null,
+  },
+};
+
 export function renderFitCardBody(row, opts = {}) {
+  return renderScoreCardBody(row, { which: 'fit', ...opts });
+}
+
+export function renderCandidateCardBody(row, opts = {}) {
+  return renderScoreCardBody(row, { which: 'candidate', ...opts });
+}
+
+// The common body. `summary` replaces the static sub-explainer when set.
+// `loading` shows a placeholder line when true and no summary provided.
+export function renderScoreCardBody(row, opts = {}) {
   if (!row) return nothing;
-  const score = row.score ?? row.fitScore ?? null;
-  const hardFails = row.hardFails || [];
+  const which = opts.which || 'fit';
+  const view = VIEWS[which];
+  const score = view.scoreOf(row);
+  const hardFails = view.hardFailsOf(row);
   const { summary = null, loading = false } = opts;
   const sub = summary
     ? html`<div class="fit-modal__score-sub">${summary}</div>`
     : loading
       ? html`<p class="fit-modal__score-sub muted">Drafting summary…</p>`
-      : html`<p class="fit-modal__score-sub">Out of 100. Values & impact and Role match are the dominant signals; comp and stage are tiebreakers. Hard fails cap at 30.</p>`;
+      : html`<p class="fit-modal__score-sub">${view.sub}</p>`;
   return html`
     <div class="fit-modal__score">
       <span class=${scoreClass(score)}>${score == null ? '—' : score}</span>
       <div>
-        <p class="fit-modal__score-label">Fit score</p>
+        <p class="fit-modal__score-label">${view.label}</p>
         ${sub}
       </div>
     </div>
@@ -58,36 +99,66 @@ export function renderFitCardBody(row, opts = {}) {
         ${hardFails.join(', ')}. Score capped at 30.
       </div>
     ` : nothing}
-    ${renderFitBreakdown(row)}
+    ${renderBreakdown(row, which)}
   `;
 }
 
-// Render just the bars + subcopy list — no header, no score block.
-// Kept exported for callers that only want the bars.
-export function renderFitBreakdown(row) {
+// Map a bucket's % of cap to a color tier. The strong/ok/weak class names
+// match the same scale used on fit pills.
+function tierClass(pct) {
+  if (pct >= 70) return 'fit-breakdown__bar--strong';
+  if (pct >= 40) return 'fit-breakdown__bar--ok';
+  return 'fit-breakdown__bar--weak';
+}
+
+// Render just the bars + subcopy list for either view. `which` selects
+// the dimension set. Dimensions flagged `binary: true` (or specifically
+// `geo` on the Fit view, `comp` on the Candidate view) render as a ✓ / ✗
+// check chip; the rest render as colored bars.
+export function renderBreakdown(row, which = 'fit') {
   if (!row) return nothing;
-  const breakdown = row.breakdown || row.fitBreakdown || {};
-  const rationales = row.rationales || row.fitRationales || {};
-  const dims = Object.keys(DIM_LABELS);
+  const view = VIEWS[which];
+  const dims = view.dims;
+  const breakdown = view.breakdownOf(row);
+  const rationales = view.rationalesOf(row);
   return html`
     <ul class="fit-breakdown">
-      ${dims.map(k => {
-        const meta = DIM_LABELS[k];
+      ${Object.keys(dims).map(k => {
+        const meta = dims[k];
         const v = (breakdown && breakdown[k]) || 0;
+        const binary = meta.binary === true;
+        const binaryMet = binary ? Boolean(view.binaryOf(row, k)) : null;
         const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
+        if (binary) {
+          return html`
+            <li class="fit-breakdown__row fit-breakdown__row--binary">
+              <div class="fit-breakdown__head">
+                <span class="fit-breakdown__label">${meta.label}</span>
+                <span class=${'fit-breakdown__check ' + (binaryMet ? 'fit-breakdown__check--met' : 'fit-breakdown__check--unmet')}
+                      aria-label=${binaryMet ? 'Met' : 'Not met'}>${binaryMet ? '✓' : '✗'}</span>
+              </div>
+              <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
+            </li>
+          `;
+        }
         return html`
           <li class="fit-breakdown__row">
             <div class="fit-breakdown__head">
               <span class="fit-breakdown__label">${meta.label}</span>
               <span class="fit-breakdown__value">${v} / ${meta.max}</span>
             </div>
-            <div class="fit-breakdown__bar"><span style=${`width:${pct}%`}></span></div>
+            <div class=${'fit-breakdown__bar ' + tierClass(pct)}><span style=${`width:${pct}%`}></span></div>
             <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
           </li>
         `;
       })}
     </ul>
   `;
+}
+
+// Backwards-compat: existing callers import renderFitBreakdown.
+export function renderFitBreakdown(row) {
+  return renderBreakdown(row, 'fit');
 }
 
 // Render the modal. `row` is the role-like object — expects { company, title,

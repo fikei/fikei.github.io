@@ -571,9 +571,25 @@
 }
 .fit-breakdown__bar > span {
   display: block; height: 100%; background: var(--accent-strong); border-radius: var(--radius-pill);
-  transition: width 200ms ease;
+  transition: width 200ms ease, background-color 200ms ease;
 }
+/* Tier coloring — same scale as the fit pills.
+   Strong: ≥70% of cap. OK: ≥40%. Weak: below. */
+.fit-breakdown__bar--strong > span { background: var(--success, #2f9d4d); }
+.fit-breakdown__bar--ok     > span { background: var(--warning, #d49b1a); }
+.fit-breakdown__bar--weak   > span { background: var(--error,   #c4382a); }
 .fit-breakdown__hint { margin: 0; font-size: var(--font-size-caption); color: var(--fg-subtle); line-height: var(--lh-tight); }
+
+/* Binary check (used for Geography — already filtered upstream). */
+.fit-breakdown__row--binary .fit-breakdown__head { align-items: center; }
+.fit-breakdown__check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 13px; font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+.fit-breakdown__check--met   { background: rgba(47,157,77,0.15); color: var(--success, #2f9d4d); }
+.fit-breakdown__check--unmet { background: rgba(196,56,42,0.15); color: var(--error,   #c4382a); }
 
 .fit-modal__foot {
   margin-top: var(--space-5);

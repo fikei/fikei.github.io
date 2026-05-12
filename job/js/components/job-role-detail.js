@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -551,6 +551,35 @@ export class JobRoleDetail extends LitElement {
     return (lastStop > 0 ? truncated.slice(0, lastStop + 1) : truncated + '…').trim();
   }
 
+<<<<<<< HEAD
+  // The v3 fit section: full modal-style card body — score block, the
+  // static "what this measures" sub-explainer, hard-fail callout, and
+  // bars-with-subcopy. The Haiku-generated fit_summary is exposed via
+  // hover/click on the score pill if needed, not as page chrome.
+  _renderFitSection(_parsed, status) {
+    const r = this.role;
+    if (!r) return nothing;
+    return html`
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Fit</h3></header>
+        ${renderFitCardBody(r, { loading: status === 'loading' })}
+      </article>
+    `;
+  }
+
+  // Candidate-strength card — same component layout as Fit, different
+  // data + dimensions. Answers "are you a good candidate for this role?
+  // where are your strengths and weaknesses?" from the hiring manager's
+  // lens. Driven by candidate_breakdown / candidate_rationales /
+  // candidate_summary fields generated alongside the Haiku role-match call.
+  _renderCandidateSection(status) {
+    const r = this.role;
+    if (!r) return nothing;
+    return html`
+      <article class="role-card role-card--fit fit-modal">
+        <header class="role-card__head"><h3>Candidate strength</h3></header>
+        ${renderCandidateCardBody(r, { loading: status === 'loading' })}
+=======
   // The v3 fit section: full modal-style card body — score block, prose
   // summary as the sub-explainer, hard-fail callout, and bars-with-subcopy.
   // The summary reads from r.fitSummary (Haiku-generated, focused strictly
@@ -567,6 +596,7 @@ export class JobRoleDetail extends LitElement {
       <article class="role-card role-card--fit fit-modal">
         <header class="role-card__head"><h3>Fit</h3></header>
         ${renderFitCardBody(r, { summary, loading: status === 'loading' })}
+>>>>>>> origin/master
       </article>
     `;
   }
@@ -614,6 +644,9 @@ export class JobRoleDetail extends LitElement {
 
       <div class="role-cards role-cards--fit-candidate">
         ${this._renderFitSection(parsed, status)}
+<<<<<<< HEAD
+        ${this._renderCandidateSection(status)}
+=======
         ${this._renderTwoColCard({
           title: 'Candidate strength',
           headerExtra: this._renderCandidateStoplight(candidate),
@@ -623,6 +656,7 @@ export class JobRoleDetail extends LitElement {
           ],
           status,
         })}
+>>>>>>> origin/master
       </div>
       ${parsed?.risks ? html`
         <article class="role-card">

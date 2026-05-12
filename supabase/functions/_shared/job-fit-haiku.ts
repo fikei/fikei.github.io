@@ -6,12 +6,29 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
 
+export interface CandidateBreakdown {
+  skills: number; scope: number; outcome: number; domain: number;
+  stretch: number; reach: number;
+}
+export interface CandidateRationales {
+  skills: string; scope: string; outcome: string; domain: string;
+  stretch: string; reach: string; comp: string;
+}
 export interface HaikuRoleMatch {
   score:      number;
   rationale:  string;
   seniority:  string;
   scope:      string;
   fitSummary: string;
+  // Candidate-side: "are you a good candidate for this role?" Same Haiku
+  // call returns both blocks so we don't pay twice.
+  candidate?: {
+    score:           number;        // 0-100
+    breakdown:       CandidateBreakdown;
+    rationales:      CandidateRationales;
+    compAcceptable:  boolean | null;
+    summary:         string;
+  };
 }
 
 let _fitCtxCache: { ctx: FitUserContext; at: number } | null = null;
@@ -20,13 +37,14 @@ const FIT_CTX_CACHE_MS = 60_000;
 // deno-lint-ignore no-explicit-any
 export async function loadFitContext(sql: any): Promise<FitUserContext> {
   if (_fitCtxCache && Date.now() - _fitCtxCache.at < FIT_CTX_CACHE_MS) return _fitCtxCache.ctx;
-  const [visionRows, skillRows, companyRows] = await Promise.all([
+  const [visionRows, skillRows, companyRows, winRows] = await Promise.all([
     sql`select impact_themes, mission_keywords, mission_required, anti_mission_terms,
-               culture_keywords, interest_tags, score_weights,
+               culture_keywords, interest_tags, target_sectors, score_weights,
                coalesce(narrative_arc,'') as narrative_arc
           from job.vision order by updated_at desc limit 1`,
     sql`select name, years_practiced from job.skills`,
     sql`select coalesce(sector,'') as sector from job.companies`,
+    sql`select headline, metric_value as metric from job.wins order by updated_at desc limit 20`,
   ]);
   const v = (visionRows as Array<Record<string, unknown>>)[0] || {};
   const arcSrc = (v.narrative_arc as string || '').toLowerCase();
@@ -45,8 +63,13 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
       name: String(s.name || ''),
       years: (s.years_practiced as number | null) ?? null,
     })),
-    pastSectors: (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
+    pastSectors:   (companyRows as Array<Record<string, unknown>>).map(c => String(c.sector || '')).filter(Boolean),
+    targetSectors: (v.target_sectors as string[] | null) || [],
     arcTags,
+    // Wins are surfaced to Haiku only; the scoring functions don't use
+    // them. Cast pattern keeps FitUserContext interface tight while we
+    // pipe extra data through.
+    wins: (winRows as Array<Record<string, unknown>>).map(w => ({ headline: String(w.headline || ''), metric: (w.metric as string | null) || null })),
     weights: (v.score_weights as Partial<FitUserContext['weights']>) || undefined,
   };
   _fitCtxCache = { ctx, at: Date.now() };
@@ -96,8 +119,87 @@ Output JSON only:
   "rationale":  "<one sentence, max 22 words>",
   "seniority":  "below" | "equivalent" | "above" | "founding",
   "scope":      "ic" | "ic_player_coach" | "manager",
-  "fitSummary": "<2-4 sentence prose, max 100 words. ONLY explain why this company / role is desirable for the candidate's needs — mission alignment, scope they want, kind of problem they care about, culture traits they care about. DO NOT describe why the candidate is a good fit for the company or what they bring to the role. Speak about the company in third person.>"
+  "fitSummary": "<2-4 sentence prose, max 100 words. ONLY explain why this company / role is desirable for the candidate's needs — mission alignment, scope they want, kind of problem they care about, culture traits they care about. DO NOT describe why the candidate is a good fit for the company or what they bring to the role. Speak about the company in third person.>",
+  "candidate": {
+    "breakdown": {
+      "skills":  <int 0-25>,
+      "scope":   <int 0-20>,
+      "outcome": <int 0-15>,
+      "domain":  <int 0-15>,
+      "stretch": <int 0-15>,
+      "reach":   <int 0-10>
+    },
+    "rationales": {
+      "skills":  "<one short sentence, ≤35 words: what they can do day-1 vs what needs ramp>",
+      "scope":   "<one short sentence: how the team/ownership scale compares to their experience>",
+      "outcome": "<one short sentence: what wins map to this role's outcomes>",
+      "domain":  "<one short sentence: sector overlap with their past work>",
+      "stretch": "<one short sentence: is this a stretch up, sideways, or down>",
+      "reach":   "<one short sentence: what would a hiring manager push on>",
+      "comp":    "<one short sentence: is the offered comp range likely to clear their floor>"
+    },
+    "compAcceptable": <boolean: true if the JD-listed comp range top clears the candidate's stated comp floor of $200k base, or null when no comp is disclosed>,
+    "summary": "<2-4 sentence prose, max 100 words. From a hiring manager's lens: can this person do the job? where are they strong? where are they reaching? Be honest about competition. Speak about the candidate in third person.>"
+  }
 }
+
+CRITICAL — calibrating the candidate-strength score against actual competition:
+These are popular Senior/Staff/Lead PM roles at well-funded companies. Each posting receives 200–800 qualified applicants. Most are ex-Big-Tech PMs, ex-unicorn PMs, or domain experts with direct shipping history. The hiring manager is comparing this candidate against 3–8 finalists who each look credible on paper.
+
+Be honest. Strong-but-not-special candidates DO NOT score in the 80s.
+
+TOTAL candidate score (sum of buckets) anchors:
+   90-100   Exceptional. Recruiter would skip the screen. Beats 95% of applicants.
+            Reserved for direct previous-employer overlap or near-identical role experience.
+            Example: "ex-PM at sister-company in same sector, same scope, recent."
+   75-89    Strong. Top 10–15% of qualified applicants. Likely advances to final rounds.
+            Some adjacent ramp; few reach factors named. Most "great fit on paper" lands here.
+   60-74    Solid. 25th–50th percentile of qualified applicants. Would interview but likely
+            lose to a closer match. Real reach factors named — not deal-breakers.
+   45-59    Plausible. Hiring manager has obvious alternatives. Multiple reach factors.
+            Worth applying if mission-aligned; expect rejection or extensive screen.
+   30-44    Long shot. Significant gaps. Apply only for mission reasons.
+   0-29     Wrong shape entirely.
+
+BUCKET-LEVEL CALIBRATION — bucket caps are top scores, not defaults. Apply ruthlessly:
+
+  skills (0-25)   Cap reserved for "could ship the JD's day-1 priorities with zero ramp,
+                  in their exact stack/tooling." Most candidates with adjacent skills land
+                  12-18. Strong-but-not-stack-matched lands 14-16. Cap = exact tool/methodology overlap.
+
+  scope (0-20)    Cap reserved for "has owned this team size + ownership scope at this stage
+                  of company before, recently." Adjacent scope (one stage up or down) → 12-15.
+                  Big-tech alum applying to series-A startup → 10-12 even if title matches.
+
+  outcome (0-15)  Cap reserved for "has shipped THE SPECIFIC OUTCOME in their JD in the last
+                  3 years." Adjacent outcomes → 8-11. Generic 'shipped product' → 5-8.
+
+  domain (0-15)   IMPORTANT: this bucket counts ACTUAL SHIPPING HISTORY ONLY. Use
+                  the "Candidate past sectors" list. DO NOT credit "target sectors"
+                  here — a sector the candidate aspires to but has never shipped in
+                  earns 3-6 at most, even if the role is in that target domain.
+                  Cap = recent shipping in EXACTLY this sector/problem space.
+                  Adjacent past sector → 8-12. No prior shipping → 3-6.
+
+  stretch (0-15)  Bidirectional. 12-15 = healthy stretch (mild reach up in scope or domain).
+                  8-11 = comfort zone (could be boring or perceived as overqualified).
+                  3-7 = significant stretch (real risk of struggling) OR significant step down.
+                  0-2 = wrong direction entirely.
+
+  reach (0-10)    HIGH = few HM concerns; LOW = real concerns. Cap-10 is rare; even strong
+                  candidates almost always have 1-2 concerns a thoughtful HM would push on:
+                  no AI-native PM experience, no big-tech, no recent clinical workflow, gap
+                  in current-role recency, overqualification, function mismatch (B2B↔C),
+                  no direct payer/clinician/teacher work, comp/title mismatch, etc.
+                    10   No meaningful concerns (very rare — like a sister-company referral).
+                    8-9  One mild concern.
+                    5-7  Two concrete concerns named.
+                    3-4  Multiple substantive concerns.
+                    0-2  Major doubts about the candidate getting past the screen.
+
+Apply skepticism. A median strong candidate for a Senior PM role at a competitive company
+totals 60-75, not 80-90. If your scores land above 80, double-check that the candidate truly
+has direct, recent, near-identical experience to JUSTIFY beating most applicants.
 
 Scoring rubric for "score":
   0-5   Wrong shape entirely
@@ -124,33 +226,89 @@ No prose outside the JSON.`;
     `Title: ${r.title}`,
     `Company: ${r.company}`,
     `Description (truncated):\n${(r.description || '').slice(0, 2500)}`,
-    `\n# Candidate skills`,
+    `Compensation (parsed): ${r.salary || '(not disclosed)'}`,
+    `\n# Candidate skills (years of practice in parens)`,
     ...ctx.skills.map(s => `- ${s.name} (${s.years ?? '?'} yrs)`),
+    `\n# Candidate past sectors (where they have actually shipped)`,
+    ...ctx.pastSectors.map(s => `- ${s}`),
+    `\n# Candidate target sectors (where they want to operate, even without prior shipping)`,
+    ...(ctx.targetSectors || []).map(s => `- ${s}`),
     `\n# Candidate interest tags`,
     `- ${(ctx.interestTags || []).join('\n- ')}`,
+    `\n# Candidate wins (recent, abbreviated)`,
+    ...(ctx.wins || []).map(w => `- ${w.headline}${w.metric ? ` (${w.metric})` : ''}`),
+    `\n# Candidate target seniority`,
+    `Senior PM, Staff PM, Principal PM, Lead PM, Product Lead, Head of Product, Founding PM. Comp floor: $200k base.`,
   ].join('\n');
   try {
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 500, system, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 1500, system, messages: [{ role: 'user', content: userPrompt }] }),
     });
     if (!res.ok) throw new Error(`anthropic ${res.status}`);
     const data = await res.json() as { content: Array<{ type: string; text: string }> };
     const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string };
+    const parsed = JSON.parse(match[0]) as {
+      score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string;
+      candidate?: {
+        breakdown?: Partial<CandidateBreakdown>;
+        rationales?: Partial<CandidateRationales>;
+        compAcceptable?: boolean | null;
+        summary?: string;
+      };
+    };
     if (typeof parsed.score !== 'number') return null;
     const seniority = ['below','equivalent','above','founding'].includes((parsed.seniority || '').toLowerCase())
       ? parsed.seniority!.toLowerCase() : 'equivalent';
     const scope = ['ic','ic_player_coach','manager'].includes((parsed.scope || '').toLowerCase())
       ? parsed.scope!.toLowerCase() : 'ic';
+
+    // --- Candidate block (best-effort parse). Caps + total recomputed
+    // server-side so a misbehaving model can't blow past the 100 ceiling. ---
+    let candidate: HaikuRoleMatch['candidate'] | undefined;
+    if (parsed.candidate && parsed.candidate.breakdown) {
+      const clamp = (n: unknown, max: number) => {
+        const x = Number(n);
+        return Number.isFinite(x) ? Math.max(0, Math.min(max, Math.round(x))) : 0;
+      };
+      const b = parsed.candidate.breakdown;
+      const breakdown: CandidateBreakdown = {
+        skills:  clamp(b.skills,  25),
+        scope:   clamp(b.scope,   20),
+        outcome: clamp(b.outcome, 15),
+        domain:  clamp(b.domain,  15),
+        stretch: clamp(b.stretch, 15),
+        reach:   clamp(b.reach,   10),
+      };
+      const totalScore = breakdown.skills + breakdown.scope + breakdown.outcome + breakdown.domain + breakdown.stretch + breakdown.reach;
+      const r = parsed.candidate.rationales || {};
+      const trim = (s: unknown) => String(s || '').slice(0, 600);
+      candidate = {
+        score: totalScore,
+        breakdown,
+        rationales: {
+          skills:  trim(r.skills),
+          scope:   trim(r.scope),
+          outcome: trim(r.outcome),
+          domain:  trim(r.domain),
+          stretch: trim(r.stretch),
+          reach:   trim(r.reach),
+          comp:    trim(r.comp),
+        },
+        compAcceptable: typeof parsed.candidate.compAcceptable === 'boolean' ? parsed.candidate.compAcceptable : null,
+        summary: String(parsed.candidate.summary || '').slice(0, 1200),
+      };
+    }
+
     return {
       score: Math.max(0, Math.min(25, Math.round(parsed.score))),
       rationale: String(parsed.rationale || '').slice(0, 400),
       seniority, scope,
       fitSummary: String(parsed.fitSummary || '').slice(0, 1200),
+      candidate,
     };
   } catch (e) {
     console.warn(`[job-fit-haiku] role-match failed: ${(e as Error).message}`);
@@ -170,6 +328,7 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   scope: string | null;
   fitSummary: string | null;
   description: string;
+  candidate: HaikuRoleMatch['candidate'] | null;
 }> {
   const ctx = await loadFitContext(sql);
   let description = r.description || '';
@@ -185,14 +344,16 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   let seniority: string | null = null;
   let scope: string | null = null;
   let fitSummary: string | null = null;
+  let candidate: HaikuRoleMatch['candidate'] | null = null;
   if (description.length > 200) {
     const haiku = await haikuRoleMatch(enriched, ctx);
     if (haiku) {
       roleScore = haiku.score; rationale = haiku.rationale;
       seniority = haiku.seniority; scope = haiku.scope;
       fitSummary = haiku.fitSummary || null;
+      candidate = haiku.candidate || null;
     }
   }
   const fit = computeFit(enriched, ctx, roleScore, seniority, rationale);
-  return { fit, roleScore, rationale, seniority, scope, fitSummary, description };
+  return { fit, roleScore, rationale, seniority, scope, fitSummary, description, candidate };
 }
