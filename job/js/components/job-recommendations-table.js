@@ -86,7 +86,10 @@ export class JobRecommendationsTable extends LitElement {
       setTimeout(async () => {
         try {
           const data = await fetchRecommendations({ view: 'all' });
-          this.items = data.items || data || [];
+          // /functions/v1/recommendations returns { recommendations: [...] }
+          // — same shape _maybeLoad uses. Wrong field name made
+          // this.items become an object and _sorted() crash next render.
+          this.items = Array.isArray(data?.recommendations) ? data.recommendations : [];
         } catch { /* keep stale */ }
         this.requestUpdate();
       }, 8000);
