@@ -618,40 +618,62 @@ export class JobOnboarding extends LitElement {
     `;
   }
 
-  // -------- Stage 3: chat (scrolling log, apt-style) --------
+  // -------- Stage 3: chat (minimal, ChatGPT-inspired) --------
+  //
+  // Two states:
+  //   - landing: no user turn yet → composer + first question centered
+  //     vertically (ChatGPT empty-state pattern).
+  //   - active:  any user turn exists → composer pinned bottom, log scrolls
+  //     above it.
 
   _renderChat() {
     this._ensureChatSeeded();
     const log = this.draft._meta.chatLog || [];
+    const hasUserTurn = log.some(t => t.role === 'user');
     const totalSlots = QUESTIONS.length;
     const answeredCount = Object.keys(this.draft._meta.answers || {}).length;
     const pct = Math.min(100, Math.round((answeredCount / totalSlots) * 100));
 
     return html`
-      <section class="onboard__stage chat">
-        <div class="chat__progress-bar"><span style="width:${pct}%"></span></div>
+      <section class="onboard__stage chat ${hasUserTurn ? 'chat--active' : 'chat--landing'}">
+        ${hasUserTurn ? html`<div class="chat__progress-bar"><span style="width:${pct}%"></span></div>` : nothing}
 
         <div class="chat__log">
-          ${log.map(turn => turn.role === 'ai' ? this._renderAiTurn(turn) : this._renderUserTurn(turn))}
-          ${this.busy ? html`<div class="chat__ai chat__ai--thinking">…</div>` : nothing}
+          ${hasUserTurn
+            ? log.map(turn => turn.role === 'ai' ? this._renderAiTurn(turn) : this._renderUserTurn(turn))
+            : this._renderLandingHero(log)}
+          ${this.busy && hasUserTurn ? html`<div class="chat__ai chat__ai--thinking">…</div>` : nothing}
         </div>
 
-        <div class="chat__composer">
-          <label for="chat-attach" class="chat__attach" title="Attach a resume or writing sample">+</label>
-          <input id="chat-attach" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
-                 style="display:none" @change=${(e) => this._handleAttach(e.target.files)}/>
-          <textarea id="chat-input" placeholder="Type your answer…"
-                    @keydown=${(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this._submitAnswer(); } }}></textarea>
-          <button class="btn btn--primary btn--send" ?disabled=${this.busy} @click=${() => this._submitAnswer()}
-                  aria-label="Send">↑</button>
-        </div>
-        <div class="chat__composer-row">
-          <div class="chat__composer-pills">
-            <button class="chat__pill" @click=${() => this._submitAnswer({ skip: true })}>Skip</button>
+        <div class="chat__composer-wrap">
+          <div class="chat__composer">
+            <label for="chat-attach" class="chat__attach" title="Attach a resume or writing sample">+</label>
+            <input id="chat-attach" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                   style="display:none" @change=${(e) => this._handleAttach(e.target.files)}/>
+            <textarea id="chat-input" rows="1" placeholder="Type your answer…"
+                      @input=${(e) => this._autoSize(e.target)}
+                      @keydown=${(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this._submitAnswer(); } }}></textarea>
+            <button class="chat__send" ?disabled=${this.busy} @click=${() => this._submitAnswer()}
+                    aria-label="Send">↑</button>
           </div>
-          <div class="chat__composer-hint">⌘+Enter to send</div>
+          <div class="chat__composer-row">
+            <button class="chat__pill" @click=${() => this._submitAnswer({ skip: true })}>Skip</button>
+            <span class="chat__composer-hint">⌘+Enter to send</span>
+          </div>
         </div>
       </section>
+    `;
+  }
+
+  _renderLandingHero(log) {
+    // Pre-first-turn: render the seeded question centered as the hero.
+    const ai = log.find(t => t.role === 'ai');
+    if (!ai) return nothing;
+    return html`
+      <div class="chat__hero">
+        ${ai.reflection ? html`<p class="chat__ai-reflection">${ai.reflection}</p>` : nothing}
+        <p class="chat__hero-question">${ai.question || ''}</p>
+      </div>
     `;
   }
 
@@ -667,7 +689,27 @@ export class JobOnboarding extends LitElement {
     return html`<div class="chat__user">${turn.text}</div>`;
   }
 
-  updated() { this._afterRender(); }
+  _autoSize(ta) {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(200, ta.scrollHeight) + 'px';
+  }
+
+  updated() {
+    this._afterRender();
+    // Autofocus the input whenever the chat stage renders. Mobile-friendly:
+    // helps the keyboard come up immediately on first arrival.
+    if (this.draft._meta.stage === 3) {
+      const ta = this.querySelector('#chat-input');
+      if (ta && document.activeElement !== ta) {
+        // Only focus on first mount of the stage to avoid stealing focus on
+        // every re-render. Track via a data attr.
+        if (!ta.dataset.autofocused) {
+          ta.dataset.autofocused = '1';
+          ta.focus();
+        }
+      }
+    }
+  }
 
   // -------- Stage 4: tailor --------
 
