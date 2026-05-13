@@ -39,6 +39,7 @@ function tinyMd(s) {
 }
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
 const ONBOARD_FN_URL = `${SUPABASE_URL}/functions/v1/onboard`;
 const DRAFT_KEY = 'job:onboarding:draft';
 
@@ -117,7 +118,19 @@ function loadDraft() {
 function saveDraft(d) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* */ } }
 function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } }
 
-async function callOnboard(token, body) {
+// Call the onboard edge function. Picks the right Authorization header:
+// signed-in user's access token if available; otherwise the anon key. The
+// edge fn accepts anon for parse/bundle/insights/extract (Haiku-only) and
+// requires a real user only for finalize.
+async function callOnboard(body) {
+  let token = SUPABASE_ANON_KEY;
+  try {
+    const sb = window.CtrlAuth?.getSupabaseClient?.();
+    if (sb) {
+      const { data } = await sb.auth.getSession();
+      if (data?.session?.access_token) token = data.session.access_token;
+    }
+  } catch { /* fall back to anon */ }
   const res = await fetch(ONBOARD_FN_URL, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -125,6 +138,15 @@ async function callOnboard(token, body) {
   });
   if (!res.ok) throw new Error(`onboard ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return await res.json();
+}
+// Returns true when a real user session is present (not just anon key).
+async function hasUserSession() {
+  try {
+    const sb = window.CtrlAuth?.getSupabaseClient?.();
+    if (!sb) return false;
+    const { data } = await sb.auth.getSession();
+    return !!data?.session?.access_token;
+  } catch { return false; }
 }
 
 export class JobOnboarding extends LitElement {
@@ -148,6 +170,22 @@ export class JobOnboarding extends LitElement {
     const params = new URLSearchParams(location.search);
     this.demoMode  = params.get('demo')  === '1';
     this.debugMode = params.get('debug') === '1';
+    // When the user finishes the sign-in modal (popped by _finalize), the
+    // ctrl:auth:signedin event fires; auto-resume the commit.
+    this._onSignedIn = () => {
+      if (this.draft?._meta?.pendingFinalize) {
+        setTimeout(() => this._finalize(), 300);
+      }
+    };
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener('ctrl:auth:signedin', this._onSignedIn);
+  }
+  disconnectedCallback() {
+    document.removeEventListener('ctrl:auth:signedin', this._onSignedIn);
+    super.disconnectedCallback();
   }
 
   async _token() {
@@ -205,18 +243,16 @@ export class JobOnboarding extends LitElement {
       this.draft._meta.uploadedFiles = named.map(f => ({ name: f.name, size: f.size, isResume: f === resume }));
       this._commit();
 
-      const token = await this._token();
-      if (!token) throw new Error('Not signed in.');
-
       // Two passes in parallel: parse resume → structured profile; bundle
       // everything else (or the same resume if it's the only doc) → voice
-      // + values + projects + dream signals.
+      // + values + projects + dream signals. Works pre-auth — callOnboard
+      // falls back to the anon key when there's no user session.
       const bundleText = (others.length ? others : [resume]).map(f => `--- ${f.name} ---\n${f.text}`).join('\n\n');
       this.busyLabel = 'Pulling out the bones (resume) and the voice (everything else)…';
 
       const [parseRes, bundleRes] = await Promise.all([
-        callOnboard(token, { mode: 'parse',  text: resume.text }),
-        callOnboard(token, { mode: 'bundle', text: bundleText }),
+        callOnboard({ mode: 'parse',  text: resume.text }),
+        callOnboard({ mode: 'bundle', text: bundleText }),
       ]);
       const draftIncoming = parseRes.draft || {};
       const bundle = bundleRes.bundle || {};
@@ -247,7 +283,7 @@ export class JobOnboarding extends LitElement {
         capability: this.draft.capability,
         bundle: this.draft.bundle,
       };
-      const insightsRes = await callOnboard(token, { mode: 'insights', profile: profileForInsights });
+      const insightsRes = await callOnboard({ mode: 'insights', profile: profileForInsights });
       this.draft.insights = insightsRes.insights || null;
 
       this._setStage(2);
@@ -348,9 +384,7 @@ export class JobOnboarding extends LitElement {
         return;
       }
 
-      const token = await this._token();
-      if (!token) throw new Error('Not signed in.');
-      const { tags, content } = await callOnboard(token, {
+      const { tags, content } = await callOnboard({
         mode: 'extract',
         questionId: active.qid,
         answer: userText,
@@ -406,9 +440,7 @@ export class JobOnboarding extends LitElement {
     this.busy = true; this.busyLabel = 'Trying another angle';
     this.requestUpdate();
     try {
-      const token = await this._token();
-      if (!token) throw new Error('Not signed in.');
-      const { tags, content } = await callOnboard(token, {
+      const { tags, content } = await callOnboard({
         mode: 'extract',
         questionId: userTurn.qid,
         answer: userTurn.text,
@@ -483,16 +515,31 @@ export class JobOnboarding extends LitElement {
 
   async _finalize() {
     this.error = '';
-    this.busy = true; this.busyLabel = this.demoMode ? 'Building demo preview…' : 'Saving your profile…';
+    // Live mode requires a signed-in user (finalize writes to user_profile).
+    // Demo mode commits to nothing and works pre-auth.
+    if (!this.demoMode) {
+      const signedIn = await hasUserSession();
+      if (!signedIn) {
+        // Stash a pending-finalize flag so _onSignedIn can resume the
+        // commit automatically when the user comes back from sign-in.
+        this.draft._meta.pendingFinalize = true;
+        this._commit();
+        this.busyLabel = 'One last thing — sign in to save your profile.';
+        this.busy = true;
+        this.requestUpdate();
+        try { window.CtrlAuth.openLoginModal(); }
+        catch { this.error = 'Sign-in is unavailable right now. Try refreshing.'; this.busy = false; }
+        return;
+      }
+    }
+    this.busy = true; this.busyLabel = this.demoMode ? 'Building demo preview' : 'Saving your profile';
     try {
-      const token = await this._token();
-      if (!token) throw new Error('Not signed in.');
       const { _meta, ...profile } = this.draft;
-      const result = await callOnboard(token, { mode: 'finalize', profile, demo: this.demoMode });
+      const result = await callOnboard({ mode: 'finalize', profile, demo: this.demoMode });
       this.finalized = result;
       if (!this.demoMode && result.ok) {
+        delete this.draft._meta.pendingFinalize;
         clearDraft();
-        // Live mode: route to recommended.
         setTimeout(() => { window.location.href = '/job/jobs/recommended/'; }, 600);
       }
     } catch (e) {

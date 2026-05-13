@@ -44,6 +44,25 @@ export async function verifyJobUser(req: Request): Promise<string | null> {
   return u?.email ?? null;
 }
 
+// Lighter auth check: returns the user when a valid signed-in session is
+// present, without requiring a user_profile row. Used by onboard.finalize
+// since that's the moment the row is created. Returns null for anon (anon
+// key only, no user session) callers.
+export async function verifySignedInUser(req: Request): Promise<JobUser | null> {
+  const auth = req.headers.get('Authorization') || '';
+  const token = auth.replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user?.id || !data?.user?.email) return null;
+  return { id: data.user.id, email: data.user.email.toLowerCase() };
+}
+
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
