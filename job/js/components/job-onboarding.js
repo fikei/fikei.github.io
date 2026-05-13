@@ -50,25 +50,25 @@ const STAGES = [
   { id: 4, label: 'Tailor' },
 ];
 
-// Question copy is intentionally short and direct. Haiku may rewrite the
-// label as `nextQuestionCopy` (via extract mode) so it flows from the prior
-// reflection — but the substance stays fixed.
+// Conversational defaults. Haiku rewrites these in the moment so each
+// question flows from the prior answer — see modeExtract in the onboard
+// edge function. Intent stays fixed; wording can drift.
 const QUESTIONS = [
   { id: 'q1_mission',
-    label: 'What problem do you want to spend the next five years on?',
-    placeholder: 'I want to make public services feel less like waiting rooms…' },
+    label: 'What kind of work has been pulling at you lately?',
+    placeholder: 'Anything that\'s been on your mind — a problem you keep thinking about, a kind of team you want to be on…' },
   { id: 'q2_self',
-    label: 'Describe a time at work where you felt most yourself.',
-    placeholder: 'Six months at a tiny civic-tech team rebuilding a benefits tool…' },
+    label: 'Tell me about a stretch of work where you felt most yourself.',
+    placeholder: 'A team, a project, a few months — when did the work feel right?' },
   { id: 'q3_win',
-    label: 'A win you\'re proud of — ideally with a number attached.',
-    placeholder: 'Took retention from 41% to 67% in eight months by rebuilding the first-week experience.' },
+    label: 'Something you\'re still kind of proud of — bonus points if there\'s a number attached.',
+    placeholder: 'A result, a launch, a shift you made happen…' },
   { id: 'q4_walkaway',
-    label: 'What would make you walk away from a great offer?',
-    placeholder: 'Anything in surveillance or defense. No patience for hustle-culture leadership.' },
+    label: 'What kind of company or team would make you pass — even on a great role?',
+    placeholder: 'Industries, leadership styles, working cultures you\'d want to avoid…' },
   { id: 'q5_titles',
-    label: 'What roles and titles should we be hunting for? Anything off-limits?',
-    placeholder: 'Head of Product, Founding PM, VP Product at seed-to-A startups. No people-manager-only roles.' },
+    label: 'What does the role you\'d love to be in next actually look like, day to day?',
+    placeholder: 'Title aside — who are you working with, what are you spending your time on?' },
 ];
 
 const SECTORS_PALETTE = ['climate', 'civic-tech', 'healthtech', 'fintech', 'edtech', 'consumer-social', 'developer-tools', 'AI-infrastructure', 'biotech', 'space', 'public-benefit'];
@@ -279,16 +279,19 @@ export class JobOnboarding extends LitElement {
 
   _ensureChatSeeded() {
     if ((this.draft._meta.chatLog || []).length === 0) {
+      // First turn has no prior answer to acknowledge — just the question,
+      // bolded so it carries weight on the hero.
       this.draft._meta.chatLog.push({
         role: 'ai',
         qid: QUESTIONS[0].id,
-        question: QUESTIONS[0].label,
+        content: `**${QUESTIONS[0].label}**`,
       });
       this.draft._meta.questionIdx = 0;
       this._commit();
     }
   }
 
+  // The active question is the most recent AI turn's qid.
   _activeQuestion() {
     const log = this.draft._meta.chatLog || [];
     // The last AI turn is always the active question.
@@ -336,8 +339,7 @@ export class JobOnboarding extends LitElement {
         this.draft._meta.chatLog.push({
           role: 'ai',
           qid: next ? next.id : active.qid,
-          reflection: 'Got it — we can switch gears.',
-          question: next ? next.label : null,
+          content: next ? `Got it — let's switch gears. **${next.label}**` : 'Got it — let\'s wrap up.',
           fresh: true,
         });
         if (next) this.draft._meta.questionIdx = i + 1;
@@ -348,7 +350,7 @@ export class JobOnboarding extends LitElement {
 
       const token = await this._token();
       if (!token) throw new Error('Not signed in.');
-      const { tags, reflection, nextQuestionCopy } = await callOnboard(token, {
+      const { tags, content } = await callOnboard(token, {
         mode: 'extract',
         questionId: active.qid,
         answer: userText,
@@ -361,8 +363,7 @@ export class JobOnboarding extends LitElement {
       this.draft._meta.chatLog.push({
         role: 'ai',
         qid: next ? next.id : active.qid,
-        reflection: reflection || null,
-        question: next ? (nextQuestionCopy || next.label) : null,
+        content: content || (next ? `**${next.label}**` : null),
         fresh: true,
       });
       if (next) this.draft._meta.questionIdx = i + 1;
@@ -407,7 +408,7 @@ export class JobOnboarding extends LitElement {
     try {
       const token = await this._token();
       if (!token) throw new Error('Not signed in.');
-      const { tags, reflection, nextQuestionCopy } = await callOnboard(token, {
+      const { tags, content } = await callOnboard(token, {
         mode: 'extract',
         questionId: userTurn.qid,
         answer: userTurn.text,
@@ -415,8 +416,9 @@ export class JobOnboarding extends LitElement {
       });
       this.draft._meta.extractions[userTurn.qid] = tags;
       // Replace the AI turn in place.
-      aiTurn.reflection = reflection || null;
-      aiTurn.question = next ? (nextQuestionCopy || next.label) : null;
+      aiTurn.content = content || (next ? `**${next.label}**` : null);
+      delete aiTurn.reflection;
+      delete aiTurn.question;
       aiTurn.fresh = true;
       this._commit();
       setTimeout(() => { delete aiTurn.fresh; this._commit(); }, 600);
@@ -467,11 +469,11 @@ export class JobOnboarding extends LitElement {
       this.draft._meta.stage = 3;
       this.draft._meta.questionIdx = idxBefore;
       // Inject a synthetic AI turn acknowledging the attach.
+      const resumeQ = QUESTIONS[idxBefore] || QUESTIONS[0];
       this.draft._meta.chatLog.push({
         role: 'ai',
-        qid: this._activeQuestion()?.qid || QUESTIONS[idxBefore].id,
-        reflection: 'Thanks — I pulled what I could from that. Picking back up:',
-        question: this._activeQuestion()?.question || QUESTIONS[idxBefore].label,
+        qid: resumeQ.id,
+        content: `Thanks — I pulled what I could from that. Picking back up: **${resumeQ.label}**`,
       });
       this._commit();
     }
@@ -764,16 +766,18 @@ export class JobOnboarding extends LitElement {
     return html`
       <div class="chat__hero">
         ${ai.reflection ? html`<p class="chat__ai-reflection">${unsafeHTML(tinyMd(ai.reflection))}</p>` : nothing}
-        <p class="chat__hero-question">${unsafeHTML(tinyMd(ai.question || ''))}</p>
+        <p class="chat__hero-question">${unsafeHTML(tinyMd(ai.content || ai.question || ''))}</p>
       </div>
     `;
   }
 
   _renderAiTurn(turn) {
+    // Prefer the combined block (new schema). Fall back to the legacy
+    // reflection + question pair so old localStorage drafts still render.
+    const content = turn.content || [turn.reflection, turn.question ? `**${turn.question}**` : ''].filter(Boolean).join(' ');
     return html`
       <div class="chat__ai ${turn.fresh ? 'chat__ai--fresh' : ''}">
-        ${turn.reflection ? html`<p class="chat__ai-reflection">${unsafeHTML(tinyMd(turn.reflection))}</p>` : nothing}
-        ${turn.question ? html`<p class="chat__ai-question">${unsafeHTML(tinyMd(turn.question))}</p>` : nothing}
+        <p class="chat__ai-turn">${unsafeHTML(tinyMd(content))}</p>
       </div>
     `;
   }

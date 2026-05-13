@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.3.0';
-console.log(`[onboard] v${VERSION} - extract returns reflection + nextQuestionCopy (chat rev)`);
+const VERSION = '0.4.0';
+console.log(`[onboard] v${VERSION} - extract returns single combined content block (ack+bold question)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -221,31 +221,31 @@ interface QuestionSpec {
 const QUESTIONS: Record<string, QuestionSpec> = {
   q1_mission: {
     id: 'q1_mission',
-    label: 'What problem do you want to spend the next five years on?',
+    label: 'What kind of work has been pulling at you lately?',
     schema: `{ "missionKeywords": [string], "impactThemes": [string], "targetSectors": [string], "summary": string }`,
     notes: 'missionKeywords: 3-6 short phrases that capture the *problem domain*. impactThemes: the verbs/outcomes ("reduce friction in public services"). targetSectors: industry tags like "civic-tech", "climate", "healthtech". summary: one-sentence reframe of what they said.',
   },
   q2_self: {
     id: 'q2_self',
-    label: 'Describe a time at work where you felt most yourself.',
+    label: 'Tell me about a stretch of work where you felt most yourself.',
     schema: `{ "cultureKeywords": [string], "arcTags": [string], "narrativeTitle": string, "narrativeMd": string }`,
     notes: 'cultureKeywords: 3-6 short phrases describing the working environment that energizes them ("high-agency", "research-led", "small team"). arcTags from: zero-to-one, scale-up, turnaround, ic-to-manager, founder, scaling-team, scaling-revenue. narrativeTitle: 4-8 word title. narrativeMd: the user\'s answer lightly cleaned (do not rewrite).',
   },
   q3_win: {
     id: 'q3_win',
-    label: 'A win you\'re proud of — ideally with a number attached.',
+    label: 'Something you\'re still kind of proud of — bonus points if there\'s a number attached.',
     schema: `{ "headline": string, "metric": string|null, "narrativeTitle": string, "narrativeMd": string }`,
     notes: 'headline: ≤ 12 words capturing the win. metric: the number or measurable result if any (e.g. "+34% retention", "$2M ARR in 9 months", "team of 12"). null if none mentioned. narrative: same as q2.',
   },
   q4_walkaway: {
     id: 'q4_walkaway',
-    label: 'What would make you walk away from a great offer?',
+    label: 'What kind of company or team would make you pass — even on a great role?',
     schema: `{ "antiMissionTerms": [string], "antiCulture": [string], "dealbreakers": [string] }`,
     notes: 'antiMissionTerms: industry/category dealbreakers ("defense", "gambling", "crypto", "adtech"). antiCulture: environment dealbreakers ("hustle culture", "RTO", "ego-driven leadership"). dealbreakers: free-form catch-all for anything else.',
   },
   q5_titles: {
     id: 'q5_titles',
-    label: 'What roles and titles should we be hunting for?',
+    label: 'What does the role you\'d love to be in next actually look like, day to day?',
     schema: `{ "targetRoles": [string], "stagePreference": [string], "antiTitles": [string] }`,
     notes: 'targetRoles: 2-4 title patterns ("Head of Product", "Founding PM"). stagePreference from: pre-seed, seed, series-a, series-b, growth, public. antiTitles: titles to exclude.',
   },
@@ -260,28 +260,38 @@ const QUESTIONS: Record<string, QuestionSpec> = {
 async function modeExtract(questionId: string, answer: string, nextQuestionLabel?: string): Promise<unknown> {
   const q = QUESTIONS[questionId];
   if (!q) throw new Error(`unknown questionId: ${questionId}`);
-  // The extracted tags use the per-question schema. We also generate a short
-  // reflection paragraph that interprets what we heard (not echoes it) so the
-  // chat surface feels like a conversation. If a next question is provided
-  // we rewrite it in voice so it flows from the reflection naturally.
-  const system = `You are the host of a calm, generative career-onboarding conversation. The user just answered the question: "${q.label}".
+  // The extract pass does two things:
+  //   1. Pull structured tags from the user's answer (schema per qid).
+  //   2. Compose a single "content" string — the AI's whole next turn,
+  //      written as natural prose. It acknowledges what we heard, bridges
+  //      to the next question, then asks the next question wrapped in
+  //      **markdown bold** so the UI can render it as the emphatic ask
+  //      inside one continuous block.
+  //
+  // You ALSO have license to rewrite the next question's wording (and even
+  // mildly reorder by picking a more natural framing) — keep the intent the
+  // same, but adapt the language so it flows.
+  const system = `You are the host of a calm, generative career-onboarding conversation. The user just answered: "${q.label}".
 
 Return ONLY JSON matching:
 {
   "tags": ${q.schema},
-  "reflection": string,
-  "nextQuestionCopy": string|null
+  "content": string
 }
 
 Rules for "tags": ${q.notes || 'extract per the schema above'}. Empty arrays beat guesses. Echo their own words; don't impose vocabulary they didn't use.
 
-Rules for "reflection": one or two sentences that *interpret* what they said — name a trait, surface a pattern, distill it. Don't just echo their words back. Sentence case. No emoji. Em-dashes welcome. Examples of good shape:
-  - "That's a purpose-driven direction — sounds like you want the work to leave a fingerprint."
-  - "Building something yourself while interviewing says you're comfortable with ambiguity."
-  - "Engagement loops + benefits navigation is a specific kind of taste."
-Tone: warm, observational, a little opinionated. Avoid corporate ("Great answer!", "Thanks for sharing"). 25 words max.
-
-Rules for "nextQuestionCopy": ${nextQuestionLabel ? `the next question is fixed as: "${nextQuestionLabel}". Rewrite it ONLY if a small lead-in would make it flow from the reflection — otherwise return it verbatim. Never change the substance of the question.` : 'return null.'}`;
+Rules for "content":
+- Write the AI's next turn as ONE short paragraph (2-4 sentences total).
+- Start with an interpretation of what they said — name a trait, surface a pattern, or distill the shape of their answer. Don't just echo back. Examples of good interpretation:
+    - "That's a purpose-driven direction — sounds like you want the work to leave a fingerprint."
+    - "Building something yourself while interviewing says you're comfortable with ambiguity."
+    - "Engagement loops + benefits navigation is a specific kind of taste."
+- Bridge naturally into the next question. A single sentence or even a phrase is enough.
+- End by asking the next question, wrapped in **bold markdown** (double-asterisk on both sides). The question is the emphatic ask of the turn.
+${nextQuestionLabel ? `- The next question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation — keep the substance, change the language. Easier-to-answer wording wins over precise wording.` : '- There is no next question; end the paragraph with a soft wrap-up sentence instead and omit any bold.'}
+- Tone: warm, observational, lightly opinionated. Sentence case. No emoji. Em-dashes welcome. Avoid corporate ("Great answer!", "Thanks for sharing").
+- Total paragraph: 60 words max.`;
   return await callClaudeJson(system, answer.slice(0, 8000), 2000);
 }
 
@@ -370,8 +380,8 @@ serve(async (req: Request) => {
       }
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');
-        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel) as { tags?: unknown; reflection?: string; nextQuestionCopy?: string | null };
-        return jsonResp({ tags: out?.tags, reflection: out?.reflection, nextQuestionCopy: out?.nextQuestionCopy });
+        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel) as { tags?: unknown; content?: string };
+        return jsonResp({ tags: out?.tags, content: out?.content });
       }
       case 'finalize': {
         if (!body.profile) return err('profile required');
