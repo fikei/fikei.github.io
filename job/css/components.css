@@ -4318,14 +4318,61 @@ job-onboarding { display: contents; }
   align-self: flex-end;
   max-width: 75%;
   text-align: left;
-  color: var(--fg-muted);
+  color: var(--fg);
   white-space: pre-wrap;
 }
 
-/* Composer — sticky to bottom in active, centered hero in landing. */
+/* Saving pill — small left-aligned status with a pulsing dot. Lives in
+   the chat log right after the user turn while we wait for the AI reply.
+   Visual cousin of /field/ dictation dot; reuses .save-pulse keyframes. */
+.chat__saving {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  padding: 4px 0;
+}
+.chat__saving-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: save-pulse 900ms ease-in-out infinite;
+}
+.chat__saving-label::after {
+  content: '';
+  display: inline-block;
+  animation: chat-ellipsis 1.6s steps(4, end) infinite;
+  white-space: pre;
+}
+@keyframes chat-ellipsis {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* Fade-in for a fresh AI turn so questions feel like they arrive,
+   not pop. ~280ms, no jitter. */
+.chat__ai--fresh {
+  animation: chat-turn-enter 280ms ease-out both;
+}
+@keyframes chat-turn-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Progress bar gets a brief flash when the active state's bar width
+   updates — handled by the existing transition on width. */
+
+/* Composer sits at the bottom of the .chat flex column. No sticky needed —
+   .chat is the viewport-height column and the composer naturally takes its
+   slot below the log. (Previously sticky caused the latest log item to
+   render *under* the composer.) */
 .chat__composer-wrap {
-  position: sticky;
-  bottom: 0;
+  flex: none;
   width: 100%;
   background: var(--bg);
   padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
@@ -4334,7 +4381,6 @@ job-onboarding { display: contents; }
   gap: var(--space-2);
 }
 .chat--landing .chat__composer-wrap {
-  position: static;
   padding-top: 0;
 }
 .chat__composer-wrap > * {

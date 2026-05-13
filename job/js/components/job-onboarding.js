@@ -300,8 +300,14 @@ export class JobOnboarding extends LitElement {
     if (!isSkip) this.draft._meta.answers[active.qid] = userText;
     if (ta) { ta.value = ''; this._autoSize(ta); }
     this.error = '';
-    this.busy = true; this.busyLabel = '';
+    this.busy = true;
+    // Status text rotates while we wait. The CSS adds animated ellipsis,
+    // so the strings don't include "…" themselves.
+    this.busyLabel = 'Saving';
     this._commit();
+    this._busyTimer = setTimeout(() => {
+      if (this.busy) { this.busyLabel = 'Reading between the lines'; this.requestUpdate(); }
+    }, 900);
 
     // Look up the next question label (so the AI can rewrite it inline).
     const i = QUESTIONS.findIndex(q => q.id === active.qid);
@@ -310,11 +316,15 @@ export class JobOnboarding extends LitElement {
     try {
       // Skip: post a soft AI ack and pivot. Don't call extract.
       if (isSkip) {
+        // Tiny pause so the saving pill is visible (otherwise skip feels
+        // instant and the chat jumps without grounding).
+        await new Promise(r => setTimeout(r, 350));
         this.draft._meta.chatLog.push({
           role: 'ai',
           qid: next ? next.id : active.qid,
           reflection: 'Got it — we can switch gears.',
           question: next ? next.label : null,
+          fresh: true,
         });
         if (next) this.draft._meta.questionIdx = i + 1;
         this._commit();
@@ -323,9 +333,6 @@ export class JobOnboarding extends LitElement {
       }
 
       const token = await this._token();
-      // Token can be null in pre-auth mode; the edge fn will reject if it
-      // requires it. For extract we treat null as ok for now; Phase 7 will
-      // unauth-gate extract on the server.
       if (!token) throw new Error('Not signed in.');
       const { tags, reflection, nextQuestionCopy } = await callOnboard(token, {
         mode: 'extract',
@@ -336,12 +343,13 @@ export class JobOnboarding extends LitElement {
       this.draft._meta.extractions[active.qid] = tags;
       if (tags) this._applyExtraction(active.qid, tags);
 
-      // Append AI turn.
+      // Append AI turn (fresh flag triggers the fade-in animation).
       this.draft._meta.chatLog.push({
         role: 'ai',
         qid: next ? next.id : active.qid,
         reflection: reflection || null,
         question: next ? (nextQuestionCopy || next.label) : null,
+        fresh: true,
       });
       if (next) this.draft._meta.questionIdx = i + 1;
       this._commit();
@@ -351,6 +359,55 @@ export class JobOnboarding extends LitElement {
       // Roll back the user turn so they can retry.
       this.draft._meta.chatLog.pop();
       this._commit();
+    } finally {
+      clearTimeout(this._busyTimer);
+      this.busy = false; this.busyLabel = '';
+      this._afterRender();
+      // Strip the `fresh` flag on the next tick so the fade-in animation
+      // only plays once per turn.
+      setTimeout(() => {
+        const log = this.draft._meta.chatLog;
+        for (const t of log) if (t.fresh) delete t.fresh;
+        this._commit();
+      }, 600);
+    }
+  }
+
+  // Rephrase the last AI turn — re-run the extract with the same user
+  // answer and replace the reflection + question. Lets users get a
+  // different angle if the first reflection didn't land.
+  async _rephrase() {
+    const log = this.draft._meta.chatLog || [];
+    // Find the most recent user turn and the AI turn that follows it.
+    let userIdx = -1;
+    for (let i = log.length - 1; i >= 0; i--) if (log[i].role === 'user') { userIdx = i; break; }
+    if (userIdx < 0 || userIdx + 1 >= log.length) return;
+    const userTurn = log[userIdx];
+    const aiTurn = log[userIdx + 1];
+
+    const qIdx = QUESTIONS.findIndex(q => q.id === userTurn.qid);
+    const next = QUESTIONS[qIdx + 1] || null;
+
+    this.busy = true; this.busyLabel = 'Trying another angle';
+    this.requestUpdate();
+    try {
+      const token = await this._token();
+      if (!token) throw new Error('Not signed in.');
+      const { tags, reflection, nextQuestionCopy } = await callOnboard(token, {
+        mode: 'extract',
+        questionId: userTurn.qid,
+        answer: userTurn.text,
+        nextQuestionLabel: next?.label || null,
+      });
+      this.draft._meta.extractions[userTurn.qid] = tags;
+      // Replace the AI turn in place.
+      aiTurn.reflection = reflection || null;
+      aiTurn.question = next ? (nextQuestionCopy || next.label) : null;
+      aiTurn.fresh = true;
+      this._commit();
+      setTimeout(() => { delete aiTurn.fresh; this._commit(); }, 600);
+    } catch (e) {
+      this.error = e.message;
     } finally {
       this.busy = false; this.busyLabel = '';
       this._afterRender();
@@ -642,7 +699,11 @@ export class JobOnboarding extends LitElement {
           ${hasUserTurn
             ? log.map(turn => turn.role === 'ai' ? this._renderAiTurn(turn) : this._renderUserTurn(turn))
             : this._renderLandingHero(log)}
-          ${this.busy && hasUserTurn ? html`<div class="chat__ai chat__ai--thinking">…</div>` : nothing}
+          ${this.busy && hasUserTurn ? html`
+            <div class="chat__saving" role="status" aria-live="polite">
+              <span class="chat__saving-dot"></span>
+              <span class="chat__saving-label">${this.busyLabel || 'Saving…'}</span>
+            </div>` : nothing}
         </div>
 
         <div class="chat__composer-wrap">
@@ -657,7 +718,10 @@ export class JobOnboarding extends LitElement {
                     aria-label="Send">↑</button>
           </div>
           <div class="chat__composer-row">
-            <button class="chat__pill" @click=${() => this._submitAnswer({ skip: true })}>Skip</button>
+            <div class="chat__composer-pills">
+              ${hasUserTurn ? html`<button class="chat__pill" ?disabled=${this.busy} @click=${() => this._rephrase()} title="Re-ask this one a different way">Rephrase</button>` : nothing}
+              <button class="chat__pill" ?disabled=${this.busy} @click=${() => this._submitAnswer({ skip: true })}>Skip</button>
+            </div>
             <span class="chat__composer-hint">⌘+Enter to send</span>
           </div>
         </div>
@@ -679,7 +743,7 @@ export class JobOnboarding extends LitElement {
 
   _renderAiTurn(turn) {
     return html`
-      <div class="chat__ai">
+      <div class="chat__ai ${turn.fresh ? 'chat__ai--fresh' : ''}">
         ${turn.reflection ? html`<p class="chat__ai-reflection">${turn.reflection}</p>` : nothing}
         ${turn.question ? html`<p class="chat__ai-question">${turn.question}</p>` : nothing}
       </div>
