@@ -1,26 +1,23 @@
 // job-detail — generic drilldown view for /job/history/{kind}/{slug}/.
-// Reads ?kind= & ?slug= from the query, fetches the corresponding markdown
-// from fikei/job, renders with the wiki-link-aware renderer, and restores
-// the pretty URL via history.replaceState.
+// Reads ?kind= & ?slug= from the query, fetches the row from the
+// job-entity edge fn (which reads job.{companies,projects,skills,wins}
+// in Postgres), renders body_md with the wiki-link-aware renderer.
+//
+// Replaces the legacy KB read of /01-job-history/{kind}/{slug}.md so
+// the last live kb-read caller is gone.
 import { LitElement, html } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
 const { renderMarkdown } = await import('../markdown.js' + V);
 
-const KIND_DIR = {
-  companies: '01-job-history/companies',
-  projects:  '01-job-history/projects',
-  skills:    '01-job-history/skills',
-  wins:      '01-job-history/wins',
-  roles:     '01-job-history/roles',
-};
+const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+const FN_URL = `${SUPABASE_URL}/functions/v1/job-entity`;
 
 const KIND_LABEL = {
   companies: 'Companies',
   projects:  'Projects',
   skills:    'Skills',
   wins:      'Wins',
-  roles:     'Roles',
 };
 
 export class JobDetail extends LitElement {
@@ -33,6 +30,8 @@ export class JobDetail extends LitElement {
     body:  { state: true },
     kind:  { state: true },
     slug:  { state: true },
+    updatedAt:   { state: true },
+    frontmatter: { state: true },
   };
 
   constructor() {
@@ -41,6 +40,8 @@ export class JobDetail extends LitElement {
     this.error = '';
     this.title = '';
     this.body = '';
+    this.updatedAt = '';
+    this.frontmatter = null;
     const params = new URLSearchParams(location.search);
     this.kind = (params.get('kind') || '').toLowerCase();
     this.slug = (params.get('slug') || '').toLowerCase();
@@ -68,27 +69,38 @@ export class JobDetail extends LitElement {
     super.disconnectedCallback();
   }
 
+  async _supabaseToken() {
+    const sb = window.CtrlAuth?.getSupabaseClient?.();
+    return (await sb?.auth.getSession?.())?.data?.session?.access_token;
+  }
+
   async _maybeLoad() {
     if (document.body.dataset.authState !== 'in') return;
     if (this.state === 'loading' || this.state === 'loaded') return;
-    if (!KIND_DIR[this.kind] || !this.slug) {
+    if (!KIND_LABEL[this.kind] || !this.slug) {
       this.state = 'error';
       this.error = `Unknown route. kind=${this.kind} slug=${this.slug}`;
       return;
     }
     this.state = 'loading';
     try {
-      const path = `${KIND_DIR[this.kind]}/${this.slug}.md`;
-      const { content } = await window.JobKB.readFile(path);
-      this.title = (content.match(/^#\s+(.+)$/m) || [, ''])[1].trim();
-      // Render the body without the leading H1 (we render that in our header).
+      const token = await this._supabaseToken();
+      const res = await fetch(`${FN_URL}?kind=${encodeURIComponent(this.kind)}&slug=${encodeURIComponent(this.slug)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      const content = data.body_md || '';
+      this.title = data.title || this.slug;
+      this.frontmatter = data.frontmatter || null;
+      this.updatedAt = data.updated_at || '';
       const stripped = content.replace(/^#\s+.+\n+/, '');
       this.body = renderMarkdown(stripped);
       document.title = `${this.title} — /job`;
       this.state = 'loaded';
     } catch (e) {
       this.state = 'error';
-      this.error = String(e);
+      this.error = String(e?.message || e);
     }
   }
 
