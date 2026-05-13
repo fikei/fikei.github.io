@@ -120,12 +120,14 @@ function emptyDraft() {
       extractions: {},
       uploadedFiles: [],
       editOpen: false,
-      // Chat log: ordered list of turns. Each turn is either:
-      //   { role: 'ai',   reflection?: string, question: string, qid: string }
-      //   { role: 'user', text: string, qid: string }
-      // The latest AI turn carries the active question. We add the first AI
-      // turn lazily when the chat stage mounts.
+      // chatLog: ordered list of turns.
+      //   { role: 'ai',   qid, content: string, fresh?: true }
+      //   { role: 'user', qid, text: string }
+      // The latest AI turn carries the active question. Seeded lazily.
       chatLog: [],
+      // followupDepth[qid] tracks how many deeper follow-ups have been
+      // asked on this slot before the next-canonical advance. Cap = 1.
+      followupDepth: {},
     },
   };
 }
@@ -451,26 +453,45 @@ export class JobOnboarding extends LitElement {
         return;
       }
 
-      const { tags, content } = await callOnboard({
+      const depthSpent = (this.draft._meta.followupDepth?.[active.qid]) || 0;
+      const { tags, content, goDeeper } = await callOnboard({
         mode: 'extract',
         questionId: active.qid,
         answer: userText,
         nextQuestionLabel: next?.label || null,
         priorTurns: this._priorTurnsForExtract(),
+        depthSpent,
       });
       this.draft._meta.extractions[active.qid] = tags;
       if (tags) this._applyExtraction(active.qid, tags);
 
-      // Append AI turn (fresh flag triggers the fade-in animation).
-      this.draft._meta.chatLog.push({
-        role: 'ai',
-        qid: next ? next.id : active.qid,
-        content: content || (next ? `**${next.label}**` : null),
-        fresh: true,
-      });
-      if (next) this.draft._meta.questionIdx = i + 1;
+      // Two branches:
+      //   goDeeper=true → stay on the same qid; the AI's bolded question
+      //                   is a follow-up probe of the same theme. Increment
+      //                   followupDepth so the next extract is forced to
+      //                   advance.
+      //   goDeeper=false → advance to the next canonical question.
+      if (goDeeper && depthSpent < 1) {
+        this.draft._meta.followupDepth = this.draft._meta.followupDepth || {};
+        this.draft._meta.followupDepth[active.qid] = depthSpent + 1;
+        this.draft._meta.chatLog.push({
+          role: 'ai',
+          qid: active.qid,             // stays on this slot
+          content: content || null,
+          fresh: true,
+        });
+      } else {
+        this.draft._meta.chatLog.push({
+          role: 'ai',
+          qid: next ? next.id : active.qid,
+          content: content || (next ? `**${next.label}**` : null),
+          fresh: true,
+        });
+        if (next) this.draft._meta.questionIdx = i + 1;
+      }
       this._commit();
-      if (!next) this._setStage(4);
+      const advanced = !(goDeeper && depthSpent < 1);
+      if (advanced && !next) this._setStage(4);
     } catch (e) {
       this.error = e.message;
       // Roll back the user turn so they can retry.
@@ -508,12 +529,16 @@ export class JobOnboarding extends LitElement {
     this.busy = true; this.busyLabel = 'Trying another angle';
     this.requestUpdate();
     try {
+      // Rephrase replays the same slot; force-advance budget so the new
+      // turn isn't an even-deeper rabbit hole. We just want a different
+      // angle on the existing reflection.
       const { tags, content } = await callOnboard({
         mode: 'extract',
         questionId: userTurn.qid,
         answer: userTurn.text,
         nextQuestionLabel: next?.label || null,
         priorTurns: this._priorTurnsForExtract(),
+        depthSpent: 1,
       });
       this.draft._meta.extractions[userTurn.qid] = tags;
       // Replace the AI turn in place.
