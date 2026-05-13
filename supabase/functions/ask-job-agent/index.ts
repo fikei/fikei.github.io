@@ -56,7 +56,7 @@ When you respond, tell Ian WHAT YOU ACTUALLY DID and what's NOW in effect. Don't
 
 ## Tools
 
-- read_preferences(): returns current blocked_titles, must_have_keywords, target_titles, target_geographies from Ian's vision. Use BEFORE update_preferences so you can show him what's already configured and skip dupes.
+- read_preferences(): returns current preferences from job.vision_field. Each field comes back as { value: string[], updated_at, source } — the updated_at tells you WHEN that preference was last touched and source tells you who touched it ('agent', 'user', 'migrate-job'). Use BEFORE update_preferences to see what's already configured, skip dupes, and tell Ian when something was last changed.
 - search_pipeline(query): find roles Ian has saved/active. Returns up to 20 matches with slug, title, company, status, stage, fit_score, url.
 - update_pipeline_row(slug, fields): patch a row. Stages: Drafting|Applied|Interviewing|Offer. Status: Active|Archive. Find slug via search_pipeline first.
 - add_role_from_url(url): save a posting URL.
@@ -110,18 +110,30 @@ async function authedFetch(url: string, opts: RequestInit, authHeader: string): 
   return fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: authHeader } });
 }
 
-async function toolReadPreferences() {
+// Read preferences from the normalized job.vision_field table (one row
+// per field, source of truth post-migration 074). Falls back to legacy
+// job.vision for fields that haven't been seeded into vision_field yet.
+async function toolReadPreferences(userId: string) {
   const sql = db();
-  const rows = await sql<{ blocked_titles: string[] | null; must_have_keywords: string[] | null; target_titles: string[] | null; target_geographies: string[] | null }[]>`
-    select blocked_titles, must_have_keywords, target_titles, target_geographies
-    from job.vision order by updated_at desc limit 1
+  const wantedFields = ['blocked_titles', 'must_have_keywords', 'target_titles', 'target_geographies'];
+  const rows = await sql<{ name: string; value: unknown; updated_at: string; source: string }[]>`
+    select name, value, updated_at, source
+      from job.vision_field
+     where user_id = ${userId}
+       and name = any(${wantedFields}::text[])
   `;
-  const v = rows[0] || {} as Record<string, string[] | null>;
+  const byName = new Map(rows.map((r) => [r.name, r]));
+  const get = (n: string): { value: string[]; updated_at: string | null; source: string | null } => {
+    const r = byName.get(n);
+    if (!r) return { value: [], updated_at: null, source: null };
+    const v = Array.isArray(r.value) ? (r.value as string[]) : [];
+    return { value: v, updated_at: r.updated_at, source: r.source };
+  };
   return {
-    blocked_titles:     v.blocked_titles ?? [],
-    must_have_keywords: v.must_have_keywords ?? [],
-    target_titles:      v.target_titles ?? [],
-    target_geographies: v.target_geographies ?? [],
+    blocked_titles:     get('blocked_titles'),
+    must_have_keywords: get('must_have_keywords'),
+    target_titles:      get('target_titles'),
+    target_geographies: get('target_geographies'),
   };
 }
 
@@ -150,7 +162,9 @@ async function toolAddRoleFromUrl({ url }: { url: string }, authHeader: string) 
   return await res.json();
 }
 
-async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: string[]; note?: string }) {
+// Writes to job.vision_field. The sync trigger mirrors changes back into
+// job.vision for legacy readers (pull-recommendations, computeFit).
+async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: string[]; note?: string }, userId: string) {
   const normalize = (arr?: string[]): string[] => (Array.isArray(arr) ? arr : [])
     .map(s => String(s).toLowerCase().trim()).filter(Boolean);
   const newBlocked  = normalize(args.blocked);
@@ -160,18 +174,21 @@ async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: str
   }
 
   const sql = db();
-  const rows = await sql<{ id: number; blocked_titles: string[] | null; must_have_keywords: string[] | null }[]>`
-    select id, blocked_titles, must_have_keywords from job.vision order by updated_at desc limit 1
-  `;
-  if (!rows.length) return { ok: false, error: 'no vision row found — set up your vision first via /job/vision' };
-  const row = rows[0];
-  const curBlocked  = new Set((row.blocked_titles || []).map((s) => s.toLowerCase()));
-  const curMustHave = new Set((row.must_have_keywords || []).map((s) => s.toLowerCase()));
 
-  const addedBlocked   = newBlocked.filter((t) => !curBlocked.has(t));
-  const skippedBlocked = newBlocked.filter((t) => curBlocked.has(t));
-  const addedMustHave  = newMustHave.filter((t) => !curMustHave.has(t));
-  const skippedMustHave = newMustHave.filter((t) => curMustHave.has(t));
+  // Read current values from vision_field. We expect both rows to exist
+  // (seeded by migration 074), but UPSERT defensively in case.
+  const cur = await sql<{ name: string; value: unknown }[]>`
+    select name, value from job.vision_field
+     where user_id = ${userId} and name in ('blocked_titles', 'must_have_keywords')
+  `;
+  const curMap = new Map(cur.map((r) => [r.name, Array.isArray(r.value) ? (r.value as string[]) : []]));
+  const curBlocked  = new Set((curMap.get('blocked_titles')      || []).map((s) => s.toLowerCase()));
+  const curMustHave = new Set((curMap.get('must_have_keywords')  || []).map((s) => s.toLowerCase()));
+
+  const addedBlocked    = newBlocked.filter((t) => !curBlocked.has(t));
+  const skippedBlocked  = newBlocked.filter((t) =>  curBlocked.has(t));
+  const addedMustHave   = newMustHave.filter((t) => !curMustHave.has(t));
+  const skippedMustHave = newMustHave.filter((t) =>  curMustHave.has(t));
 
   if (addedBlocked.length === 0 && addedMustHave.length === 0) {
     return { ok: true, no_op: true, skipped_blocked: skippedBlocked, skipped_must_have: skippedMustHave, total_blocked: curBlocked.size, total_must_have: curMustHave.size };
@@ -179,14 +196,32 @@ async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: str
 
   const nextBlocked  = Array.from(new Set([...curBlocked,  ...addedBlocked]));
   const nextMustHave = Array.from(new Set([...curMustHave, ...addedMustHave]));
+  const sourceDetail = args.note ? { note: args.note } : null;
 
-  await sql`
-    update job.vision set
-      blocked_titles = ${nextBlocked},
-      must_have_keywords = ${nextMustHave},
-      updated_at = now()
-    where id = ${row.id}
-  `;
+  // Upsert both rows. on conflict updates value + source + updated_at.
+  // The sync trigger mirrors the new arrays into job.vision columns.
+  if (addedBlocked.length) {
+    await sql`
+      insert into job.vision_field (user_id, name, value, kind, source, source_detail)
+      values (${userId}, 'blocked_titles', ${JSON.stringify(nextBlocked)}::jsonb, 'string_array', 'agent', ${sourceDetail})
+      on conflict (user_id, name) do update set
+        value = excluded.value,
+        source = excluded.source,
+        source_detail = excluded.source_detail,
+        updated_at = now()
+    `;
+  }
+  if (addedMustHave.length) {
+    await sql`
+      insert into job.vision_field (user_id, name, value, kind, source, source_detail)
+      values (${userId}, 'must_have_keywords', ${JSON.stringify(nextMustHave)}::jsonb, 'string_array', 'agent', ${sourceDetail})
+      on conflict (user_id, name) do update set
+        value = excluded.value,
+        source = excluded.source,
+        source_detail = excluded.source_detail,
+        updated_at = now()
+    `;
+  }
 
   return {
     ok: true,
@@ -199,14 +234,14 @@ async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: str
   };
 }
 
-async function runTool(name: string, input: Record<string, unknown>, authHeader: string): Promise<unknown> {
+async function runTool(name: string, input: Record<string, unknown>, authHeader: string, userId: string): Promise<unknown> {
   try {
     switch (name) {
-      case 'read_preferences':    return await toolReadPreferences();
+      case 'read_preferences':    return await toolReadPreferences(userId);
       case 'search_pipeline':     return await toolSearchPipeline(input as { query: string }, authHeader);
       case 'update_pipeline_row': return await toolUpdatePipelineRow(input, authHeader);
       case 'add_role_from_url':   return await toolAddRoleFromUrl(input as { url: string }, authHeader);
-      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string[]; must_have?: string[]; note?: string });
+      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string[]; must_have?: string[]; note?: string }, userId);
       default: return { error: `unknown tool: ${name}` };
     }
   } catch (err) { return { error: String((err as Error).message || err) }; }
@@ -305,7 +340,7 @@ serve(async (req) => {
       if (response.stop_reason !== 'tool_use' || toolUses.length === 0) break;
       const resultBlocks: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
       for (const tu of toolUses) {
-        const result = await runTool(tu.name, tu.input, authHeader);
+        const result = await runTool(tu.name, tu.input, authHeader, user.id);
         const rec = await insertMessage(supabase, user.id, { role: 'tool', body: '', tool_name: tu.name, tool_payload: { input: tu.input, output: result } });
         if (rec) newEvents.push(rec);
         resultBlocks.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result).slice(0,8000) });
