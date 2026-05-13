@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.93.0";
-console.log(`[job] v${VERSION} - Agent chat: intent expansion + conversational confirms on preferences`);
+const VERSION = "0.94.0";
+console.log(`[job] v${VERSION} - Agent end-to-end: read_preferences + vision-backed prefs + pull-recommendations filter`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

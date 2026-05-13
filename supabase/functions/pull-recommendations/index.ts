@@ -284,7 +284,19 @@ serve(async (req) => {
       // score and surfaces low in the sorted list. UI filters at read
       // time. Pipeline-dedup stays (don't show roles already tracked).
       const fitCtx = await loadFitContext(sql);
-      const { kept } = scoreAndFilter(pulled, /* minScore */ 0, fitCtx);
+      // Blocked-title prefilter: drop any posting whose title substring-
+      // matches a term in vision.blocked_titles BEFORE scoring. Saves the
+      // Fit compute on roles the user has explicitly opted out of, and
+      // makes the agent-driven update_preferences flow actually take
+      // effect end-to-end.
+      const blockedTitles = await loadBlockedTitles(sql);
+      const beforeBlock = pulled.length;
+      const filteredPull = blockedTitles.length
+        ? pulled.filter(r => !titleMatchesAny((r.title || '').toLowerCase(), blockedTitles))
+        : pulled;
+      const droppedByBlocked = beforeBlock - filteredPull.length;
+      if (droppedByBlocked > 0) console.log(`[pull-recommendations] dropped ${droppedByBlocked}/${beforeBlock} by blocked_titles`);
+      const { kept } = scoreAndFilter(filteredPull, /* minScore */ 0, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -402,6 +414,29 @@ async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   const titles = fromVision.length ? fromVision : DEFAULT_TARGET_TITLES;
   _titleCache = { rows: titles, at: Date.now() };
   return titles;
+}
+
+// Blocked-title list (vision.blocked_titles). Each entry is a lowercase
+// phrase; if it substring-matches a posting title, the role is dropped
+// before scoring. Written by the agent chat's update_preferences tool
+// after expanding the user's vague ask into concrete role-title terms.
+let _blockedCache: { rows: string[]; at: number } | null = null;
+async function loadBlockedTitles(sql: ReturnType<typeof db>): Promise<string[]> {
+  if (_blockedCache && Date.now() - _blockedCache.at < TITLE_CACHE_MS) return _blockedCache.rows;
+  const rows = await sql<{ blocked: string[] | null }[]>`
+    select blocked_titles as blocked from job.vision order by updated_at desc limit 1
+  `;
+  const list = ((rows[0]?.blocked as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  _blockedCache = { rows: list, at: Date.now() };
+  return list;
+}
+// Substring-match any blocked phrase against a (lowercased) posting title.
+function titleMatchesAny(title: string, blocked: string[]): boolean {
+  if (!title) return false;
+  for (const b of blocked) {
+    if (b && title.includes(b)) return true;
+  }
+  return false;
 }
 
 // Tokenize each target title into the meaningful keywords that need to
