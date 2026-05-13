@@ -2367,7 +2367,7 @@
 }
 .rec-card__meta {
   margin: 2px 0 0;
-  font-size: var(--font-size-caption);
+  font-size: 13px;
   color: var(--fg-muted);
   line-height: var(--lh-tight);
 }
@@ -3474,7 +3474,7 @@
     column-gap: var(--space-3);
     row-gap: 2px;
     align-items: center;
-    padding: var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4);
     border: 0;
     border-bottom: 1px solid var(--border);
     border-radius: 0;
@@ -3497,10 +3497,14 @@
     justify-content: center;
   }
   .pipeline-table .col-fit .fit-pill {
+    /* Badge type — keep at small (14px); the 16px default body size was
+       too large for a 44px-wide pill. */
     font-size: var(--font-size-small);
-    padding: 8px 0;
+    font-weight: var(--fw-semibold);
+    padding: 6px 0;
     min-width: 44px;
     text-align: center;
+    line-height: 1.2;
   }
   .pipeline-table .col-role {
     grid-area: role;
@@ -3606,9 +3610,10 @@
   min-width: 0;
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
-  font-size: var(--font-size-title-3);
+  /* iOS compact-title baseline (17pt). Title-3 (22) felt large for a top bar. */
+  font-size: var(--font-size-title-4);
   line-height: var(--lh-tight);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3667,11 +3672,11 @@
   color: var(--accent-strong-fg);
 }
 .subnav-bar__item .nav-count {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   font-weight: var(--fw-semibold);
   padding: 0 6px;
   min-width: 18px;
-  height: 16px;
+  height: 18px;
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-pill);
@@ -3775,14 +3780,30 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
     grid-template-areas:
       "main";
   }
+  /* Anti-overflow firewall.
+     Grid items default to min-width: auto (= min-content), so a wide child
+     (e.g. the 1800px .rec-row carousel) stretches the grid track and pushes
+     the page wider than the device viewport, which iOS Safari then exposes
+     as horizontal scroll. Forcing min-width: 0 + max-width: 100% on the
+     grid item AND its children caps the cascade. body { overflow-x: hidden }
+     is the belt to the suspender. */
+  body { overflow-x: hidden; }
   body .app > .app__main {
     grid-area: main;
+    min-width: 0;
+    max-width: 100%;
     padding: var(--space-4);
-    max-width: none;
     /* Leave room for the fixed bottom tabbar + safe-area inset so the last
        row isn't hidden behind it. 64px ≈ tabbar height incl. padding. */
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
+  body .app > .app__main > * { min-width: 0; max-width: 100%; }
+  /* Horizontal carousels: keep them inside the viewport. They scroll
+     internally via their own overflow-x: auto. */
+  .rec-row { min-width: 0; max-width: 100%; }
+  /* Recommendation cards on phones: 360px is too wide for a 400px screen.
+     Scale to fit while staying readable. */
+  .rec-card { width: min(82vw, 320px); flex: 0 0 auto; }
   /* Footer (theme toggle + version) lives in Settings on mobile; hiding the
      desktop footer prevents it from sitting between content and the tabbar. */
   body .app__footer { display: none; }
