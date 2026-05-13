@@ -5198,3 +5198,27 @@ job-onboarding { display: contents; }
    existing rule that hides the rest of the app. */
 body[data-auth-state="loading"] job-chat,
 body[data-auth-state="out"] job-chat { display: none; }
+
+/* Inline tool-use pill in the chat thread. Surfaces what the agent is
+   doing under the hood ("search_pipeline · Acme → 3 matches") without
+   spamming the thread with raw JSON. */
+.chat-tool {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  max-width: 88%;
+}
+.chat-tool__icon { font-size: 11px; opacity: 0.8; }
+.chat-tool__name {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+}
+.chat-tool__summary { color: var(--fg-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
