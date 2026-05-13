@@ -5222,3 +5222,159 @@ body[data-auth-state="out"] job-chat { display: none; }
   color: var(--fg);
 }
 .chat-tool__summary { color: var(--fg-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* ─────────────────────────────────────────────────────────────
+   Structured vision editor — replaces the legacy KB-backed
+   file-per-concept tree. One section per category, one card per
+   job.vision_field row. Each card carries its updated_at + source.
+   ───────────────────────────────────────────────────────────── */
+
+.vf { display: flex; flex-direction: column; gap: var(--space-7); max-width: 920px; }
+
+.vf-section__title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  letter-spacing: -0.015em;
+}
+.vf-section__grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr;
+}
+
+.vf-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.vf-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.vf-card__title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.vf-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-4);
+  letter-spacing: -0.01em;
+}
+.vf-card__name {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle);
+}
+.vf-card__meta {
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+}
+.vf-card__desc {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  line-height: var(--lh-tight);
+}
+.vf-card__editor { width: 100%; }
+
+.vf-card__foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.vf-saved { color: var(--success); font-size: var(--font-size-small); }
+.vf-error { color: var(--error);   font-size: var(--font-size-small); }
+
+/* ── Inputs ─────────────────────────────────────────────────── */
+.vf-input,
+.vf-textarea {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.vf-input:focus,
+.vf-textarea:focus,
+.vf-chip-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.vf-textarea--mono { font-family: var(--font-mono); font-size: var(--font-size-small); }
+
+.vf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+/* ── Chip editor for string_array ───────────────────────────── */
+.vf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  min-height: 44px;
+  align-items: center;
+}
+.vf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-2) 4px var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-small);
+  color: var(--fg);
+}
+.vf-chip__x {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.vf-chip__x:hover { color: var(--fg); }
+.vf-chip-input {
+  flex: 1;
+  min-width: 120px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-body);
+  padding: 4px var(--space-2);
+  outline: none;
+}
+
+.vf-empty { color: var(--fg-muted); font-style: italic; }
