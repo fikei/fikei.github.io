@@ -703,11 +703,23 @@ export class JobOnboarding extends LitElement {
     const hasUserTurn = log.some(t => t.role === 'user');
     const totalSlots = QUESTIONS.length;
     const answeredCount = Object.keys(this.draft._meta.answers || {}).length;
-    const pct = Math.min(100, Math.round((answeredCount / totalSlots) * 100));
+    // Current is the next unanswered slot (0-indexed). On the landing
+    // state nothing is answered yet so current=0 ("1 of 5").
+    const current = Math.min(totalSlots - 1, answeredCount);
+    const dots = Array.from({ length: totalSlots }, (_, i) => {
+      if (i < answeredCount) return 'is-done';
+      if (i === current)     return 'is-current';
+      return '';
+    });
 
     return html`
       <section class="onboard__stage chat ${hasUserTurn ? 'chat--active' : 'chat--landing'}">
-        ${hasUserTurn ? html`<div class="chat__progress-bar"><span style="width:${pct}%"></span></div>` : nothing}
+        <div class="chat__progress" aria-label="Question ${current + 1} of ${totalSlots}">
+          <span class="chat__progress-dots">
+            ${dots.map(cls => html`<span class=${cls}></span>`)}
+          </span>
+          <span>${current + 1} of ${totalSlots}</span>
+        </div>
 
         <div class="chat__log">
           ${hasUserTurn

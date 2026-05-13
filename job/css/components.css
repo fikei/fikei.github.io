@@ -4219,22 +4219,33 @@ job-onboarding { display: contents; }
   flex-direction: column;
 }
 
-.chat__progress-bar {
+/* Progress meter — dot-step + "N of M" caption. Replaces the bar so the
+   user has both shape (where am I) and number (how much left) at a glance.
+   Sits flush top-center, captions-size, --fg-muted. */
+.chat__progress {
   flex: none;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  height: 2px;
-  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  letter-spacing: 0.01em;
+}
+.chat__progress-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+.chat__progress-dots span {
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  overflow: hidden;
+  background: var(--border);
+  transition: background 240ms ease-out, transform 240ms ease-out;
 }
-.chat__progress-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--accent-strong);
-  transition: width 240ms ease-out;
-}
+.chat__progress-dots span.is-done    { background: var(--accent-strong); }
+.chat__progress-dots span.is-current { background: var(--accent); transform: scale(1.15); }
 
 .chat__log {
   flex: 1;
@@ -4242,14 +4253,16 @@ job-onboarding { display: contents; }
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4);
+  /* Vertical rhythm: more space at the bottom so the latest turn has
+     breathing room above the composer; horizontal padding keeps text
+     off the absolute viewport edge. */
+  padding: var(--space-5) var(--space-4) var(--space-6);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  /* Latest message hugs the composer (anchor to bottom). When content
-     exceeds the log height, older messages scroll up. */
+  /* Latest turn hugs the composer; older turns scroll up off the top. */
   justify-content: flex-end;
-  gap: var(--space-4);
+  gap: var(--space-5);
   scroll-behavior: smooth;
 }
 
@@ -4296,7 +4309,7 @@ job-onboarding { display: contents; }
   color: var(--fg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 .chat__ai-reflection,
 .chat__ai-question {
@@ -4379,7 +4392,7 @@ job-onboarding { display: contents; }
   flex: none;
   width: 100%;
   background: var(--bg);
-  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
