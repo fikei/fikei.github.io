@@ -3589,16 +3589,18 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: transparent;
   color: var(--fg);
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
   flex-shrink: 0;
 }
 .mobile-bar__menu:hover,
-.mobile-bar__action:hover { background: var(--bg-surface); }
+.mobile-bar__action:hover { background: var(--bg-elevated); }
+.mobile-bar__menu:active,
+.mobile-bar__action:active { background: var(--bg-surface); }
 .mobile-bar__title {
   flex: 1;
   min-width: 0;
@@ -3764,24 +3766,26 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   }
   body.rail-open .app .app__rail { transform: translateX(0); }
   .rail-foot { margin-top: auto; flex-direction: column; align-items: flex-start; }
-  .app {
+  /* Higher-specificity selector (body .app) to outrank the unconditional
+     base.css `.app { grid-template-columns: 280px 1fr }` rule — same
+     cascade trap as the rail. Mobile collapses to a single column; the
+     rail is fixed-positioned and lives outside grid flow. */
+  body .app {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "rail"
-      "main"
-      "footer";
+      "main";
   }
-  /* Rail no longer occupies layout flow on mobile — reclaim the column. */
-  .app > .app__rail { grid-area: rail; }
-  .app__main {
+  body .app > .app__main {
+    grid-area: main;
     padding: var(--space-4);
+    max-width: none;
     /* Leave room for the fixed bottom tabbar + safe-area inset so the last
        row isn't hidden behind it. 64px ≈ tabbar height incl. padding. */
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
   /* Footer (theme toggle + version) lives in Settings on mobile; hiding the
      desktop footer prevents it from sitting between content and the tabbar. */
-  .app__footer { display: none; }
+  body .app__footer { display: none; }
 }
 
 /* ── Phase 2.0 — application-tracker UI ─────────────────────────── */
