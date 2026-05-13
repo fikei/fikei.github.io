@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifySignedInUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.5.0';
-console.log(`[onboard] v${VERSION} - pre-auth: parse/bundle/insights/extract open to anon; finalize requires user`);
+const VERSION = '0.6.0';
+console.log(`[onboard] v${VERSION} - apt voice sharpened; +4 follow-up Qs; priorTurns wired for quote-back`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -219,11 +219,23 @@ interface QuestionSpec {
 }
 
 const QUESTIONS: Record<string, QuestionSpec> = {
+  q_intent: {
+    id: 'q_intent',
+    label: 'What\'s bringing you here — actively looking, just exploring, or somewhere in between?',
+    schema: `{ "intent": "job-search"|"exploring"|"career-change"|"between-roles"|"open-to-talking", "summary": string }`,
+    notes: 'intent picks the closest enum value from their answer. summary: one short sentence reframing where they are.',
+  },
   q1_mission: {
     id: 'q1_mission',
     label: 'What kind of work has been pulling at you lately?',
     schema: `{ "missionKeywords": [string], "impactThemes": [string], "targetSectors": [string], "summary": string }`,
     notes: 'missionKeywords: 3-6 short phrases that capture the *problem domain*. impactThemes: the verbs/outcomes ("reduce friction in public services"). targetSectors: industry tags like "civic-tech", "climate", "healthtech". summary: one-sentence reframe of what they said.',
+  },
+  q_energy: {
+    id: 'q_energy',
+    label: 'When you\'ve had a long week, do you recharge around people or with time to yourself?',
+    schema: `{ "energyStyle": "solo"|"social"|"hybrid", "cultureKeywords": [string] }`,
+    notes: 'energyStyle: closest enum. cultureKeywords: 2-4 short phrases inferred from their answer (e.g. "quiet focus", "small team energy", "deep-work mode").',
   },
   q2_self: {
     id: 'q2_self',
@@ -237,11 +249,23 @@ const QUESTIONS: Record<string, QuestionSpec> = {
     schema: `{ "headline": string, "metric": string|null, "narrativeTitle": string, "narrativeMd": string }`,
     notes: 'headline: ≤ 12 words capturing the win. metric: the number or measurable result if any (e.g. "+34% retention", "$2M ARR in 9 months", "team of 12"). null if none mentioned. narrative: same as q2.',
   },
+  q_aspiration: {
+    id: 'q_aspiration',
+    label: 'If there were zero constraints — no hiring filters, no practicality — what\'s the role you\'d love to try just for the sake of it?',
+    schema: `{ "dreamRoles": [string], "aspirationalSignals": [string] }`,
+    notes: 'dreamRoles: 1-3 role descriptors from their answer ("city urbanist", "benefits-eligibility designer"). aspirationalSignals: 2-4 short phrases capturing what their dream role reveals about values ("public-interest pull", "design at scale", "invisible infrastructure").',
+  },
   q4_walkaway: {
     id: 'q4_walkaway',
     label: 'What kind of company or team would make you pass — even on a great role?',
     schema: `{ "antiMissionTerms": [string], "antiCulture": [string], "dealbreakers": [string] }`,
     notes: 'antiMissionTerms: industry/category dealbreakers ("defense", "gambling", "crypto", "adtech"). antiCulture: environment dealbreakers ("hustle culture", "RTO", "ego-driven leadership"). dealbreakers: free-form catch-all for anything else.',
+  },
+  q_hardyes: {
+    id: 'q_hardyes',
+    label: 'Two or three things that would feel non-negotiable for you to say yes to a role?',
+    schema: `{ "hardYes": [string] }`,
+    notes: 'hardYes: 2-4 short phrases capturing must-haves for accepting an offer ("mission I can defend", "real ownership", "small founding team", "remote-first"). Echo their phrasing where possible.',
   },
   q5_titles: {
     id: 'q5_titles',
@@ -257,21 +281,29 @@ const QUESTIONS: Record<string, QuestionSpec> = {
   },
 };
 
-async function modeExtract(questionId: string, answer: string, nextQuestionLabel?: string): Promise<unknown> {
+async function modeExtract(questionId: string, answer: string, nextQuestionLabel?: string, priorTurns?: { q: string; a: string }[]): Promise<unknown> {
   const q = QUESTIONS[questionId];
   if (!q) throw new Error(`unknown questionId: ${questionId}`);
   // The extract pass does two things:
   //   1. Pull structured tags from the user's answer (schema per qid).
-  //   2. Compose a single "content" string — the AI's whole next turn,
-  //      written as natural prose. It acknowledges what we heard, bridges
-  //      to the next question, then asks the next question wrapped in
-  //      **markdown bold** so the UI can render it as the emphatic ask
-  //      inside one continuous block.
+  //   2. Compose a single "content" string — the AI's next turn as one
+  //      short prose paragraph. Interpret → bridge → bolded next question.
   //
-  // You ALSO have license to rewrite the next question's wording (and even
-  // mildly reorder by picking a more natural framing) — keep the intent the
-  // same, but adapt the language so it flows.
-  const system = `You are the host of a calm, generative career-onboarding conversation. The user just answered: "${q.label}".
+  // Voice is modeled on tryapt.ai/quiz — see docs/research/apt-walkthrough-notes.md
+  // for the full pattern library. Headline rules:
+  //   - Name a trait, don't echo content.
+  //   - Quote the user's own phrasing back in quotes when the prior turns
+  //     contain a distinctive line worth recycling.
+  //   - Distill into 3-element formulas: "[X] + [Y] + [Z] is a very specific
+  //     kind of [noun]" when the answer has clean pieces to combine.
+  //   - Add light POV ("I like that mix", "That balance is powerful") — warm,
+  //     a touch opinionated, not neutral.
+  //   - Pattern recognition over summary. Reframe; don't restate.
+  const priorBlock = priorTurns && priorTurns.length
+    ? '\n\nPrior turns in this conversation (for quote-back when natural):\n' +
+      priorTurns.slice(-5).map((t, i) => `${i + 1}. Q: ${t.q}\n   A: ${t.a}`).join('\n')
+    : '';
+  const system = `You are the host of a calm, generative career-onboarding conversation. The user just answered: "${q.label}".${priorBlock}
 
 Return ONLY JSON matching:
 {
@@ -281,18 +313,28 @@ Return ONLY JSON matching:
 
 Rules for "tags": ${q.notes || 'extract per the schema above'}. Empty arrays beat guesses. Echo their own words; don't impose vocabulary they didn't use.
 
-Rules for "content":
-- Write the AI's next turn as ONE short paragraph (2-4 sentences, 60 words max).
-- Start with 1-2 sentences that *interpret* what they said — name a trait, surface a pattern, distill the shape of their answer. Don't just echo back. Examples:
+Rules for "content" — the AI's next turn as ONE short paragraph (2-4 sentences, 60 words max):
+
+VOICE (apt-inspired)
+- Start with an interpretation that *names a trait or pattern*, not an echo. Examples of good shape:
     - "That's a purpose-driven direction — sounds like you want the work to leave a fingerprint."
     - "Engagement loops + benefits navigation is a specific kind of taste."
+    - "You're building independently while interviewing — that's someone comfortable with ambiguity."
+- When a prior turn contains a distinctive phrase, quote it back verbatim in double-quotes. Example: 'That "invisible but essential" pull keeps showing up.' Use this trick sparingly — once or twice across the whole conversation, not every turn.
+- When the answer breaks into clean pieces, use a 3-element distillation formula: "[X] + [Y] + [Z] is a very specific kind of [noun]."
+- Add light POV occasionally: "I like that mix", "That balance is powerful", "That tracks". Never corporate ("Great answer!", "Thanks for sharing").
+- Em-dashes welcome. Sentence case. No emoji. Avoid all-caps.
+
+QUESTION
 - ${nextQuestionLabel
-    ? `End with the next question. The question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation; keep the substance, change the language. Make it easier to answer, not more precise.`
+    ? `End with the next question. The question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation — keep the substance, change the language. Make it easier to answer than the canonical phrasing.`
     : 'End with a soft wrap-up sentence — no further question.'}
-- FORMATTING REQUIREMENT: ${nextQuestionLabel
-    ? 'The next question MUST be the very last sentence of the paragraph, MUST end with a "?", and MUST be wrapped in **double-asterisks** on both sides. Like: "**What does that look like for you?**". This is non-negotiable; the UI relies on it to bold the ask. Do NOT use single-asterisks anywhere in the paragraph — no italic emphasis, no quoted words via asterisks. Plain prose otherwise.'
+
+FORMATTING REQUIREMENT
+- ${nextQuestionLabel
+    ? 'The next question MUST be the LAST sentence of the paragraph, MUST end with a "?", and MUST be wrapped in **double-asterisks** on both sides. Example: "**What does that look like for you?**". This is non-negotiable — the UI uses it to bold the ask.'
     : 'Do not use any asterisks in the paragraph.'}
-- Tone: warm, observational, lightly opinionated. Sentence case. No emoji. Em-dashes welcome. Avoid corporate phrases like "Great answer!" or "Thanks for sharing".`;
+- Single-asterisks are FORBIDDEN — no italic emphasis, no markup other than the required double-asterisk bold. Plain prose otherwise. The only allowed quote marks are around phrases pulled verbatim from the user's prior answers.`;
   return await callClaudeJson(system, answer.slice(0, 8000), 2000);
 }
 
@@ -356,7 +398,7 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return err('POST only', 405);
 
-  let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; profile?: Partial<DraftProfile>; demo?: boolean };
+  let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; priorTurns?: { q: string; a: string }[]; profile?: Partial<DraftProfile>; demo?: boolean };
   try { body = await req.json(); } catch { return err('invalid json'); }
 
   // Auth model per-mode:
@@ -382,7 +424,7 @@ serve(async (req: Request) => {
       }
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');
-        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel) as { tags?: unknown; content?: string };
+        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel, body.priorTurns) as { tags?: unknown; content?: string };
         // Belt-and-braces: if Haiku forgot to bold the final question, bold
         // it ourselves. Find the last "?"-terminated sentence, wrap it.
         let content = out?.content || '';
