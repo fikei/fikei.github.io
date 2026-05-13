@@ -178,8 +178,10 @@ export class JobChat extends LitElement {
     const input = m.tool_payload?.input || {};
     const out = m.tool_payload?.output || {};
     switch (m.tool_name) {
-      case 'read_preferences':
-        return `blocked: ${(out.blocked_titles || []).length} · must_have: ${(out.must_have_keywords || []).length}`;
+      case 'read_preferences': {
+        const len = (k) => (out?.[k]?.value || out?.[k] || []).length;
+        return `blocked: ${len('blocked_titles')} · must_have: ${len('must_have_keywords')} · titles: ${len('target_titles')} · geos: ${len('target_geographies')}`;
+      }
       case 'search_pipeline':
         return `${input.query || '(all)'} → ${out.count ?? 0} matches`;
       case 'update_pipeline_row': {
