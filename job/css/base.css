@@ -1,11 +1,11 @@
 /* @import querystrings are bumped alongside JOB_VERSION in app.js so a
    release that only touches components.css/tokens busts the browser
    disk cache. The HTML cache-buster only refreshes base.css itself. */
-@import url("./tokens-generic-light.css?v=0.49.0");
-@import url("./tokens-generic-dark.css?v=0.49.0");
-@import url("./tokens-ctrl-light.css?v=0.49.0");
-@import url("./tokens-ctrl-dark.css?v=0.49.0");
-@import url("./components.css?v=0.49.0");
+@import url("./tokens-generic-light.css?v=0.49.1");
+@import url("./tokens-generic-dark.css?v=0.49.1");
+@import url("./tokens-ctrl-light.css?v=0.49.1");
+@import url("./tokens-ctrl-dark.css?v=0.49.1");
+@import url("./components.css?v=0.49.1");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
 
@@ -40,9 +40,15 @@ button { font: inherit; cursor: pointer; }
 
 ::selection { background: var(--accent-muted); color: var(--fg); }
 
-/* Auth gating: signin card visible until allowlisted user is signed in. */
+/* Auth gating: gate visible only when auth definitely resolved to signed-out.
+   During the loading window (initial paint → session restored from cookie)
+   we hide both the gate and the app so neither flashes briefly during page
+   navigations. Once ctrl-auth dispatches signedin/signedout, the matching
+   surface fades in. */
+body[data-auth-state="loading"] #signin-gate,
+body[data-auth-state="loading"] .app { visibility: hidden; }
 body[data-auth-state="in"] #signin-gate { display: none; }
-body:not([data-auth-state="in"]) .app { display: none; }
+body[data-auth-state="out"] .app { display: none; }
 
 /* Hide the floating CtrlAuth bar while signed-out (own gate has the CTA). */
 body:not([data-auth-state="in"]) #ctrlAuthBar { display: none !important; }
