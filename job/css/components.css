@@ -4222,8 +4222,12 @@ job-onboarding { display: contents; }
 .chat__progress-bar {
   flex: none;
   width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
   height: 2px;
-  background: transparent;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
 }
 .chat__progress-bar > span {
   display: block;
@@ -4245,7 +4249,7 @@ job-onboarding { display: contents; }
   /* Latest message hugs the composer (anchor to bottom). When content
      exceeds the log height, older messages scroll up. */
   justify-content: flex-end;
-  gap: var(--space-6);
+  gap: var(--space-4);
   scroll-behavior: smooth;
 }
 
