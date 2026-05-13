@@ -4761,6 +4761,12 @@ job-onboarding { display: contents; }
   text-align: left;
   color: var(--fg);
   white-space: pre-wrap;
+  /* Soft outlined card — apt-style. Just enough definition to anchor the
+     user side; AI stays plain inline text. */
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
 }
 
 /* Saving pill — small left-aligned status with a pulsing dot. Lives in
