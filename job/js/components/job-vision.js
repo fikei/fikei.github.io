@@ -1,214 +1,106 @@
-// job-vision — tabbed browser for fikei/job/02-goals-intents/.
+// job-vision — structured editor for job.vision_field. Each preference
+// is its own row in Postgres (see migration 074); this page is a typed
+// form over that table, replacing the old KB-backed tree-of-markdown-
+// files UI.
 //
-// Layout:
-//   [Narrative | Goals | Intents | Filters | Other]   ← only non-empty tabs
-//   Single-column list of cards (title · facts/bullets preview · "Open")
-//   Click a card  → expands inline to render structured fields + markdown
-//                   body, plus Edit/Save/Cancel. Edits commit via kb-write
-//                   with baseSha concurrency control.
+// Reads:  GET  /functions/v1/vision-field → { fields: { [name]: {...} } }
+// Writes: POST /functions/v1/vision-field { updates: [{name,value}] }
 //
-// Structure on disk: the same `**Label:** value` convention used elsewhere
-// in fikei/job (see migrate-job's parseDoc). Fields live between the H1 and
-// the first H2 / non-field line. We lift those into a "facts strip" so the
-// UI matches how /jobs already consumes the data, while editing stays raw
-// markdown — no schema lock-in.
+// Auth: standard /job bearer token. The edge fn marks every write as
+// `source: 'user'` so the agent-driven 'agent' edits are visually
+// distinguishable in the metadata footer of each field.
+
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
-import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
-const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { writeFile }] = await Promise.all([
-  import('../markdown.js' + V),
-  import('../kbwrite.js' + V),
-]);
 
-const VISION_DIR = '02-goals-intents';
+const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+const FN_URL = `${SUPABASE_URL}/functions/v1/vision-field`;
 
-const CATEGORIES = [
-  { id: 'narrative', label: 'Narrative',
-    test: (n) => /^(narrative|voice|story|bio|about|arc)/.test(n) },
-  { id: 'goals',     label: 'Goals',
-    test: (n) => /^(goal|north|mission|vision|aim|ambition)/.test(n) },
-  { id: 'intents',   label: 'Intents',
-    test: (n) => /^(intent|target|seeking|looking|wants|preference|stage|sector|role|geo|comp|salary|location)/.test(n) },
-  { id: 'filters',   label: 'Filters',
-    test: (n) => /^(criteria|filter|dealbreaker|deal-breaker|anti|no-go|must|reject|exclud)/.test(n) },
-  { id: 'other',     label: 'Other', test: () => true },
+// Field grouping. Each section lists the canonical field names that
+// belong to it. Anything not listed below falls into 'Other'.
+const SECTIONS = [
+  { id: 'narrative', label: 'Narrative + voice',
+    names: ['narrative_arc', 'voice_rules_md'] },
+  { id: 'targets', label: 'Targets',
+    names: ['target_titles', 'target_stages', 'target_sectors', 'target_geographies'] },
+  { id: 'mission', label: 'Mission + culture',
+    names: ['mission_keywords', 'mission_required', 'anti_mission_terms', 'culture_keywords', 'interest_tags', 'impact_themes'] },
+  { id: 'comp', label: 'Compensation',
+    names: ['comp_floor_base', 'comp_floor_total'] },
+  { id: 'filters', label: 'Filters',
+    names: ['deal_breakers', 'blocked_titles', 'must_have_keywords'] },
+  { id: 'advanced', label: 'Advanced',
+    names: ['score_weights', 'raw_md'] },
 ];
 
-function categoryFor(name) {
-  const base = name.replace(/\.md$/, '').toLowerCase();
-  for (const c of CATEGORIES) if (c.test(base)) return c.id;
-  return 'other';
+function relTime(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!t) return '';
+  const dt = Date.now() - t;
+  if (dt < 60_000) return 'just now';
+  if (dt < 3_600_000) return `${Math.floor(dt / 60_000)}m ago`;
+  if (dt < 86_400_000) return `${Math.floor(dt / 3_600_000)}h ago`;
+  if (dt < 30 * 86_400_000) return `${Math.floor(dt / 86_400_000)}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
-function titleFromFile(name, content) {
-  const m = (content || '').match(/^#\s+(.+)$/m);
-  if (m) return m[1].trim();
-  return name.replace(/\.md$/, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function wordCount(content) {
-  return (content || '').trim().split(/\s+/).filter(Boolean).length;
-}
-
-// Parse `**Label:** value` lines between the H1 and the first H2 / non-field
-// content. Mirrors migrate-job's parseDoc. Anything we couldn't pull out as a
-// field stays in the body for normal markdown rendering.
-function parseDoc(content) {
-  const out = { title: '', fields: [], body: '' };
-  const lines = (content || '').split(/\r?\n/);
-  let i = 0;
-  let inHeader = true;
-  const bodyStart = () => lines.slice(i).join('\n').trim();
-  for (; i < lines.length; i++) {
-    const line = lines[i];
-    if (!out.title) {
-      const h1 = line.match(/^#\s+(.+)$/);
-      if (h1) { out.title = h1[1].trim(); continue; }
-    }
-    if (inHeader) {
-      if (line.startsWith('## ')) { inHeader = false; break; }
-      const f = line.match(/^\*\*([^*:]+):\*\*\s*(.*)$/);
-      if (f) { out.fields.push({ label: f[1].trim(), value: f[2].trim() }); continue; }
-      if (!line.trim()) continue;
-      // First non-field, non-blank line ends the header section.
-      inHeader = false;
-      break;
-    }
-  }
-  out.body = bodyStart();
-  return out;
-}
-
-// A value is treated as a list if it has 2+ items separated by `,` or `;`
-// or ` / `. Returns null otherwise. We use this to pick chip vs. inline.
-function splitList(value) {
-  if (!value) return null;
-  const parts = value.split(/\s*(?:,|;| \/ )\s*/).map(s => s.trim()).filter(Boolean);
-  return parts.length >= 2 ? parts : null;
-}
-
-// Field labels that should render as money. Values are passed through —
-// we don't reformat (Ian might write "$180k base + 0.5% equity").
-const MONEY_LABELS = /^(base|base floor|salary|salary floor|cash|total comp|total comp target|fractional|fractional rate|day rate|hourly|equity|equity expectation|equity target|all-in|total)/i;
-
-function isMoney(label) { return MONEY_LABELS.test(label); }
-
-// Some KB files have a literal bullet glyph after the markdown marker
-// (e.g. `- • foo` from copy/paste). Both the marker AND the glyph render,
-// giving the appearance of "double bullets". Strip the leading glyph
-// (and other common variants) from the captured text. Also collapse any
-// remaining nested markdown bullet markers at the very start.
-const LEADING_BULLET_RE = /^[\s ]*[•·●○◦▪▫–—-][\s ]*/;
-
-function cleanBulletText(text) {
-  let out = (text || '').trim();
-  // Repeat in case the line is `· · foo` etc.
-  for (let i = 0; i < 3 && LEADING_BULLET_RE.test(out); i++) {
-    out = out.replace(LEADING_BULLET_RE, '');
-  }
-  return out.trim();
-}
-
-// Normalize the raw markdown body before marked sees it: when a list line
-// starts with `- • foo` (or any equivalent), drop the glyph so marked
-// renders only one bullet from the list marker. Leaves real content alone.
-function normalizeBulletGlyphs(md) {
-  if (!md) return md;
-  return md.replace(
-    /^([ \t]*)([-*+])([ \t]+)([•·●○◦▪▫–—-])([ \t]+|)/gm,
-    (_m, indent, marker, sp, _glyph, _tail) => `${indent}${marker}${sp}`
-  );
-}
-
-// First non-field, non-heading bullet line from the body — used as a card
-// preview when the file is bullet-heavy (deal-breakers, voice rules, etc.).
-function firstBullets(body, max = 3) {
-  if (!body) return [];
-  const out = [];
-  for (const line of body.split(/\r?\n/)) {
-    const m = line.match(/^\s*[-*+]\s+(.+?)\s*$/);
-    if (m) out.push(cleanBulletText(m[1]));
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-// Plain-text fallback preview if the file has no fields and no bullets.
-function prosePreview(body) {
-  return (body || '')
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, s, l) => (l || s))
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^[#>*\-+\s]+/gm, '')
-    .replace(/\*\*?([^*]+)\*\*?/g, '$1')
-    .replace(/_+([^_]+)_+/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const SOURCE_LABEL = {
+  user: 'you',
+  agent: 'the chat agent',
+  'migrate-job': 'the initial KB import',
+  import: 'an import',
+};
 
 export class JobVision extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
-    state:    { state: true },
-    error:    { state: true },
-    files:    { state: true },
-    activeTab:{ state: true },
-    openPath: { state: true },
+    state:   { state: true },     // 'idle' | 'loading' | 'loaded' | 'error'
+    error:   { state: true },
+    fields:  { state: true },     // { [name]: row }
+    drafts:  { state: true },     // { [name]: draft value } — edit-in-progress
+    saving:  { state: true },     // Set<name>
+    flash:   { state: true },     // { [name]: 'saved' | 'error' }
   };
 
   constructor() {
     super();
     this.state = 'idle';
     this.error = '';
-    this.files = [];
-    const params = new URLSearchParams(location.search);
-    this.activeTab = params.get('tab') || 'all';
-    this.openPath = params.get('open') || '';
+    this.fields = {};
+    this.drafts = {};
+    this.saving = new Set();
+    this.flash = {};
   }
 
   connectedCallback() {
     super.connectedCallback();
-    this._maybeLoad();
-    this._onAuth = () => this._maybeLoad();
-    document.addEventListener('ctrl:auth:signedin', this._onAuth);
-    document.addEventListener('job:auth:ready', this._onAuth);
+    this._authReady = () => this._load();
+    document.addEventListener('job:auth:ready', this._authReady);
+    if (document.body.dataset.authState === 'in') this._load();
   }
   disconnectedCallback() {
-    document.removeEventListener('ctrl:auth:signedin', this._onAuth);
-    document.removeEventListener('job:auth:ready', this._onAuth);
+    document.removeEventListener('job:auth:ready', this._authReady);
     super.disconnectedCallback();
   }
 
-  async _maybeLoad() {
-    if (document.body.dataset.authState !== 'in') return;
+  _supabase() { return window.CtrlAuth?.getSupabaseClient?.(); }
+
+  async _token() {
+    const sb = this._supabase();
+    return (await sb?.auth.getSession?.())?.data?.session?.access_token;
+  }
+
+  async _load() {
     if (this.state === 'loading' || this.state === 'loaded') return;
     this.state = 'loading';
+    this.error = '';
     try {
-      const { entries = [] } = await window.JobKB.listDir(VISION_DIR);
-      const mdEntries = entries
-        .filter(e => e.type === 'file' && e.name.endsWith('.md'))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      const files = await Promise.all(mdEntries.map(async (e) => {
-        try {
-          const { content, sha } = await window.JobKB.readFile(e.path);
-          return {
-            path: e.path, name: e.name, content, sha,
-            category: categoryFor(e.name),
-            editing: false, draft: '', saving: false, saveError: '',
-          };
-        } catch (err) {
-          return {
-            path: e.path, name: e.name, content: '', sha: '',
-            category: categoryFor(e.name),
-            editing: false, draft: '', saving: false,
-            saveError: String(err?.message || err),
-          };
-        }
-      }));
-      this.files = files;
+      const token = await this._token();
+      const res = await fetch(FN_URL, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`Server ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      this.fields = data.fields || {};
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e?.message || e);
@@ -216,253 +108,240 @@ export class JobVision extends LitElement {
     }
   }
 
-  _writeUrl() {
-    const qs = new URLSearchParams();
-    if (this.activeTab && this.activeTab !== 'all') qs.set('tab', this.activeTab);
-    if (this.openPath) qs.set('open', this.openPath);
-    const search = qs.toString();
-    history.replaceState(null, '', '/job/vision/' + (search ? `?${search}` : ''));
+  _draftFor(name) {
+    if (Object.prototype.hasOwnProperty.call(this.drafts, name)) return this.drafts[name];
+    return this._currentValue(name);
   }
 
-  _switchTab(id) {
-    this.activeTab = id;
-    if (this.openPath) {
-      const open = this.files.find(f => f.path === this.openPath);
-      if (open && id !== 'all' && open.category !== id) this.openPath = '';
+  _currentValue(name) {
+    const v = this.fields[name]?.value;
+    if (v === undefined || v === null) {
+      const kind = this.fields[name]?.kind;
+      if (kind === 'string_array') return [];
+      if (kind === 'text_md')      return '';
+      if (kind === 'number')       return null;
+      if (kind === 'bool')         return false;
+      return null;
     }
-    this._writeUrl();
+    return v;
   }
 
-  _openCard(path) {
-    this.openPath = this.openPath === path ? '' : path;
-    if (!this.openPath) {
-      this._updateFile(path, { editing: false, draft: '', saveError: '' });
-    }
-    this._writeUrl();
+  _setDraft(name, value) {
+    this.drafts = { ...this.drafts, [name]: value };
   }
 
-  _updateFile(path, patch) {
-    this.files = this.files.map(f => f.path === path ? { ...f, ...patch } : f);
+  _hasChanges(name) {
+    if (!Object.prototype.hasOwnProperty.call(this.drafts, name)) return false;
+    const a = JSON.stringify(this.drafts[name]);
+    const b = JSON.stringify(this._currentValue(name));
+    return a !== b;
   }
 
-  _startEdit(path) {
-    const f = this.files.find(x => x.path === path);
-    if (!f) return;
-    this._updateFile(path, { editing: true, draft: f.content, saveError: '' });
-  }
-  _cancelEdit(path) {
-    this._updateFile(path, { editing: false, draft: '', saveError: '' });
-  }
-  _onDraftInput(path, value) {
-    this._updateFile(path, { draft: value });
+  _cancel(name) {
+    const { [name]: _, ...rest } = this.drafts;
+    this.drafts = rest;
+    const { [name]: _f, ...rf } = this.flash;
+    this.flash = rf;
   }
 
-  async _save(path) {
-    const f = this.files.find(x => x.path === path);
-    if (!f) return;
-    const next = (f.draft ?? '').trimEnd() + '\n';
-    if (next === (f.content ?? '')) {
-      this._updateFile(path, { editing: false, draft: '', saveError: '' });
-      return;
-    }
-    this._updateFile(path, { saving: true, saveError: '' });
+  async _save(name) {
+    if (!this._hasChanges(name) || this.saving.has(name)) return;
+    this.saving = new Set([...this.saving, name]);
+    this.flash = { ...this.flash, [name]: '' };
     try {
-      const res = await writeFile(path, next, f.sha);
-      this._updateFile(path, {
-        content: next,
-        sha: res?.sha || f.sha,
-        editing: false,
-        draft: '',
-        saving: false,
-        saveError: '',
+      const token = await this._token();
+      const value = this.drafts[name];
+      const res = await fetch(FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ updates: [{ name, value }] }),
       });
+      if (!res.ok) throw new Error(`Server ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      if (data.errors?.length) throw new Error(data.errors[0].reason);
+      // Refresh just this field's metadata
+      const updated_at = data.updated?.[0]?.updated_at || new Date().toISOString();
+      this.fields = {
+        ...this.fields,
+        [name]: { ...this.fields[name], value, updated_at, source: 'user', source_detail: null },
+      };
+      const { [name]: _, ...rest } = this.drafts;
+      this.drafts = rest;
+      this.flash = { ...this.flash, [name]: 'saved' };
+      setTimeout(() => { const { [name]: _x, ...r } = this.flash; this.flash = r; }, 1800);
     } catch (e) {
-      this._updateFile(path, {
-        saving: false,
-        saveError: String(e?.message || e),
-      });
+      this.flash = { ...this.flash, [name]: `error: ${String(e.message || e).slice(0, 120)}` };
+    } finally {
+      const s = new Set(this.saving); s.delete(name); this.saving = s;
     }
   }
 
-  _visibleTabs() {
-    const counts = new Map([['all', this.files.length]]);
-    for (const f of this.files) counts.set(f.category, (counts.get(f.category) || 0) + 1);
-    const tabs = [{ id: 'all', label: 'All', count: counts.get('all') || 0 }];
-    for (const c of CATEGORIES) {
-      const n = counts.get(c.id) || 0;
-      if (n > 0) tabs.push({ id: c.id, label: c.label, count: n });
-    }
-    return tabs;
-  }
+  // ── Renderers per kind ───────────────────────────────────────────────
 
-  _filteredFiles() {
-    if (this.activeTab === 'all') return this.files;
-    return this.files.filter(f => f.category === this.activeTab);
-  }
-
-  _renderTabs(tabs) {
+  _renderStringArray(name) {
+    const value = this._draftFor(name) || [];
     return html`
-      <div class="asset-tabs">
-        ${tabs.map(t => html`
-          <button class="asset-tabs__tab ${this.activeTab === t.id ? 'is-active' : ''}"
-                  @click=${() => this._switchTab(t.id)}>
-            ${t.label} <span class="muted" style="font-weight:400;">${t.count}</span>
-          </button>
+      <div class="vf-chips">
+        ${value.map((v, i) => html`
+          <span class="vf-chip">
+            ${v}
+            <button class="vf-chip__x" aria-label="Remove"
+                    @click=${() => this._setDraft(name, value.filter((_, idx) => idx !== i))}>×</button>
+          </span>
         `)}
+        <input type="text" class="vf-chip-input" placeholder="Add term + Enter"
+               @keydown=${(e) => {
+                 if (e.key === 'Enter') {
+                   e.preventDefault();
+                   const t = e.target.value.trim();
+                   if (!t) return;
+                   if (value.includes(t)) { e.target.value = ''; return; }
+                   this._setDraft(name, [...value, t]);
+                   e.target.value = '';
+                 } else if (e.key === 'Backspace' && !e.target.value && value.length) {
+                   this._setDraft(name, value.slice(0, -1));
+                 }
+               }}>
       </div>
     `;
   }
 
-  // Render one field row. Lists become chips; money labels render as the
-  // value emphasized; everything else is plain text.
-  _renderField(field) {
-    const items = splitList(field.value);
-    const money = isMoney(field.label);
+  _renderTextMd(name) {
+    const value = this._draftFor(name) || '';
+    const rows = Math.min(20, Math.max(3, value.split('\n').length + 1));
     return html`
-      <div class="facts__row">
-        <dt class="facts__label">${field.label}</dt>
-        <dd class="facts__value ${money ? 'facts__value--money' : ''}">
-          ${items
-            ? html`<div class="chip-row">${items.map(x => html`<span class="tag-chip">${x}</span>`)}</div>`
-            : (field.value || html`<span class="muted">—</span>`)}
-        </dd>
-      </div>
+      <textarea class="vf-textarea" rows=${rows}
+                .value=${value}
+                @input=${(e) => this._setDraft(name, e.target.value)}></textarea>
     `;
   }
 
-  _renderFacts(doc, { compact = false } = {}) {
-    if (!doc.fields.length) return nothing;
-    const fields = compact ? doc.fields.slice(0, 4) : doc.fields;
+  _renderNumber(name) {
+    const value = this._draftFor(name);
     return html`
-      <dl class="facts ${compact ? 'facts--compact' : ''}">
-        ${fields.map(f => this._renderField(f))}
-      </dl>
+      <input type="number" class="vf-input" .value=${value == null ? '' : String(value)}
+             @input=${(e) => this._setDraft(name, e.target.value === '' ? null : Number(e.target.value))}>
     `;
   }
 
-  _renderCardPreview(doc) {
-    if (doc.fields.length) return this._renderFacts(doc, { compact: true });
-    const bullets = firstBullets(doc.body, 3);
-    if (bullets.length) {
-      return html`
-        <ul class="card-bullets">
-          ${bullets.map(b => html`<li>${b}</li>`)}
-        </ul>
-      `;
+  _renderBool(name) {
+    const value = !!this._draftFor(name);
+    return html`
+      <label class="vf-toggle">
+        <input type="checkbox" .checked=${value}
+               @change=${(e) => this._setDraft(name, e.target.checked)}>
+        <span>${value ? 'On' : 'Off'}</span>
+      </label>
+    `;
+  }
+
+  _renderJson(name) {
+    const raw = this._draftFor(name);
+    const value = raw == null ? '' : JSON.stringify(raw, null, 2);
+    return html`
+      <textarea class="vf-textarea vf-textarea--mono" rows="8" spellcheck="false"
+                .value=${value}
+                @input=${(e) => {
+                  const t = e.target.value;
+                  try { this._setDraft(name, t.trim() === '' ? null : JSON.parse(t)); }
+                  catch (_) { this._setDraft(name, t); /* leave as string until valid */ }
+                }}></textarea>
+    `;
+  }
+
+  _renderEditor(name) {
+    const kind = this.fields[name]?.kind;
+    switch (kind) {
+      case 'string_array': return this._renderStringArray(name);
+      case 'text_md':      return this._renderTextMd(name);
+      case 'number':       return this._renderNumber(name);
+      case 'bool':         return this._renderBool(name);
+      case 'json':         return this._renderJson(name);
+      default:             return html`<em class="vf-empty">Unknown kind: ${kind}</em>`;
     }
-    const prose = prosePreview(doc.body);
-    return html`<p class="vision-card__preview">${prose || html`<span class="muted">_(empty)_</span>`}</p>`;
   }
 
-  _renderCard(f) {
-    const doc = parseDoc(f.content);
-    const title = doc.title || titleFromFile(f.name, f.content);
-    const words = wordCount(f.content);
-    const isOpen = this.openPath === f.path;
-    if (isOpen) return this._renderDetail(f, doc, title);
+  _renderFieldCard(name) {
+    const f = this.fields[name];
+    if (!f) return nothing;
+    const dirty = this._hasChanges(name);
+    const saving = this.saving.has(name);
+    const flash = this.flash[name];
+    const updatedBy = SOURCE_LABEL[f.source] || f.source;
     return html`
-      <button type="button" class="vision-card" @click=${() => this._openCard(f.path)}>
-        <header class="vision-card__head">
-          <h3 class="vision-card__title">${title}</h3>
-          <span class="vision-card__cta">Open →</span>
+      <article class="vf-card" data-kind=${f.kind}>
+        <header class="vf-card__head">
+          <div class="vf-card__title-wrap">
+            <h3 class="vf-card__title">${f.display_name || name}</h3>
+            <span class="vf-card__name">${name}</span>
+          </div>
+          <div class="vf-card__meta">
+            <span class="vf-card__updated" title=${new Date(f.updated_at).toLocaleString()}>
+              Updated ${relTime(f.updated_at)} by ${updatedBy}
+            </span>
+          </div>
         </header>
-        <div class="vision-card__meta">
-          <span>${f.name}</span>
-          <span>·</span>
-          <span>${words} ${words === 1 ? 'word' : 'words'}</span>
-          ${doc.fields.length ? html`<span>·</span><span>${doc.fields.length} field${doc.fields.length === 1 ? '' : 's'}</span>` : nothing}
-        </div>
-        ${this._renderCardPreview(doc)}
-      </button>
+        ${f.description ? html`<p class="vf-card__desc">${f.description}</p>` : nothing}
+        <div class="vf-card__editor">${this._renderEditor(name)}</div>
+        ${dirty || flash ? html`
+          <footer class="vf-card__foot">
+            ${flash === 'saved'
+              ? html`<span class="vf-saved">✓ Saved</span>`
+              : flash
+                ? html`<span class="vf-error">${flash}</span>`
+                : nothing}
+            ${dirty ? html`
+              <button class="btn btn--sm" ?disabled=${saving}
+                      @click=${() => this._cancel(name)}>Cancel</button>
+              <button class="btn btn--sm btn--primary" ?disabled=${saving}
+                      @click=${() => this._save(name)}>
+                ${saving ? 'Saving…' : 'Save'}
+              </button>
+            ` : nothing}
+          </footer>
+        ` : nothing}
+      </article>
     `;
   }
 
-  _renderDetail(f, doc, title) {
+  _renderSection(section) {
+    const present = section.names.filter((n) => this.fields[n]);
+    if (!present.length) return nothing;
     return html`
-      <section class="vision-detail">
-        <header class="vision-detail__head">
-          <div>
-            <h2 class="vision-detail__title">${title}</h2>
-            <p class="muted" style="margin:0;font-size:var(--font-size-small);font-family:var(--font-mono);">${f.path}</p>
-          </div>
-          <div class="vision-detail__actions">
-            ${f.editing ? html`
-              <button class="btn btn--sm" ?disabled=${f.saving} @click=${() => this._cancelEdit(f.path)}>Cancel</button>
-              <button class="btn btn--sm btn--primary" ?disabled=${f.saving} @click=${() => this._save(f.path)}>
-                ${f.saving ? 'Saving…' : 'Save'}
-              </button>
-            ` : html`
-              <button class="btn btn--sm" @click=${() => this._startEdit(f.path)}>Edit</button>
-              <button class="btn btn--sm" @click=${() => this._openCard(f.path)}>Close</button>
-            `}
-          </div>
-        </header>
+      <section class="vf-section">
+        <h2 class="vf-section__title">${section.label}</h2>
+        <div class="vf-section__grid">
+          ${present.map((n) => this._renderFieldCard(n))}
+        </div>
+      </section>
+    `;
+  }
 
-        ${f.saveError ? html`
-          <p class="muted" style="color:var(--error);margin:0 0 var(--space-3);">${f.saveError}</p>
-        ` : nothing}
-
-        ${f.editing ? html`
-          <textarea class="asset-editor" style="min-height: 360px;"
-                    .value=${f.draft}
-                    @input=${(e) => this._onDraftInput(f.path, e.target.value)}></textarea>
-          <p class="muted" style="font-size:var(--font-size-small);margin:var(--space-3) 0 0;">
-            Tip: header fields use <code>**Label:** value</code>. Commas in a value become chips
-            (e.g. <code>**Primary sectors:** healthtech, edtech</code>). The /jobs skill reads
-            the same fields.
-          </p>
-        ` : html`
-          ${this._renderFacts(doc)}
-          ${doc.body ? html`
-            <article class="kb-doc asset-doc">${unsafeHTML(renderMarkdown(normalizeBulletGlyphs(doc.body)))}</article>
-          ` : (doc.fields.length ? nothing : html`<p class="muted">_(empty)_</p>`)}
-        `}
+  _renderOtherSection() {
+    const known = new Set(SECTIONS.flatMap((s) => s.names));
+    const others = Object.keys(this.fields).filter((n) => !known.has(n)).sort();
+    if (!others.length) return nothing;
+    return html`
+      <section class="vf-section">
+        <h2 class="vf-section__title">Other</h2>
+        <div class="vf-section__grid">
+          ${others.map((n) => this._renderFieldCard(n))}
+        </div>
       </section>
     `;
   }
 
   render() {
-    if (this.state === 'idle' || this.state === 'loading') {
-      return html`
-        <div class="vision-grid">
-          ${[0,1,2,3].map(() => html`
-            <div class="vision-card" style="cursor:default;">
-              <div class="skeleton" style="width:60%;height:18px;display:block;margin-bottom:8px;"></div>
-              <div class="skeleton" style="width:90%;height:12px;display:block;margin-bottom:6px;"></div>
-              <div class="skeleton" style="width:80%;height:12px;display:block;"></div>
-            </div>
-          `)}
-        </div>
-      `;
+    if (this.state === 'loading' || this.state === 'idle') {
+      return html`<p class="muted">Loading…</p>`;
     }
     if (this.state === 'error') {
-      return html`
-        <div class="placeholder" style="border-color:var(--error);color:var(--error);">
-          <h2>Couldn't load Search plan</h2>
-          <p style="font-family:var(--font-mono);font-size:13px;">${this.error}</p>
-        </div>`;
+      return html`<div class="placeholder"><h2>Couldn't load</h2><p>${this.error}</p></div>`;
     }
-    if (!this.files.length) {
-      return html`
-        <div class="vision-empty">
-          <h2 style="margin:0 0 var(--space-2);">No files yet</h2>
-          <p style="margin:0;">Add markdown files to <code>${VISION_DIR}/</code> in fikei/job to see them here.</p>
-        </div>`;
-    }
-    const tabs = this._visibleTabs();
-    const filtered = this._filteredFiles();
-    const totalFields = this.files.reduce((sum, f) => sum + parseDoc(f.content).fields.length, 0);
     return html`
-      ${this._renderTabs(tabs)}
-      <div class="vision-meta">
-        <span>${filtered.length} ${filtered.length === 1 ? 'file' : 'files'}</span>
-        <span>·</span>
-        <span>${totalFields} structured field${totalFields === 1 ? '' : 's'} across Search plan</span>
-      </div>
-      <div class="vision-grid">
-        ${filtered.length === 0
-          ? html`<div class="vision-empty" style="grid-column: 1 / -1;">Nothing in this category yet.</div>`
-          : filtered.map(f => this._renderCard(f))}
+      <div class="vf">
+        ${SECTIONS.map((s) => this._renderSection(s))}
+        ${this._renderOtherSection()}
       </div>
     `;
   }
