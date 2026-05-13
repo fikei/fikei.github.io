@@ -104,6 +104,9 @@ export class JobRail extends LitElement {
       const active = roles.filter(r => bucketFor(r) === 'active').length;
       const recommended = recs?.count ?? (recs?.recommendations?.length ?? 0);
       this.counts = { leads, active, recommended };
+      // Broadcast so other mobile chrome (the segmented .subnav-bar in
+      // app.js) can pull the same counts without re-fetching.
+      document.dispatchEvent(new CustomEvent('job:rail:counts', { detail: this.counts }));
     } finally {
       this._loading = false;
     }

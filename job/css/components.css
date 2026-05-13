@@ -3741,7 +3741,12 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   .mobile-bar { display: flex; }
   .app-tabbar  { display: flex; }
   .subnav-bar[data-has-items="true"] { display: block; }
-  .app__rail {
+  /* Higher specificity (.app .app__rail) than base.css's unconditional
+     `.app__rail { position: sticky }` rule, so the drawer's `fixed`
+     positioning wins regardless of CSS load order. base.css @imports
+     components.css then declares its own rules, so a flat `.app__rail`
+     selector here would otherwise lose the cascade. */
+  .app .app__rail {
     position: fixed;
     inset: 0 auto 0 0;
     width: min(280px, 86vw);
@@ -3757,7 +3762,7 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
     padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
     gap: var(--space-5);
   }
-  body.rail-open .app__rail { transform: translateX(0); }
+  body.rail-open .app .app__rail { transform: translateX(0); }
   .rail-foot { margin-top: auto; flex-direction: column; align-items: flex-start; }
   .app {
     grid-template-columns: 1fr;
