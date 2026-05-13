@@ -5380,3 +5380,64 @@ body[data-auth-state="out"] job-chat { display: none; }
 }
 
 .vf-empty { color: var(--fg-muted); font-style: italic; }
+
+/* Supporting-docs invite card — sits at the bottom of the insight stage,
+   asks for the deeper read (cover letters, writing samples, etc.) after
+   the resume insight has rendered. */
+.insight-deepen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--bg-surface);
+}
+.insight-deepen__title {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0;
+}
+.insight-deepen__lede {
+  color: var(--fg-muted);
+  line-height: var(--lh-body);
+  margin: 0;
+}
+.insight-deepen__examples {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.insight-deepen__examples li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-left: var(--space-3);
+  position: relative;
+  line-height: var(--lh-body);
+}
+.insight-deepen__examples li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.insight-deepen__example-label {
+  color: var(--fg);
+  font-weight: 500;
+}
+.insight-deepen__example-use {
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+}
+.dropzone--compact {
+  padding: var(--space-4);
+}
