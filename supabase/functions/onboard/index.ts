@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifySignedInUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.6.0';
-console.log(`[onboard] v${VERSION} - apt voice sharpened; +4 follow-up Qs; priorTurns wired for quote-back`);
+const VERSION = '0.7.0';
+console.log(`[onboard] v${VERSION} - extract: goDeeper branch (1 follow-up budget per slot)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -281,9 +281,16 @@ const QUESTIONS: Record<string, QuestionSpec> = {
   },
 };
 
-async function modeExtract(questionId: string, answer: string, nextQuestionLabel?: string, priorTurns?: { q: string; a: string }[]): Promise<unknown> {
+async function modeExtract(
+  questionId: string,
+  answer: string,
+  nextQuestionLabel?: string,
+  priorTurns?: { q: string; a: string }[],
+  depthSpent?: number,   // follow-ups already asked on this slot (0 or 1)
+): Promise<unknown> {
   const q = QUESTIONS[questionId];
   if (!q) throw new Error(`unknown questionId: ${questionId}`);
+  const followupBudget = Math.max(0, 1 - (depthSpent || 0)); // hard cap: 1 per slot
   // The extract pass does two things:
   //   1. Pull structured tags from the user's answer (schema per qid).
   //   2. Compose a single "content" string — the AI's next turn as one
@@ -308,10 +315,19 @@ async function modeExtract(questionId: string, answer: string, nextQuestionLabel
 Return ONLY JSON matching:
 {
   "tags": ${q.schema},
-  "content": string
+  "content": string,
+  "goDeeper": boolean
 }
 
 Rules for "tags": ${q.notes || 'extract per the schema above'}. Empty arrays beat guesses. Echo their own words; don't impose vocabulary they didn't use.
+
+Rules for "goDeeper" — whether to ask one more question on THIS topic before advancing:
+- Budget remaining on this slot: ${followupBudget}. If 0, you MUST return goDeeper=false.
+- Set goDeeper=true ONLY if BOTH:
+    (a) the answer was short, vague, or revealed a specific thread worth pulling on (a phrase, a metric, a person, a turning point), AND
+    (b) a single follow-up would meaningfully sharpen the data (not just polite curiosity).
+- Otherwise return goDeeper=false and advance to the next canonical question.
+- Default to false. Going deeper costs the user a turn; only spend it when the payoff is clear.
 
 Rules for "content" — the AI's next turn as ONE short paragraph (2-4 sentences, 60 words max):
 
@@ -326,16 +342,28 @@ VOICE (apt-inspired)
 - Em-dashes welcome. Sentence case. No emoji. Avoid all-caps.
 
 QUESTION
-- ${nextQuestionLabel
-    ? `End with the next question. The question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation — keep the substance, change the language. Make it easier to answer than the canonical phrasing.`
-    : 'End with a soft wrap-up sentence — no further question.'}
+- If goDeeper=true: end with a follow-up question on the SAME topic the user just answered. Don't ask "tell me more" — pick a specific angle (a phrase they used, a number that begs context, a turning point worth unpacking). Wrap the follow-up in **bold** just like the canonical question.
+- If goDeeper=false${nextQuestionLabel
+    ? `: end with the NEXT canonical question. Intent: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation — keep the substance, change the language. Make it easier to answer than the canonical phrasing.`
+    : ': end with a soft wrap-up sentence — no further question.'}
 
 FORMATTING REQUIREMENT
 - ${nextQuestionLabel
-    ? 'The next question MUST be the LAST sentence of the paragraph, MUST end with a "?", and MUST be wrapped in **double-asterisks** on both sides. Example: "**What does that look like for you?**". This is non-negotiable — the UI uses it to bold the ask.'
-    : 'Do not use any asterisks in the paragraph.'}
+    ? 'The question (deeper or next) MUST be the LAST sentence of the paragraph, MUST end with a "?", and MUST be wrapped in **double-asterisks** on both sides. Example: "**What does that look like for you?**". This is non-negotiable — the UI uses it to bold the ask.'
+    : (followupBudget > 0
+        ? 'If goDeeper=true the follow-up question MUST be the LAST sentence, end with "?", and be wrapped in **double-asterisks**. If goDeeper=false do not use any asterisks.'
+        : 'Do not use any asterisks in the paragraph.')}
 - Single-asterisks are FORBIDDEN — no italic emphasis, no markup other than the required double-asterisk bold. Plain prose otherwise. The only allowed quote marks are around phrases pulled verbatim from the user's prior answers.`;
   return await callClaudeJson(system, answer.slice(0, 8000), 2000);
+}
+
+// Hard-clamp Haiku's follow-up budget on the server. If Haiku tries to
+// go deeper but we're out of budget, force-advance.
+function clampFollowUp(out: { content?: string; goDeeper?: boolean }, depthSpent: number, hasNext: boolean): { content?: string; goDeeper?: boolean } {
+  if ((depthSpent || 0) >= 1) out.goDeeper = false;
+  // If goDeeper=false but there's no next question, we still need a
+  // wrap-up — the model has already produced one. Leave content alone.
+  return out;
 }
 
 // ---------- finalize: commit profile ----------
@@ -398,7 +426,7 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return err('POST only', 405);
 
-  let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; priorTurns?: { q: string; a: string }[]; profile?: Partial<DraftProfile>; demo?: boolean };
+  let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; priorTurns?: { q: string; a: string }[]; depthSpent?: number; profile?: Partial<DraftProfile>; demo?: boolean };
   try { body = await req.json(); } catch { return err('invalid json'); }
 
   // Auth model per-mode:
@@ -424,17 +452,26 @@ serve(async (req: Request) => {
       }
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');
-        const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel, body.priorTurns) as { tags?: unknown; content?: string };
-        // Belt-and-braces: if Haiku forgot to bold the final question, bold
-        // it ourselves. Find the last "?"-terminated sentence, wrap it.
-        let content = out?.content || '';
-        if (body.nextQuestionLabel && content && !/\*\*[^*]+\*\*/.test(content)) {
+        const out = await modeExtract(
+          body.questionId,
+          body.answer,
+          body.nextQuestionLabel,
+          body.priorTurns,
+          body.depthSpent || 0,
+        ) as { tags?: unknown; content?: string; goDeeper?: boolean };
+        const clamped = clampFollowUp(out, body.depthSpent || 0, !!body.nextQuestionLabel);
+        const goDeeper = !!clamped.goDeeper;
+        // Belt-and-braces: if Haiku forgot to bold the final question (either
+        // deeper follow-up or canonical next), bold the last "?"-sentence.
+        let content = clamped.content || '';
+        const needsBold = goDeeper || !!body.nextQuestionLabel;
+        if (needsBold && content && !/\*\*[^*]+\*\*/.test(content)) {
           const m = content.match(/([A-Z][^.?!]*\?)(\s*)$/);
           if (m) {
             content = content.slice(0, m.index) + `**${m[1]}**` + (m[2] || '');
           }
         }
-        return jsonResp({ tags: out?.tags, content });
+        return jsonResp({ tags: out?.tags, content, goDeeper });
       }
       case 'finalize': {
         if (!body.profile) return err('profile required');
