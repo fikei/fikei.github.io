@@ -3,15 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Role — /job</title>
+  <title>Chat — /job</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-
   <link rel="stylesheet" href="/job/css/base.css?v=1.7.0">
   <script src="/job/js/theme.js?v=1.7.0"></script>
-
-
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -20,7 +16,7 @@
   <section id="signin-gate" class="gate">
     <div class="gate__card">
       <h1>/job</h1>
-      <p>Ian's career knowledge base and pipeline. Sign in to continue.</p>
+      <p>Sign in to read your chat history.</p>
       <button class="btn btn--primary" id="signin-btn">Sign in</button>
       <div id="ctrl-auth-root"></div>
     </div>
@@ -29,13 +25,14 @@
   <div class="app">
     <job-rail></job-rail>
     <main class="app__main">
-      <job-role-detail></job-role-detail>
+      <header class="page-header">
+        <h1>Chat</h1>
+        <p>Your conversation history with the /job agent.</p>
+      </header>
+      <job-chat-page></job-chat-page>
     </main>
   </div>
 
   <script type="module" src="/job/js/app.js?v=1.7.0"></script>
-
-
-
 </body>
 </html>

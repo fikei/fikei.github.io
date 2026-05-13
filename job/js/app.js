@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "1.6.0";
-console.log(`[job] v${VERSION} - history drill reads from job.companies/projects/skills/wins via job-entity`);
+const VERSION = "1.7.0";
+console.log(`[job] v${VERSION} - chat permalink page at /job/chat/`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -44,6 +44,9 @@ if (location.pathname.startsWith('/job/settings')) {
 // inline script in index.html before this module runs.
 if (location.pathname === '/job/' || location.pathname === '/job') {
   import('./components/job-home.js' + V);
+}
+if (location.pathname.startsWith('/job/chat')) {
+  import('./components/job-chat-page.js' + V);
 }
 
 async function applySignedInState(email) {
