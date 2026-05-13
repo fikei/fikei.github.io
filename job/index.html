@@ -2,14 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>/job — ctrl.rodeo</title>
-  <meta http-equiv="refresh" content="0; url=/job/jobs/">
-  <link rel="canonical" href="/job/jobs/">
   <meta name="robots" content="noindex">
-  <style>body{font-family:system-ui;padding:40px;color:#666}</style>
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+  <link rel="stylesheet" href="/job/css/base.css?v=0.90.0">
+  <script src="/job/js/theme.js?v=0.90.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+  <script src="/auth/ctrl-auth.js"></script>
+  <script>
+    // Desktop falls through to the Jobs list view — the rail nav is more
+    // information-dense there, so the dashboard home is mobile-only.
+    if (window.matchMedia('(min-width: 721px)').matches) {
+      location.replace('/job/jobs/');
+    }
+  </script>
 </head>
-<body>
-  <p>Redirecting to <a href="/job/jobs/">/job/jobs/</a>…</p>
-  <script>location.replace('/job/jobs/');</script>
+<body data-auth-state="loading">
+
+  <section id="signin-gate" class="gate">
+    <div class="gate__card">
+      <h1>/job</h1>
+      <p>Ian's career knowledge base and pipeline. Sign in to continue.</p>
+      <button class="btn btn--primary" id="signin-btn">Sign in</button>
+      <div id="ctrl-auth-root"></div>
+    </div>
+  </section>
+
+  <div class="app">
+    <job-rail></job-rail>
+    <main class="app__main">
+      <job-home></job-home>
+    </main>
+  </div>
+
+  <script type="module" src="/job/js/app.js?v=0.90.0"></script>
 </body>
 </html>
