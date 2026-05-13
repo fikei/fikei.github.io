@@ -2,7 +2,7 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 console.log(`[job] v${VERSION} - Gmail OAuth callback handler + Ladder label + pre-auth landing`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
@@ -223,42 +223,18 @@ window.CtrlAuth.init({
 
 // Gmail OAuth callback. gmail-auth's auth-url action redirects to
 // /job/?code=<code>&state=gmail:<user_id>&scope=… after the user grants
-// consent. Detect that shape, complete the token exchange via
-// gmail-auth action='connect', then strip the query so refresh doesn't
-// re-fire. Lives at boot so the redirect lands fast.
-(async () => {
+// consent. We can't finish the token exchange synchronously (need auth
+// to be ready first) and we can't keep the page from redirecting (the
+// applySignedInState flow may bounce us to /onboarding/ before the
+// fetch resolves), so stash the code in sessionStorage immediately and
+// process it on whatever page eventually settles.
+(() => {
   const params = new URLSearchParams(location.search);
   const code = params.get('code');
   const state = params.get('state') || '';
-  if (!code || !state.startsWith('gmail:')) return;
-  // Wait for auth so CtrlAuth.getSupabaseClient() can give us a token.
-  const supabase = window.CtrlAuth?.getSupabaseClient?.();
-  if (!supabase) return;
-  const wait = () => new Promise(r => {
-    if (document.body.dataset.authState === 'in') return r();
-    document.addEventListener('ctrl:auth:signedin', () => r(), { once: true });
-    setTimeout(r, 5000);   // give up after 5s; user is probably signed in already
-  });
-  await wait();
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (!token) return;
-  try {
-    const r = await fetch('https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gmail-auth', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'connect', code }),
-    });
-    if (r.ok) {
-      console.log('[job] Gmail connected — token stored with gmail.modify scope');
-    } else {
-      console.warn('[job] gmail-auth connect failed:', await r.text());
-    }
-  } catch (e) {
-    console.warn('[job] gmail-auth connect error:', e.message);
-  } finally {
-    // Drop the code/state from the URL so a refresh doesn't re-fire the
-    // exchange (which would 400 — codes are single-use).
+  if (code && state.startsWith('gmail:')) {
+    try { sessionStorage.setItem('job:pendingGmailOAuth', JSON.stringify({ code, state, at: Date.now() })); } catch {}
+    // Strip query so refresh / nav doesn't re-process (codes are single-use).
     const clean = new URL(location.href);
     clean.searchParams.delete('code');
     clean.searchParams.delete('state');
@@ -268,6 +244,45 @@ window.CtrlAuth.init({
     history.replaceState(null, '', clean.pathname + (clean.search || '') + clean.hash);
   }
 })();
+
+// On any /job/ page where auth eventually settles, complete a pending
+// Gmail OAuth exchange. keepalive on the fetch so a follow-up redirect
+// doesn't kill the request mid-flight.
+async function _completePendingGmailOAuth() {
+  let pending;
+  try { pending = JSON.parse(sessionStorage.getItem('job:pendingGmailOAuth') || 'null'); } catch { return; }
+  if (!pending?.code) return;
+  // Stale entries (>10 min) — codes are single-use and quickly invalid.
+  if (Date.now() - (pending.at || 0) > 10 * 60 * 1000) {
+    sessionStorage.removeItem('job:pendingGmailOAuth');
+    return;
+  }
+  const supabase = window.CtrlAuth?.getSupabaseClient?.();
+  if (!supabase) return;
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) return;
+  try {
+    const r = await fetch('https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gmail-auth', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'connect', code: pending.code }),
+      keepalive: true,
+    });
+    if (r.ok) {
+      console.log('[job] Gmail connected — token stored with gmail.modify scope');
+      sessionStorage.removeItem('job:pendingGmailOAuth');
+    } else {
+      console.warn('[job] gmail-auth connect failed:', await r.text());
+      // Don't clear sessionStorage on failure — next page load tries again.
+    }
+  } catch (e) {
+    console.warn('[job] gmail-auth connect error:', e.message);
+  }
+}
+document.addEventListener('ctrl:auth:signedin', () => { _completePendingGmailOAuth(); });
+// Belt-and-braces: also try after a tick in case auth was already ready.
+setTimeout(() => { _completePendingGmailOAuth(); }, 250);
 
 // Belt-and-braces: even with the listener attached early, some CtrlAuth code
 // paths can settle a restored session without dispatching to a fresh listener.
