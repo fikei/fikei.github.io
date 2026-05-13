@@ -208,3 +208,107 @@ function stripHtml(html: string): string {
 function dedupe(arr: string[]): string[] {
   return [...new Set(arr)];
 }
+
+// ---------- Labels ----------
+//
+// Every Gmail message the pipeline touches gets stamped with a label so
+// the user can audit what we've used. Requires gmail.modify scope (a
+// strict superset of gmail.readonly).
+
+export interface GmailLabel {
+  id: string;
+  name: string;
+  type?: 'user' | 'system';
+}
+
+// Idempotent: returns the existing label id when present, otherwise
+// creates it. Cache the result per-process to avoid the list/create
+// round-trip on every batch.
+const _labelCache = new Map<string, string>();   // accessToken+name → labelId
+
+export async function ensureLabel(accessToken: string, name: string): Promise<string> {
+  const cacheKey = `${accessToken.slice(0, 24)}:${name}`;
+  const cached = _labelCache.get(cacheKey);
+  if (cached) return cached;
+
+  // List existing labels. labels.list returns user + system labels.
+  const listRes = await fetch(`${GMAIL_BASE}/labels`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!listRes.ok) throw new Error(`labels.list ${listRes.status}: ${(await listRes.text()).slice(0, 200)}`);
+  const list = await listRes.json() as { labels?: GmailLabel[] };
+  const existing = (list.labels || []).find(l => l.name === name);
+  if (existing) {
+    _labelCache.set(cacheKey, existing.id);
+    return existing.id;
+  }
+
+  // Create the label. labelListVisibility/messageListVisibility default
+  // to visible — the user wants to see emails the pipeline has touched.
+  const createRes = await fetch(`${GMAIL_BASE}/labels`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      labelListVisibility:    'labelShow',
+      messageListVisibility:  'show',
+    }),
+  });
+  if (!createRes.ok) throw new Error(`labels.create ${createRes.status}: ${(await createRes.text()).slice(0, 200)}`);
+  const created = await createRes.json() as GmailLabel;
+  _labelCache.set(cacheKey, created.id);
+  return created.id;
+}
+
+// Apply a label to many Gmail messages in one round-trip. Gmail's
+// batchModify accepts up to 1000 ids per call; we chunk just in case.
+// No-ops on empty input. Failures are caught + logged, never thrown —
+// labeling is a side-effect, not the critical path.
+export async function batchAddLabel(
+  accessToken: string,
+  messageIds: string[],
+  labelId: string,
+): Promise<{ labeled: number; chunks: number; errors: string[] }> {
+  const out = { labeled: 0, chunks: 0, errors: [] as string[] };
+  if (!messageIds.length) return out;
+  const unique = [...new Set(messageIds.filter(Boolean))];
+  const CHUNK = 900;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    try {
+      const r = await fetch(`${GMAIL_BASE}/messages/batchModify`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: chunk, addLabelIds: [labelId] }),
+      });
+      if (!r.ok) {
+        const errBody = (await r.text()).slice(0, 200);
+        out.errors.push(`batchModify ${r.status}: ${errBody}`);
+        continue;
+      }
+      out.labeled += chunk.length;
+      out.chunks++;
+    } catch (e) {
+      out.errors.push((e as Error).message);
+    }
+  }
+  return out;
+}
+
+// Convenience: ensure label + apply in one call. Used by the live
+// pipeline (gmail-jobs + application-scan) where we always want the
+// same Ladder label applied to every touched message.
+export async function ensureAndApplyLabel(
+  accessToken: string,
+  messageIds: string[],
+  labelName: string,
+): Promise<{ labelId: string | null; labeled: number; errors: string[] }> {
+  if (!messageIds.length) return { labelId: null, labeled: 0, errors: [] };
+  try {
+    const labelId = await ensureLabel(accessToken, labelName);
+    const res = await batchAddLabel(accessToken, messageIds, labelId);
+    return { labelId, labeled: res.labeled, errors: res.errors };
+  } catch (e) {
+    return { labelId: null, labeled: 0, errors: [(e as Error).message] };
+  }
+}

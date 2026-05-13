@@ -13,8 +13,8 @@
 // don't need a new client registration. The redirect URI for gmail
 // connect points at /job/ — calendar-api keeps /calendar/.
 
-const VERSION = '0.1.0';
-console.log(`[gmail-auth] v${VERSION} - oauth for gmail.readonly`);
+const VERSION = '0.2.0';
+console.log(`[gmail-auth] v${VERSION} - oauth requests gmail.modify (superset of readonly) so pipeline can apply Ladder label`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -23,9 +23,16 @@ import {
   findTokenForScopes,
   getServiceClient,
   GMAIL_READONLY_SCOPE,
+  GMAIL_MODIFY_SCOPE,
   markRevoked,
   upsertToken,
 } from '../_shared/google-tokens.ts';
+
+// gmail.modify is a strict superset of gmail.readonly. We request both
+// so the scope_set on the token row covers callers that look up by
+// either scope. Existing readonly-only tokens still work for reading
+// until the user re-consents; labeling silently no-ops until then.
+const GMAIL_REQUESTED_SCOPES = [GMAIL_READONLY_SCOPE, GMAIL_MODIFY_SCOPE];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,14 +79,13 @@ serve(async (req) => {
     if (!user) return json({ error: 'unauthorized' }, 401);
 
     const db = getServiceClient();
-    const scopeSet = canonicalScopeSet([GMAIL_READONLY_SCOPE]);
 
     if (action === 'auth-url') {
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
         redirect_uri: GMAIL_REDIRECT_URI,
         response_type: 'code',
-        scope: GMAIL_READONLY_SCOPE,
+        scope: GMAIL_REQUESTED_SCOPES.join(' '),
         access_type: 'offline',
         prompt: 'consent',
         // Including 'gmail' in state lets the /job/ JS distinguish this
@@ -119,11 +125,18 @@ serve(async (req) => {
         scope: string;
       };
 
-      // Verify Google actually granted gmail.readonly. include_granted_scopes
-      // means a previous calendar consent could come back without gmail.
+      // Verify Google actually granted the Gmail scopes we asked for.
+      // include_granted_scopes means a previous calendar consent could
+      // come back without gmail. We accept either readonly or modify —
+      // modify is a strict superset, so either path lets us read mail.
+      // Labeling requires modify specifically; if only readonly was
+      // granted, the row still stores OK and the pipeline degrades to
+      // read-only behavior.
       const grantedScopes = tokens.scope.split(/\s+/).filter(Boolean);
-      if (!grantedScopes.includes(GMAIL_READONLY_SCOPE)) {
-        return json({ error: 'gmail.readonly was not granted' }, 400);
+      const hasReadonly = grantedScopes.includes(GMAIL_READONLY_SCOPE);
+      const hasModify   = grantedScopes.includes(GMAIL_MODIFY_SCOPE);
+      if (!hasReadonly && !hasModify) {
+        return json({ error: 'gmail scopes not granted' }, 400);
       }
 
       // Resolve the Google account email so the user can confirm which
@@ -145,6 +158,16 @@ serve(async (req) => {
       if (!refresh) {
         return json({ error: 'no refresh_token; reconnect with prompt=consent' }, 400);
       }
+
+      // Store the Gmail scopes Google granted. gmail.modify is a strict
+      // superset of gmail.readonly — if modify was granted, advertise
+      // readonly too so existing callers (findTokenForScopes(...[GMAIL_READONLY_SCOPE])
+      // pattern) keep matching.
+      const gmailGranted = grantedScopes.filter(s => s.startsWith('https://www.googleapis.com/auth/gmail.'));
+      if (hasModify && !gmailGranted.includes(GMAIL_READONLY_SCOPE)) {
+        gmailGranted.push(GMAIL_READONLY_SCOPE);
+      }
+      const scopeSet = canonicalScopeSet(gmailGranted);
 
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
       await upsertToken(db, {

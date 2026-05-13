@@ -14,11 +14,17 @@
 import { db } from './job-db.ts';
 import {
   type GmailMessage,
+  ensureAndApplyLabel,
   extractBody,
   getHeader,
   getMessage,
   getMessageIdHeader,
 } from './gmail.ts';
+
+// Every Gmail message we classify into an application event gets
+// stamped with this label so the user can audit what we've touched.
+// Mirrors the labeling in the gmail-jobs source plugin.
+const LADDER_LABEL = 'Ladder';
 import {
   classifyApplicationMessage,
   type ApplicationEventType,
@@ -84,6 +90,10 @@ export async function scanApplicationResponses(args: {
   const out: ApplicationScanResult = {
     classified: 0, inserted: 0, autoAdvanced: 0, needsReview: 0, skippedNoMatch: 0,
   };
+  // Gmail API ids of every message that produced at least one event row,
+  // collected so we can stamp the Ladder label in one batchModify call
+  // at end-of-scan.
+  const labelTargets: string[] = [];
 
   // Load active pipeline roles + best-known domain via hiring_companies cache.
   // company_name is the join key (case-insensitive). hiring_companies.name_norm
@@ -329,6 +339,7 @@ export async function scanApplicationResponses(args: {
     if (!inserted.length) continue;
     out.inserted++;
     if (needsReview) out.needsReview++;
+    labelTargets.push(msg.id);
 
     // Update role: last_activity_at always; gmail_thread_ids only at
     // THREAD_ASSOCIATION_FLOOR (poison-resistance); stage on auto-advance.
@@ -364,6 +375,19 @@ export async function scanApplicationResponses(args: {
     // signal. Source ranking: recruiter_email > jd_extract > inferred.
     // Backfill never writes inferred_from_events (per locked decision).
     await maybeUpdateProcessOutline(sql, matchedRole, classified, mode);
+  }
+
+  // Apply Ladder label to every message we classified into an event.
+  // Best-effort — failures (missing modify scope, transient errors) log
+  // but don't throw, since labeling is a side-effect of the scan.
+  if (labelTargets.length) {
+    try {
+      const res = await ensureAndApplyLabel(args.accessToken, labelTargets, LADDER_LABEL);
+      if (res.errors.length) console.warn(`[gmail-app-scan] label errors: ${res.errors.slice(0, 3).join(' | ')}`);
+      else console.log(`[gmail-app-scan] labeled ${res.labeled} message(s) with '${LADDER_LABEL}'`);
+    } catch (e) {
+      console.warn(`[gmail-app-scan] label apply failed: ${(e as Error).message}`);
+    }
   }
 
   return out;

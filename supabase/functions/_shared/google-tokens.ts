@@ -181,5 +181,9 @@ export async function userIdForEmail(
 
 // Standard Gmail scope. Exported so every call site uses the same string.
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+// gmail.modify is a strict superset of gmail.readonly. Required to apply
+// labels (users.messages.modify / users.messages.batchModify). Added so
+// the pipeline can stamp a "Ladder" label on every email it sources from.
+export const GMAIL_MODIFY_SCOPE   = 'https://www.googleapis.com/auth/gmail.modify';
 export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
