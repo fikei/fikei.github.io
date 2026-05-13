@@ -6,16 +6,34 @@
   <title>/job — ctrl.rodeo</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/job/css/base.css?v=0.98.0">
-  <script src="/job/js/theme.js?v=0.98.0"></script>
+  <link rel="stylesheet" href="/job/css/base.css?v=1.0.0">
+  <script src="/job/js/theme.js?v=1.0.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
   <script>
-    // Desktop falls through to the Jobs list view — the rail nav is more
-    // information-dense there, so the dashboard home is mobile-only.
-    if (window.matchMedia('(min-width: 721px)').matches) {
-      location.replace('/job/jobs/');
-    }
+    // Pre-auth landing: strangers (no Supabase session in localStorage) get
+    // routed into the onboarding chat at /job/onboarding/, which works
+    // without sign-in until the final commit. Authed users keep the
+    // existing /job/ behavior (desktop → /jobs/, mobile → job-home).
+    (function () {
+      try {
+        var raw = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
+        var hasSession = false;
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          hasSession = !!(parsed && parsed.access_token);
+        }
+        if (!hasSession) { location.replace('/job/onboarding/'); return; }
+      } catch (e) { /* parse fail → treat as unauthed */
+        location.replace('/job/onboarding/');
+        return;
+      }
+      // Desktop falls through to the Jobs list view — the rail nav is more
+      // information-dense there, so the dashboard home is mobile-only.
+      if (window.matchMedia('(min-width: 721px)').matches) {
+        location.replace('/job/jobs/');
+      }
+    })();
   </script>
 </head>
 <body data-auth-state="loading">
@@ -36,6 +54,6 @@
     </main>
   </div>
 
-  <script type="module" src="/job/js/app.js?v=0.98.0"></script>
+  <script type="module" src="/job/js/app.js?v=1.0.0"></script>
 </body>
 </html>

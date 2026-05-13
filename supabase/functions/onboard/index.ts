@@ -14,11 +14,11 @@
 // PRD: docs/strategy/prds/job-onboarding-flow.md
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
+import { verifySignedInUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.4.1';
-console.log(`[onboard] v${VERSION} - extract: mandatory bold + post-process safety net`);
+const VERSION = '0.5.0';
+console.log(`[onboard] v${VERSION} - pre-auth: parse/bundle/insights/extract open to anon; finalize requires user`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -356,12 +356,13 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return err('POST only', 405);
 
-  const user = await verifyJobUserDetailed(req);
-  if (!user) return err('unauthorized', 401);
-
   let body: { mode?: string; text?: string; questionId?: string; answer?: string; nextQuestionLabel?: string; profile?: Partial<DraftProfile>; demo?: boolean };
   try { body = await req.json(); } catch { return err('invalid json'); }
 
+  // Auth model per-mode:
+  //   parse / bundle / insights / extract → anonymous OK (anon key suffices).
+  //     These are read-only Haiku calls used by the pre-auth onboarding flow.
+  //   finalize → requires a real signed-in user (writes to user_profile).
   try {
     switch (body.mode) {
       case 'parse': {
@@ -395,7 +396,14 @@ serve(async (req: Request) => {
       }
       case 'finalize': {
         if (!body.profile) return err('profile required');
-        const result = await modeFinalize(user.id, { profile: body.profile, demo: !!body.demo });
+        if (body.demo) {
+          // Demo finalize doesn't write — works anonymously.
+          const result = await modeFinalize('demo-anon', { profile: body.profile, demo: true });
+          return jsonResp(result);
+        }
+        const user = await verifySignedInUser(req);
+        if (!user) return err('sign in to save your profile', 401);
+        const result = await modeFinalize(user.id, { profile: body.profile, demo: false });
         return jsonResp(result);
       }
       default:
