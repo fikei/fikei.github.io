@@ -54,19 +54,42 @@ const STAGES = [
 // Conversational defaults. Haiku rewrites these in the moment so each
 // question flows from the prior answer — see modeExtract in the onboard
 // edge function. Intent stays fixed; wording can drift.
+//
+// Ordering follows apt's warm-up → stories → boundaries → specifics arc:
+//   1. intent      — why are you here (gentle opener)
+//   2. mission     — what's pulling at you (taste)
+//   3. energy      — how you recharge (personality)
+//   4. self        — felt most yourself (story)
+//   5. win         — proud-of moment (story + number)
+//   6. aspiration  — zero-constraint role (the real wish)
+//   7. walkaway    — would-pass criteria (boundary)
+//   8. hardyes     — non-negotiables (boundary)
+//   9. titles      — next-role specifics
 const QUESTIONS = [
+  { id: 'q_intent',
+    label: 'What\'s bringing you here — actively looking, just exploring, or somewhere in between?',
+    placeholder: 'No wrong answer. Casual is fine.' },
   { id: 'q1_mission',
     label: 'What kind of work has been pulling at you lately?',
-    placeholder: 'Anything that\'s been on your mind — a problem you keep thinking about, a kind of team you want to be on…' },
+    placeholder: 'A problem you keep thinking about, a kind of team you want to be on…' },
+  { id: 'q_energy',
+    label: 'When you\'ve had a long week, do you recharge around people or with time to yourself?',
+    placeholder: 'How you reset says a lot about how you work.' },
   { id: 'q2_self',
     label: 'Tell me about a stretch of work where you felt most yourself.',
     placeholder: 'A team, a project, a few months — when did the work feel right?' },
   { id: 'q3_win',
     label: 'Something you\'re still kind of proud of — bonus points if there\'s a number attached.',
     placeholder: 'A result, a launch, a shift you made happen…' },
+  { id: 'q_aspiration',
+    label: 'If there were zero constraints — no hiring filters, no practicality — what\'s the role you\'d love to try just for the sake of it?',
+    placeholder: 'The role you\'d try if no one was watching.' },
   { id: 'q4_walkaway',
     label: 'What kind of company or team would make you pass — even on a great role?',
     placeholder: 'Industries, leadership styles, working cultures you\'d want to avoid…' },
+  { id: 'q_hardyes',
+    label: 'Two or three things that would feel non-negotiable for you to say yes to a role?',
+    placeholder: 'The must-haves. Where you\'d walk if they weren\'t there.' },
   { id: 'q5_titles',
     label: 'What does the role you\'d love to be in next actually look like, day to day?',
     placeholder: 'Title aside — who are you working with, what are you spending your time on?' },
@@ -389,6 +412,7 @@ export class JobOnboarding extends LitElement {
         questionId: active.qid,
         answer: userText,
         nextQuestionLabel: next?.label || null,
+        priorTurns: this._priorTurnsForExtract(),
       });
       this.draft._meta.extractions[active.qid] = tags;
       if (tags) this._applyExtraction(active.qid, tags);
@@ -445,6 +469,7 @@ export class JobOnboarding extends LitElement {
         questionId: userTurn.qid,
         answer: userTurn.text,
         nextQuestionLabel: next?.label || null,
+        priorTurns: this._priorTurnsForExtract(),
       });
       this.draft._meta.extractions[userTurn.qid] = tags;
       // Replace the AI turn in place.
@@ -463,10 +488,15 @@ export class JobOnboarding extends LitElement {
   }
 
   _applyExtraction(qid, tags) {
-    if (qid === 'q1_mission') {
+    if (qid === 'q_intent') {
+      if (tags.intent) this._patch('targeting.intent', tags.intent);
+    } else if (qid === 'q1_mission') {
       this._mergeArr('values_seed.missionKeywords', tags.missionKeywords);
       this._mergeArr('values_seed.impactThemes', tags.impactThemes);
       this._mergeArr('targeting.targetSectors', tags.targetSectors);
+    } else if (qid === 'q_energy') {
+      if (tags.energyStyle) this._patch('values_seed.energyStyle', tags.energyStyle);
+      this._mergeArr('values_seed.cultureKeywords', tags.cultureKeywords);
     } else if (qid === 'q2_self') {
       this._mergeArr('values_seed.cultureKeywords', tags.cultureKeywords);
       this._mergeArr('capability.arcTags', tags.arcTags);
@@ -474,14 +504,37 @@ export class JobOnboarding extends LitElement {
     } else if (qid === 'q3_win') {
       if (tags.headline) this.draft.wins.push({ headline: tags.headline, metric: tags.metric || null });
       if (tags.narrativeMd) this.draft.narratives.push({ title: tags.narrativeTitle || 'A win', content_md: tags.narrativeMd, source_question: qid });
+    } else if (qid === 'q_aspiration') {
+      this._mergeArr('targeting.dreamRoles', tags.dreamRoles);
+      this._mergeArr('values_seed.aspirationalSignals', tags.aspirationalSignals);
     } else if (qid === 'q4_walkaway') {
       this._mergeArr('targeting.antiMissionTerms', tags.antiMissionTerms);
       this._mergeArr('values_seed.antiCulture', tags.antiCulture);
+    } else if (qid === 'q_hardyes') {
+      this._mergeArr('targeting.hardYes', tags.hardYes);
     } else if (qid === 'q5_titles') {
       this._mergeArr('targeting.targetRoles', tags.targetRoles);
       this._mergeArr('targeting.stagePreference', tags.stagePreference);
     }
     this._commit();
+  }
+
+  // Build the priorTurns array Haiku uses for quote-back. Pull the last few
+  // {question, answer} pairs from the chat log.
+  _priorTurnsForExtract() {
+    const log = this.draft._meta.chatLog || [];
+    const out = [];
+    for (let i = 0; i < log.length; i++) {
+      const turn = log[i];
+      if (turn.role !== 'ai') continue;
+      // Strip markdown from the question text we send up.
+      const question = (turn.content || '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+      const next = log[i + 1];
+      if (next && next.role === 'user' && next.text) {
+        out.push({ q: question.slice(0, 240), a: next.text.slice(0, 600) });
+      }
+    }
+    return out.slice(-5);
   }
 
   // Auto-scroll to bottom of chat after re-render.
