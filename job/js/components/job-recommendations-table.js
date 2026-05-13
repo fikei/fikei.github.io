@@ -345,7 +345,7 @@ export class JobRecommendationsTable extends LitElement {
     const rows = this._sorted();
     return html`
       <header class="recs-page__head">
-        <h1>Recommended for you</h1>
+        <h1>For You</h1>
         <span class="muted">${rows.length} ${rows.length === 1 ? 'role' : 'roles'}</span>
         <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
                 title="Scan Gmail for new role alerts and application updates"
