@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "1.9.0";
-console.log(`[job] v${VERSION} - Branching follow-ups: Haiku may ask one deeper question per slot`);
+const VERSION = "2.0.0";
+console.log(`[job] v${VERSION} - Post-finalize deeper-story prompt before /jobs/recommended/`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
