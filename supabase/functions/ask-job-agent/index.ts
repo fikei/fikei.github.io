@@ -24,23 +24,42 @@ const SYSTEM_PROMPT = `You are the agent for /job, Ian Fike's career knowledge b
 
 Speak with Ian directly. Be concise, conversational, useful. Voice = sharp, friendly co-worker, not customer support. No disclaimers, no "great question" filler. Keep replies under ~120 words unless he asks for more.
 
-You have four tools:
+## Convert vague asks into thorough scope
+
+When Ian gives you a category-level instruction, do not write it back verbatim. Ask yourself: "what does this mean in practice?" and expand into the specific terms a job-recommender would actually match against. Then make ONE tool call with the full expanded list.
+
+Examples of how to expand:
+- "block developer jobs" → ["software engineer", "backend engineer", "frontend engineer", "full-stack engineer", "developer", "software developer", "SRE", "DevOps engineer", "platform engineer", "infrastructure engineer", "mobile engineer", "ML engineer"]
+- "no early-stage startups" → ["seed-stage", "series A", "pre-seed", "early-stage startup", "founding engineer"]
+- "must be remote" → ["remote", "fully remote", "remote-first"]
+- "only climate tech" → ["climate", "climate tech", "decarbonization", "clean energy", "sustainability", "carbon"]
+
+Lean toward MORE coverage rather than less — recommenders match strings, so being generous beats missing edge cases. Cap each call at ~12 terms.
+
+When you respond, tell Ian conversationally WHAT YOU ACTUALLY DID, not just "done". Say which expanded terms you added so he can correct course if you went too wide or too narrow. Example:
+
+> Got it — I read "developer jobs" as anything engineering-coded, so I blocked: software engineer, backend engineer, frontend engineer, full-stack engineer, developer, software developer, SRE, DevOps, platform engineer, infrastructure engineer, mobile engineer, ML engineer. If I went too broad (e.g. you'd still consider ML engineer roles), tell me and I'll trim it.
+
+## Tools
+
 - search_pipeline(query): find roles Ian has saved or marked active. Pass a short query. Returns up to 20 matches with slug, title, company, status, stage, fit_score, url.
 - update_pipeline_row(slug, fields): change a row's status/stage/exit_reason. Find slug via search_pipeline first. Stages: Drafting|Applied|Interviewing|Offer. Status: Active|Archive.
 - add_role_from_url(url): save a job posting URL into Ian's pipeline.
-- update_preferences(blocked, must_have): record search-direction signals.
+- update_preferences(blocked, must_have, note): record search-direction signals. blocked + must_have are ARRAYS of strings — pass the full expanded list in one call.
 
-Rules:
+## Rules
+
 - Use search_pipeline before update_pipeline_row to look up the slug.
-- Don't confirm before single-row changes - just do them and report.
+- Don't confirm before single-row changes — just do them and report.
 - If a tool fails, tell Ian honestly. Don't pretend it worked.
-- If the request doesn't match any tool, just answer.`;
+- If the request doesn't match any tool, just answer.
+- Never write a vague string like "developer jobs" to preferences. Expand it first.`;
 
 const TOOLS = [
   { name: 'search_pipeline', description: "Search Ian's saved + active job pipeline. Returns up to 20 matching rows.", input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Free-text query.' } }, required: ['query'] } },
   { name: 'update_pipeline_row', description: 'Update a single pipeline row by slug.', input_schema: { type: 'object', properties: { slug: { type: 'string' }, status: { type: 'string', enum: ['Active','Archive'] }, stage: { type: 'string', enum: ['Drafting','Applied','Interviewing','Offer'] }, exit_reason: { type: 'string' } }, required: ['slug'] } },
   { name: 'add_role_from_url', description: 'Save a job posting from a URL.', input_schema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] } },
-  { name: 'update_preferences', description: 'Record search-direction signals.', input_schema: { type: 'object', properties: { blocked: { type: 'string' }, must_have: { type: 'string' }, note: { type: 'string' } } } },
+  { name: 'update_preferences', description: 'Record search-direction signals. Pass arrays — the model is expected to expand the user\'s vague ask into a thorough list of specific terms before calling.', input_schema: { type: 'object', properties: { blocked: { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to block. Expand from the user\'s ask (e.g. "developer jobs" → ["software engineer","backend engineer",...]).' }, must_have: { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to require.' }, note: { type: 'string', description: 'Optional free-text context.' } } } },
 ];
 
 async function authedFetch(url: string, opts: RequestInit, authHeader: string): Promise<Response> {
@@ -72,7 +91,7 @@ async function toolAddRoleFromUrl({ url }: { url: string }, authHeader: string) 
   return await res.json();
 }
 
-async function toolUpdatePreferences(args: { blocked?: string; must_have?: string; note?: string }, authHeader: string) {
+async function toolUpdatePreferences(args: { blocked?: string | string[]; must_have?: string | string[]; note?: string }, authHeader: string) {
   const path = 'fikei/job/02-goals-intents/agent-preferences.md';
   let existing = '';
   let sha: string | undefined;
@@ -80,17 +99,57 @@ async function toolUpdatePreferences(args: { blocked?: string; must_have?: strin
     const readRes = await authedFetch(`${KB_READ_URL}?path=${encodeURIComponent(path)}`, {}, authHeader);
     if (readRes.ok) { const d = await readRes.json(); existing = d.content || ''; sha = d.sha; }
   } catch (_) {}
-  if (!args.blocked && !args.must_have) return { ok: false, error: 'specify blocked or must_have' };
+
+  // Accept either a single string (legacy) or an array (new schema) and
+  // normalize to arrays. Dedupe against what's already in the file so the
+  // same term doesn't pile up if the user re-runs the same instruction.
+  const toArr = (v: string | string[] | undefined): string[] => {
+    if (v == null) return [];
+    if (Array.isArray(v)) return v.map(String).map(s => s.trim()).filter(Boolean);
+    return String(v).split(',').map(s => s.trim()).filter(Boolean);
+  };
+  const blocked   = toArr(args.blocked);
+  const mustHave  = toArr(args.must_have);
+  if (blocked.length === 0 && mustHave.length === 0) return { ok: false, error: 'specify at least one blocked or must_have term' };
+
+  const existingLower = existing.toLowerCase();
+  const isAlreadyBlocked   = (t: string) => existingLower.includes(`**blocked** - ${t.toLowerCase()}`);
+  const isAlreadyMustHave  = (t: string) => existingLower.includes(`**must_have** - ${t.toLowerCase()}`);
+
   const ts = new Date().toISOString().slice(0,10);
+  const noteSuffix = args.note ? ` _(${args.note})_` : '';
   const lines: string[] = [];
-  if (args.blocked)   lines.push(`- ${ts}: **blocked** - ${args.blocked}${args.note ? ` _(${args.note})_` : ''}`);
-  if (args.must_have) lines.push(`- ${ts}: **must_have** - ${args.must_have}${args.note ? ` _(${args.note})_` : ''}`);
+  const addedBlocked: string[] = [];
+  const addedMustHave: string[] = [];
+  const skippedBlocked: string[] = [];
+  const skippedMustHave: string[] = [];
+
+  for (const t of blocked) {
+    if (isAlreadyBlocked(t)) { skippedBlocked.push(t); continue; }
+    lines.push(`- ${ts}: **blocked** - ${t}${noteSuffix}`);
+    addedBlocked.push(t);
+  }
+  for (const t of mustHave) {
+    if (isAlreadyMustHave(t)) { skippedMustHave.push(t); continue; }
+    lines.push(`- ${ts}: **must_have** - ${t}${noteSuffix}`);
+    addedMustHave.push(t);
+  }
+  if (lines.length === 0) {
+    return { ok: true, added_blocked: [], added_must_have: [], skipped_blocked: skippedBlocked, skipped_must_have: skippedMustHave, note: 'all terms already present' };
+  }
+
   const header = '# Agent search preferences\n\nAppended by /job chat. Used to bias future recommendations.\n\n';
   const body = existing.includes('# Agent search preferences') ? existing : header;
   const newBody = body.trimEnd() + '\n' + lines.join('\n') + '\n';
   const writeRes = await authedFetch(KB_WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, content: newBody, sha }) }, authHeader);
   if (!writeRes.ok) throw new Error(`kb-write ${writeRes.status}: ${(await writeRes.text()).slice(0,200)}`);
-  return { ok: true, appended: lines };
+  return {
+    ok: true,
+    added_blocked: addedBlocked,
+    added_must_have: addedMustHave,
+    skipped_blocked: skippedBlocked,
+    skipped_must_have: skippedMustHave,
+  };
 }
 
 async function runTool(name: string, input: Record<string, unknown>, authHeader: string): Promise<unknown> {
@@ -99,7 +158,7 @@ async function runTool(name: string, input: Record<string, unknown>, authHeader:
       case 'search_pipeline':     return await toolSearchPipeline(input as { query: string }, authHeader);
       case 'update_pipeline_row': return await toolUpdatePipelineRow(input, authHeader);
       case 'add_role_from_url':   return await toolAddRoleFromUrl(input as { url: string }, authHeader);
-      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string; must_have?: string; note?: string }, authHeader);
+      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string | string[]; must_have?: string | string[]; note?: string }, authHeader);
       default: return { error: `unknown tool: ${name}` };
     }
   } catch (err) { return { error: String((err as Error).message || err) }; }
