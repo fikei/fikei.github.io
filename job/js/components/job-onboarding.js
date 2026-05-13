@@ -20,9 +20,23 @@
 // insights, extract, finalize.
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
+import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 
 const V = (new URL(import.meta.url)).search;
 const { readFileAsText } = await import('../pdf-extract.js' + V);
+
+// Tiny markdown renderer for the chat surface — *emphasis* and **strong**
+// only. Escapes everything else so we never inject raw HTML from Haiku.
+// Anything fancier (links, lists) doesn't belong in the chat copy.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function tinyMd(s) {
+  let out = escapeHtml(s || '');
+  out = out.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  return out;
+}
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const ONBOARD_FN_URL = `${SUPABASE_URL}/functions/v1/onboard`;
@@ -712,6 +726,8 @@ export class JobOnboarding extends LitElement {
             <input id="chat-attach" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
                    style="display:none" @change=${(e) => this._handleAttach(e.target.files)}/>
             <textarea id="chat-input" rows="1" placeholder="Type your answer…"
+                      autocomplete="off" autocorrect="off" spellcheck="true"
+                      data-form-type="other"
                       @input=${(e) => this._autoSize(e.target)}
                       @keydown=${(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this._submitAnswer(); } }}></textarea>
             <button class="chat__send" ?disabled=${this.busy} @click=${() => this._submitAnswer()}
@@ -735,8 +751,8 @@ export class JobOnboarding extends LitElement {
     if (!ai) return nothing;
     return html`
       <div class="chat__hero">
-        ${ai.reflection ? html`<p class="chat__ai-reflection">${ai.reflection}</p>` : nothing}
-        <p class="chat__hero-question">${ai.question || ''}</p>
+        ${ai.reflection ? html`<p class="chat__ai-reflection">${unsafeHTML(tinyMd(ai.reflection))}</p>` : nothing}
+        <p class="chat__hero-question">${unsafeHTML(tinyMd(ai.question || ''))}</p>
       </div>
     `;
   }
@@ -744,8 +760,8 @@ export class JobOnboarding extends LitElement {
   _renderAiTurn(turn) {
     return html`
       <div class="chat__ai ${turn.fresh ? 'chat__ai--fresh' : ''}">
-        ${turn.reflection ? html`<p class="chat__ai-reflection">${turn.reflection}</p>` : nothing}
-        ${turn.question ? html`<p class="chat__ai-question">${turn.question}</p>` : nothing}
+        ${turn.reflection ? html`<p class="chat__ai-reflection">${unsafeHTML(tinyMd(turn.reflection))}</p>` : nothing}
+        ${turn.question ? html`<p class="chat__ai-question">${unsafeHTML(tinyMd(turn.question))}</p>` : nothing}
       </div>
     `;
   }
