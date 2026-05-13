@@ -5463,3 +5463,77 @@ body[data-auth-state="out"] job-chat { display: none; }
   cursor: pointer;
 }
 .onboard__signin:hover { color: var(--fg); border-color: var(--border-strong); }
+
+/* ─────────────────────────────────────────────────────────────
+   Chat permalink page (/job/chat/). Two-pane: thread list +
+   message view. Reuses .chat-msg / .chat-tool styles from the
+   drawer so the visuals stay consistent.
+   ───────────────────────────────────────────────────────────── */
+
+.chat-page {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .chat-page { grid-template-columns: 1fr; }
+}
+
+.chat-page__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-right: 1px solid var(--border);
+  padding-right: var(--space-3);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+@media (max-width: 720px) {
+  .chat-page__sidebar {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 0 var(--space-3);
+    max-height: none;
+  }
+}
+
+.chat-page__thread {
+  appearance: none;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-3);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--fg);
+  font: inherit;
+  flex-shrink: 0;
+}
+.chat-page__thread:hover { background: var(--bg-surface); }
+.chat-page__thread.is-active {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+.chat-page__thread-title {
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-page__thread-time {
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle);
+}
+
+.chat-page__thread-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
