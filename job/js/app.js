@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.88.0";
-console.log(`[job] v${VERSION} - Mobile: viewport overflow firewall + type-size pass`);
+const VERSION = "0.89.0";
+console.log(`[job] v${VERSION} - Mobile: drop bottom tabbar, edge-to-edge bars, stage-tabs scroll, fix row overlap, breathing room`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -70,7 +70,6 @@ async function applySignedInState(email) {
   injectFooter();
   injectMobileBar();
   injectSubnavBar();
-  injectTabbar();
 }
 
 // Inject the global footer (theme toggle + version + links) into the .app
@@ -109,7 +108,10 @@ function injectMobileBar() {
     <span class="mobile-bar__title">${title}</span>
     <span class="mobile-bar__action-slot"></span>
   `;
-  main.prepend(bar);
+  // Sit OUTSIDE .app__main so the bar can be edge-to-edge while main keeps
+  // its own horizontal padding. Inserting before .app makes the sticky bar
+  // stick to the viewport top, not to a padded container.
+  document.body.insertBefore(bar, app);
 
   // Scrim sits between rail and the rest of the page; tapping it closes.
   let scrim = document.querySelector('.rail-scrim');
@@ -150,17 +152,18 @@ function injectMobileBar() {
 // rail uses to refresh its count badges.
 function injectSubnavBar() {
   if (document.querySelector('.subnav-bar')) return;
-  const main = document.querySelector('.app__main');
-  if (!main) return;
+  const app = document.querySelector('.app');
+  if (!app) return;
 
   const bar = document.createElement('nav');
   bar.className = 'subnav-bar';
   bar.setAttribute('aria-label', 'Sub-navigation');
   bar.dataset.hasItems = 'false';
   bar.innerHTML = `<div class="subnav-bar__row"></div>`;
-  // Place directly after the mobile-bar (which has been prepended already).
-  const mb = main.querySelector('.mobile-bar');
-  (mb || main).after(bar);
+  // Place directly after the mobile-bar (which has been inserted before .app).
+  const mb = document.querySelector('.mobile-bar');
+  if (mb) mb.after(bar);
+  else document.body.insertBefore(bar, app);
 
   const row = bar.querySelector('.subnav-bar__row');
   const here = location.pathname;
@@ -214,31 +217,7 @@ function injectSubnavBar() {
   askRail();
 }
 
-// Inject the bottom tab bar (4 top-level routes). CSS shows it only at
-// ≤720px. The active route gets aria-current="page" and styles with
-// --accent-strong. Sourcing from the rail's ROUTES list is overkill for
-// 4 items, so we declare them inline here. Keep in sync with job-rail.js.
-function injectTabbar() {
-  if (document.querySelector('.app-tabbar')) return;
-  const TABS = [
-    { href: '/job/jobs/',     label: 'Jobs',   icon: '◧', match: /^\/job\/jobs\/?/      },
-    { href: '/job/history/',  label: 'Career', icon: '◯', match: /^\/job\/history\/?/  },
-    { href: '/job/vision/',   label: 'Plan',   icon: '◇', match: /^\/job\/vision\/?/   },
-    { href: '/job/settings/', label: 'You',    icon: '◉', match: /^\/job\/settings\/?/ },
-  ];
-  const here = location.pathname;
-  const nav = document.createElement('nav');
-  nav.className = 'app-tabbar';
-  nav.setAttribute('aria-label', 'Primary');
-  nav.innerHTML = TABS.map(t => `
-    <a class="app-tabbar__item" href="${t.href}"
-       aria-current="${t.match.test(here) ? 'page' : 'false'}">
-      <span class="app-tabbar__icon" aria-hidden="true">${t.icon}</span>
-      <span class="app-tabbar__label">${t.label}</span>
-    </a>
-  `).join('');
-  document.body.appendChild(nav);
-}
+// (Bottom tab bar removed — drawer is the only mobile nav now.)
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when
 // it restores an existing session, so we must already be subscribed.

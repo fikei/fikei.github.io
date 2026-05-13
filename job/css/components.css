@@ -1421,10 +1421,10 @@
     position: fixed;
     left: 0;
     right: 0;
-    /* Sits just above the bottom tabbar (≈64px + safe-area). */
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    bottom: 0;
     z-index: 28;
     padding: var(--space-3) var(--space-4);
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
     display: flex;
@@ -1436,9 +1436,10 @@
     min-height: 48px;
     justify-content: center;
   }
-  /* Make sure the bottom of the page content isn't hidden behind the bar. */
+  /* Reserve room below content for the sticky action bar so the last
+     paragraph isn't hidden by it. */
   .app__main:has(.role-header__actions) {
-    padding-bottom: calc(72px + 64px + env(safe-area-inset-bottom));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 }
 
@@ -3273,6 +3274,33 @@
   margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
+/* On phones, the 5 stage chips can't fit on one line in 360–400px. Drop
+   the pill container so the row can scroll horizontally without an ugly
+   wrapping pill. The chips themselves keep their pill styling. */
+@media (max-width: 720px) {
+  .stage-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    border-radius: 0;
+    max-width: 100%;
+    gap: var(--space-2);
+  }
+  .stage-tabs::-webkit-scrollbar { display: none; }
+  .stage-tabs__tab {
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+  }
+  .stage-tabs__tab.is-active {
+    border-color: var(--accent);
+  }
+}
 .stage-tabs__tab {
   appearance: none;
   background: transparent;
@@ -3467,19 +3495,19 @@
   }
   .pipeline-table tr {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 48px minmax(0, 1fr) 44px;
     grid-template-areas:
       "fit role menu"
       "fit meta menu";
-    column-gap: var(--space-3);
-    row-gap: 2px;
+    column-gap: var(--space-4);
+    row-gap: var(--space-2);
     align-items: center;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4) 0;
     border: 0;
     border-bottom: 1px solid var(--border);
     border-radius: 0;
     background: transparent;
-    min-height: 64px;
+    min-height: 72px;
   }
   .pipeline-table tr:last-child { border-bottom: 0; }
   .pipeline-table tr:hover td { background: transparent; }
@@ -3490,19 +3518,28 @@
   }
   .pipeline-table .col-fit {
     grid-area: fit;
-    width: 44px;
+    width: 48px;
     align-self: center;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: visible;
   }
+  /* Score-pair on desktop shows both fit + candidate-strength side-by-side
+     in 93px. On phones that overflows a 48px column and bleeds into the
+     role title. Drop the secondary score on mobile — fit is the primary
+     signal; the breakdown lives one tap away in the role detail. */
+  .pipeline-table .col-fit .score-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .pipeline-table .col-fit .score-pair__cand { display: none; }
   .pipeline-table .col-fit .fit-pill {
-    /* Badge type — keep at small (14px); the 16px default body size was
-       too large for a 44px-wide pill. */
     font-size: var(--font-size-small);
     font-weight: var(--fw-semibold);
     padding: 6px 0;
-    min-width: 44px;
+    min-width: 48px;
     text-align: center;
     line-height: 1.2;
   }
@@ -3538,6 +3575,8 @@
      grid-area: meta and overlap. Hide sector in favor of status on the
      pipeline rows (status is the higher-information cell). */
   .pipeline-table tr:has(.col-status) .col-sector { display: none; }
+  /* col-signal has no grid-area assigned — let auto-flow ignore it. */
+  .pipeline-table .col-signal { display: none; }
   .pipeline-table .col-menu {
     grid-area: menu;
     width: auto;
@@ -3638,21 +3677,24 @@
 .subnav-bar {
   display: none;
   position: sticky;
-  top: 65px; /* sits directly under mobile-bar */
+  /* Sticks just below the mobile-bar. The mobile-bar is the previous
+     body-level sibling and reports ~60–68px including safe-area inset. */
+  top: 60px;
   z-index: 29;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  white-space: nowrap;
 }
 .subnav-bar::-webkit-scrollbar { display: none; }
 .subnav-bar__row {
   display: inline-flex;
-  gap: 6px;
-  padding: 2px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-pill);
+  gap: var(--space-2);
+  padding: 0;
+  background: transparent;
 }
 .subnav-bar__item {
   display: inline-flex;
@@ -3684,52 +3726,8 @@
 }
 .subnav-bar__item[aria-current="page"] .nav-count { background: rgba(0,0,0,0.15); }
 
-/* --- Mobile bottom tab bar ---
-   Fixed at the bottom of the viewport, 4 items. The active route's icon and
-   label use --accent-strong (Bright Green) per the brand rule. Respects
-   iOS safe-area so the bar doesn't collide with the home indicator. */
-.app-tabbar {
-  display: none;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 35;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border);
-  padding: 4px var(--space-2);
-  padding-bottom: max(4px, env(safe-area-inset-bottom));
-  justify-content: space-around;
-  align-items: stretch;
-}
-.app-tabbar__item {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex: 1 1 0;
-  min-height: 56px;
-  padding: 6px var(--space-2);
-  font-size: 11px;
-  font-weight: var(--fw-medium);
-  color: var(--fg-muted);
-  text-decoration: none;
-  border-radius: var(--radius-sm);
-}
-.app-tabbar__item:hover { text-decoration: none; }
-.app-tabbar__icon {
-  width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  font-size: 18px;
-  line-height: 1;
-}
-.app-tabbar__item[aria-current="page"] {
-  color: var(--accent-strong-fg);
-  background: var(--accent-strong);
-}
+/* Bottom tab bar was removed: drawer (hamburger → rail) is the only mobile
+   nav. The .app-tabbar class is intentionally absent now. */
 
 /* Drawer scrim + sliding panel for rail nav. */
 .rail-scrim {
@@ -3746,7 +3744,6 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
 
 @media (max-width: 720px) {
   .mobile-bar { display: flex; }
-  .app-tabbar  { display: flex; }
   .subnav-bar[data-has-items="true"] { display: block; }
   /* Higher specificity (.app .app__rail) than base.css's unconditional
      `.app__rail { position: sticky }` rule, so the drawer's `fixed`
@@ -3792,10 +3789,8 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
     grid-area: main;
     min-width: 0;
     max-width: 100%;
-    padding: var(--space-4);
-    /* Leave room for the fixed bottom tabbar + safe-area inset so the last
-       row isn't hidden behind it. 64px ≈ tabbar height incl. padding. */
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    padding: var(--space-5) var(--space-4);
+    padding-bottom: max(var(--space-7), env(safe-area-inset-bottom));
   }
   body .app > .app__main > * { min-width: 0; max-width: 100%; }
   /* Horizontal carousels: keep them inside the viewport. They scroll
