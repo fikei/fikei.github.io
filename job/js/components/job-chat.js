@@ -62,7 +62,7 @@ export class JobChat extends LitElement {
     if (!sb) return;
     const { data, error } = await sb
       .from('chat_message')
-      .select('id, role, body, created_at')
+      .select('id, role, body, tool_name, tool_payload, created_at')
       .order('created_at', { ascending: true })
       .limit(200);
     if (error) {
@@ -111,10 +111,13 @@ export class JobChat extends LitElement {
         throw new Error(`Server ${res.status}: ${errText.slice(0, 240)}`);
       }
       const data = await res.json();
-      // Replace optimistic user message with the persisted one and append assistant.
+      // New response shape is { events: ChatEvent[] } where ChatEvent may be
+      // role 'user' | 'assistant' | 'tool'. Replace the optimistic user
+      // message and append the full event trace in order.
+      const events = (data.events || []).filter(Boolean).map((m) => ({ ...m, kind: 'persisted' }));
       this.messages = this.messages
         .filter((m) => m.id !== optimisticId)
-        .concat([data.user, data.assistant].filter(Boolean).map((m) => ({ ...m, kind: 'persisted' })));
+        .concat(events);
       this._scrollToBottom();
     } catch (err) {
       console.error('[job-chat] send failed', err);
@@ -153,6 +156,47 @@ export class JobChat extends LitElement {
     this.querySelector('.chat-drawer__input')?.focus();
   }
 
+  _renderEvent(m) {
+    if (m.role === 'tool') {
+      const summary = this._summarizeTool(m);
+      return html`
+        <div class="chat-tool">
+          <span class="chat-tool__icon" aria-hidden="true">⚙</span>
+          <span class="chat-tool__name">${m.tool_name}</span>
+          <span class="chat-tool__summary">${summary}</span>
+        </div>
+      `;
+    }
+    return html`
+      <div class="chat-msg chat-msg--${m.role}">
+        <div class="chat-msg__body">${m.body}</div>
+      </div>
+    `;
+  }
+
+  _summarizeTool(m) {
+    const input = m.tool_payload?.input || {};
+    const out = m.tool_payload?.output || {};
+    switch (m.tool_name) {
+      case 'search_pipeline':
+        return `${input.query || '(all)'} → ${out.count ?? 0} matches`;
+      case 'update_pipeline_row': {
+        const fields = Object.entries(input).filter(([k]) => k !== 'slug').map(([k, v]) => `${k}=${v}`).join(', ');
+        return `${input.slug} · ${fields || 'no-op'}`;
+      }
+      case 'add_role_from_url':
+        return `${input.url} → ${out.ok === false ? 'failed' : (out.role?.title || out.slug || 'saved')}`;
+      case 'update_preferences': {
+        const bits = [];
+        if (input.blocked) bits.push(`blocked: ${input.blocked}`);
+        if (input.must_have) bits.push(`must_have: ${input.must_have}`);
+        return bits.join(' · ') || 'noted';
+      }
+      default:
+        return '';
+    }
+  }
+
   render() {
     return html`
       <button class="chat-fab"
@@ -173,14 +217,9 @@ export class JobChat extends LitElement {
           <div class="chat-drawer__thread">
             ${this.messages.length === 0 ? html`
               <div class="chat-empty">
-                <p>I'm the /job agent. Ask me anything about your pipeline, career, or search plan.</p>
-                <p class="chat-empty__hint">In P0 I can only answer questions — tools land soon.</p>
+                <p>I'm the /job agent. Ask me about your pipeline, paste a role to save, change a stage, or steer your preferences.</p>
               </div>
-            ` : this.messages.map((m) => html`
-              <div class="chat-msg chat-msg--${m.role}">
-                <div class="chat-msg__body">${m.body}</div>
-              </div>
-            `)}
+            ` : this.messages.map((m) => this._renderEvent(m))}
             ${this.sending ? html`
               <div class="chat-msg chat-msg--assistant chat-msg--pending">
                 <div class="chat-msg__body"><span class="chat-dot"></span><span class="chat-dot"></span><span class="chat-dot"></span></div>
