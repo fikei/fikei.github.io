@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.86.0";
-console.log(`[job] v${VERSION} - Chat: conversational questions + single combined ack+question block`);
+const VERSION = "0.87.0";
+console.log(`[job] v${VERSION} - Mobile: drawer fix + app-bar + bottom tabbar + segmented subnav + list-row + sticky action bar`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -69,6 +69,8 @@ async function applySignedInState(email) {
   document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
   injectFooter();
   injectMobileBar();
+  injectSubnavBar();
+  injectTabbar();
 }
 
 // Inject the global footer (theme toggle + version + links) into the .app
@@ -81,21 +83,31 @@ function injectFooter() {
   app.appendChild(el);
 }
 
-// Inject a mobile top app bar (hamburger + brand) at the start of every
-// page's <main>. CSS hides it on >720px screens. Tapping the menu button
-// flips body.rail-open which slides the rail in as a drawer.
+// Inject a mobile top app bar (menu + page title + optional action slot) at
+// the start of every page's <main>. CSS hides it on >720px screens. Tapping
+// the menu button flips body.rail-open which slides the rail in as a drawer.
+//
+// The title text is sourced from the page's .page-header h1 so each route
+// shows its own name. Pages can populate the trailing action slot by
+// appending elements to <header class="mobile-bar"> .mobile-bar__action-slot
+// (used by the pipeline page for Filter / Search).
 function injectMobileBar() {
   if (document.querySelector('.mobile-bar')) return;
   const main = document.querySelector('.app__main');
   const app = document.querySelector('.app');
   if (!main || !app) return;
 
+  const title = document.querySelector('.page-header h1')?.textContent?.trim()
+    || document.title.replace(/\s*[—|]\s*\/?job.*$/i, '').trim()
+    || 'ctrl.rodeo';
+
   const bar = document.createElement('header');
   bar.className = 'mobile-bar';
   bar.innerHTML = `
     <button type="button" class="mobile-bar__menu" aria-label="Open navigation"
             aria-controls="job-rail" aria-expanded="false">☰</button>
-    <span class="mobile-bar__brand">ctrl.rodeo<span class="mobile-bar__sub">/ job</span></span>
+    <span class="mobile-bar__title">${title}</span>
+    <span class="mobile-bar__action-slot"></span>
   `;
   main.prepend(bar);
 
@@ -129,6 +141,105 @@ function injectMobileBar() {
   // If the viewport grows past the breakpoint, drop the open state.
   const mq = window.matchMedia('(min-width: 721px)');
   mq.addEventListener?.('change', (e) => { if (e.matches) close(); });
+}
+
+// Inject the mobile segmented sub-nav (sticky under mobile-bar). Only
+// populated on /job/jobs/ today; data-has-items toggles visibility so
+// CSS only shows it when there's something to switch between. Counts are
+// kept in sync by listening to the same 'job:pipeline:refresh' that the
+// rail uses to refresh its count badges.
+function injectSubnavBar() {
+  if (document.querySelector('.subnav-bar')) return;
+  const main = document.querySelector('.app__main');
+  if (!main) return;
+
+  const bar = document.createElement('nav');
+  bar.className = 'subnav-bar';
+  bar.setAttribute('aria-label', 'Sub-navigation');
+  bar.dataset.hasItems = 'false';
+  bar.innerHTML = `<div class="subnav-bar__row"></div>`;
+  // Place directly after the mobile-bar (which has been prepended already).
+  const mb = main.querySelector('.mobile-bar');
+  (mb || main).after(bar);
+
+  const row = bar.querySelector('.subnav-bar__row');
+  const here = location.pathname;
+  const isJobs = /^\/job\/jobs\/?/.test(here);
+
+  if (!isJobs) {
+    bar.dataset.hasItems = 'false';
+    return;
+  }
+
+  // Keep in sync with ROUTES[0].sub in components/job-rail.js.
+  const ITEMS = [
+    { href: '/job/jobs/recommended/',    label: 'For You', path: '/job/jobs/recommended/', countKey: 'recommended' },
+    { href: '/job/jobs/?bucket=leads',   label: 'Saved',   bucket: 'leads',                countKey: 'leads' },
+    { href: '/job/jobs/?bucket=active',  label: 'Active',  bucket: 'active',               countKey: 'active' },
+    { href: '/job/jobs/?bucket=archive', label: 'Archive', bucket: 'archive' },
+  ];
+  const bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
+  const onSubPath = ITEMS.some(i => i.path && here.startsWith(i.path));
+  row.innerHTML = ITEMS.map(i => {
+    const active = i.path
+      ? here.startsWith(i.path)
+      : (!onSubPath && bucket === i.bucket);
+    return `<a class="subnav-bar__item" href="${i.href}" aria-current="${active ? 'page' : 'false'}"
+              data-count-key="${i.countKey || ''}">
+              <span class="subnav-bar__label">${i.label}</span>
+              ${i.countKey ? `<span class="nav-count" data-count="${i.countKey}" hidden></span>` : ''}
+            </a>`;
+  }).join('');
+  bar.dataset.hasItems = 'true';
+
+  const applyCounts = (counts) => {
+    if (!counts) return;
+    for (const el of bar.querySelectorAll('[data-count]')) {
+      const k = el.getAttribute('data-count');
+      const n = counts[k];
+      if (n == null) { el.hidden = true; continue; }
+      el.hidden = false;
+      el.textContent = String(n);
+    }
+  };
+
+  // The rail component already fetches and stores counts on itself; ask it
+  // for the current value, then listen for refresh signals.
+  const askRail = () => {
+    const rail = document.querySelector('job-rail');
+    if (rail?.counts) applyCounts(rail.counts);
+  };
+  askRail();
+  document.addEventListener('job:pipeline:refresh', () => setTimeout(askRail, 200));
+  document.addEventListener('job:auth:ready', () => setTimeout(askRail, 400));
+  // Poll once shortly after mount in case the rail hasn't fetched yet.
+  setTimeout(askRail, 600);
+}
+
+// Inject the bottom tab bar (4 top-level routes). CSS shows it only at
+// ≤720px. The active route gets aria-current="page" and styles with
+// --accent-strong. Sourcing from the rail's ROUTES list is overkill for
+// 4 items, so we declare them inline here. Keep in sync with job-rail.js.
+function injectTabbar() {
+  if (document.querySelector('.app-tabbar')) return;
+  const TABS = [
+    { href: '/job/jobs/',     label: 'Jobs',   icon: '◧', match: /^\/job\/jobs\/?/      },
+    { href: '/job/history/',  label: 'Career', icon: '◯', match: /^\/job\/history\/?/  },
+    { href: '/job/vision/',   label: 'Plan',   icon: '◇', match: /^\/job\/vision\/?/   },
+    { href: '/job/settings/', label: 'You',    icon: '◉', match: /^\/job\/settings\/?/ },
+  ];
+  const here = location.pathname;
+  const nav = document.createElement('nav');
+  nav.className = 'app-tabbar';
+  nav.setAttribute('aria-label', 'Primary');
+  nav.innerHTML = TABS.map(t => `
+    <a class="app-tabbar__item" href="${t.href}"
+       aria-current="${t.match.test(here) ? 'page' : 'false'}">
+      <span class="app-tabbar__icon" aria-hidden="true">${t.icon}</span>
+      <span class="app-tabbar__label">${t.label}</span>
+    </a>
+  `).join('');
+  document.body.appendChild(nav);
 }
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when

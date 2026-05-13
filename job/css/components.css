@@ -90,9 +90,17 @@
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
-  font-size: var(--font-size-title-1);
+  /* Scales from 24px on phones to 36px on desktop. The static token
+     --font-size-title-1 is 36px; the clamp keeps that as the ceiling so
+     desktop is unchanged. */
+  font-size: clamp(24px, 5.5vw, var(--font-size-title-1));
   line-height: var(--lh-title);
   letter-spacing: -0.02em;
+}
+/* On mobile the page H1 is duplicated by the .mobile-bar title — hide the
+   .page-header to keep the layout tight and avoid double titling. */
+@media (max-width: 720px) {
+  .page-header { display: none; }
 }
 .page-header p {
   margin: var(--space-2) 0 0;
@@ -1399,6 +1407,41 @@
 }
 .role-header__actions { flex-shrink: 0; padding-top: var(--space-2); }
 
+/* --- Mobile sticky action bar ---
+   On mobile, .role-header__actions detaches from the header and pins to the
+   bottom of the viewport (above the .app-tabbar) so the primary CTA stays
+   reachable while the user scrolls a long role page. */
+@media (max-width: 720px) {
+  .role-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .role-header__actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* Sits just above the bottom tabbar (≈64px + safe-area). */
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    z-index: 28;
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: var(--space-3);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+  }
+  .role-header__actions > * {
+    flex: 1 1 0;
+    min-height: 48px;
+    justify-content: center;
+  }
+  /* Make sure the bottom of the page content isn't hidden behind the bar. */
+  .app__main:has(.role-header__actions) {
+    padding-bottom: calc(72px + 64px + env(safe-area-inset-bottom));
+  }
+}
+
 .role-meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -2278,8 +2321,8 @@
   scroll-snap-align: start;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -3397,9 +3440,15 @@
   overflow: hidden;
 }
 
-/* --- Mobile / narrow (< 820px): stack each row as a card.
-   Was 720px but the table cumulative min-width of ~600px plus padding
-   meant 720-820px viewports got a cramped horizontal scroll. */
+/* --- Mobile / narrow (< 820px): render each row as a Wise List Item ---
+   Layout per row:
+     [fit-pill 44px] [role-title + company + meta line]  [menu 44px]
+   Status moves into the meta line as a tiny chip beside the sector chips.
+   Sector chips are capped to a single line via flex+nowrap so the row keeps
+   the same height for every entry (predictable rhythm at scroll).
+
+   Cards sit on a transparent background with only a hairline divider, more
+   inline with native list-item patterns than the v1 outlined cards. */
 @media (max-width: 820px) {
   .pipeline-table-wrap {
     border: 0;
@@ -3414,43 +3463,114 @@
   .pipeline-table tbody {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: 0;
   }
   .pipeline-table tr {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "fit role menu"
-      "status sector sector";
-    gap: var(--space-2) var(--space-3);
+      "fit meta menu";
+    column-gap: var(--space-3);
+    row-gap: 2px;
     align-items: center;
-    padding: var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--bg-elevated);
+    padding: var(--space-3) var(--space-2);
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+    min-height: 64px;
   }
+  .pipeline-table tr:last-child { border-bottom: 0; }
   .pipeline-table tr:hover td { background: transparent; }
   .pipeline-table td {
     border-bottom: 0;
     padding: 0;
+    min-width: 0;
   }
-  .pipeline-table .col-fit    { grid-area: fit;    width: auto; }
-  .pipeline-table .col-status { grid-area: status; width: auto; }
-  .pipeline-table .col-role   { grid-area: role;   max-width: none; min-width: 0; }
-  .pipeline-table .col-sector { grid-area: sector; width: auto; }
-  .pipeline-table .col-menu   { grid-area: menu;   width: auto; text-align: right; }
-  .pipeline-table .col-sector .tag-chips { max-height: none; }
-  /* Recs table extras — show as a meta line below the role on mobile. */
+  .pipeline-table .col-fit {
+    grid-area: fit;
+    width: 44px;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pipeline-table .col-fit .fit-pill {
+    font-size: var(--font-size-small);
+    padding: 8px 0;
+    min-width: 44px;
+    text-align: center;
+  }
+  .pipeline-table .col-role {
+    grid-area: role;
+    max-width: none;
+    min-width: 0;
+    align-self: end;
+  }
+  /* Status + sector chips share a single meta line beneath the role title.
+     status is rendered into the same cell using a pseudo-area below; if the
+     row only has the status column, it sits alone. */
+  .pipeline-table .col-status {
+    grid-area: meta;
+    width: auto;
+    align-self: start;
+    font-size: var(--font-size-caption);
+    color: var(--fg-muted);
+  }
+  .pipeline-table .col-sector {
+    grid-area: meta;
+    width: auto;
+    align-self: start;
+    overflow: hidden;
+    max-height: 22px;
+  }
+  .pipeline-table .col-sector .tag-chips {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    max-height: 22px;
+  }
+  /* When both status + sector cells exist on the same row they'd both claim
+     grid-area: meta and overlap. Hide sector in favor of status on the
+     pipeline rows (status is the higher-information cell). */
+  .pipeline-table tr:has(.col-status) .col-sector { display: none; }
+  .pipeline-table .col-menu {
+    grid-area: menu;
+    width: auto;
+    text-align: right;
+    align-self: center;
+  }
+  .pipeline-table .col-menu button {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-pill);
+  }
+
+  /* Recs table extras — collapse location / source / added into the meta line. */
   .pipeline-table tr:has(.col-location) {
     grid-template-areas:
-      "fit  role     menu"
-      "loc  source   added";
+      "fit role     menu"
+      "fit metarec  menu";
   }
-  .pipeline-table .col-location { grid-area: loc;    width: auto; }
-  .pipeline-table .col-added    { grid-area: added;  width: auto; text-align: right; }
+  .pipeline-table .col-location,
+  .pipeline-table .col-source,
+  .pipeline-table .col-added {
+    grid-area: metarec;
+    width: auto;
+    font-size: var(--font-size-caption);
+    color: var(--fg-muted);
+  }
+  /* When all three are present, stack them inline with separators via gap. */
+  .pipeline-table tr:has(.col-location) .col-location { justify-self: start; }
+  .pipeline-table tr:has(.col-location) .col-source   { display: none; } /* keep info dense */
+  .pipeline-table tr:has(.col-location) .col-added    { justify-self: end; }
 }
 
-/* --- Mobile top app bar (hamburger → drawer) --- */
+/* --- Mobile top app bar (title + contextual action; menu opens drawer) ---
+   Layout: [menu 44px] [title — page H1 text] [action slot, optional].
+   The menu is only the "more / nav drawer" affordance — primary nav lives
+   in the bottom .app-tabbar so the user never has to open the drawer to
+   switch top-level routes. */
 .mobile-bar {
   display: none;
   position: sticky;
@@ -3459,33 +3579,149 @@
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   padding: var(--space-3) var(--space-4);
+  padding-top: max(var(--space-3), env(safe-area-inset-top));
   align-items: center;
   gap: var(--space-3);
 }
-.mobile-bar__menu {
+.mobile-bar__menu,
+.mobile-bar__action {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
   font-size: 18px;
   cursor: pointer;
+  flex-shrink: 0;
 }
-.mobile-bar__menu:hover { background: var(--bg-surface); }
-.mobile-bar__brand {
+.mobile-bar__menu:hover,
+.mobile-bar__action:hover { background: var(--bg-surface); }
+.mobile-bar__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mobile-bar__action-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mobile-bar__brand,
+.mobile-bar__sub { /* legacy — kept so older injected markup still renders */
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
   font-size: var(--font-size-body-lg);
   letter-spacing: -0.015em;
 }
-.mobile-bar__sub {
-  margin-left: var(--space-2);
+
+/* --- Mobile segmented sub-nav ---
+   Sticky horizontal pill group under the mobile-bar. Used on /job/jobs/ to
+   switch buckets (For You / Saved / Active / Archive) without opening the
+   drawer. Scrolls horizontally if items overflow the viewport. */
+.subnav-bar {
+  display: none;
+  position: sticky;
+  top: 65px; /* sits directly under mobile-bar */
+  z-index: 29;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.subnav-bar::-webkit-scrollbar { display: none; }
+.subnav-bar__row {
+  display: inline-flex;
+  gap: 6px;
+  padding: 2px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-pill);
+}
+.subnav-bar__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px var(--space-4);
   font-size: var(--font-size-small);
-  color: var(--fg-subtle);
   font-weight: var(--fw-medium);
+  color: var(--fg-muted);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.subnav-bar__item:hover { text-decoration: none; color: var(--fg); }
+.subnav-bar__item[aria-current="page"] {
+  background: var(--accent-strong);
+  color: var(--accent-strong-fg);
+}
+.subnav-bar__item .nav-count {
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  padding: 0 6px;
+  min-width: 18px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: rgba(0,0,0,0.10);
+}
+.subnav-bar__item[aria-current="page"] .nav-count { background: rgba(0,0,0,0.15); }
+
+/* --- Mobile bottom tab bar ---
+   Fixed at the bottom of the viewport, 4 items. The active route's icon and
+   label use --accent-strong (Bright Green) per the brand rule. Respects
+   iOS safe-area so the bar doesn't collide with the home indicator. */
+.app-tabbar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  padding: 4px var(--space-2);
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  justify-content: space-around;
+  align-items: stretch;
+}
+.app-tabbar__item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 1 0;
+  min-height: 56px;
+  padding: 6px var(--space-2);
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--fg-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+.app-tabbar__item:hover { text-decoration: none; }
+.app-tabbar__icon {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}
+.app-tabbar__item[aria-current="page"] {
+  color: var(--accent-strong-fg);
+  background: var(--accent-strong);
 }
 
 /* Drawer scrim + sliding panel for rail nav. */
@@ -3503,6 +3739,8 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
 
 @media (max-width: 720px) {
   .mobile-bar { display: flex; }
+  .app-tabbar  { display: flex; }
+  .subnav-bar[data-has-items="true"] { display: block; }
   .app__rail {
     position: fixed;
     inset: 0 auto 0 0;
@@ -3515,6 +3753,8 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
     flex-wrap: nowrap;
     box-shadow: var(--shadow-lg);
     padding: var(--space-5) var(--space-4);
+    padding-top: max(var(--space-5), env(safe-area-inset-top));
+    padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
     gap: var(--space-5);
   }
   body.rail-open .app__rail { transform: translateX(0); }
@@ -3528,7 +3768,15 @@ body.rail-open .rail-scrim { display: block; opacity: 1; }
   }
   /* Rail no longer occupies layout flow on mobile — reclaim the column. */
   .app > .app__rail { grid-area: rail; }
-  .app__main { padding: var(--space-4); }
+  .app__main {
+    padding: var(--space-4);
+    /* Leave room for the fixed bottom tabbar + safe-area inset so the last
+       row isn't hidden behind it. 64px ≈ tabbar height incl. padding. */
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+  /* Footer (theme toggle + version) lives in Settings on mobile; hiding the
+     desktop footer prevents it from sitting between content and the tabbar. */
+  .app__footer { display: none; }
 }
 
 /* ── Phase 2.0 — application-tracker UI ─────────────────────────── */
