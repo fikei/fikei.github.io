@@ -19,7 +19,7 @@
 // Auth: standard /job bearer token.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { verifyJobUserDetailed, corsHeaders } from '../_shared/job-auth.ts';
+import { verifyJobUserAny, corsHeaders } from '../_shared/job-auth.ts';
 import { TOOL_SCHEMAS, invokeTool, type ToolContext } from '../_shared/job-tools.ts';
 
 const VERSION = '0.1.0';
@@ -43,7 +43,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return rpcError(null, -32600, 'POST required', 405);
 
-  const user = await verifyJobUserDetailed(req);
+  const user = await verifyJobUserAny(req);
   if (!user) return rpcError(null, -32001, 'unauthorized', 401);
 
   let body: JsonRpcReq;
