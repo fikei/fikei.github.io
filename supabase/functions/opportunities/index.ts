@@ -14,6 +14,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
+import { loadVisionField } from '../_shared/job-vision.ts';
 
 const VERSION = '0.1.0';
 console.log(`[opportunities] v${VERSION} - persisted audit cache + stale check`);
@@ -78,14 +79,15 @@ async function callClaudeJson(system: string, user: string, maxTokens = 4096): P
 }
 
 async function runAudit(sql: any): Promise<any[]> {
-  const [vision, companies, projects, clients, narratives] = await Promise.all([
-    sql`select narrative_arc, raw_md from job.vision where id = 1`,
+  const [narrativeArc, rawMd, companies, projects, clients, narratives] = await Promise.all([
+    loadVisionField<string>(sql, 'narrative_arc'),
+    loadVisionField<string>(sql, 'raw_md'),
     sql`select slug, name, sector, body_md from job.companies`,
     sql`select id, company_slug, role_title, name, description, outcome, metric from job.role_projects`,
     sql`select project_id, name, kind, description from job.project_clients`,
     sql`select id, title, tags, linked_company_slug, content_md from job.narratives`,
   ]);
-  const visionText = (vision[0]?.narrative_arc || vision[0]?.raw_md || '').slice(0, 6000);
+  const visionText = (narrativeArc || rawMd || '').slice(0, 6000);
   const clientsByProject = new Map<string, any[]>();
   for (const c of clients) {
     if (!clientsByProject.has(c.project_id)) clientsByProject.set(c.project_id, []);
