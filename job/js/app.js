@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.89.0";
-console.log(`[job] v${VERSION} - Mobile: drop bottom tabbar, edge-to-edge bars, stage-tabs scroll, fix row overlap, breathing room`);
+const VERSION = "0.90.0";
+console.log(`[job] v${VERSION} - Mobile: home dashboard at /job/, back caret, drop drawer, fix For You row, ✓ icon`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -39,6 +39,11 @@ if (location.pathname.startsWith('/job/onboarding')) {
 }
 if (location.pathname.startsWith('/job/settings')) {
   import('./components/job-settings.js' + V);
+}
+// Mobile dashboard at /job/ (root). Desktop gets redirected to /jobs/ by
+// inline script in index.html before this module runs.
+if (location.pathname === '/job/' || location.pathname === '/job') {
+  import('./components/job-home.js' + V);
 }
 
 async function applySignedInState(email) {
@@ -82,67 +87,35 @@ function injectFooter() {
   app.appendChild(el);
 }
 
-// Inject a mobile top app bar (menu + page title + optional action slot) at
-// the start of every page's <main>. CSS hides it on >720px screens. Tapping
-// the menu button flips body.rail-open which slides the rail in as a drawer.
-//
-// The title text is sourced from the page's .page-header h1 so each route
-// shows its own name. Pages can populate the trailing action slot by
-// appending elements to <header class="mobile-bar"> .mobile-bar__action-slot
-// (used by the pipeline page for Filter / Search).
+// Inject a mobile top app bar at the start of <body>. CSS hides it on
+// >720px screens. The leading button is a back caret on every page except
+// the home dashboard at /job/, where it's omitted. Title comes from the
+// page's .page-header h1.
 function injectMobileBar() {
   if (document.querySelector('.mobile-bar')) return;
-  const main = document.querySelector('.app__main');
   const app = document.querySelector('.app');
-  if (!main || !app) return;
+  if (!app) return;
 
-  const title = document.querySelector('.page-header h1')?.textContent?.trim()
-    || document.title.replace(/\s*[—|]\s*\/?job.*$/i, '').trim()
-    || 'ctrl.rodeo';
+  const isHome = location.pathname === '/job/' || location.pathname === '/job';
+  const title = isHome
+    ? '/ job'
+    : (document.querySelector('.page-header h1')?.textContent?.trim()
+       || document.title.replace(/\s*[—|]\s*\/?job.*$/i, '').trim()
+       || 'ctrl.rodeo');
 
   const bar = document.createElement('header');
   bar.className = 'mobile-bar';
+  bar.dataset.home = isHome ? 'true' : 'false';
   bar.innerHTML = `
-    <button type="button" class="mobile-bar__menu" aria-label="Open navigation"
-            aria-controls="job-rail" aria-expanded="false">☰</button>
+    ${isHome
+      ? `<span class="mobile-bar__spacer" aria-hidden="true"></span>`
+      : `<a class="mobile-bar__back" href="/job/" aria-label="Back to home">‹</a>`}
     <span class="mobile-bar__title">${title}</span>
     <span class="mobile-bar__action-slot"></span>
   `;
   // Sit OUTSIDE .app__main so the bar can be edge-to-edge while main keeps
-  // its own horizontal padding. Inserting before .app makes the sticky bar
-  // stick to the viewport top, not to a padded container.
+  // its own horizontal padding.
   document.body.insertBefore(bar, app);
-
-  // Scrim sits between rail and the rest of the page; tapping it closes.
-  let scrim = document.querySelector('.rail-scrim');
-  if (!scrim) {
-    scrim = document.createElement('div');
-    scrim.className = 'rail-scrim';
-    scrim.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(scrim);
-  }
-
-  const close = () => {
-    document.body.classList.remove('rail-open');
-    bar.querySelector('.mobile-bar__menu').setAttribute('aria-expanded', 'false');
-  };
-  const open = () => {
-    document.body.classList.add('rail-open');
-    bar.querySelector('.mobile-bar__menu').setAttribute('aria-expanded', 'true');
-  };
-
-  bar.querySelector('.mobile-bar__menu').addEventListener('click', () => {
-    document.body.classList.contains('rail-open') ? close() : open();
-  });
-  scrim.addEventListener('click', close);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-  // Tapping a nav link inside the rail should close the drawer.
-  document.querySelector('.app__rail')?.addEventListener('click', (e) => {
-    if (e.target.closest('a[href]')) close();
-  });
-  // If the viewport grows past the breakpoint, drop the open state.
-  const mq = window.matchMedia('(min-width: 721px)');
-  mq.addEventListener?.('change', (e) => { if (e.matches) close(); });
 }
 
 // Inject the mobile segmented sub-nav (sticky under mobile-bar). Only

@@ -300,9 +300,12 @@ export class JobRecommendationsTable extends LitElement {
         <td class="col col-menu">
           <div class="rec-actions">
             <button class="btn btn--sm btn--accent"
+                    aria-label=${this.addingId === r.id ? 'Saving' : 'Save role'}
+                    title=${this.addingId === r.id ? 'Saving…' : 'Save role'}
                     ?disabled=${this.addingId === r.id}
                     @click=${() => this._onAdd(r)}>
-              ${this.addingId === r.id ? 'Saving…' : 'Save'}
+              <span class="btn-icon" aria-hidden="true">${this.addingId === r.id ? '…' : '✓'}</span>
+              <span class="btn-label">${this.addingId === r.id ? 'Saving…' : 'Save'}</span>
             </button>
             <button class="btn-dismiss" aria-label="Dismiss recommendation"
                     title="Dismiss"

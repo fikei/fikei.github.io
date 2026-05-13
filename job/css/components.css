@@ -3589,24 +3589,55 @@
     border-radius: var(--radius-pill);
   }
 
-  /* Recs table extras — collapse location / source / added into the meta line. */
+  /* Recs table extras — collapse location / source / added into the meta line.
+     col-menu on rec rows holds the Save + Dismiss actions (rec-actions ~96px
+     wide), so widen the menu column there. col-sector (which carries the
+     "source" string for recs, NOT a sector chip cluster) is hidden because
+     the company name already appears in col-role. */
   .pipeline-table tr:has(.col-location) {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
     grid-template-areas:
       "fit role     menu"
       "fit metarec  menu";
+    column-gap: var(--space-3);
   }
+  .pipeline-table tr:has(.col-location) .col-sector { display: none; }
+  .pipeline-table tr:has(.col-location) .col-source { display: none; }
   .pipeline-table .col-location,
-  .pipeline-table .col-source,
   .pipeline-table .col-added {
     grid-area: metarec;
     width: auto;
     font-size: var(--font-size-caption);
     color: var(--fg-muted);
+    align-self: start;
   }
-  /* When all three are present, stack them inline with separators via gap. */
-  .pipeline-table tr:has(.col-location) .col-location { justify-self: start; }
-  .pipeline-table tr:has(.col-location) .col-source   { display: none; } /* keep info dense */
-  .pipeline-table tr:has(.col-location) .col-added    { justify-self: end; }
+  .pipeline-table tr:has(.col-location) .col-location { justify-self: start; white-space: nowrap; }
+  .pipeline-table tr:has(.col-location) .col-added    { justify-self: end;   white-space: nowrap; }
+  .pipeline-table tr:has(.col-location) .col-menu {
+    width: auto;
+    min-width: 96px;
+    align-self: center;
+  }
+  .pipeline-table .col-menu .rec-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* Save button → checkmark icon on mobile. The label span is hidden, the
+     icon span (added in the Lit template) shows. Visually a 36px round
+     accent button — cleaner than a "Save" text pill at this width. */
+  .pipeline-table .col-menu .rec-actions .btn--accent {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: var(--radius-pill);
+  }
+  .pipeline-table .col-menu .rec-actions .btn--accent .btn-label { display: none; }
+  .pipeline-table .col-menu .rec-actions .btn-dismiss {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* --- Mobile top app bar (title + contextual action; menu opens drawer) ---
@@ -3626,6 +3657,7 @@
   align-items: center;
   gap: var(--space-3);
 }
+.mobile-bar__back,
 .mobile-bar__menu,
 .mobile-bar__action {
   display: inline-grid;
@@ -3636,14 +3668,17 @@
   border: 0;
   background: transparent;
   color: var(--fg);
-  font-size: 20px;
+  font-size: 28px;
+  line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
+  text-decoration: none;
 }
+.mobile-bar__back:hover,
 .mobile-bar__menu:hover,
-.mobile-bar__action:hover { background: var(--bg-elevated); }
-.mobile-bar__menu:active,
-.mobile-bar__action:active { background: var(--bg-surface); }
+.mobile-bar__action:hover { background: var(--bg-elevated); text-decoration: none; }
+.mobile-bar__back { font-weight: var(--fw-semibold); padding-bottom: 4px; }
+.mobile-bar__spacer { width: 44px; height: 44px; flex-shrink: 0; }
 .mobile-bar__title {
   flex: 1;
   min-width: 0;
@@ -3662,12 +3697,157 @@
   align-items: center;
   gap: var(--space-2);
 }
+/* The For You carousel inside the Saved Jobs page (rendered by
+   <job-pipeline> when bucket=leads) is pulled forward to the home dashboard
+   on mobile, so hide it on the list view to avoid duplication and a long
+   above-the-fold scroll before the user reaches their saved roles. */
+@media (max-width: 720px) {
+  job-pipeline > job-recommendations { display: none; }
+}
+
 .mobile-bar__brand,
 .mobile-bar__sub { /* legacy — kept so older injected markup still renders */
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
   font-size: var(--font-size-body-lg);
   letter-spacing: -0.015em;
+}
+
+/* --- Mobile home dashboard (rendered by <job-home>) ---
+   Full-page hub at /job/ on mobile. Stacks four entry cards (Jobs, Career,
+   Plan, Settings); the Jobs card shows live counts plus a preview list of
+   For You roles so the carousel data is "pulled forward" into the hub. */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.home__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(28px, 7vw, 36px);
+  letter-spacing: -0.02em;
+  line-height: var(--lh-title);
+}
+.home__sub {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+}
+.home-card {
+  display: block;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  text-decoration: none;
+  transition: border-color 80ms ease, transform 80ms ease;
+}
+.home-card:hover { border-color: var(--border-strong); text-decoration: none; }
+.home-card:active { transform: translateY(1px); }
+.home-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.home-card__head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  letter-spacing: -0.015em;
+  line-height: var(--lh-tight);
+}
+.home-card__arrow {
+  color: var(--fg-subtle);
+  font-size: 22px;
+  line-height: 1;
+}
+.home-card__hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  line-height: var(--lh-tight);
+}
+.home-card__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+}
+.home-card__metrics strong {
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-4);
+  margin-right: 4px;
+}
+.home-card__list {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.home-rec {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  color: var(--fg);
+  text-decoration: none;
+}
+.home-rec:hover { text-decoration: none; }
+.home-rec__logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.home-rec__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.home-rec__title {
+  font-size: var(--font-size-body);
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-rec__sub {
+  font-size: 13px;
+  color: var(--fg-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-rec__fit {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-small);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+  color: var(--accent-strong-fg);
+  min-width: 36px;
+  text-align: center;
 }
 
 /* --- Mobile segmented sub-nav ---
@@ -3729,45 +3909,15 @@
 /* Bottom tab bar was removed: drawer (hamburger → rail) is the only mobile
    nav. The .app-tabbar class is intentionally absent now. */
 
-/* Drawer scrim + sliding panel for rail nav. */
-.rail-scrim {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(14,15,12,0.45);
-  z-index: 40;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-body.rail-open .rail-scrim { display: block; opacity: 1; }
-[data-theme$="-dark"] .rail-scrim { background: rgba(0,0,0,0.55); }
+/* Drawer pattern was retired on mobile; .rail-scrim CSS was here. */
 
 @media (max-width: 720px) {
   .mobile-bar { display: flex; }
   .subnav-bar[data-has-items="true"] { display: block; }
-  /* Higher specificity (.app .app__rail) than base.css's unconditional
-     `.app__rail { position: sticky }` rule, so the drawer's `fixed`
-     positioning wins regardless of CSS load order. base.css @imports
-     components.css then declares its own rules, so a flat `.app__rail`
-     selector here would otherwise lose the cascade. */
-  .app .app__rail {
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: min(280px, 86vw);
-    height: 100dvh;
-    transform: translateX(-100%);
-    transition: transform 220ms cubic-bezier(0.2, 0.0, 0.0, 1.0);
-    z-index: 50;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    box-shadow: var(--shadow-lg);
-    padding: var(--space-5) var(--space-4);
-    padding-top: max(var(--space-5), env(safe-area-inset-top));
-    padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
-    gap: var(--space-5);
-  }
-  body.rail-open .app .app__rail { transform: translateX(0); }
-  .rail-foot { margin-top: auto; flex-direction: column; align-items: flex-start; }
+  /* Drawer pattern is retired on mobile — the home dashboard at /job/ is
+     the nav surface. Hide the rail entirely on phones; the rail stays for
+     desktop. */
+  .app .app__rail { display: none; }
   /* Higher-specificity selector (body .app) to outrank the unconditional
      base.css `.app { grid-template-columns: 280px 1fr }` rule — same
      cascade trap as the rail. Mobile collapses to a single column; the
