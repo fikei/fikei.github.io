@@ -98,9 +98,11 @@
   letter-spacing: -0.02em;
 }
 /* On mobile the page H1 is duplicated by the .mobile-bar title — hide the
-   .page-header to keep the layout tight and avoid double titling. */
+   .page-header and the rec-table's own header to keep the layout tight and
+   avoid double titling. Refresh button moves down into the meta row. */
 @media (max-width: 720px) {
   .page-header { display: none; }
+  .recs-page__head h1 { display: none; }
 }
 .page-header p {
   margin: var(--space-2) 0 0;
