@@ -4309,19 +4309,18 @@ job-onboarding { display: contents; }
   color: var(--fg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
 }
-.chat__ai-reflection,
-.chat__ai-question {
+.chat__ai-turn {
   margin: 0;
-}
-.chat__ai-reflection {
-  color: var(--fg-muted);
-}
-.chat__ai-question {
   color: var(--fg);
-  font-weight: 500;
 }
+.chat__ai-turn strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+/* Legacy split (older drafts in localStorage) still renders, just inline. */
+.chat__ai-reflection { color: var(--fg-muted); margin: 0 0 var(--space-3); }
+.chat__ai-question   { color: var(--fg); font-weight: 600; margin: 0; }
 .chat__ai--thinking {
   color: var(--fg-muted);
   letter-spacing: 0.15em;
