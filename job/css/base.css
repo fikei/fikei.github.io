@@ -1,13 +1,22 @@
 /* @import querystrings are bumped alongside JOB_VERSION in app.js so a
    release that only touches components.css/tokens busts the browser
    disk cache. The HTML cache-buster only refreshes base.css itself. */
-@import url("./tokens-generic-light.css?v=0.45.0");
-@import url("./tokens-generic-dark.css?v=0.45.0");
-@import url("./tokens-ctrl-light.css?v=0.45.0");
-@import url("./tokens-ctrl-dark.css?v=0.45.0");
-@import url("./components.css?v=0.45.0");
+@import url("./tokens-generic-light.css?v=0.46.0");
+@import url("./tokens-generic-dark.css?v=0.46.0");
+@import url("./tokens-ctrl-light.css?v=0.46.0");
+@import url("./tokens-ctrl-dark.css?v=0.46.0");
+@import url("./components.css?v=0.46.0");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+/* Named breakpoints. Use as `@media (max-width: 720px)` etc. in CSS — the
+   custom properties exist so JS can read them via getComputedStyle(:root). */
+:root {
+  --bp-xs: 480px;
+  --bp-sm: 720px;
+  --bp-md: 960px;
+  --bp-lg: 1240px;
+}
 
 * { box-sizing: border-box; }
 
@@ -107,24 +116,7 @@ body:not([data-auth-state="in"]) #ctrlAuthBar { display: none !important; }
   color: var(--fg-muted);
 }
 
-@media (max-width: 720px) {
-  .app {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "rail"
-      "main"
-      "footer";
-  }
-  .app__rail {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-  }
-  .app__main { padding: var(--space-5); }
-  .rail-foot { margin-top: 0; flex-direction: row; gap: var(--space-3); }
-  .app__footer { padding: var(--space-3) var(--space-4); }
-}
+/* Mobile responsive rules for .app, .app__rail (drawer), .mobile-bar, and
+   the bottom .app-tabbar live in components.css. base.css used to redefine
+   them here, which silently won the cascade (base @imports components, then
+   its own rules run last) and neutralized the drawer. */
