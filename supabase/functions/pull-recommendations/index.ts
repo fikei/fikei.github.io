@@ -21,6 +21,7 @@ import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
+import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
 const VERSION = '0.15.0';
 console.log(`[pull-recommendations] v${VERSION} - surface all recs (no off-target/geo/min drops) + LinkedIn 'and more' digest detection`);
@@ -289,13 +290,25 @@ serve(async (req) => {
       // Fit compute on roles the user has explicitly opted out of, and
       // makes the agent-driven update_preferences flow actually take
       // effect end-to-end.
-      const blockedTitles = await loadBlockedTitles(sql);
+      const blockedTitles  = await loadBlockedTitles(sql);
+      const mustHaveTerms  = await loadMustHaveKeywords(sql);
       const beforeBlock = pulled.length;
-      const filteredPull = blockedTitles.length
+      let stage1 = blockedTitles.length
         ? pulled.filter(r => !titleMatchesAny((r.title || '').toLowerCase(), blockedTitles))
         : pulled;
-      const droppedByBlocked = beforeBlock - filteredPull.length;
+      const droppedByBlocked = beforeBlock - stage1.length;
       if (droppedByBlocked > 0) console.log(`[pull-recommendations] dropped ${droppedByBlocked}/${beforeBlock} by blocked_titles`);
+      // must_have_keywords: at least one term must appear in the title or
+      // description. Empty list = no-op.
+      const beforeMust = stage1.length;
+      const filteredPull = mustHaveTerms.length
+        ? stage1.filter(r => {
+            const hay = `${(r.title || '').toLowerCase()} ${(r.description || '').toLowerCase()}`;
+            return mustHaveTerms.some(t => t && hay.includes(t));
+          })
+        : stage1;
+      const droppedByMust = beforeMust - filteredPull.length;
+      if (droppedByMust > 0) console.log(`[pull-recommendations] dropped ${droppedByMust}/${beforeMust} by must_have_keywords`);
       const { kept } = scoreAndFilter(filteredPull, /* minScore */ 0, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
@@ -385,10 +398,7 @@ let _geoCache: { rows: string[]; at: number } | null = null;
 
 async function loadTargetGeographies(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_geoCache && Date.now() - _geoCache.at < TITLE_CACHE_MS) return _geoCache.rows;
-  const rows = await sql<{ geos: string[] | null }[]>`
-    select target_geographies as geos from job.vision order by updated_at desc limit 1
-  `;
-  const fromVision = ((rows[0]?.geos as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const fromVision = await loadVisionStringArray(sql, 'target_geographies');
   const geos = fromVision.length ? fromVision : DEFAULT_TARGET_GEOGRAPHIES;
   _geoCache = { rows: geos, at: Date.now() };
   return geos;
@@ -407,10 +417,7 @@ function geoMatches(loc: string, targets: string[]): boolean {
 
 async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_titleCache && Date.now() - _titleCache.at < TITLE_CACHE_MS) return _titleCache.rows;
-  const rows = await sql<{ titles: string[] | null }[]>`
-    select target_titles as titles from job.vision order by updated_at desc limit 1
-  `;
-  const fromVision = ((rows[0]?.titles as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const fromVision = await loadVisionStringArray(sql, 'target_titles');
   const titles = fromVision.length ? fromVision : DEFAULT_TARGET_TITLES;
   _titleCache = { rows: titles, at: Date.now() };
   return titles;
@@ -423,11 +430,18 @@ async function loadTargetTitles(sql: ReturnType<typeof db>): Promise<string[]> {
 let _blockedCache: { rows: string[]; at: number } | null = null;
 async function loadBlockedTitles(sql: ReturnType<typeof db>): Promise<string[]> {
   if (_blockedCache && Date.now() - _blockedCache.at < TITLE_CACHE_MS) return _blockedCache.rows;
-  const rows = await sql<{ blocked: string[] | null }[]>`
-    select blocked_titles as blocked from job.vision order by updated_at desc limit 1
-  `;
-  const list = ((rows[0]?.blocked as string[]) || []).map(s => s.toLowerCase()).filter(Boolean);
+  const list = await loadVisionStringArray(sql, 'blocked_titles');
   _blockedCache = { rows: list, at: Date.now() };
+  return list;
+}
+
+// Required keywords (must_have_keywords). When any are configured, drop
+// postings whose title doesn't contain at least one. Empty = no-op.
+let _mustHaveCache: { rows: string[]; at: number } | null = null;
+async function loadMustHaveKeywords(sql: ReturnType<typeof db>): Promise<string[]> {
+  if (_mustHaveCache && Date.now() - _mustHaveCache.at < TITLE_CACHE_MS) return _mustHaveCache.rows;
+  const list = await loadVisionStringArray(sql, 'must_have_keywords');
+  _mustHaveCache = { rows: list, at: Date.now() };
   return list;
 }
 // Substring-match any blocked phrase against a (lowercased) posting title.
@@ -629,16 +643,17 @@ async function insertNew(
 //   - Why does the role fit the user? (cite the breakdown — e.g. "+22 title")
 
 async function loadUserContext(sql: ReturnType<typeof db>): Promise<UserContext> {
-  const [skills, wins, vision] = await Promise.all([
+  const [skills, wins, rawMd, narrativeArc] = await Promise.all([
     sql`select name, type, level, body_md from job.skills order by name`,
     sql`select headline, metric_value, body_md from job.wins order by updated_at desc limit 30`,
-    sql`select coalesce(raw_md, narrative_arc) as body_md from job.vision order by updated_at desc limit 1`,
+    loadVisionField<string>(sql, 'raw_md'),
+    loadVisionField<string>(sql, 'narrative_arc'),
   ]);
   return {
     resume: '', // hook for a future "primary resume" lookup
     skills: (skills as Array<Record<string, unknown>>).map(s => `- ${s.name} (${s.type}/${s.level}): ${(s.body_md || '').toString().slice(0, 200)}`).join('\n'),
     wins:   (wins as Array<Record<string, unknown>>).map(w => `- ${w.headline} (${w.metric_value || 'n/a'}): ${(w.body_md || '').toString().slice(0, 200)}`).join('\n'),
-    vision: (vision as Array<Record<string, unknown>>)[0]?.body_md as string || '',
+    vision: rawMd || narrativeArc || '',
   };
 }
 

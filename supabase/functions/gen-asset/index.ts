@@ -8,6 +8,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
+import { loadVisionField } from '../_shared/job-vision.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompts.ts';
 
 const VERSION = '0.8.0';
@@ -32,17 +33,17 @@ async function loadRole(slug: string | null, rowNumber: number | null) {
 
 async function loadKb(): Promise<string> {
   const sql = db();
-  const [companies, projects, skills, wins, vision] = await Promise.all([
+  const [companies, projects, skills, wins, rawMd] = await Promise.all([
     sql`select slug, name, sector, stage_at_time, location, body_md from job.companies`,
     sql`select slug, company_slug, title, role, body_md, metric_value from job.projects`,
     sql`select slug, name, type, level, years_practiced, body_md, cover_letter_blurb from job.skills`,
     sql`select slug, company_slug, project_slug, headline, body_md, metric_value from job.wins`,
-    sql`select narrative_arc, voice_rules_md, raw_md from job.vision where id = 1`,
+    loadVisionField<string>(sql, 'raw_md'),
   ]);
 
   const sections: string[] = [];
 
-  if (vision[0]?.raw_md) sections.push(`## Vision\n\n${vision[0].raw_md}`);
+  if (rawMd) sections.push(`## Vision\n\n${rawMd}`);
   for (const c of companies) {
     sections.push(`## Company: ${c.name} (${c.slug})\n\n${c.body_md || ''}`);
   }
@@ -204,14 +205,15 @@ Produce the JSON object now. JSON only.`;
     // or project upserts as appropriate.
     if (kind === 'career-opportunities') {
       const sql = db();
-      const [vision, companies, projects, clients, narratives] = await Promise.all([
-        sql`select narrative_arc, raw_md from job.vision where id = 1`,
+      const [narrativeArc, rawMd, companies, projects, clients, narratives] = await Promise.all([
+        loadVisionField<string>(sql, 'narrative_arc'),
+        loadVisionField<string>(sql, 'raw_md'),
         sql`select slug, name, sector, body_md from job.companies`,
         sql`select id, company_slug, role_title, name, description, outcome, metric from job.role_projects`,
         sql`select project_id, name, kind, description from job.project_clients`,
         sql`select id, title, tags, linked_company_slug, content_md from job.narratives`,
       ]);
-      const visionText = (vision[0]?.narrative_arc || vision[0]?.raw_md || '').slice(0, 6000);
+      const visionText = (narrativeArc || rawMd || '').slice(0, 6000);
       const clientsByProject = new Map<string, any[]>();
       for (const c of clients) {
         if (!clientsByProject.has(c.project_id)) clientsByProject.set(c.project_id, []);

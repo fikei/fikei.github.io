@@ -2,6 +2,7 @@
 // role-match call. Used by both pull-recommendations (cron pulls) and
 // add-role (user-saved rows) so all entry points walk the same v3 path.
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
+import { loadVisionFields } from './job-vision.ts';
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -37,17 +38,17 @@ const FIT_CTX_CACHE_MS = 60_000;
 // deno-lint-ignore no-explicit-any
 export async function loadFitContext(sql: any): Promise<FitUserContext> {
   if (_fitCtxCache && Date.now() - _fitCtxCache.at < FIT_CTX_CACHE_MS) return _fitCtxCache.ctx;
-  const [visionRows, skillRows, companyRows, winRows] = await Promise.all([
-    sql`select impact_themes, mission_keywords, mission_required, anti_mission_terms,
-               culture_keywords, interest_tags, target_sectors, score_weights,
-               coalesce(narrative_arc,'') as narrative_arc
-          from job.vision order by updated_at desc limit 1`,
+  const wanted = [
+    'impact_themes', 'mission_keywords', 'mission_required', 'anti_mission_terms',
+    'culture_keywords', 'interest_tags', 'target_sectors', 'score_weights', 'narrative_arc',
+  ];
+  const [v, skillRows, companyRows, winRows] = await Promise.all([
+    loadVisionFields(sql, wanted),
     sql`select name, years_practiced from job.skills`,
     sql`select coalesce(sector,'') as sector from job.companies`,
     sql`select headline, metric_value as metric from job.wins order by updated_at desc limit 20`,
   ]);
-  const v = (visionRows as Array<Record<string, unknown>>)[0] || {};
-  const arcSrc = (v.narrative_arc as string || '').toLowerCase();
+  const arcSrc = ((v.narrative_arc as string) || '').toLowerCase();
   const arcTags: string[] = [];
   for (const tag of ['founding','zero-to-one','zero to one','platform','scale','scaled','ipo','acquisition','fractional','pmf','product-market fit','growth','greenfield']) {
     if (arcSrc.includes(tag)) arcTags.push(tag);
