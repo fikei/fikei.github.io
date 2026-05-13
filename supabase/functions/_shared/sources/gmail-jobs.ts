@@ -29,6 +29,7 @@ import {
 import { db } from '../job-db.ts';
 import {
   type GmailMessage,
+  ensureAndApplyLabel,
   extractBody,
   getHeader,
   getMessage,
@@ -37,6 +38,11 @@ import {
   listSinceCursor,
 } from '../gmail.ts';
 import { scanApplicationResponses } from '../gmail-application-scan.ts';
+
+// Every email the pipeline sources from gets labeled in Gmail so the
+// user can audit what we've touched. The label is created on first use
+// and reused thereafter (see ensureLabel cache in _shared/gmail.ts).
+const LADDER_LABEL = 'Ladder';
 
 interface GmailJobsCfg {
   allowSenders?: string[];
@@ -162,6 +168,9 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidates from gmail (history=${!!state.history_id}, cap=${maxMessages})`);
 
     const out: RecommendedRoleInput[] = [];
+    // Track every Gmail API id that contributed at least one emit, so
+    // we can stamp the Ladder label at end-of-pull in one batch call.
+    const labelTargets: string[] = [];
 
     for (const id of ids) {
       if (newWork >= maxMessages) { cappedRun = true; break; }
@@ -337,6 +346,25 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       // so we can audit — otherwise the message silently disappears.
       if (!emitted) {
         await logSkipped(sql, ctx.userEmail, msg, messageId, 'no_usable_roles', { extracted: jobs });
+      } else {
+        // At least one role was emitted from this message — stamp the
+        // Ladder label so the user can see which inbox items the
+        // pipeline has sourced from.
+        labelTargets.push(msg.id);
+      }
+    }
+
+    // Apply the Ladder label to every Gmail message that contributed at
+    // least one rec this tick. Best-effort: failures (missing modify
+    // scope, transient API errors) are logged but never throw, since
+    // labeling is a side-effect of the pipeline, not the critical path.
+    if (labelTargets.length) {
+      try {
+        const res = await ensureAndApplyLabel(accessToken, labelTargets, LADDER_LABEL);
+        if (res.errors.length) console.warn(`[gmail-jobs] label errors: ${res.errors.slice(0, 3).join(' | ')}`);
+        else console.log(`[gmail-jobs] labeled ${res.labeled} message(s) with '${LADDER_LABEL}'`);
+      } catch (e) {
+        console.warn(`[gmail-jobs] label apply failed: ${(e as Error).message}`);
       }
     }
 

@@ -26,13 +26,17 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import {
   getServiceClient,
   GMAIL_READONLY_SCOPE,
+  GMAIL_MODIFY_SCOPE,
   getAccessToken,
   userIdForEmail,
 } from '../_shared/google-tokens.ts';
 import { scanApplicationResponses } from '../_shared/gmail-application-scan.ts';
+import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
-const VERSION = '1.4.0';
-console.log(`[application-events] v${VERSION} - backfill skips user's own outbound messages`);
+const LADDER_LABEL = 'Ladder';
+
+const VERSION = '1.5.0';
+console.log(`[application-events] v${VERSION} - Gmail 'Ladder' label backfill action (needs gmail.modify scope)`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
@@ -83,6 +87,9 @@ serve(async (req) => {
     }
     if (action === 'backfill') {
       return await runBackfill(body, userEmail);
+    }
+    if (action === 'backfill-labels') {
+      return await runBackfillLabels(body, userEmail);
     }
     return err(`unknown action: ${action}`);
   } catch (e) {
@@ -339,4 +346,63 @@ async function runBackfill(body: Record<string, unknown>, userEmail: string): Pr
   });
 
   return jsonResp({ version: VERSION, ...result });
+}
+
+
+// ---------- backfill-labels ----------
+//
+// One-time (re-runnable) sweep: stamp the Ladder label on every Gmail
+// message the pipeline has ever sourced. Walks two surfaces:
+//   - job.recommended_roles where source='gmail-jobs' (gmailApiId in payload)
+//   - job.application_events (gmail_api_id column)
+// Requires gmail.modify scope — if the user only has readonly, we
+// return a clear error asking for re-consent.
+
+async function runBackfillLabels(_body: Record<string, unknown>, userEmail: string): Promise<Response> {
+  const sb = getServiceClient();
+  const userId = await userIdForEmail(sb, userEmail);
+  if (!userId) return err('user not found', 400);
+  // Require the broader scope so batchModify is actually allowed.
+  const tokenRes = await getAccessToken(sb, userId, [GMAIL_MODIFY_SCOPE]);
+  if (!tokenRes) {
+    return jsonResp({
+      ok: false,
+      reason: 'needs_modify_scope',
+      message: 'Gmail labels require gmail.modify scope. Re-connect Gmail at /job/ to grant it.',
+    }, 400);
+  }
+
+  const sql = db();
+  // recommended_roles stores the Gmail API id under payload.gmailApiId
+  // when the row came from the gmail-jobs source. application_events
+  // stores it in its own column.
+  const recIds = await sql<{ gmail_api_id: string }[]>`
+    select distinct payload->>'gmailApiId' as gmail_api_id
+      from job.recommended_roles
+     where source = 'gmail-jobs'
+       and payload->>'gmailApiId' is not null
+  `;
+  const eventIds = await sql<{ gmail_api_id: string }[]>`
+    select distinct gmail_api_id
+      from job.application_events
+     where gmail_api_id is not null
+  `;
+
+  const all = [
+    ...recIds.map(r => r.gmail_api_id),
+    ...eventIds.map(r => r.gmail_api_id),
+  ].filter(Boolean);
+  const unique = [...new Set(all)];
+
+  const res = await ensureAndApplyLabel(tokenRes.accessToken, unique, LADDER_LABEL);
+  return jsonResp({
+    ok: true,
+    version: VERSION,
+    found:   unique.length,
+    fromRecs:   recIds.length,
+    fromEvents: eventIds.length,
+    labeled: res.labeled,
+    labelId: res.labelId,
+    errors:  res.errors,
+  });
 }
