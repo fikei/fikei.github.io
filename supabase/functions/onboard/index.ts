@@ -17,8 +17,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.4.0';
-console.log(`[onboard] v${VERSION} - extract returns single combined content block (ack+bold question)`);
+const VERSION = '0.4.1';
+console.log(`[onboard] v${VERSION} - extract: mandatory bold + post-process safety net`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -282,16 +282,17 @@ Return ONLY JSON matching:
 Rules for "tags": ${q.notes || 'extract per the schema above'}. Empty arrays beat guesses. Echo their own words; don't impose vocabulary they didn't use.
 
 Rules for "content":
-- Write the AI's next turn as ONE short paragraph (2-4 sentences total).
-- Start with an interpretation of what they said — name a trait, surface a pattern, or distill the shape of their answer. Don't just echo back. Examples of good interpretation:
+- Write the AI's next turn as ONE short paragraph (2-4 sentences, 60 words max).
+- Start with 1-2 sentences that *interpret* what they said — name a trait, surface a pattern, distill the shape of their answer. Don't just echo back. Examples:
     - "That's a purpose-driven direction — sounds like you want the work to leave a fingerprint."
-    - "Building something yourself while interviewing says you're comfortable with ambiguity."
     - "Engagement loops + benefits navigation is a specific kind of taste."
-- Bridge naturally into the next question. A single sentence or even a phrase is enough.
-- End by asking the next question, wrapped in **bold markdown** (double-asterisk on both sides). The question is the emphatic ask of the turn.
-${nextQuestionLabel ? `- The next question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation — keep the substance, change the language. Easier-to-answer wording wins over precise wording.` : '- There is no next question; end the paragraph with a soft wrap-up sentence instead and omit any bold.'}
-- Tone: warm, observational, lightly opinionated. Sentence case. No emoji. Em-dashes welcome. Avoid corporate ("Great answer!", "Thanks for sharing").
-- Total paragraph: 60 words max.`;
+- ${nextQuestionLabel
+    ? `End with the next question. The question's intent is: "${nextQuestionLabel}". You may rewrite the wording so it flows from your interpretation; keep the substance, change the language. Make it easier to answer, not more precise.`
+    : 'End with a soft wrap-up sentence — no further question.'}
+- FORMATTING REQUIREMENT: ${nextQuestionLabel
+    ? 'The next question MUST be the very last sentence of the paragraph, MUST end with a "?", and MUST be wrapped in **double-asterisks** on both sides. Like: "**What does that look like for you?**". This is non-negotiable; the UI relies on it to bold the ask. Do NOT use single-asterisks anywhere in the paragraph — no italic emphasis, no quoted words via asterisks. Plain prose otherwise.'
+    : 'Do not use any asterisks in the paragraph.'}
+- Tone: warm, observational, lightly opinionated. Sentence case. No emoji. Em-dashes welcome. Avoid corporate phrases like "Great answer!" or "Thanks for sharing".`;
   return await callClaudeJson(system, answer.slice(0, 8000), 2000);
 }
 
@@ -381,7 +382,16 @@ serve(async (req: Request) => {
       case 'extract': {
         if (!body.questionId || !body.answer) return err('questionId + answer required');
         const out = await modeExtract(body.questionId, body.answer, body.nextQuestionLabel) as { tags?: unknown; content?: string };
-        return jsonResp({ tags: out?.tags, content: out?.content });
+        // Belt-and-braces: if Haiku forgot to bold the final question, bold
+        // it ourselves. Find the last "?"-terminated sentence, wrap it.
+        let content = out?.content || '';
+        if (body.nextQuestionLabel && content && !/\*\*[^*]+\*\*/.test(content)) {
+          const m = content.match(/([A-Z][^.?!]*\?)(\s*)$/);
+          if (m) {
+            content = content.slice(0, m.index) + `**${m[1]}**` + (m[2] || '');
+          }
+        }
+        return jsonResp({ tags: out?.tags, content });
       }
       case 'finalize': {
         if (!body.profile) return err('profile required');
