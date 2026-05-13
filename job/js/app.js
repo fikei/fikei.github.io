@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.87.0";
-console.log(`[job] v${VERSION} - Mobile: drawer fix + app-bar + bottom tabbar + segmented subnav + list-row + sticky action bar`);
+const VERSION = "0.87.1";
+console.log(`[job] v${VERSION} - Mobile: rail position cascade + subnav counts event`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -203,17 +203,15 @@ function injectSubnavBar() {
     }
   };
 
-  // The rail component already fetches and stores counts on itself; ask it
-  // for the current value, then listen for refresh signals.
+  // The rail component already fetches and stores counts on itself; listen
+  // for its broadcast event and apply.
   const askRail = () => {
     const rail = document.querySelector('job-rail');
     if (rail?.counts) applyCounts(rail.counts);
   };
-  askRail();
+  document.addEventListener('job:rail:counts', (e) => applyCounts(e.detail));
   document.addEventListener('job:pipeline:refresh', () => setTimeout(askRail, 200));
-  document.addEventListener('job:auth:ready', () => setTimeout(askRail, 400));
-  // Poll once shortly after mount in case the rail hasn't fetched yet.
-  setTimeout(askRail, 600);
+  askRail();
 }
 
 // Inject the bottom tab bar (4 top-level routes). CSS shows it only at
