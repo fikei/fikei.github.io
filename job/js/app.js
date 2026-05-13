@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "0.90.2";
-console.log(`[job] v${VERSION} - Mobile: hide For You H1 (mobile-bar title covers it)`);
+const VERSION = "0.91.0";
+console.log(`[job] v${VERSION} - Agent chat P0: FAB + drawer + ask-job-agent (no tools yet)`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -75,6 +75,7 @@ async function applySignedInState(email) {
   injectFooter();
   injectMobileBar();
   injectSubnavBar();
+  injectChat();
 }
 
 // Inject the global footer (theme toggle + version + links) into the .app
@@ -191,6 +192,16 @@ function injectSubnavBar() {
 }
 
 // (Bottom tab bar removed — drawer is the only mobile nav now.)
+
+// Mount the global agent chat — FAB at bottom-right + bottom drawer.
+// Skipped on onboarding (the onboarding flow has its own chat surface).
+async function injectChat() {
+  if (document.querySelector('job-chat')) return;
+  if (location.pathname.startsWith('/job/onboarding')) return;
+  await import('./components/job-chat.js' + V);
+  const el = document.createElement('job-chat');
+  document.body.appendChild(el);
+}
 
 // Listeners FIRST — CtrlAuth's init can dispatch signedin synchronously when
 // it restores an existing session, so we must already be subscribed.
