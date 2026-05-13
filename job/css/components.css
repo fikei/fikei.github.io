@@ -5441,3 +5441,25 @@ body[data-auth-state="out"] job-chat { display: none; }
 .dropzone--compact {
   padding: var(--space-4);
 }
+
+/* Welcome-stage sign-in shortcut. Sits in the top-right corner of the
+   pitch screen so returning users have an easy entry without walking
+   the onboarding flow. */
+.onboard__stage--welcome {
+  position: relative;
+}
+.onboard__signin {
+  position: absolute;
+  top: 0;
+  right: 0;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.onboard__signin:hover { color: var(--fg); border-color: var(--border-strong); }

@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "1.4.0";
-console.log(`[job] v${VERSION} - Resume-first upload + insight card + supporting docs prompt`);
+const VERSION = "1.5.0";
+console.log(`[job] v${VERSION} - Sign-in on Welcome + auto-redirect completed users to recommended`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -48,10 +48,6 @@ if (location.pathname === '/job/' || location.pathname === '/job') {
 
 async function applySignedInState(email) {
   const sb = window.CtrlAuth?.getSupabaseClient?.();
-  // Gate: user must have a user_profile row with onboarding_complete_at set.
-  // No row → first-time user; redirect to onboarding (which will create one).
-  // Row but not complete → resume onboarding.
-  // Already on the onboarding page → let it render regardless of status.
   const onOnboarding = location.pathname.startsWith(ONBOARDING_PATH);
   let profile = null;
   if (sb) {
@@ -66,7 +62,16 @@ async function applySignedInState(email) {
       console.warn('[job] user_profile query threw', e);
     }
   }
-  if (!onOnboarding && (!profile || !profile.onboarding_complete_at)) {
+  const completed = !!profile?.onboarding_complete_at;
+  // Returning user with completed onboarding lands on /job/onboarding —
+  // bounce to recommended. They came back to sign in, not to walk the flow
+  // again. (Existing users still get to /job/settings/?demo=1 to re-test.)
+  if (onOnboarding && completed) {
+    location.replace('/job/jobs/recommended/');
+    return;
+  }
+  // Unauth or incomplete profile on a protected route → push into onboarding.
+  if (!onOnboarding && !completed) {
     location.replace(ONBOARDING_PATH + '/');
     return;
   }
