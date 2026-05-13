@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "1.0.1";
-console.log(`[job] v${VERSION} - Gmail OAuth callback handler + Ladder label + pre-auth landing`);
+const VERSION = "1.5.1";
+console.log(`[job] v${VERSION} - Gmail OAuth callback (sessionStorage + keepalive) on top of Welcome sign-in flow`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -48,10 +48,6 @@ if (location.pathname === '/job/' || location.pathname === '/job') {
 
 async function applySignedInState(email) {
   const sb = window.CtrlAuth?.getSupabaseClient?.();
-  // Gate: user must have a user_profile row with onboarding_complete_at set.
-  // No row → first-time user; redirect to onboarding (which will create one).
-  // Row but not complete → resume onboarding.
-  // Already on the onboarding page → let it render regardless of status.
   const onOnboarding = location.pathname.startsWith(ONBOARDING_PATH);
   let profile = null;
   if (sb) {
@@ -66,7 +62,16 @@ async function applySignedInState(email) {
       console.warn('[job] user_profile query threw', e);
     }
   }
-  if (!onOnboarding && (!profile || !profile.onboarding_complete_at)) {
+  const completed = !!profile?.onboarding_complete_at;
+  // Returning user with completed onboarding lands on /job/onboarding —
+  // bounce to recommended. They came back to sign in, not to walk the flow
+  // again. (Existing users still get to /job/settings/?demo=1 to re-test.)
+  if (onOnboarding && completed) {
+    location.replace('/job/jobs/recommended/');
+    return;
+  }
+  // Unauth or incomplete profile on a protected route → push into onboarding.
+  if (!onOnboarding && !completed) {
     location.replace(ONBOARDING_PATH + '/');
     return;
   }
@@ -223,18 +228,16 @@ window.CtrlAuth.init({
 
 // Gmail OAuth callback. gmail-auth's auth-url action redirects to
 // /job/?code=<code>&state=gmail:<user_id>&scope=… after the user grants
-// consent. We can't finish the token exchange synchronously (need auth
-// to be ready first) and we can't keep the page from redirecting (the
-// applySignedInState flow may bounce us to /onboarding/ before the
-// fetch resolves), so stash the code in sessionStorage immediately and
-// process it on whatever page eventually settles.
+// consent. Stash code+state in sessionStorage immediately, strip the
+// query (codes are single-use), then complete the exchange on
+// ctrl:auth:signedin — keepalive on the fetch so a follow-up redirect
+// to /onboarding/ doesn't kill the request mid-flight.
 (() => {
   const params = new URLSearchParams(location.search);
   const code = params.get('code');
   const state = params.get('state') || '';
   if (code && state.startsWith('gmail:')) {
     try { sessionStorage.setItem('job:pendingGmailOAuth', JSON.stringify({ code, state, at: Date.now() })); } catch {}
-    // Strip query so refresh / nav doesn't re-process (codes are single-use).
     const clean = new URL(location.href);
     clean.searchParams.delete('code');
     clean.searchParams.delete('state');
@@ -245,9 +248,6 @@ window.CtrlAuth.init({
   }
 })();
 
-// On any /job/ page where auth eventually settles, complete a pending
-// Gmail OAuth exchange. keepalive on the fetch so a follow-up redirect
-// doesn't kill the request mid-flight.
 async function _completePendingGmailOAuth() {
   let pending;
   try { pending = JSON.parse(sessionStorage.getItem('job:pendingGmailOAuth') || 'null'); } catch { return; }
@@ -274,14 +274,12 @@ async function _completePendingGmailOAuth() {
       sessionStorage.removeItem('job:pendingGmailOAuth');
     } else {
       console.warn('[job] gmail-auth connect failed:', await r.text());
-      // Don't clear sessionStorage on failure — next page load tries again.
     }
   } catch (e) {
     console.warn('[job] gmail-auth connect error:', e.message);
   }
 }
 document.addEventListener('ctrl:auth:signedin', () => { _completePendingGmailOAuth(); });
-// Belt-and-braces: also try after a tick in case auth was already ready.
 setTimeout(() => { _completePendingGmailOAuth(); }, 250);
 
 // Belt-and-braces: even with the listener attached early, some CtrlAuth code

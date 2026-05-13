@@ -17,6 +17,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
+import { loadVisionField } from '../_shared/job-vision.ts';
 
 const VERSION = '0.3.0';
 console.log(`[narratives] v${VERSION} - CRUD + AI auto-tag/link + KB extract (bigger output + cron entry)`);
@@ -101,16 +102,16 @@ Rules:
 
 async function extractFromKb(): Promise<{ title: string; content_md: string; anchor_company_slug: string | null }[]> {
   const sql = db();
-  const [companies, projects, skills, wins, vision] = await Promise.all([
+  const [companies, projects, skills, wins, narrativeArc] = await Promise.all([
     sql`select slug, name, sector, body_md from job.companies`,
     sql`select slug, title, role, body_md, metric_value, company_slug from job.projects`,
     sql`select slug, name, type, level, body_md from job.skills`,
     sql`select slug, headline, body_md, metric_value, company_slug from job.wins`,
-    sql`select narrative_arc, raw_md from job.vision where id = 1`,
+    loadVisionField<string>(sql, 'narrative_arc'),
   ]);
 
   const sections: string[] = [];
-  if (vision[0]?.narrative_arc) sections.push(`## Vision / narrative arc\n\n${vision[0].narrative_arc}`);
+  if (narrativeArc) sections.push(`## Vision / narrative arc\n\n${narrativeArc}`);
   for (const c of companies) {
     sections.push(`## Company: ${c.name} (${c.slug})${c.sector ? ` — ${c.sector}` : ''}\n\n${c.body_md || '(no body)'}`);
   }
@@ -160,11 +161,12 @@ Rules:
 
 async function tagNarrative(narrativeText: string, opts: { title: string }): Promise<{ tags: string[]; linked_company_slug: string | null; confidence: number; reason: string }> {
   const sql = db();
-  const [companies, vision] = await Promise.all([
+  const [companies, narrativeArc, rawMd] = await Promise.all([
     sql`select slug, name, sector from job.companies order by name`,
-    sql`select narrative_arc, raw_md from job.vision where id = 1`,
+    loadVisionField<string>(sql, 'narrative_arc'),
+    loadVisionField<string>(sql, 'raw_md'),
   ]);
-  const visionText = (vision[0]?.narrative_arc || vision[0]?.raw_md || '').slice(0, 4000);
+  const visionText = (narrativeArc || rawMd || '').slice(0, 4000);
   const companyList = companies.map((c: any) => `- ${c.slug}: ${c.name}${c.sector ? ` — ${c.sector}` : ''}`).join('\n');
   const user = `# Vision\n\n${visionText || '(no vision recorded)'}\n\n# Companies\n\n${companyList || '(no companies recorded)'}\n\n# Narrative title\n\n${opts.title}\n\n# Narrative\n\n${narrativeText}\n\n# Ask\n\nProduce the JSON object now. JSON only.`;
   const parsed = await callClaudeJson(TAG_SYSTEM, user);

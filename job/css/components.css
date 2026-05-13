@@ -603,7 +603,6 @@
 .fit-breakdown__check--met   { background: rgba(47,157,77,0.15); color: var(--success, #2f9d4d); }
 .fit-breakdown__check--unmet { background: rgba(196,56,42,0.15); color: var(--error,   #c4382a); }
 
-<<<<<<< HEAD
 /* Score pair — Fit pill on top, Candidate pill below, used everywhere
    a row appears in a list. Each is independently clickable. */
 .score-pair {
@@ -632,8 +631,6 @@
   font-weight: var(--fw-medium); opacity: 0.6;
 }
 
-=======
->>>>>>> origin/master
 .fit-modal__foot {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
@@ -4154,7 +4151,6 @@
   font-style: italic;
 }
 
-
 /* ============================================================== */
 /* Onboarding flow (/job/onboarding)                                */
 /* New primitives + page-specific layout. Promote primitives        */
@@ -4761,6 +4757,12 @@ job-onboarding { display: contents; }
   text-align: left;
   color: var(--fg);
   white-space: pre-wrap;
+  /* Soft outlined card — apt-style. Just enough definition to anchor the
+     user side; AI stays plain inline text. */
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
 }
 
 /* Saving pill — small left-aligned status with a pulsing dot. Lives in
@@ -5378,3 +5380,86 @@ body[data-auth-state="out"] job-chat { display: none; }
 }
 
 .vf-empty { color: var(--fg-muted); font-style: italic; }
+
+/* Supporting-docs invite card — sits at the bottom of the insight stage,
+   asks for the deeper read (cover letters, writing samples, etc.) after
+   the resume insight has rendered. */
+.insight-deepen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--bg-surface);
+}
+.insight-deepen__title {
+  font-size: var(--font-size-title-3);
+  font-weight: 600;
+  margin: 0;
+}
+.insight-deepen__lede {
+  color: var(--fg-muted);
+  line-height: var(--lh-body);
+  margin: 0;
+}
+.insight-deepen__examples {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.insight-deepen__examples li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-left: var(--space-3);
+  position: relative;
+  line-height: var(--lh-body);
+}
+.insight-deepen__examples li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.insight-deepen__example-label {
+  color: var(--fg);
+  font-weight: 500;
+}
+.insight-deepen__example-use {
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+}
+.dropzone--compact {
+  padding: var(--space-4);
+}
+
+/* Welcome-stage sign-in shortcut. Sits in the top-right corner of the
+   pitch screen so returning users have an easy entry without walking
+   the onboarding flow. */
+.onboard__stage--welcome {
+  position: relative;
+}
+.onboard__signin {
+  position: absolute;
+  top: 0;
+  right: 0;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.onboard__signin:hover { color: var(--fg); border-color: var(--border-strong); }

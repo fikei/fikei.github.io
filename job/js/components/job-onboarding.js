@@ -54,19 +54,42 @@ const STAGES = [
 // Conversational defaults. Haiku rewrites these in the moment so each
 // question flows from the prior answer — see modeExtract in the onboard
 // edge function. Intent stays fixed; wording can drift.
+//
+// Ordering follows apt's warm-up → stories → boundaries → specifics arc:
+//   1. intent      — why are you here (gentle opener)
+//   2. mission     — what's pulling at you (taste)
+//   3. energy      — how you recharge (personality)
+//   4. self        — felt most yourself (story)
+//   5. win         — proud-of moment (story + number)
+//   6. aspiration  — zero-constraint role (the real wish)
+//   7. walkaway    — would-pass criteria (boundary)
+//   8. hardyes     — non-negotiables (boundary)
+//   9. titles      — next-role specifics
 const QUESTIONS = [
+  { id: 'q_intent',
+    label: 'What\'s bringing you here — actively looking, just exploring, or somewhere in between?',
+    placeholder: 'No wrong answer. Casual is fine.' },
   { id: 'q1_mission',
     label: 'What kind of work has been pulling at you lately?',
-    placeholder: 'Anything that\'s been on your mind — a problem you keep thinking about, a kind of team you want to be on…' },
+    placeholder: 'A problem you keep thinking about, a kind of team you want to be on…' },
+  { id: 'q_energy',
+    label: 'When you\'ve had a long week, do you recharge around people or with time to yourself?',
+    placeholder: 'How you reset says a lot about how you work.' },
   { id: 'q2_self',
     label: 'Tell me about a stretch of work where you felt most yourself.',
     placeholder: 'A team, a project, a few months — when did the work feel right?' },
   { id: 'q3_win',
     label: 'Something you\'re still kind of proud of — bonus points if there\'s a number attached.',
     placeholder: 'A result, a launch, a shift you made happen…' },
+  { id: 'q_aspiration',
+    label: 'If there were zero constraints — no hiring filters, no practicality — what\'s the role you\'d love to try just for the sake of it?',
+    placeholder: 'The role you\'d try if no one was watching.' },
   { id: 'q4_walkaway',
     label: 'What kind of company or team would make you pass — even on a great role?',
     placeholder: 'Industries, leadership styles, working cultures you\'d want to avoid…' },
+  { id: 'q_hardyes',
+    label: 'Two or three things that would feel non-negotiable for you to say yes to a role?',
+    placeholder: 'The must-haves. Where you\'d walk if they weren\'t there.' },
   { id: 'q5_titles',
     label: 'What does the role you\'d love to be in next actually look like, day to day?',
     placeholder: 'Title aside — who are you working with, what are you spending your time on?' },
@@ -220,44 +243,34 @@ export class JobOnboarding extends LitElement {
     o[k] = [...cur];
   }
 
-  // -------- Stage 1: multi-file ingest --------
+  // -------- Stage 1: resume upload (single file) --------
+  //
+  // The resume is the bones — we always parse it first and generate insights
+  // from it alone. Supporting docs are layered on AFTER the insight card
+  // renders, via _handleSupportingUpload (called from Stage 2).
 
-  async _handleFiles(fileList) {
+  async _handleResumeUpload(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     this.error = '';
-    this.busy = true; this.busyLabel = `Reading ${files.length} file${files.length > 1 ? 's' : ''}…`;
+    this.busy = true; this.busyLabel = 'Reading your resume';
     try {
-      // Classify by filename: anything with "resume" or "cv" is the primary
-      // resume; everything else is bundle context. If no name match, the
-      // largest file (likely the resume) wins.
+      // Prefer the largest file as the resume if multiple were dropped;
+      // fallback to the only file. Anything else gets ignored here — the
+      // supporting-docs uploader on Stage 2 picks up additional files.
       const named = [];
       for (const f of files) {
         const text = await readFileAsText(f);
         named.push({ name: f.name, size: text.length, text });
       }
-      const resumeMatch = named.find(f => /(^|[\s_-])(resume|cv)/i.test(f.name));
-      const resume = resumeMatch || named.slice().sort((a, b) => b.size - a.size)[0];
-      const others = named.filter(f => f !== resume);
-
-      this.draft._meta.uploadedFiles = named.map(f => ({ name: f.name, size: f.size, isResume: f === resume }));
+      const resume = named.slice().sort((a, b) => b.size - a.size)[0];
+      this.draft._meta.uploadedFiles = [{ name: resume.name, size: resume.size, isResume: true }];
       this._commit();
 
-      // Two passes in parallel: parse resume → structured profile; bundle
-      // everything else (or the same resume if it's the only doc) → voice
-      // + values + projects + dream signals. Works pre-auth — callOnboard
-      // falls back to the anon key when there's no user session.
-      const bundleText = (others.length ? others : [resume]).map(f => `--- ${f.name} ---\n${f.text}`).join('\n\n');
-      this.busyLabel = 'Pulling out the bones (resume) and the voice (everything else)…';
-
-      const [parseRes, bundleRes] = await Promise.all([
-        callOnboard({ mode: 'parse',  text: resume.text }),
-        callOnboard({ mode: 'bundle', text: bundleText }),
-      ]);
+      this.busyLabel = 'Pulling out the bones';
+      const parseRes = await callOnboard({ mode: 'parse', text: resume.text });
       const draftIncoming = parseRes.draft || {};
-      const bundle = bundleRes.bundle || {};
 
-      // Merge parse output.
       this.draft.identity = { ...this.draft.identity, ...draftIncoming.identity };
       this.draft.location = { ...this.draft.location, ...draftIncoming.location };
       if (draftIncoming.capability) {
@@ -267,21 +280,12 @@ export class JobOnboarding extends LitElement {
         this.draft.capability.history     = draftIncoming.capability.history     || this.draft.capability.history;
       }
 
-      // Merge bundle output.
-      this.draft.bundle = bundle;
-      this._mergeArr('values_seed.cultureKeywords', bundle.values);
-      this._mergeArr('targeting.targetRoles', bundle.dreamRoleSignals);
-      if (Array.isArray(bundle.wins)) {
-        for (const w of bundle.wins) this.draft.wins.push(w);
-      }
-
-      // Now generate insights for Stage 2.
-      this.busyLabel = 'Mapping where this experience travels…';
+      // Generate insights from resume alone — the celebration card.
+      this.busyLabel = 'Mapping where this experience travels';
       const profileForInsights = {
         identity: this.draft.identity,
         location: this.draft.location,
         capability: this.draft.capability,
-        bundle: this.draft.bundle,
       };
       const insightsRes = await callOnboard({ mode: 'insights', profile: profileForInsights });
       this.draft.insights = insightsRes.insights || null;
@@ -294,8 +298,71 @@ export class JobOnboarding extends LitElement {
     }
   }
 
+  // -------- Stage 2: supporting-docs upload (optional, layered on top) --------
+  //
+  // Runs bundle on the new docs to extract voice + values + dream signals,
+  // merges into the existing draft, then regenerates the insight card so
+  // the user sees the depth grow.
+
+  async _handleSupportingUpload(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    this.error = '';
+    this.busy = true; this.busyLabel = `Reading ${files.length} more file${files.length > 1 ? 's' : ''}`;
+    try {
+      const named = [];
+      for (const f of files) {
+        const text = await readFileAsText(f);
+        named.push({ name: f.name, size: text.length, text });
+      }
+      // Track these as additional uploaded files (resume stays flagged).
+      const meta = this.draft._meta.uploadedFiles || [];
+      this.draft._meta.uploadedFiles = [
+        ...meta,
+        ...named.map(f => ({ name: f.name, size: f.size, isResume: false })),
+      ];
+      this._commit();
+
+      this.busyLabel = 'Listening for the voice';
+      const bundleText = named.map(f => `--- ${f.name} ---\n${f.text}`).join('\n\n');
+      const bundleRes = await callOnboard({ mode: 'bundle', text: bundleText });
+      const bundle = bundleRes.bundle || {};
+
+      // Merge into draft.bundle (concat-merge for arrays).
+      const cur = this.draft.bundle || {};
+      this.draft.bundle = {
+        voiceSample: bundle.voiceSample || cur.voiceSample || '',
+        values:            [...new Set([...(cur.values || []),            ...(bundle.values || [])])],
+        projects:          [...(cur.projects || []), ...(bundle.projects || [])],
+        dreamRoleSignals:  [...new Set([...(cur.dreamRoleSignals || []),  ...(bundle.dreamRoleSignals || [])])],
+        wins:              [...(cur.wins || []),     ...(bundle.wins || [])],
+      };
+      this._mergeArr('values_seed.cultureKeywords', bundle.values);
+      this._mergeArr('targeting.targetRoles',        bundle.dreamRoleSignals);
+      if (Array.isArray(bundle.wins)) for (const w of bundle.wins) this.draft.wins.push(w);
+
+      // Regenerate insights with the deeper context — the celebration card
+      // grows as the user gives us more material.
+      this.busyLabel = 'Re-mapping with the deeper read';
+      const profileForInsights = {
+        identity: this.draft.identity,
+        location: this.draft.location,
+        capability: this.draft.capability,
+        bundle: this.draft.bundle,
+      };
+      const insightsRes = await callOnboard({ mode: 'insights', profile: profileForInsights });
+      if (insightsRes.insights) this.draft.insights = insightsRes.insights;
+      this._commit();
+    } catch (e) {
+      this.error = e.message;
+    } finally {
+      this.busy = false; this.busyLabel = '';
+    }
+  }
+
   async _skipUpload() {
-    // Manual start — no insights to show, but we still need an insights card.
+    // Manual start — no insights to show; the cold-start branch of
+    // _renderInsights handles the no-resume case.
     this.draft.insights = null;
     this._setStage(2);
   }
@@ -389,6 +456,7 @@ export class JobOnboarding extends LitElement {
         questionId: active.qid,
         answer: userText,
         nextQuestionLabel: next?.label || null,
+        priorTurns: this._priorTurnsForExtract(),
       });
       this.draft._meta.extractions[active.qid] = tags;
       if (tags) this._applyExtraction(active.qid, tags);
@@ -445,6 +513,7 @@ export class JobOnboarding extends LitElement {
         questionId: userTurn.qid,
         answer: userTurn.text,
         nextQuestionLabel: next?.label || null,
+        priorTurns: this._priorTurnsForExtract(),
       });
       this.draft._meta.extractions[userTurn.qid] = tags;
       // Replace the AI turn in place.
@@ -463,10 +532,15 @@ export class JobOnboarding extends LitElement {
   }
 
   _applyExtraction(qid, tags) {
-    if (qid === 'q1_mission') {
+    if (qid === 'q_intent') {
+      if (tags.intent) this._patch('targeting.intent', tags.intent);
+    } else if (qid === 'q1_mission') {
       this._mergeArr('values_seed.missionKeywords', tags.missionKeywords);
       this._mergeArr('values_seed.impactThemes', tags.impactThemes);
       this._mergeArr('targeting.targetSectors', tags.targetSectors);
+    } else if (qid === 'q_energy') {
+      if (tags.energyStyle) this._patch('values_seed.energyStyle', tags.energyStyle);
+      this._mergeArr('values_seed.cultureKeywords', tags.cultureKeywords);
     } else if (qid === 'q2_self') {
       this._mergeArr('values_seed.cultureKeywords', tags.cultureKeywords);
       this._mergeArr('capability.arcTags', tags.arcTags);
@@ -474,14 +548,37 @@ export class JobOnboarding extends LitElement {
     } else if (qid === 'q3_win') {
       if (tags.headline) this.draft.wins.push({ headline: tags.headline, metric: tags.metric || null });
       if (tags.narrativeMd) this.draft.narratives.push({ title: tags.narrativeTitle || 'A win', content_md: tags.narrativeMd, source_question: qid });
+    } else if (qid === 'q_aspiration') {
+      this._mergeArr('targeting.dreamRoles', tags.dreamRoles);
+      this._mergeArr('values_seed.aspirationalSignals', tags.aspirationalSignals);
     } else if (qid === 'q4_walkaway') {
       this._mergeArr('targeting.antiMissionTerms', tags.antiMissionTerms);
       this._mergeArr('values_seed.antiCulture', tags.antiCulture);
+    } else if (qid === 'q_hardyes') {
+      this._mergeArr('targeting.hardYes', tags.hardYes);
     } else if (qid === 'q5_titles') {
       this._mergeArr('targeting.targetRoles', tags.targetRoles);
       this._mergeArr('targeting.stagePreference', tags.stagePreference);
     }
     this._commit();
+  }
+
+  // Build the priorTurns array Haiku uses for quote-back. Pull the last few
+  // {question, answer} pairs from the chat log.
+  _priorTurnsForExtract() {
+    const log = this.draft._meta.chatLog || [];
+    const out = [];
+    for (let i = 0; i < log.length; i++) {
+      const turn = log[i];
+      if (turn.role !== 'ai') continue;
+      // Strip markdown from the question text we send up.
+      const question = (turn.content || '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+      const next = log[i + 1];
+      if (next && next.role === 'user' && next.text) {
+        out.push({ q: question.slice(0, 240), a: next.text.slice(0, 600) });
+      }
+    }
+    return out.slice(-5);
   }
 
   // Auto-scroll to bottom of chat after re-render.
@@ -490,25 +587,20 @@ export class JobOnboarding extends LitElement {
     if (log) log.scrollTop = log.scrollHeight;
   }
 
-  // Mid-flow attach handler. Reuses upload path; routes back to chat
-  // afterwards with the same questionIdx so the user resumes where they were.
+  // Mid-flow attach handler — treats new files as supporting docs (resume
+  // is already parsed by now). Bundle pass + insights refresh; routes back
+  // to chat afterwards with the same questionIdx so the user resumes.
   async _handleAttach(fileList) {
     const idxBefore = this.draft._meta.questionIdx;
-    const stageBefore = this.draft._meta.stage;
-    await this._handleFiles(fileList);
-    // _handleFiles set stage=2. If they were in chat, route them back.
-    if (stageBefore === 3) {
-      this.draft._meta.stage = 3;
-      this.draft._meta.questionIdx = idxBefore;
-      // Inject a synthetic AI turn acknowledging the attach.
-      const resumeQ = QUESTIONS[idxBefore] || QUESTIONS[0];
-      this.draft._meta.chatLog.push({
-        role: 'ai',
-        qid: resumeQ.id,
-        content: `Thanks — I pulled what I could from that. Picking back up: **${resumeQ.label}**`,
-      });
-      this._commit();
-    }
+    await this._handleSupportingUpload(fileList);
+    // Stay on the chat stage; inject a soft AI ack of the attach.
+    const resumeQ = QUESTIONS[idxBefore] || QUESTIONS[0];
+    this.draft._meta.chatLog.push({
+      role: 'ai',
+      qid: resumeQ.id,
+      content: `Thanks — I pulled what I could from that. Picking back up: **${resumeQ.label}**`,
+    });
+    this._commit();
   }
 
   // -------- Stage 4: tailor --------
@@ -597,7 +689,10 @@ export class JobOnboarding extends LitElement {
 
   _renderPitch() {
     return html`
-      <section class="onboard__stage">
+      <section class="onboard__stage onboard__stage--welcome">
+        <button class="onboard__signin" @click=${() => this._openSignIn()}
+                title="Already have an account?">Sign in</button>
+
         <h1>Your career operating system.</h1>
         <p class="lede">Upload what you've already written, answer a few open questions, and we'll start pulling roles that match what you actually want — and draft the cover letters too.</p>
         <p class="onboard__hint">Takes about 8 minutes. You can leave and come back; we'll save where you left off.</p>
@@ -609,23 +704,31 @@ export class JobOnboarding extends LitElement {
     `;
   }
 
+  // Open the sign-in modal directly. Existing users with a completed
+  // profile will be auto-redirected to /job/jobs/recommended/ by
+  // applySignedInState in app.js once the session lands.
+  _openSignIn() {
+    try { window.CtrlAuth.openLoginModal(); }
+    catch { this.error = 'Sign-in is unavailable right now. Try refreshing.'; }
+  }
+
   _renderUpload() {
     const files = this.draft._meta.uploadedFiles || [];
     return html`
       <section class="onboard__stage">
-        <h1>Drop in everything you've already got.</h1>
-        <p class="lede">Resume is the headline. Cover letters, writing samples, LLM career docs, project descriptions, dream JDs — anything you've already written that shows your shape. We'll pull the bones from the resume and the voice from the rest.</p>
+        <h1>Start with your resume.</h1>
+        <p class="lede">We'll pull the bones — companies, titles, skills, where you've been — and use them to ask better questions. You can layer in other docs next.</p>
         <label class="dropzone dropzone--multi" for="resume-file"
                @dragover=${(e) => { e.preventDefault(); e.currentTarget.classList.add('dropzone--active'); }}
                @dragleave=${(e) => e.currentTarget.classList.remove('dropzone--active')}
-               @drop=${(e) => { e.preventDefault(); e.currentTarget.classList.remove('dropzone--active'); this._handleFiles(e.dataTransfer.files); }}>
-          <div class="dropzone__title">Drag in PDFs, .md, or .txt — or click to choose</div>
-          <div class="dropzone__hint">Anything with "resume" or "cv" in the name is treated as the primary resume. The rest become voice/values context.</div>
-          <input id="resume-file" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
-                 style="display:none" @change=${(e) => this._handleFiles(e.target.files)}/>
+               @drop=${(e) => { e.preventDefault(); e.currentTarget.classList.remove('dropzone--active'); this._handleResumeUpload(e.dataTransfer.files); }}>
+          <div class="dropzone__title">Drop your resume — PDF, .md, or .txt</div>
+          <div class="dropzone__hint">Or click to choose. One file is plenty here.</div>
+          <input id="resume-file" type="file" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                 style="display:none" @change=${(e) => this._handleResumeUpload(e.target.files)}/>
           ${files.length ? html`
             <ul class="dropzone__files">
-              ${files.map(f => html`<li><strong>${f.name}</strong> ${f.isResume ? html`<span class="chip chip--on" style="font-size:var(--font-size-caption);">resume</span>` : ''}</li>`)}
+              ${files.map(f => html`<li><strong>${f.name}</strong></li>`)}
             </ul>` : nothing}
         </label>
         <div class="onboard__nav">
@@ -634,6 +737,19 @@ export class JobOnboarding extends LitElement {
         </div>
       </section>
     `;
+  }
+
+  // Bulleted list of high-value supporting-doc examples. Rendered inside
+  // the insight stage to invite a deeper read.
+  _supportingDocExamples() {
+    return [
+      { label: 'A past cover letter you liked',           uses: 'seeds the voice your cover-letter agent will write in' },
+      { label: 'Writing samples — Substack, internal memos, anything in your voice', uses: 'pulls voice + thinking patterns' },
+      { label: 'A performance review you held onto',      uses: 'third-party language about your strengths' },
+      { label: 'Project case studies or decks',           uses: 'depth on specific wins beyond resume bullets' },
+      { label: 'Dream JDs you\'ve bookmarked',            uses: 'reverse-engineers what you actually want' },
+      { label: 'A LinkedIn About blurb or short bio',     uses: 'how you already position yourself' },
+    ];
   }
 
   _renderInsights() {
@@ -667,12 +783,48 @@ export class JobOnboarding extends LitElement {
         ${this._renderTrack('Craft you bring', 'product / IC skills → role shapes this unlocks', ins.skills || [])}
 
         ${this._renderEditFooter()}
+        ${this._renderSupportingDocsCard()}
 
         <div class="onboard__nav">
           <button class="btn btn--ghost" @click=${() => this._setStage(1)}>Back</button>
           <button class="btn btn--primary" @click=${() => this._setStage(3)}>Looks right — keep going</button>
         </div>
       </section>
+    `;
+  }
+
+  // Supporting-docs card — invites the user to deepen the read after they've
+  // seen the resume-only insight. Bulleted examples make the ask concrete.
+  _renderSupportingDocsCard() {
+    const meta = this.draft._meta.uploadedFiles || [];
+    const supporting = meta.filter(f => !f.isResume);
+    return html`
+      <div class="insight-deepen">
+        <h2 class="insight-deepen__title">Want me to go deeper?</h2>
+        <p class="insight-deepen__lede">Resume tells me what you've done. Drop in anything else you've written and I can read for voice, taste, and the texture between the lines.</p>
+        <ul class="insight-deepen__examples">
+          ${this._supportingDocExamples().map(ex => html`
+            <li>
+              <span class="insight-deepen__example-label">${ex.label}</span>
+              <span class="insight-deepen__example-use">${ex.uses}</span>
+            </li>
+          `)}
+        </ul>
+        <label class="dropzone dropzone--multi dropzone--compact" for="supporting-files"
+               @dragover=${(e) => { e.preventDefault(); e.currentTarget.classList.add('dropzone--active'); }}
+               @dragleave=${(e) => e.currentTarget.classList.remove('dropzone--active')}
+               @drop=${(e) => { e.preventDefault(); e.currentTarget.classList.remove('dropzone--active'); this._handleSupportingUpload(e.dataTransfer.files); }}>
+          <div class="dropzone__title">Drop one or more — PDF, .md, .txt</div>
+          <div class="dropzone__hint">Or click to choose. I'll re-read everything and refresh the insight above.</div>
+          <input id="supporting-files" type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                 style="display:none" @change=${(e) => this._handleSupportingUpload(e.target.files)}/>
+          ${supporting.length ? html`
+            <ul class="dropzone__files">
+              ${supporting.map(f => html`<li><strong>${f.name}</strong></li>`)}
+            </ul>` : nothing}
+        </label>
+        <p class="onboard__hint">Totally optional — keep going if you'd rather skip.</p>
+      </div>
     `;
   }
 

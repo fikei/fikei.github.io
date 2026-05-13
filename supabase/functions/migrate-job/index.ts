@@ -201,18 +201,41 @@ async function seedKb(sql: ReturnType<typeof postgres>): Promise<Pick<Counts, 'c
     }
   }
 
-  // Vision (v1 — kept for backwards compat with the existing scorer).
+  // Vision (source of truth: job.vision_field). The sync trigger mirrors
+  // each row back into the legacy job.vision columns so unmigrated
+  // readers stay fresh during Phase 2. Writes are stamped
+  // source='migrate-job' so a future audit can tell re-seeds apart from
+  // agent or user edits.
   const visionMd = vision.map(v => `# ${v.slug}\n\n${v.content}`).join('\n\n---\n\n');
   const narrative = vision.find(v => v.slug === 'narrative-arc')?.content || null;
   const dealBreakers = vision.find(v => v.slug === 'deal-breakers')?.content || null;
   const voiceRules = vision.find(v => v.slug === 'voice-and-cover-letter-rules')?.content || null;
-  await sql`
-    insert into job.vision (id, narrative_arc, deal_breakers, voice_rules_md, raw_md)
-    values (1, ${narrative}, ${dealBreakers ? [dealBreakers] : []}, ${voiceRules}, ${visionMd})
-    on conflict (id) do update set
-      narrative_arc = excluded.narrative_arc, deal_breakers = excluded.deal_breakers,
-      voice_rules_md = excluded.voice_rules_md, raw_md = excluded.raw_md, updated_at = now();
+
+  const uidRows = await sql<{ user_id: string }[]>`
+    select user_id from public.user_profile order by onboarding_complete_at desc nulls last limit 1
   `;
+  const uid = uidRows[0]?.user_id;
+  if (!uid) {
+    console.warn('[migrate-job] no user_profile found — falling back to legacy job.vision write');
+    await sql`
+      insert into job.vision (id, narrative_arc, deal_breakers, voice_rules_md, raw_md)
+      values (1, ${narrative}, ${dealBreakers ? [dealBreakers] : []}, ${voiceRules}, ${visionMd})
+      on conflict (id) do update set
+        narrative_arc = excluded.narrative_arc, deal_breakers = excluded.deal_breakers,
+        voice_rules_md = excluded.voice_rules_md, raw_md = excluded.raw_md, updated_at = now();
+    `;
+  } else {
+    const upsert = (name: string, value: unknown, kind: string) => sql`
+      insert into job.vision_field (user_id, name, value, kind, source)
+      values (${uid}, ${name}, ${JSON.stringify(value)}::jsonb, ${kind}, 'migrate-job')
+      on conflict (user_id, name) do update set
+        value = excluded.value, source = 'migrate-job', updated_at = now()
+    `;
+    await upsert('narrative_arc',  narrative ?? '',                       'text_md');
+    await upsert('voice_rules_md', voiceRules ?? '',                      'text_md');
+    await upsert('raw_md',         visionMd,                              'text_md');
+    await upsert('deal_breakers',  dealBreakers ? [dealBreakers] : [],    'string_array');
+  }
 
   // Search Plan v2 — parsed sections + fields. See migration 057.
   await populateSearchPlanV2(sql, vision);

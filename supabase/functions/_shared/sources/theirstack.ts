@@ -17,6 +17,7 @@
 
 import type { Source, RecommendedRoleInput } from './types.ts';
 import { db } from '../job-db.ts';
+import { loadVisionFields } from '../job-vision.ts';
 
 // Full request-body passthrough. Anything you set here lands in the
 // TheirStack body verbatim. When `auto: true`, the plugin starts from
@@ -108,23 +109,19 @@ export const theirstackSource: Source<TheirStackConfig> = {
     if (!apiKey) throw new Error('THEIRSTACK_API_KEY env var not set');
     const sql = db();
 
-    // Auto-build mode: start from job.vision so the request stays in
+    // Auto-build mode: start from vision_field so the request stays in
     // sync with the user's stated preferences. Explicit fields on the
     // source's config still win.
     const auto: Record<string, unknown> = {};
     if (cfg.auto) {
-      const v = await sql<{ target_titles: string[]|null; target_geographies: string[]|null; target_stages: string[]|null; target_sectors: string[]|null }[]>`
-        select target_titles, target_geographies, target_stages, target_sectors
-          from job.vision order by updated_at desc limit 1
-      `;
-      const row = v[0] || { target_titles: null, target_geographies: null, target_stages: null, target_sectors: null };
-      const titles = (row.target_titles || []).map(s => s.toLowerCase()).filter(Boolean);
+      const v = await loadVisionFields(sql, ['target_titles', 'target_geographies', 'target_stages', 'target_sectors']);
+      const titles = ((v.target_titles as string[] | null) || []).map(s => s.toLowerCase()).filter(Boolean);
       if (titles.length) auto.job_title_or = titles;
-      const geos = geosToCountryCodes(row.target_geographies || []);
+      const geos = geosToCountryCodes((v.target_geographies as string[] | null) || []);
       if (geos.length) auto.job_country_code_or = geos;
-      const stages = stagesToFundingStages(row.target_stages || []);
+      const stages = stagesToFundingStages((v.target_stages as string[] | null) || []);
       if (stages.length) auto.funding_stage_or = stages;
-      const sectors = (row.target_sectors || []).filter(Boolean);
+      const sectors = ((v.target_sectors as string[] | null) || []).filter(Boolean);
       if (sectors.length) auto.industry_or = sectors;
     }
 
