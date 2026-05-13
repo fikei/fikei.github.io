@@ -1,69 +1,128 @@
 // Supabase Edge Function: ask-job-agent
-// P1: agent loop with 4 tools. Sonnet 4.6 coordinator. See chat thread for
-// locked design recs.
+// P1.1: agent loop with intent-expansion + read-before-write. Sonnet 4.6
+// coordinator. Five tools, all backed by existing /job endpoints or
+// job.vision Postgres rows.
+//
+// POST /functions/v1/ask-job-agent
+// Body: { message: string }
+// Returns: { events: ChatEvent[] }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
 import { verifyJobUserDetailed, corsHeaders } from '../_shared/job-auth.ts';
+import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[ask-job-agent] v${VERSION} - P1 agent loop with 4 tools`);
+const VERSION = '0.4.0';
+console.log(`[ask-job-agent] v${VERSION} - P1.1 read-before-write, vision-backed preferences`);
 
 const MODEL = 'claude-sonnet-4-6';
 const MAX_HISTORY = 20;
-const MAX_OUTPUT_TOKENS = 1024;
-const MAX_ITERATIONS = 5;
+const MAX_OUTPUT_TOKENS = 1500;
+const MAX_ITERATIONS = 6;
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const PIPE_URL     = `${SUPABASE_URL}/functions/v1/jobs-pipe`;
 const ADD_ROLE_URL = `${SUPABASE_URL}/functions/v1/add-role`;
-const KB_READ_URL  = `${SUPABASE_URL}/functions/v1/kb-read`;
-const KB_WRITE_URL = `${SUPABASE_URL}/functions/v1/kb-write`;
 
 const SYSTEM_PROMPT = `You are the agent for /job, Ian Fike's career knowledge base at ctrl.rodeo/job. Ian uses /job to track every role he's interested in, his career history, and his search preferences.
 
-Speak with Ian directly. Be concise, conversational, useful. Voice = sharp, friendly co-worker, not customer support. No disclaimers, no "great question" filler. Keep replies under ~120 words unless he asks for more.
+Speak with Ian directly. Be concise, conversational, useful. Voice = sharp, friendly co-worker, not customer support. No disclaimers, no "great question" filler. Keep replies under ~150 words unless he asks for more.
+
+## ALWAYS READ BEFORE WRITE
+
+Before mutating anything, read the current state.
+- Before update_preferences: call read_preferences to see what's already blocked / required, then only pass NEW terms in update_preferences. Don't re-submit duplicates.
+- Before update_pipeline_row: call search_pipeline to resolve the slug AND confirm the row's current state. Don't blindly issue patches.
+
+This rule applies to every future tool that mutates data. Read state, plan the diff, then call.
 
 ## Convert vague asks into thorough scope
 
-When Ian gives you a category-level instruction, do not write it back verbatim. Ask yourself: "what does this mean in practice?" and expand into the specific terms a job-recommender would actually match against. Then make ONE tool call with the full expanded list.
+When Ian gives you a category-level instruction, expand it into the specific terms a recommender would match against. Make ONE update_preferences call with the full expanded list.
 
-Examples of how to expand:
-- "block developer jobs" → ["software engineer", "backend engineer", "frontend engineer", "full-stack engineer", "developer", "software developer", "SRE", "DevOps engineer", "platform engineer", "infrastructure engineer", "mobile engineer", "ML engineer"]
-- "no early-stage startups" → ["seed-stage", "series A", "pre-seed", "early-stage startup", "founding engineer"]
-- "must be remote" → ["remote", "fully remote", "remote-first"]
-- "only climate tech" → ["climate", "climate tech", "decarbonization", "clean energy", "sustainability", "carbon"]
+Examples:
+- "block developer jobs" → ["software engineer","backend engineer","frontend engineer","full-stack engineer","developer","software developer","sre","devops engineer","platform engineer","infrastructure engineer","mobile engineer","ml engineer"]
+- "no early-stage startups" → ["seed","series a","pre-seed","early-stage","founding engineer"]
+- "must be remote" → ["remote","fully remote","remote-first"]
+- "only climate tech" → ["climate","climate tech","decarbonization","clean energy","sustainability","carbon"]
 
-Lean toward MORE coverage rather than less — recommenders match strings, so being generous beats missing edge cases. Cap each call at ~12 terms.
+Lean toward MORE coverage — recommenders match strings, generous beats narrow. Cap each call at ~12 terms.
 
-When you respond, tell Ian conversationally WHAT YOU ACTUALLY DID, not just "done". Say which expanded terms you added so he can correct course if you went too wide or too narrow. Example:
+## Conversational confirms
 
-> Got it — I read "developer jobs" as anything engineering-coded, so I blocked: software engineer, backend engineer, frontend engineer, full-stack engineer, developer, software developer, SRE, DevOps, platform engineer, infrastructure engineer, mobile engineer, ML engineer. If I went too broad (e.g. you'd still consider ML engineer roles), tell me and I'll trim it.
+When you respond, tell Ian WHAT YOU ACTUALLY DID and what's NOW in effect. Don't say "done" alone. Example:
+
+> Read your prefs, then expanded "developer jobs" to: software engineer, backend engineer, frontend engineer, full-stack engineer, developer, sre, devops, platform engineer, infrastructure engineer, mobile engineer, ML engineer. Added 11 new terms (1 was already there). Your blocked list is at 12 total. Future recommendations will skip any posting whose title matches one of these. Tell me if I went too wide.
 
 ## Tools
 
-- search_pipeline(query): find roles Ian has saved or marked active. Pass a short query. Returns up to 20 matches with slug, title, company, status, stage, fit_score, url.
-- update_pipeline_row(slug, fields): change a row's status/stage/exit_reason. Find slug via search_pipeline first. Stages: Drafting|Applied|Interviewing|Offer. Status: Active|Archive.
-- add_role_from_url(url): save a job posting URL into Ian's pipeline.
-- update_preferences(blocked, must_have, note): record search-direction signals. blocked + must_have are ARRAYS of strings — pass the full expanded list in one call.
+- read_preferences(): returns current blocked_titles, must_have_keywords, target_titles, target_geographies from Ian's vision. Use BEFORE update_preferences so you can show him what's already configured and skip dupes.
+- search_pipeline(query): find roles Ian has saved/active. Returns up to 20 matches with slug, title, company, status, stage, fit_score, url.
+- update_pipeline_row(slug, fields): patch a row. Stages: Drafting|Applied|Interviewing|Offer. Status: Active|Archive. Find slug via search_pipeline first.
+- add_role_from_url(url): save a posting URL.
+- update_preferences(blocked, must_have, note): WRITES TO job.vision so pull-recommendations actually filters by these. blocked + must_have are arrays. Always read_preferences first; only pass NEW terms.
 
 ## Rules
 
-- Use search_pipeline before update_pipeline_row to look up the slug.
 - Don't confirm before single-row changes — just do them and report.
 - If a tool fails, tell Ian honestly. Don't pretend it worked.
 - If the request doesn't match any tool, just answer.
-- Never write a vague string like "developer jobs" to preferences. Expand it first.`;
+- Never write vague strings like "developer jobs" — expand first.`;
 
 const TOOLS = [
-  { name: 'search_pipeline', description: "Search Ian's saved + active job pipeline. Returns up to 20 matching rows.", input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Free-text query.' } }, required: ['query'] } },
-  { name: 'update_pipeline_row', description: 'Update a single pipeline row by slug.', input_schema: { type: 'object', properties: { slug: { type: 'string' }, status: { type: 'string', enum: ['Active','Archive'] }, stage: { type: 'string', enum: ['Drafting','Applied','Interviewing','Offer'] }, exit_reason: { type: 'string' } }, required: ['slug'] } },
-  { name: 'add_role_from_url', description: 'Save a job posting from a URL.', input_schema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] } },
-  { name: 'update_preferences', description: 'Record search-direction signals. Pass arrays — the model is expected to expand the user\'s vague ask into a thorough list of specific terms before calling.', input_schema: { type: 'object', properties: { blocked: { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to block. Expand from the user\'s ask (e.g. "developer jobs" → ["software engineer","backend engineer",...]).' }, must_have: { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to require.' }, note: { type: 'string', description: 'Optional free-text context.' } } } },
+  {
+    name: 'read_preferences',
+    description: "Read Ian's current search preferences from job.vision. Returns blocked_titles, must_have_keywords, target_titles, target_geographies. Call this BEFORE update_preferences so you can dedupe and tell Ian what's already in effect.",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'search_pipeline',
+    description: "Search Ian's saved + active job pipeline. Returns up to 20 matching rows with slug, title, company, status, stage, fit_score, url.",
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Free-text query: company name, role title, keyword. Empty returns the most recent rows.' } }, required: ['query'] },
+  },
+  {
+    name: 'update_pipeline_row',
+    description: 'Update a single pipeline row by slug. Use for stage advances, status changes, exit_reason capture. Slug from search_pipeline.',
+    input_schema: { type: 'object', properties: { slug: { type: 'string' }, status: { type: 'string', enum: ['Active','Archive'] }, stage: { type: 'string', enum: ['Drafting','Applied','Interviewing','Offer'] }, exit_reason: { type: 'string' } }, required: ['slug'] },
+  },
+  {
+    name: 'add_role_from_url',
+    description: 'Save a job posting from a URL into the pipeline.',
+    input_schema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+  },
+  {
+    name: 'update_preferences',
+    description: 'Record search-direction signals into job.vision so pull-recommendations actually filters. Always call read_preferences first and only pass NEW terms. blocked and must_have are arrays.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        blocked:   { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to block. Expand the user\'s vague ask (e.g. "developer jobs" → ["software engineer","backend engineer",...]).' },
+        must_have: { type: 'array', items: { type: 'string' }, description: 'Categories/keywords to require.' },
+        note:      { type: 'string', description: 'Optional human-readable context.' },
+      },
+    },
+  },
 ];
+
+// ── Tool implementations ─────────────────────────────────────────────────
 
 async function authedFetch(url: string, opts: RequestInit, authHeader: string): Promise<Response> {
   return fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: authHeader } });
+}
+
+async function toolReadPreferences() {
+  const sql = db();
+  const rows = await sql<{ blocked_titles: string[] | null; must_have_keywords: string[] | null; target_titles: string[] | null; target_geographies: string[] | null }[]>`
+    select blocked_titles, must_have_keywords, target_titles, target_geographies
+    from job.vision order by updated_at desc limit 1
+  `;
+  const v = rows[0] || {} as Record<string, string[] | null>;
+  return {
+    blocked_titles:     v.blocked_titles ?? [],
+    must_have_keywords: v.must_have_keywords ?? [],
+    target_titles:      v.target_titles ?? [],
+    target_geographies: v.target_geographies ?? [],
+  };
 }
 
 async function toolSearchPipeline({ query }: { query: string }, authHeader: string) {
@@ -91,78 +150,69 @@ async function toolAddRoleFromUrl({ url }: { url: string }, authHeader: string) 
   return await res.json();
 }
 
-async function toolUpdatePreferences(args: { blocked?: string | string[]; must_have?: string | string[]; note?: string }, authHeader: string) {
-  const path = 'fikei/job/02-goals-intents/agent-preferences.md';
-  let existing = '';
-  let sha: string | undefined;
-  try {
-    const readRes = await authedFetch(`${KB_READ_URL}?path=${encodeURIComponent(path)}`, {}, authHeader);
-    if (readRes.ok) { const d = await readRes.json(); existing = d.content || ''; sha = d.sha; }
-  } catch (_) {}
-
-  // Accept either a single string (legacy) or an array (new schema) and
-  // normalize to arrays. Dedupe against what's already in the file so the
-  // same term doesn't pile up if the user re-runs the same instruction.
-  const toArr = (v: string | string[] | undefined): string[] => {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v.map(String).map(s => s.trim()).filter(Boolean);
-    return String(v).split(',').map(s => s.trim()).filter(Boolean);
-  };
-  const blocked   = toArr(args.blocked);
-  const mustHave  = toArr(args.must_have);
-  if (blocked.length === 0 && mustHave.length === 0) return { ok: false, error: 'specify at least one blocked or must_have term' };
-
-  const existingLower = existing.toLowerCase();
-  const isAlreadyBlocked   = (t: string) => existingLower.includes(`**blocked** - ${t.toLowerCase()}`);
-  const isAlreadyMustHave  = (t: string) => existingLower.includes(`**must_have** - ${t.toLowerCase()}`);
-
-  const ts = new Date().toISOString().slice(0,10);
-  const noteSuffix = args.note ? ` _(${args.note})_` : '';
-  const lines: string[] = [];
-  const addedBlocked: string[] = [];
-  const addedMustHave: string[] = [];
-  const skippedBlocked: string[] = [];
-  const skippedMustHave: string[] = [];
-
-  for (const t of blocked) {
-    if (isAlreadyBlocked(t)) { skippedBlocked.push(t); continue; }
-    lines.push(`- ${ts}: **blocked** - ${t}${noteSuffix}`);
-    addedBlocked.push(t);
-  }
-  for (const t of mustHave) {
-    if (isAlreadyMustHave(t)) { skippedMustHave.push(t); continue; }
-    lines.push(`- ${ts}: **must_have** - ${t}${noteSuffix}`);
-    addedMustHave.push(t);
-  }
-  if (lines.length === 0) {
-    return { ok: true, added_blocked: [], added_must_have: [], skipped_blocked: skippedBlocked, skipped_must_have: skippedMustHave, note: 'all terms already present' };
+async function toolUpdatePreferences(args: { blocked?: string[]; must_have?: string[]; note?: string }) {
+  const normalize = (arr?: string[]): string[] => (Array.isArray(arr) ? arr : [])
+    .map(s => String(s).toLowerCase().trim()).filter(Boolean);
+  const newBlocked  = normalize(args.blocked);
+  const newMustHave = normalize(args.must_have);
+  if (newBlocked.length === 0 && newMustHave.length === 0) {
+    return { ok: false, error: 'specify at least one blocked or must_have term' };
   }
 
-  const header = '# Agent search preferences\n\nAppended by /job chat. Used to bias future recommendations.\n\n';
-  const body = existing.includes('# Agent search preferences') ? existing : header;
-  const newBody = body.trimEnd() + '\n' + lines.join('\n') + '\n';
-  const writeRes = await authedFetch(KB_WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, content: newBody, sha }) }, authHeader);
-  if (!writeRes.ok) throw new Error(`kb-write ${writeRes.status}: ${(await writeRes.text()).slice(0,200)}`);
+  const sql = db();
+  const rows = await sql<{ id: number; blocked_titles: string[] | null; must_have_keywords: string[] | null }[]>`
+    select id, blocked_titles, must_have_keywords from job.vision order by updated_at desc limit 1
+  `;
+  if (!rows.length) return { ok: false, error: 'no vision row found — set up your vision first via /job/vision' };
+  const row = rows[0];
+  const curBlocked  = new Set((row.blocked_titles || []).map((s) => s.toLowerCase()));
+  const curMustHave = new Set((row.must_have_keywords || []).map((s) => s.toLowerCase()));
+
+  const addedBlocked   = newBlocked.filter((t) => !curBlocked.has(t));
+  const skippedBlocked = newBlocked.filter((t) => curBlocked.has(t));
+  const addedMustHave  = newMustHave.filter((t) => !curMustHave.has(t));
+  const skippedMustHave = newMustHave.filter((t) => curMustHave.has(t));
+
+  if (addedBlocked.length === 0 && addedMustHave.length === 0) {
+    return { ok: true, no_op: true, skipped_blocked: skippedBlocked, skipped_must_have: skippedMustHave, total_blocked: curBlocked.size, total_must_have: curMustHave.size };
+  }
+
+  const nextBlocked  = Array.from(new Set([...curBlocked,  ...addedBlocked]));
+  const nextMustHave = Array.from(new Set([...curMustHave, ...addedMustHave]));
+
+  await sql`
+    update job.vision set
+      blocked_titles = ${nextBlocked},
+      must_have_keywords = ${nextMustHave},
+      updated_at = now()
+    where id = ${row.id}
+  `;
+
   return {
     ok: true,
     added_blocked: addedBlocked,
     added_must_have: addedMustHave,
     skipped_blocked: skippedBlocked,
     skipped_must_have: skippedMustHave,
+    total_blocked: nextBlocked.length,
+    total_must_have: nextMustHave.length,
   };
 }
 
 async function runTool(name: string, input: Record<string, unknown>, authHeader: string): Promise<unknown> {
   try {
     switch (name) {
+      case 'read_preferences':    return await toolReadPreferences();
       case 'search_pipeline':     return await toolSearchPipeline(input as { query: string }, authHeader);
       case 'update_pipeline_row': return await toolUpdatePipelineRow(input, authHeader);
       case 'add_role_from_url':   return await toolAddRoleFromUrl(input as { url: string }, authHeader);
-      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string | string[]; must_have?: string | string[]; note?: string }, authHeader);
+      case 'update_preferences':  return await toolUpdatePreferences(input as { blocked?: string[]; must_have?: string[]; note?: string });
       default: return { error: `unknown tool: ${name}` };
     }
   } catch (err) { return { error: String((err as Error).message || err) }; }
 }
+
+// ── Persistence ──────────────────────────────────────────────────────────
 
 interface PersistedMessage { id: string; role: 'user'|'assistant'|'tool'; body: string; tool_name?: string; tool_payload?: unknown; created_at: string; }
 
@@ -194,50 +244,29 @@ async function callClaude(messages: Array<{ role: 'user'|'assistant'; content: u
   return await res.json();
 }
 
-// Reconstruct prior turns for the model. We can't replay the original
-// tool_use/tool_result blocks (we don't persist Anthropic's tool_use_id),
-// so tool runs become a compact assistant-side breadcrumb:
-//   "[I called update_preferences with {...} → {ok: true, appended: [...]}]"
-// That keeps the model's memory of what it actually did, so on the next
-// turn it doesn't claim it never ran the tool. Without this, the agent
-// gets amnesia about its own actions across turns.
 function historyToMessages(history: PersistedMessage[]): Array<{ role: 'user'|'assistant'; content: unknown }> {
   const out: Array<{ role: 'user'|'assistant'; content: unknown }> = [];
-  // Group consecutive tool events with the assistant turn they belong to.
   let pendingBreadcrumbs: string[] = [];
-
-  const flushBreadcrumbs = () => {
+  const flush = () => {
     if (!pendingBreadcrumbs.length) return;
-    // Attach to the most recent assistant message, OR push as a standalone
-    // assistant note if the assistant turn hasn't been emitted yet.
-    const lastIdx = out.length - 1;
-    if (lastIdx >= 0 && out[lastIdx].role === 'assistant') {
-      out[lastIdx] = { role: 'assistant', content: `${out[lastIdx].content as string}\n\n${pendingBreadcrumbs.join('\n')}` };
+    const last = out.length - 1;
+    if (last >= 0 && out[last].role === 'assistant') {
+      out[last] = { role: 'assistant', content: `${out[last].content as string}\n\n${pendingBreadcrumbs.join('\n')}` };
     } else {
       out.push({ role: 'assistant', content: pendingBreadcrumbs.join('\n') });
     }
     pendingBreadcrumbs = [];
   };
-
   for (const m of history) {
     if (m.role === 'tool') {
-      const payload = (m.tool_payload || {}) as { input?: unknown; output?: unknown };
-      const inputStr = JSON.stringify(payload.input ?? {}).slice(0, 400);
-      const outputStr = JSON.stringify(payload.output ?? {}).slice(0, 600);
-      pendingBreadcrumbs.push(`[Ran ${m.tool_name} with ${inputStr} → ${outputStr}]`);
+      const p = (m.tool_payload || {}) as { input?: unknown; output?: unknown };
+      pendingBreadcrumbs.push(`[Ran ${m.tool_name} with ${JSON.stringify(p.input ?? {}).slice(0,400)} → ${JSON.stringify(p.output ?? {}).slice(0,600)}]`);
       continue;
     }
-    if (m.role === 'user') {
-      flushBreadcrumbs();
-      if (m.body) out.push({ role: 'user', content: m.body });
-      continue;
-    }
-    if (m.role === 'assistant') {
-      flushBreadcrumbs();
-      if (m.body) out.push({ role: 'assistant', content: m.body });
-    }
+    if (m.role === 'user') { flush(); if (m.body) out.push({ role: 'user', content: m.body }); continue; }
+    if (m.role === 'assistant') { flush(); if (m.body) out.push({ role: 'assistant', content: m.body }); }
   }
-  flushBreadcrumbs();
+  flush();
   return out;
 }
 
@@ -247,7 +276,7 @@ serve(async (req) => {
   const user = await verifyJobUserDetailed(req);
   if (!user) return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   let message = '';
-  try { const body = await req.json(); message = String(body?.message || '').slice(0,4000).trim(); } catch (_) {}
+  try { const body = await req.json(); message = String(body?.message || '').slice(0,4000).trim(); } catch (_) { /* ignore */ }
   if (!message) return new Response(JSON.stringify({ error: 'message required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
