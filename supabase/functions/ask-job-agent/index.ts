@@ -135,13 +135,50 @@ async function callClaude(messages: Array<{ role: 'user'|'assistant'; content: u
   return await res.json();
 }
 
+// Reconstruct prior turns for the model. We can't replay the original
+// tool_use/tool_result blocks (we don't persist Anthropic's tool_use_id),
+// so tool runs become a compact assistant-side breadcrumb:
+//   "[I called update_preferences with {...} → {ok: true, appended: [...]}]"
+// That keeps the model's memory of what it actually did, so on the next
+// turn it doesn't claim it never ran the tool. Without this, the agent
+// gets amnesia about its own actions across turns.
 function historyToMessages(history: PersistedMessage[]): Array<{ role: 'user'|'assistant'; content: unknown }> {
   const out: Array<{ role: 'user'|'assistant'; content: unknown }> = [];
+  // Group consecutive tool events with the assistant turn they belong to.
+  let pendingBreadcrumbs: string[] = [];
+
+  const flushBreadcrumbs = () => {
+    if (!pendingBreadcrumbs.length) return;
+    // Attach to the most recent assistant message, OR push as a standalone
+    // assistant note if the assistant turn hasn't been emitted yet.
+    const lastIdx = out.length - 1;
+    if (lastIdx >= 0 && out[lastIdx].role === 'assistant') {
+      out[lastIdx] = { role: 'assistant', content: `${out[lastIdx].content as string}\n\n${pendingBreadcrumbs.join('\n')}` };
+    } else {
+      out.push({ role: 'assistant', content: pendingBreadcrumbs.join('\n') });
+    }
+    pendingBreadcrumbs = [];
+  };
+
   for (const m of history) {
-    if (m.role === 'tool') continue;
-    if (!m.body) continue;
-    out.push({ role: m.role as 'user'|'assistant', content: m.body });
+    if (m.role === 'tool') {
+      const payload = (m.tool_payload || {}) as { input?: unknown; output?: unknown };
+      const inputStr = JSON.stringify(payload.input ?? {}).slice(0, 400);
+      const outputStr = JSON.stringify(payload.output ?? {}).slice(0, 600);
+      pendingBreadcrumbs.push(`[Ran ${m.tool_name} with ${inputStr} → ${outputStr}]`);
+      continue;
+    }
+    if (m.role === 'user') {
+      flushBreadcrumbs();
+      if (m.body) out.push({ role: 'user', content: m.body });
+      continue;
+    }
+    if (m.role === 'assistant') {
+      flushBreadcrumbs();
+      if (m.body) out.push({ role: 'assistant', content: m.body });
+    }
   }
+  flushBreadcrumbs();
   return out;
 }
 
