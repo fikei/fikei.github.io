@@ -5538,87 +5538,27 @@ body[data-auth-state="out"] job-chat { display: none; }
   gap: var(--space-3);
 }
 
-/* ─────────────────────────────────────────────────────────────
-   MCP tokens section in /job/settings/. Personal access tokens
-   for the job-mcp endpoint.
-   ───────────────────────────────────────────────────────────── */
-
-.mcp-create {
-  display: flex;
-  gap: var(--space-3);
-  margin: var(--space-3) 0;
-}
-.mcp-create input {
-  flex: 1;
-  height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-}
-.mcp-create input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
-
-.mcp-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-small);
-}
-.mcp-table th {
-  text-align: left;
-  font-weight: var(--fw-medium);
-  color: var(--fg-muted);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-}
-.mcp-table td {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border);
-  color: var(--fg);
-}
-.mcp-table tr:last-child td { border-bottom: 0; }
-.mcp-table code {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
-  color: var(--fg-subtle);
-}
-
-.mcp-fresh {
-  margin: var(--space-3) 0;
-  padding: var(--space-4);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
-  background: var(--accent-muted);
+/* Stage 5 — post-sign-in deeper-story prompts. Plain text choices. */
+.deeper-prompt-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-4) 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
-.mcp-fresh__title { margin: 0; font-weight: var(--fw-semibold); }
-.mcp-fresh__warn { margin: 0; color: var(--warning); font-size: var(--font-size-small); }
-.mcp-fresh__value {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-small);
-  word-break: break-all;
-  padding: var(--space-3);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  user-select: all;
-}
-.mcp-fresh__actions { display: flex; gap: var(--space-2); }
-.mcp-fresh__howto { margin-top: var(--space-2); }
-.mcp-fresh__howto summary {
-  cursor: pointer;
-  font-size: var(--font-size-small);
-  color: var(--fg-muted);
-}
-.mcp-fresh__howto pre {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-3);
+.deeper-prompt {
+  appearance: none;
+  width: 100%;
+  text-align: left;
   background: var(--bg-surface);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-caption);
-  overflow-x: auto;
-  white-space: pre;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-size: var(--font-size-body);
+  color: var(--fg);
+  line-height: var(--lh-body);
+  cursor: pointer;
 }
+.deeper-prompt:hover { border-color: var(--border-strong); background: var(--bg); }
