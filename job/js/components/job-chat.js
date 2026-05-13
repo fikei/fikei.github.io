@@ -187,9 +187,12 @@ export class JobChat extends LitElement {
       case 'add_role_from_url':
         return `${input.url} → ${out.ok === false ? 'failed' : (out.role?.title || out.slug || 'saved')}`;
       case 'update_preferences': {
+        const asArr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+        const b = asArr(input.blocked);
+        const mh = asArr(input.must_have);
         const bits = [];
-        if (input.blocked) bits.push(`blocked: ${input.blocked}`);
-        if (input.must_have) bits.push(`must_have: ${input.must_have}`);
+        if (b.length)  bits.push(`blocked × ${b.length}`);
+        if (mh.length) bits.push(`must_have × ${mh.length}`);
         return bits.join(' · ') || 'noted';
       }
       default:
