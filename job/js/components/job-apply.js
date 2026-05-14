@@ -9,13 +9,13 @@
 //   PR4 — Cover letter step (reuse annotation UI)
 //   PR5 — Custom questions step with AI annotated answers
 //   PR6 — Auto-submit handoff
-const VERSION = '0.1.0';
-console.log(`[job-apply] v${VERSION} - takeover shell`);
+const VERSION = '0.2.0';
+console.log(`[job-apply] v${VERSION} - + field extraction (PR2)`);
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 
 const V = (new URL(import.meta.url)).search;
-const [{ readApplicationDraft, upsertApplicationDraft, STEPS, visibleSteps }] = await Promise.all([
+const [{ readApplicationDraft, upsertApplicationDraft, extractApplicationFields, STEPS, visibleSteps }] = await Promise.all([
   import('../apply.js' + V),
 ]);
 
@@ -23,14 +23,16 @@ export class JobApply extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
-    open:      { type: Boolean, reflect: true },
-    slug:      { type: String },
-    role:      { state: true },
-    draft:     { state: true },   // application_draft row
-    step:      { state: true },   // current step id
-    state:     { state: true },   // 'idle' | 'loading' | 'ready' | 'error'
-    error:     { state: true },
-    saving:    { state: true },
+    open:       { type: Boolean, reflect: true },
+    slug:       { type: String },
+    role:       { state: true },
+    draft:      { state: true },   // application_draft row
+    step:       { state: true },   // current step id
+    state:      { state: true },   // 'idle' | 'loading' | 'ready' | 'error'
+    error:      { state: true },
+    saving:     { state: true },
+    extracting: { state: true },   // 'idle' | 'running' | 'error'
+    extractErr: { state: true },
   };
 
   constructor() {
@@ -43,6 +45,8 @@ export class JobApply extends LitElement {
     this.state   = 'idle';
     this.error   = '';
     this.saving  = false;
+    this.extracting = 'idle';
+    this.extractErr = '';
   }
 
   // Public — called by the role detail page when the user clicks Apply.
@@ -66,9 +70,31 @@ export class JobApply extends LitElement {
       this.draft = d;
       this.step  = d.current_step || 'general';
       this.state = 'ready';
+      // Auto-extract on first launch (no extracted_at yet) when we have
+      // a posting URL. The takeover stays usable during extraction —
+      // step bodies that depend on `fields` show their own loading state.
+      const haveFields = !!d?.extracted_at;
+      if (!haveFields && (role?.url || d.apply_url)) {
+        this._runExtraction(role?.url || d.apply_url);
+      }
     } catch (e) {
       this.error = e.message || String(e);
       this.state = 'error';
+    }
+  }
+
+  async _runExtraction(url) {
+    this.extracting = 'running';
+    this.extractErr = '';
+    try {
+      const schema = await extractApplicationFields(this.slug, url);
+      // Re-read the draft to pick up server-side merged state.
+      const d = await readApplicationDraft(this.slug);
+      this.draft = d;
+      this.extracting = 'idle';
+    } catch (e) {
+      this.extracting = 'error';
+      this.extractErr = e.message || String(e);
     }
   }
 
@@ -144,6 +170,7 @@ export class JobApply extends LitElement {
           <div class="apply-bar__role-company">${r.company || ''}</div>
         </div>
         <div class="apply-bar__spacer"></div>
+        ${this._renderExtractionPill()}
         ${r.url ? html`
           <a class="apply-btn apply-btn--ghost apply-btn--sm" href=${r.url} target="_blank" rel="noopener noreferrer">
             Open posting ↗
@@ -153,6 +180,31 @@ export class JobApply extends LitElement {
         </button>
       </header>
     `;
+  }
+
+  _renderExtractionPill() {
+    const d = this.draft;
+    if (this.extracting === 'running') {
+      return html`<span class="apply-pill apply-pill--info"><span class="apply-loading" style="color:inherit;"></span>Reading the application…</span>`;
+    }
+    if (this.extracting === 'error') {
+      return html`<button class="apply-pill apply-pill--warn" @click=${() => this._runExtraction(this.role?.url || d?.apply_url)}
+                          title=${this.extractErr}>Extraction failed — retry</button>`;
+    }
+    if (d?.extracted_at && d?.fields?.ats) {
+      const ats = d.fields.ats;
+      const qN = (d.fields.custom_questions || []).length;
+      const cl = d.fields.requires?.cover_letter ? ' · cover letter' : '';
+      return html`<span class="apply-pill apply-pill--ok" title="Detected via ${ats}">
+        ${ats} · ${qN} question${qN === 1 ? '' : 's'}${cl}
+      </span>`;
+    }
+    if (this.role?.url || d?.apply_url) {
+      return html`<button class="apply-pill" @click=${() => this._runExtraction(this.role?.url || d?.apply_url)}>
+        Detect application fields →
+      </button>`;
+    }
+    return nothing;
   }
 
   _renderRail() {
@@ -238,11 +290,25 @@ export class JobApply extends LitElement {
     );
   }
   _renderQuestions() {
+    const qs = this.draft?.fields?.custom_questions || [];
     return this._stepStub(
       'Step 4',
-      'Custom questions',
+      `Custom questions${qs.length ? ` · ${qs.length}` : ''}`,
       'For each question on the application, we generate a draft with sourced stories and annotated rationale.',
-      html`<div class="apply-card"><p class="apply-card__hint">Custom-question pages arrive in PR5 — one page per question, with intent + standout-candidate profile + matched narratives + annotated draft.</p></div>`,
+      qs.length
+        ? html`
+            <ol class="apply-card" style="margin:0;padding:24px 24px 24px 44px;display:block;">
+              ${qs.map(q => html`
+                <li style="margin-bottom:14px;">
+                  <div style="font-weight:600;">${q.prompt}</div>
+                  <div style="font-size:12px;color:var(--apply-ink-subtle);">
+                    ${q.type}${q.required ? ' · required' : ''}${q.options?.length ? ` · ${q.options.length} options` : ''}
+                  </div>
+                </li>
+              `)}
+            </ol>
+            <p class="apply-card__hint" style="margin:0;">PR5 wraps each of these in its own page with AI intent + annotated draft answers.</p>`
+        : html`<div class="apply-card"><p class="apply-card__hint">No custom questions detected yet — extraction either hasn't run or this ATS has none.</p></div>`,
     );
   }
   _renderReview() {
