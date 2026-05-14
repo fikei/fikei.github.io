@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.1.0";
-console.log(`[job] v${VERSION} - hotfix: strip stale conflict markers from onboarding HTML`);
+const VERSION = "2.2.0";
+console.log(`[job] v${VERSION} - Pre-render auth check + prominent sign-in on Welcome + no-cache on entry HTML`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -66,6 +66,13 @@ async function applySignedInState(email) {
     }
   }
   const completed = !!profile?.onboarding_complete_at;
+  // Cache completion flag so the next page load can pre-redirect without
+  // waiting for the user_profile query. Read by the inline script on
+  // /job/ and /job/onboarding/index.html.
+  try {
+    if (completed) localStorage.setItem('job:profile:completed', '1');
+    else           localStorage.removeItem('job:profile:completed');
+  } catch (e) { /* */ }
   // Returning user with completed onboarding lands on /job/onboarding —
   // bounce to recommended. They came back to sign in, not to walk the flow
   // again. (Existing users still get to /job/settings/?demo=1 to re-test.)
@@ -219,6 +226,7 @@ document.addEventListener('ctrl:auth:signedin', (e) => {
 });
 document.addEventListener('ctrl:auth:signedout', () => {
   document.body.dataset.authState = 'out';
+  try { localStorage.removeItem('job:profile:completed'); } catch (e) { /* */ }
 });
 
 // CtrlAuth mounts magic-link + Google sign-in into #ctrl-auth-root.

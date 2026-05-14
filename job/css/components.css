@@ -5442,27 +5442,29 @@ body[data-auth-state="out"] job-chat { display: none; }
   padding: var(--space-4);
 }
 
-/* Welcome-stage sign-in shortcut. Sits in the top-right corner of the
-   pitch screen so returning users have an easy entry without walking
-   the onboarding flow. */
-.onboard__stage--welcome {
-  position: relative;
+/* Welcome-stage CTA row: Sign in (secondary) + Get started (primary).
+   Sign in sits beside the primary CTA so returning users see it
+   without scanning — no longer tucked into the corner. */
+.onboard__nav--welcome {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
-.onboard__signin {
-  position: absolute;
-  top: 0;
-  right: 0;
+.onboard__btn-signin {
   appearance: none;
-  background: transparent;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  padding: 6px var(--space-3);
+  padding: var(--space-3) var(--space-4);
   font: inherit;
-  font-size: var(--font-size-small);
-  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+  color: var(--fg);
   cursor: pointer;
 }
-.onboard__signin:hover { color: var(--fg); border-color: var(--border-strong); }
+.onboard__btn-signin:hover { border-color: var(--border-strong); background: var(--bg); }
+.onboard__btn-signin strong { font-weight: 600; color: var(--fg); }
 
 /* ─────────────────────────────────────────────────────────────
    Chat permalink page (/job/chat/). Two-pane: thread list +
