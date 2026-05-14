@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0">
   <title>/job — ctrl.rodeo</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/job/css/base.css?v=2.2.0">
-  <script src="/job/js/theme.js?v=2.2.0"></script>
+  <link rel="stylesheet" href="/job/css/base.css?v=2.3.0">
+  <script src="/job/js/theme.js?v=2.3.0"></script>
 
 
 
@@ -15,10 +18,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
   <script>
-    // Pre-auth landing: strangers (no Supabase session in localStorage) get
-    // routed into the onboarding chat at /job/onboarding/, which works
-    // without sign-in until the final commit. Authed users keep the
-    // existing /job/ behavior (desktop → /jobs/, mobile → job-home).
+    // Pre-render routing — runs synchronously off localStorage so we never
+    // flash the wrong shell at the user:
+    //   - No Supabase session → /job/onboarding/ (pre-auth chat).
+    //   - Session + completed profile → desktop /job/jobs/, mobile <job-home>.
+    //   - Session but no completion flag → fall through to render <job-home>;
+    //     app.js will reconcile against user_profile and redirect if needed.
+    //
+    // The `job:profile:completed` flag is written by app.js whenever it
+    // confirms a completed profile, so subsequent loads pre-redirect with
+    // no network call.
     (function () {
       try {
         var raw = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
@@ -28,7 +37,7 @@
           hasSession = !!(parsed && parsed.access_token);
         }
         if (!hasSession) { location.replace('/job/onboarding/'); return; }
-      } catch (e) { /* parse fail → treat as unauthed */
+      } catch (e) {
         location.replace('/job/onboarding/');
         return;
       }
@@ -58,7 +67,7 @@
     </main>
   </div>
 
-  <script type="module" src="/job/js/app.js?v=2.2.0"></script>
+  <script type="module" src="/job/js/app.js?v=2.3.0"></script>
 
 
 

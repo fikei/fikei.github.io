@@ -814,14 +814,13 @@ export class JobOnboarding extends LitElement {
   _renderPitch() {
     return html`
       <section class="onboard__stage onboard__stage--welcome">
-        <button class="onboard__signin" @click=${() => this._openSignIn()}
-                title="Already have an account?">Sign in</button>
-
         <h1>Your career operating system.</h1>
         <p class="lede">Upload what you've already written, answer a few open questions, and we'll start pulling roles that match what you actually want — and draft the cover letters too.</p>
         <p class="onboard__hint">Takes about 8 minutes. You can leave and come back; we'll save where you left off.</p>
-        <div class="onboard__nav">
-          <span></span>
+        <div class="onboard__nav onboard__nav--welcome">
+          <button class="btn onboard__btn-signin" @click=${() => this._openSignIn()}>
+            Have an account? <strong>Sign in</strong>
+          </button>
           <button class="btn btn--primary" @click=${() => this._setStage(1)}>Get started</button>
         </div>
       </section>
