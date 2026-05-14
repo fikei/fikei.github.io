@@ -9,15 +9,26 @@
 //   PR4 — Cover letter step (reuse annotation UI)
 //   PR5 — Custom questions step with AI annotated answers
 //   PR6 — Auto-submit handoff
-const VERSION = '0.2.0';
-console.log(`[job-apply] v${VERSION} - + field extraction (PR2)`);
+const VERSION = '0.3.0';
+console.log(`[job-apply] v${VERSION} - + general info + resume steps (PR3)`);
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
+import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 
 const V = (new URL(import.meta.url)).search;
-const [{ readApplicationDraft, upsertApplicationDraft, extractApplicationFields, STEPS, visibleSteps }] = await Promise.all([
+const [
+  { readApplicationDraft, upsertApplicationDraft, extractApplicationFields, STEPS, visibleSteps },
+  { readRoleAsset },
+  { renderMarkdown },
+  { diffMarkdown },
+] = await Promise.all([
   import('../apply.js' + V),
+  import('../roleAsset.js' + V),
+  import('../markdown.js' + V),
+  import('../diff.js' + V),
 ]);
+
+const BASE_RESUME_SLUG = '__base__';
 
 export class JobApply extends LitElement {
   createRenderRoot() { return this; }
@@ -33,6 +44,11 @@ export class JobApply extends LitElement {
     saving:     { state: true },
     extracting: { state: true },   // 'idle' | 'running' | 'error'
     extractErr: { state: true },
+    profile:    { state: true },   // user_profile row
+    resumeMd:   { state: true },   // tailored resume markdown
+    baseMd:     { state: true },   // base resume markdown (for diff)
+    showDiff:   { state: true },
+    resumeState:{ state: true },   // 'idle'|'loading'|'ready'|'error'
   };
 
   constructor() {
@@ -47,6 +63,12 @@ export class JobApply extends LitElement {
     this.saving  = false;
     this.extracting = 'idle';
     this.extractErr = '';
+    this.profile = null;
+    this.resumeMd = '';
+    this.baseMd = '';
+    this.showDiff = true;
+    this.resumeState = 'idle';
+    this._answerTimers = {};
   }
 
   // Public — called by the role detail page when the user clicks Apply.
@@ -70,6 +92,10 @@ export class JobApply extends LitElement {
       this.draft = d;
       this.step  = d.current_step || 'general';
       this.state = 'ready';
+      // Fire-and-forget side loads — profile drives prefill, resume
+      // assets drive the Resume step diff.
+      this._loadProfile();
+      this._loadResumeAssets();
       // Auto-extract on first launch (no extracted_at yet) when we have
       // a posting URL. The takeover stays usable during extraction —
       // step bodies that depend on `fields` show their own loading state.
@@ -80,6 +106,33 @@ export class JobApply extends LitElement {
     } catch (e) {
       this.error = e.message || String(e);
       this.state = 'error';
+    }
+  }
+
+  async _loadProfile() {
+    const sb = window.CtrlAuth?.getSupabaseClient?.();
+    if (!sb) return;
+    try {
+      const { data } = await sb.from('user_profile').select('identity, location, capability').maybeSingle();
+      this.profile = data || null;
+    } catch (e) {
+      console.warn('[job-apply] user_profile load failed', e);
+    }
+  }
+
+  async _loadResumeAssets() {
+    this.resumeState = 'loading';
+    try {
+      const [tailored, base] = await Promise.all([
+        readRoleAsset(this.slug, 'resume').catch(() => null),
+        readRoleAsset(BASE_RESUME_SLUG, 'resume').catch(() => null),
+      ]);
+      this.resumeMd = tailored?.content_md || '';
+      this.baseMd   = base?.content_md     || '';
+      this.resumeState = 'ready';
+    } catch (e) {
+      this.resumeState = 'error';
+      console.warn('[job-apply] resume load failed', e);
     }
   }
 
@@ -265,21 +318,172 @@ export class JobApply extends LitElement {
     `;
   }
 
-  _renderGeneral() {
-    return this._stepStub(
-      'Step 1',
-      'General information',
-      'We\'ll use what you already have. Skim and confirm — anything we don\'t know, you can fill in below.',
-      html`<div class="apply-card"><p class="apply-card__hint">General-info form arrives in the next PR — this step pulls name, email, location, work auth, and links from your /job profile and lets you confirm or override per application.</p></div>`,
-    );
+  // --- General info -------------------------------------------------------
+  _profileValue(mapsTo) {
+    const id   = this.profile?.identity || {};
+    const loc  = this.profile?.location || {};
+    switch (mapsTo) {
+      case 'first_name': return id.firstName || id.first_name || (id.name || '').split(/\s+/)[0] || '';
+      case 'last_name':  return id.lastName  || id.last_name  || (id.name || '').split(/\s+/).slice(1).join(' ') || '';
+      case 'full_name':  return id.name || [id.firstName, id.lastName].filter(Boolean).join(' ') || '';
+      case 'email':      return id.email || '';
+      case 'phone':      return id.phone || '';
+      case 'linkedin':   return id.linkedin || id.linkedinUrl || '';
+      case 'github':     return id.github || id.githubUrl || '';
+      case 'portfolio':  return id.website || id.portfolio || '';
+      case 'location':   return loc.city ? `${loc.city}${loc.region ? ', ' + loc.region : ''}` : (loc.address || '');
+      case 'work_auth':  return Array.isArray(loc.workAuth) ? loc.workAuth.join(', ') : (loc.workAuth || '');
+      case 'sponsorship':return (loc.needsSponsorship === true) ? 'Yes' : (loc.needsSponsorship === false ? 'No' : '');
+      case 'pronouns':   return id.pronouns || '';
+      default:           return '';
+    }
   }
+  _answerFor(fieldId, fallback = '') {
+    const a = this.draft?.answers?.[fieldId];
+    return (a === undefined || a === null) ? fallback : a;
+  }
+  _setAnswer(fieldId, value) {
+    const answers = { ...(this.draft?.answers || {}), [fieldId]: value };
+    // Optimistic update so the input doesn't flicker.
+    this.draft = { ...this.draft, answers };
+    clearTimeout(this._answerTimers[fieldId]);
+    this._answerTimers[fieldId] = setTimeout(() => this._persist({ answers }), 400);
+  }
+
+  _renderGeneral() {
+    const fields = this.draft?.fields?.general || [];
+    const extracted = !!this.draft?.extracted_at;
+    return html`
+      <section class="apply-step">
+        <div class="apply-step__head">
+          <div class="apply-step__eyebrow">Step 1 · General info</div>
+          <h1 class="apply-step__title">Confirm your basics</h1>
+          <p class="apply-step__sub">
+            ${extracted
+              ? html`We mapped the application's standard fields to your /job profile — skim, edit anything that's off, and continue.`
+              : html`We'll pull these directly from your profile once we read the application form.`}
+          </p>
+        </div>
+
+        ${!extracted ? html`
+          <div class="apply-empty">
+            ${this.extracting === 'running'
+              ? html`<span class="apply-loading">Reading the application's form…</span>`
+              : html`Waiting for field extraction to finish.`}
+          </div>` : nothing}
+
+        ${fields.length === 0 && extracted ? html`
+          <div class="apply-empty">
+            No standard fields detected for this application — head to the next step.
+          </div>` : nothing}
+
+        ${fields.length ? html`
+          <div class="apply-card">
+            <div class="apply-card__head">
+              <h2 class="apply-card__title">From your profile</h2>
+              <p class="apply-card__hint">${this._prefillStats(fields)}</p>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              ${fields.map(f => this._renderGeneralField(f))}
+            </div>
+          </div>
+        ` : nothing}
+      </section>
+    `;
+  }
+  _prefillStats(fields) {
+    const total = fields.length;
+    let filled = 0;
+    for (const f of fields) {
+      const v = this._answerFor(f.id, this._profileValue(f.maps_to));
+      if (v) filled++;
+    }
+    return `${filled}/${total} prefilled`;
+  }
+  _renderGeneralField(f) {
+    const profileVal = this._profileValue(f.maps_to);
+    const v = this._answerFor(f.id, profileVal);
+    const isLong = f.type === 'textarea';
+    return html`
+      <div class="apply-field" style=${isLong ? 'grid-column:1/-1;' : ''}>
+        <label class="apply-field__label">
+          ${f.label}${f.required ? html`<span class="apply-field__required">*</span>` : nothing}
+          ${v && v === profileVal ? html`<span class="apply-pill apply-pill--ok" style="font-size:10px;padding:1px 6px;">from profile</span>` : nothing}
+        </label>
+        ${isLong
+          ? html`<textarea class="apply-textarea" .value=${v} @input=${(e) => this._setAnswer(f.id, e.target.value)}></textarea>`
+          : html`<input class="apply-input" type=${f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : f.type === 'url' ? 'url' : 'text'}
+                        .value=${v}
+                        @input=${(e) => this._setAnswer(f.id, e.target.value)} />`}
+        ${f.maps_to ? html`<div class="apply-field__hint">maps to ${f.maps_to.replace(/_/g, ' ')}</div>` : nothing}
+      </div>
+    `;
+  }
+
+  // --- Resume -------------------------------------------------------------
   _renderResume() {
-    return this._stepStub(
-      'Step 2',
-      'Resume',
-      'Tailored for this role, side-by-side with your base resume so you can see every change.',
-      html`<div class="apply-card"><p class="apply-card__hint">Resume review tools land in the next PR — same diff/highlight system as the Resume tab on the role page, embedded directly here.</p></div>`,
-    );
+    const md   = this.resumeMd;
+    const base = this.baseMd;
+    const showDiff = this.showDiff && !!base;
+    const rendered = renderMarkdown(showDiff ? diffMarkdown(base, md) : md || '');
+    return html`
+      <section class="apply-step">
+        <div class="apply-step__head">
+          <div class="apply-step__eyebrow">Step 2 · Resume</div>
+          <h1 class="apply-step__title">Your tailored resume</h1>
+          <p class="apply-step__sub">
+            ${base
+              ? html`Side-by-side with your base resume — each addition is <ins class="d-add">highlighted</ins>, each cut is <del class="d-del">struck through</del>. Toggle off to read the clean tailored version.`
+              : html`No base resume yet — saving one on the Career page enables diff review here.`}
+          </p>
+        </div>
+
+        <div class="apply-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">${this.role?.company || 'Company'} · ${this.role?.title || 'Role'}</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${base ? html`
+                <button class="apply-btn apply-btn--ghost apply-btn--sm"
+                        @click=${() => this.showDiff = !this.showDiff}>
+                  ${this.showDiff ? 'Hide changes' : 'Show changes'}
+                </button>` : nothing}
+              <button class="apply-btn apply-btn--ghost apply-btn--sm"
+                      @click=${() => this._openInTab('resume')}>Edit in full editor ↗</button>
+            </div>
+          </div>
+          ${this.resumeState === 'loading' ? html`<div class="apply-loading">Loading resume…</div>` : nothing}
+          ${this.resumeState === 'ready' && !md ? html`
+            <div class="apply-empty">
+              No tailored resume yet for this role.
+              <div style="margin-top:12px;">
+                <button class="apply-btn apply-btn--dark apply-btn--sm" @click=${() => this._openInTab('resume')}>Generate one →</button>
+              </div>
+            </div>` : nothing}
+          ${md ? html`<article class="apply-resume-body apply-prose">${unsafeHTML(rendered)}</article>` : nothing}
+        </div>
+      </section>
+    `;
+  }
+
+  _openInTab(tab) {
+    // Close the takeover and switch the role detail page to the given tab.
+    this.close();
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('tab', tab);
+      history.replaceState(null, '', u.toString());
+      // Fire a tabchange event the host component can listen for; fall
+      // back to a hard reload if no handler picks it up.
+      const ev = new CustomEvent('apply:opentab', { detail: { tab }, bubbles: true, composed: true });
+      window.dispatchEvent(ev);
+      // Defensive — if the host doesn't react in 50ms, reload.
+      setTimeout(() => {
+        const sp = new URLSearchParams(location.search);
+        if (sp.get('tab') === tab && !document.querySelector(`.asset-tabs__tab.is-active`)?.textContent?.toLowerCase().includes(tab === 'resume' ? 'resume' : tab)) {
+          location.reload();
+        }
+      }, 50);
+    } catch { location.reload(); }
   }
   _renderCover() {
     return this._stepStub(
