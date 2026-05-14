@@ -50,6 +50,9 @@ const KIND_BY_TAB = {
 };
 
 const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel } = await import('../applicationEvents.js' + V);
+// Side-effect import — registers the <job-apply> custom element used by the
+// "Apply with /job" launch button below.
+await import('./job-apply.js' + V);
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -1642,8 +1645,11 @@ export class JobRoleDetail extends LitElement {
                title="Open the originating email in Gmail">📧 Source email</a>
           ` : nothing}
           ${r.url ? html`
-            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
-               @click=${() => engageRole(this.slug)}>Apply ↗</a>
+            <button class="btn apply-launch-btn" @click=${() => this._launchApply()}>
+              Apply with /job ✨
+            </button>
+            <a class="btn btn--sm" href=${r.url} target="_blank" rel="noopener noreferrer"
+               @click=${() => engageRole(this.slug)} title="Open the posting in a new tab">Posting ↗</a>
           ` : nothing}
         </div>
       </header>
@@ -1755,9 +1761,12 @@ export class JobRoleDetail extends LitElement {
                title="Open the originating email in Gmail">📧 Source email</a>
           ` : nothing}
           ${r?.url ? html`
-            <a class="btn btn--accent" href=${r.url} target="_blank" rel="noopener noreferrer"
-               @click=${() => engageRole(this.slug)}>
-              Apply ↗
+            <button class="btn apply-launch-btn" @click=${() => this._launchApply()}>
+              Apply with /job ✨
+            </button>
+            <a class="btn btn--sm" href=${r.url} target="_blank" rel="noopener noreferrer"
+               @click=${() => engageRole(this.slug)} title="Open the posting in a new tab">
+              Posting ↗
             </a>
           ` : nothing}
         </div>
@@ -1779,7 +1788,35 @@ export class JobRoleDetail extends LitElement {
         : this.activeTab === 'activity' ? this._renderActivityTab()
         : this._renderAssetTab(this.activeTab)}
       </section>
+
+      <job-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></job-apply>
     `;
+  }
+
+  _launchApply() {
+    // Engagement signal — same as the "Posting ↗" outbound click.
+    try { engageRole(this.slug); } catch { /* silent */ }
+    const el = this.renderRoot.querySelector('#apply-takeover');
+    if (!el) {
+      console.warn('[job-role-detail] apply takeover element missing');
+      return;
+    }
+    el.launch({ slug: this.slug, role: this.role });
+    // Reflect in URL so back-button closes the takeover instead of leaving the page.
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('apply', '1');
+      history.pushState({ apply: true }, '', u.toString());
+    } catch { /* ignore */ }
+  }
+  _onApplyClose() {
+    try {
+      const u = new URL(location.href);
+      if (u.searchParams.has('apply')) {
+        u.searchParams.delete('apply');
+        history.replaceState(null, '', u.toString());
+      }
+    } catch { /* ignore */ }
   }
 
   _renderProcessTracker() {
