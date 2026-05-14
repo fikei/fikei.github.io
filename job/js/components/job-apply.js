@@ -9,8 +9,8 @@
 //   PR4 — Cover letter step (reuse annotation UI)
 //   PR5 — Custom questions step with AI annotated answers
 //   PR6 — Auto-submit handoff
-const VERSION = '0.5.0';
-console.log(`[job-apply] v${VERSION} - + custom-question annotated drafts (PR5)`);
+const VERSION = '0.6.0';
+console.log(`[job-apply] v${VERSION} - + review & submit handoff (PR6)`);
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
@@ -824,13 +824,214 @@ export class JobApply extends LitElement {
       </section>
     `;
   }
+  // --- Review + submit ----------------------------------------------------
+  _buildPayload() {
+    // Self-contained payload that an autofill companion (browser
+    // extension / userscript) can read out of localStorage or
+    // window.name. Mirrors application_draft.fields/.answers but in a
+    // friendlier per-field shape with the resolved values.
+    const f = this.draft?.fields || {};
+    const general = (f.general || []).map(field => ({
+      id: field.id,
+      label: field.label,
+      maps_to: field.maps_to || null,
+      type: field.type,
+      required: !!field.required,
+      value: this._answerFor(field.id, this._profileValue(field.maps_to)),
+    }));
+    const questions = (f.custom_questions || []).map(q => {
+      const a = this._qAnswer(q.id);
+      return {
+        id: q.id,
+        prompt: q.prompt,
+        type: q.type,
+        required: !!q.required,
+        options: q.options || null,
+        max_length: q.max_length || null,
+        answer: a?.user_edited_draft ?? a?.draft ?? '',
+      };
+    });
+    return {
+      role: {
+        slug: this.slug,
+        company: this.role?.company || '',
+        title:   this.role?.title   || '',
+        url:     this.role?.url     || this.draft?.apply_url || '',
+      },
+      ats: this.draft?.ats || f.ats || null,
+      requires: f.requires || { resume: true, cover_letter: false },
+      general,
+      questions,
+      resume_md: this.resumeMd || '',
+      cover_letter_md: this.coverMd || '',
+      generated_at: new Date().toISOString(),
+      schema_version: 1,
+    };
+  }
+
+  async _copyPayload() {
+    const json = JSON.stringify(this._buildPayload(), null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      this._toast('Copied — paste into your notes or pass it to an autofill companion');
+    } catch (e) {
+      console.warn('[job-apply] clipboard fail', e);
+      this._toast('Copy failed — see console for the payload', 'warn');
+      console.log('[job-apply] payload:', json);
+    }
+  }
+
+  _openWithHandoff() {
+    const payload = this._buildPayload();
+    const url = payload.role.url;
+    if (!url) { this._toast('No posting URL on this role.', 'warn'); return; }
+    try {
+      const key = `job:apply:payload:${this.slug}`;
+      localStorage.setItem(key, JSON.stringify({ ...payload, key, written_at: Date.now() }));
+      localStorage.setItem('job:apply:lastPayloadKey', key);
+    } catch (e) {
+      console.warn('[job-apply] localStorage write failed', e);
+    }
+    // Open in a new tab. We can't reliably reach into the new tab from
+    // here, but a paired Chrome extension reads job:apply:payload:* from
+    // the active tab on navigation. This is the public handshake.
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) this._toast('Popup blocked — allow popups for this site, then retry.', 'warn');
+  }
+
+  async _markSubmitted() {
+    if (!confirm('Mark this application as submitted? You can still edit the draft afterwards.')) return;
+    try {
+      await this._persist({ status: 'submitted', submitted_at: new Date().toISOString() });
+      this._toast('Marked as submitted.');
+    } catch (e) {
+      this._toast(`Couldn't mark as submitted: ${e.message}`, 'warn');
+    }
+  }
+
+  _toast(msg, kind = 'ok') {
+    const el = document.createElement('div');
+    el.className = `apply-toast apply-toast--${kind}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('is-on'));
+    setTimeout(() => {
+      el.classList.remove('is-on');
+      setTimeout(() => el.remove(), 220);
+    }, 2600);
+  }
+
   _renderReview() {
-    return this._stepStub(
-      'Final',
-      'Review and submit',
-      'One last pass. Submit goes through our autofill agent (handoff coming in PR6).',
-      html`<div class="apply-card"><p class="apply-card__hint">Review + auto-submit handoff arrives in PR6.</p></div>`,
-    );
+    const payload = this._buildPayload();
+    const submitted = this.draft?.status === 'submitted';
+    const reqCover = payload.requires?.cover_letter;
+    const qs = payload.questions;
+    const totalQ = qs.length;
+    const draftedQ = qs.filter(q => q.answer && q.answer.trim()).length;
+    const missing = [];
+    for (const g of payload.general) if (g.required && !g.value) missing.push(g.label);
+    if (payload.requires?.resume && !payload.resume_md) missing.push('Tailored resume');
+    if (reqCover && !payload.cover_letter_md) missing.push('Cover letter');
+    for (const q of qs) if (q.required && !q.answer) missing.push(`Question: ${q.prompt.slice(0, 60)}`);
+
+    return html`
+      <section class="apply-step" style="max-width:880px;">
+        <div class="apply-step__head">
+          <div class="apply-step__eyebrow">Final · Review</div>
+          <h1 class="apply-step__title">Ready to apply${submitted ? ' (submitted)' : ''}</h1>
+          <p class="apply-step__sub">
+            Open the posting in a new tab — we've stashed your answers so a paired autofill companion can drop them in. Don't have one yet? Copy the payload or grab values per field.
+          </p>
+        </div>
+
+        ${missing.length ? html`
+          <div class="apply-card" style="border-color: var(--apply-warning); background: #fff8ec;">
+            <h2 class="apply-card__title" style="color: var(--apply-warning);">${missing.length} item${missing.length === 1 ? '' : 's'} still missing</h2>
+            <ul style="margin:0;padding-left:18px;font-size:14px;">
+              ${missing.map(m => html`<li>${m}</li>`)}
+            </ul>
+          </div>` : html`
+          <div class="apply-card" style="border-color: var(--apply-accent-soft); background: #f2fbeb;">
+            <h2 class="apply-card__title" style="color: var(--apply-success);">Everything required is filled in ✓</h2>
+            <p class="apply-card__hint" style="margin:0;">
+              ${totalQ ? `${draftedQ}/${totalQ} custom questions answered. ` : ''}Resume ${payload.resume_md ? '✓' : '—'}${reqCover ? ` · Cover letter ${payload.cover_letter_md ? '✓' : '—'}` : ''}.
+            </p>
+          </div>`}
+
+        <div class="apply-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">General info</h2>
+            <span class="apply-pill">${payload.general.length} field${payload.general.length === 1 ? '' : 's'}</span>
+          </div>
+          ${payload.general.length === 0
+            ? html`<p class="apply-card__hint">No general fields detected.</p>`
+            : html`<dl class="apply-review-dl">
+                ${payload.general.map(g => html`
+                  <div>
+                    <dt>${g.label}${g.required && !g.value ? html`<span class="apply-field__required"> *</span>` : nothing}</dt>
+                    <dd>${g.value || html`<span class="apply-card__hint">—</span>`}</dd>
+                  </div>`)}
+              </dl>`}
+        </div>
+
+        <div class="apply-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">Resume & cover letter</h2>
+            <div style="display:flex;gap:6px;">
+              <span class="apply-pill ${payload.resume_md ? 'apply-pill--ok' : 'apply-pill--warn'}">Resume ${payload.resume_md ? '✓' : 'missing'}</span>
+              ${reqCover ? html`<span class="apply-pill ${payload.cover_letter_md ? 'apply-pill--ok' : 'apply-pill--warn'}">Cover ${payload.cover_letter_md ? '✓' : 'missing'}</span>` : nothing}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="apply-btn apply-btn--ghost apply-btn--sm" @click=${() => this._openInTab('resume')}>Edit resume ↗</button>
+            ${reqCover ? html`<button class="apply-btn apply-btn--ghost apply-btn--sm" @click=${() => this._openInTab('cover-letter')}>Edit cover letter ↗</button>` : nothing}
+          </div>
+        </div>
+
+        ${qs.length ? html`
+          <div class="apply-card">
+            <div class="apply-card__head">
+              <h2 class="apply-card__title">Custom questions</h2>
+              <span class="apply-pill ${draftedQ === totalQ ? 'apply-pill--ok' : ''}">${draftedQ}/${totalQ} drafted</span>
+            </div>
+            <ol class="apply-review-qlist">
+              ${qs.map((q, i) => html`
+                <li>
+                  <div class="apply-review-qlist__head">
+                    <button class="apply-review-qlist__num" @click=${() => { this.qIdx = i; this._go('questions'); }}>${i + 1}</button>
+                    <span class="apply-review-qlist__prompt">${q.prompt}</span>
+                    ${q.required ? html`<span class="apply-pill apply-pill--warn">required</span>` : nothing}
+                  </div>
+                  ${q.answer
+                    ? html`<p class="apply-review-qlist__answer">${q.answer.length > 320 ? q.answer.slice(0, 320) + '…' : q.answer}</p>`
+                    : html`<p class="apply-card__hint">— not drafted yet</p>`}
+                </li>`)}
+            </ol>
+          </div>` : nothing}
+
+        <div class="apply-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">Submit</h2>
+            <span class="apply-card__hint">Auto-submit requires a paired browser companion — see notes</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="apply-btn apply-btn--primary" @click=${() => this._openWithHandoff()} ?disabled=${!payload.role.url}>
+              Open posting & hand off ↗
+            </button>
+            <button class="apply-btn apply-btn--ghost" @click=${() => this._copyPayload()}>Copy answers (JSON)</button>
+            <button class="apply-btn apply-btn--dark" @click=${() => this._markSubmitted()} ?disabled=${submitted}>
+              ${submitted ? 'Marked as submitted ✓' : 'Mark as submitted'}
+            </button>
+          </div>
+          <details class="apply-card__hint" style="margin:0;">
+            <summary style="cursor:pointer;">How the autofill handoff works</summary>
+            <div style="margin-top:8px;font-size:13px;color:var(--apply-ink-muted);line-height:1.5;">
+              Clicking <strong>Open posting & hand off</strong> stashes your payload at <code>localStorage["job:apply:payload:${this.slug}"]</code> and opens the application in a new tab. A future browser extension (or userscript) reads that key on page load and autofills the form. Until then, use <strong>Copy answers</strong> and paste field-by-field.
+            </div>
+          </details>
+        </div>
+      </section>
+    `;
   }
 
   _renderActions() {
@@ -838,15 +1039,19 @@ export class JobApply extends LitElement {
     const i = this._stepIndex();
     const atStart = i <= 0;
     const atEnd   = i >= steps.length - 1;
+    const submitted = this.draft?.status === 'submitted';
     return html`
       <div class="apply-actions">
         <div class="apply-actions__status">
           ${this.saving ? html`<span class="apply-loading">Saving…</span>` : html`<span>Draft saved · ${this._dirtyTag()}</span>`}
+          ${submitted ? html`<span class="apply-pill apply-pill--ok" style="margin-left:8px;">Submitted</span>` : nothing}
         </div>
         <div class="apply-actions__group">
           <button class="apply-btn apply-btn--ghost" ?disabled=${atStart} @click=${() => this._prev()}>← Back</button>
           ${atEnd
-            ? html`<button class="apply-btn apply-btn--primary" disabled title="Submit lands in PR6">Submit application</button>`
+            ? html`<button class="apply-btn apply-btn--primary" @click=${() => this._openWithHandoff()} ?disabled=${!(this.role?.url || this.draft?.apply_url)}>
+                Open posting & hand off ↗
+              </button>`
             : html`<button class="apply-btn apply-btn--dark" @click=${() => this._next()}>Continue →</button>`}
         </div>
       </div>
