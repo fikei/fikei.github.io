@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.3.1";
-console.log(`[job] v${VERSION} - Fix blank page: transition out of "loading" when no session`);
+const VERSION = "2.3.2";
+console.log(`[job] v${VERSION} - Await getSession + trust completion cache when RLS query fails`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -53,35 +53,50 @@ async function applySignedInState(email) {
   const sb = window.CtrlAuth?.getSupabaseClient?.();
   const onOnboarding = location.pathname.startsWith(ONBOARDING_PATH);
   let profile = null;
+  let queryOk = false;
   if (sb) {
     try {
+      // Wait for the supabase client to actually load the session from
+      // localStorage before issuing the user_profile query — otherwise the
+      // request can go out with just the anon key, RLS returns no rows, and
+      // we incorrectly conclude the user hasn't completed onboarding and
+      // bounce them back through it.
+      await sb.auth.getSession();
       const { data, error } = await sb
         .from('user_profile')
         .select('onboarding_complete_at')
         .maybeSingle();
       if (error) console.warn('[job] user_profile query failed', error);
+      else queryOk = true;
       profile = data;
     } catch (e) {
       console.warn('[job] user_profile query threw', e);
     }
   }
   const completed = !!profile?.onboarding_complete_at;
-  // Cache completion flag so the next page load can pre-redirect without
-  // waiting for the user_profile query. Read by the inline script on
-  // /job/ and /job/onboarding/index.html.
-  try {
-    if (completed) localStorage.setItem('job:profile:completed', '1');
-    else           localStorage.removeItem('job:profile:completed');
-  } catch (e) { /* */ }
+  // Only WRITE the completion cache on a successful query. A failed query
+  // (network/RLS hiccup) must not clear the flag and bounce a returning user
+  // back through onboarding.
+  if (queryOk) {
+    try {
+      if (completed) localStorage.setItem('job:profile:completed', '1');
+      else           localStorage.removeItem('job:profile:completed');
+    } catch (e) { /* */ }
+  }
+  // If the query failed but the cached flag says completed, trust the cache.
+  const effectiveCompleted = completed || (!queryOk && (() => {
+    try { return localStorage.getItem('job:profile:completed') === '1'; }
+    catch { return false; }
+  })());
   // Returning user with completed onboarding lands on /job/onboarding —
   // bounce to recommended. They came back to sign in, not to walk the flow
   // again. (Existing users still get to /job/settings/?demo=1 to re-test.)
-  if (onOnboarding && completed) {
+  if (onOnboarding && effectiveCompleted) {
     location.replace('/job/jobs/recommended/');
     return;
   }
   // Unauth or incomplete profile on a protected route → push into onboarding.
-  if (!onOnboarding && !completed) {
+  if (!onOnboarding && !effectiveCompleted) {
     location.replace(ONBOARDING_PATH + '/');
     return;
   }
