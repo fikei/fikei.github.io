@@ -143,11 +143,19 @@ export class JobRoleDetail extends LitElement {
     document.addEventListener('job:auth:ready', this._onAuth);
     this._onSelectionChange = () => this._handleSelectionChange();
     document.addEventListener('selectionchange', this._onSelectionChange);
+    // <job-apply> requests a deep-link into the Resume / Cover-letter tab
+    // via this event when the user clicks "Edit in full editor ↗".
+    this._onApplyOpenTab = (ev) => {
+      const t = ev?.detail?.tab;
+      if (t) this._switchTab(t);
+    };
+    window.addEventListener('apply:opentab', this._onApplyOpenTab);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('selectionchange', this._onSelectionChange);
+    window.removeEventListener('apply:opentab', this._onApplyOpenTab);
     this._teardownBodyObserver();
     if (this._genTimer) { clearInterval(this._genTimer); this._genTimer = null; }
     // Flush pending autosaves on unmount.

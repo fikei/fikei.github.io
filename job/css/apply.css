@@ -295,6 +295,24 @@
 }
 .apply-launch-btn:hover { filter: brightness(0.95); }
 
+/* ----- Prose + diff (resume + cover letter steps) -------------------- */
+.apply-prose {
+  font-size: 14px; line-height: 1.55; color: var(--apply-ink);
+}
+.apply-prose h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.apply-prose h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+                  margin: 18px 0 6px; border-bottom: 1px solid var(--apply-border);
+                  padding-bottom: 2px; color: var(--apply-ink-muted); }
+.apply-prose h3 { font-size: 14px; margin: 12px 0 2px; }
+.apply-prose p, .apply-prose li { font-size: 14px; line-height: 1.55; }
+.apply-prose ul { padding-left: 20px; margin: 6px 0 12px; }
+.apply-prose em { color: var(--apply-ink-muted); }
+.apply-prose a  { color: inherit; text-decoration: underline; }
+.apply-prose ins.d-add { background: #d6f4be; text-decoration: none; padding: 0 2px; border-radius: 3px; }
+.apply-prose del.d-del { background: #ffd9d4; text-decoration: line-through; padding: 0 2px; border-radius: 3px; color: var(--apply-error); }
+
+.apply-resume-body { max-height: 60vh; overflow: auto; padding-right: 4px; }
+
 @media (max-width: 720px) {
   .apply-body { padding: 28px 16px 140px; }
   .apply-bar  { padding: 12px 16px; }
