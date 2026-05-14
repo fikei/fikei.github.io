@@ -9,8 +9,8 @@
 //   PR4 — Cover letter step (reuse annotation UI)
 //   PR5 — Custom questions step with AI annotated answers
 //   PR6 — Auto-submit handoff
-const VERSION = '0.3.0';
-console.log(`[job-apply] v${VERSION} - + general info + resume steps (PR3)`);
+const VERSION = '0.4.0';
+console.log(`[job-apply] v${VERSION} - + cover letter w/ annotations (PR4)`);
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
@@ -20,12 +20,14 @@ const [
   { readApplicationDraft, upsertApplicationDraft, extractApplicationFields, STEPS, visibleSteps },
   { readRoleAsset },
   { renderMarkdown },
-  { diffMarkdown },
+  { diffMarkdown, applyAIHighlights },
+  { fetchCoverRationale },
 ] = await Promise.all([
   import('../apply.js' + V),
   import('../roleAsset.js' + V),
   import('../markdown.js' + V),
   import('../diff.js' + V),
+  import('../pipeline.js' + V),
 ]);
 
 const BASE_RESUME_SLUG = '__base__';
@@ -49,6 +51,10 @@ export class JobApply extends LitElement {
     baseMd:     { state: true },   // base resume markdown (for diff)
     showDiff:   { state: true },
     resumeState:{ state: true },   // 'idle'|'loading'|'ready'|'error'
+    coverMd:    { state: true },   // tailored cover letter markdown
+    analysisMd: { state: true },   // role analysis JSON (raw markdown blob)
+    coverState: { state: true },   // 'idle'|'loading'|'ready'|'error'
+    coverHi:    { state: true },   // { highlights, opportunities, loading, error }
   };
 
   constructor() {
@@ -68,6 +74,10 @@ export class JobApply extends LitElement {
     this.baseMd = '';
     this.showDiff = true;
     this.resumeState = 'idle';
+    this.coverMd = '';
+    this.analysisMd = '';
+    this.coverState = 'idle';
+    this.coverHi = { highlights: [], opportunities: [], loading: false, error: '' };
     this._answerTimers = {};
   }
 
@@ -96,6 +106,7 @@ export class JobApply extends LitElement {
       // assets drive the Resume step diff.
       this._loadProfile();
       this._loadResumeAssets();
+      this._loadCoverAssets();
       // Auto-extract on first launch (no extracted_at yet) when we have
       // a posting URL. The takeover stays usable during extraction —
       // step bodies that depend on `fields` show their own loading state.
@@ -133,6 +144,51 @@ export class JobApply extends LitElement {
     } catch (e) {
       this.resumeState = 'error';
       console.warn('[job-apply] resume load failed', e);
+    }
+  }
+
+  async _loadCoverAssets() {
+    this.coverState = 'loading';
+    try {
+      const [cover, analysis] = await Promise.all([
+        readRoleAsset(this.slug, 'cover-letter').catch(() => null),
+        readRoleAsset(this.slug, 'analysis').catch(() => null),
+      ]);
+      this.coverMd    = cover?.content_md    || '';
+      this.analysisMd = analysis?.content_md || '';
+      this.coverState = 'ready';
+      if (this.coverMd && this.analysisMd) this._loadCoverRationale();
+    } catch (e) {
+      this.coverState = 'error';
+      console.warn('[job-apply] cover load failed', e);
+    }
+  }
+
+  _parseAnalysis(md) {
+    if (!md) return null;
+    const fence = md.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const body = fence ? fence[1] : md;
+    try { return JSON.parse(body); } catch { return null; }
+  }
+  _coverSources() {
+    const parsed = this._parseAnalysis(this.analysisMd);
+    if (!parsed) return [];
+    const out = [];
+    if (parsed.suggestedAngle) out.push({ label: 'Suggested angle', text: parsed.suggestedAngle });
+    if (parsed.whyFits)        out.push({ label: 'Why it fits',     text: parsed.whyFits });
+    if (parsed.strengths)      out.push({ label: 'Strengths',       text: parsed.strengths });
+    if (parsed.gaps)           out.push({ label: 'Gaps to address', text: parsed.gaps });
+    return out;
+  }
+  async _loadCoverRationale() {
+    const sources = this._coverSources();
+    if (!this.coverMd || !sources.length) return;
+    this.coverHi = { ...this.coverHi, loading: true, error: '' };
+    try {
+      const { highlights, opportunities } = await fetchCoverRationale(this.coverMd, sources);
+      this.coverHi = { highlights, opportunities, loading: false, error: '' };
+    } catch (e) {
+      this.coverHi = { ...this.coverHi, loading: false, error: e.message || String(e) };
     }
   }
 
@@ -486,12 +542,88 @@ export class JobApply extends LitElement {
     } catch { location.reload(); }
   }
   _renderCover() {
-    return this._stepStub(
-      'Step 3',
-      'Cover letter',
-      'Drafted, annotated with rationale, with one-click edits per highlight.',
-      html`<div class="apply-card"><p class="apply-card__hint">Cover-letter step arrives in PR4 — reuses the existing annotation UI (load-bearing phrases + opportunities) from the role page.</p></div>`,
-    );
+    const md = this.coverMd;
+    const { html: marked, comments } = (md && (this.coverHi.highlights.length || this.coverHi.opportunities.length))
+      ? applyAIHighlights(md, this.coverHi.highlights, this.coverHi.opportunities)
+      : { html: md || '', comments: [] };
+    const rendered = renderMarkdown(marked);
+    return html`
+      <section class="apply-step" style="max-width:1080px;">
+        <div class="apply-step__head">
+          <div class="apply-step__eyebrow">Step 3 · Cover letter</div>
+          <h1 class="apply-step__title">Your tailored cover letter</h1>
+          <p class="apply-step__sub">
+            Highlights tie each load-bearing phrase back to a piece of the analysis. Click a phrase or a comment to see them paired.
+          </p>
+        </div>
+
+        <div class="apply-card apply-cover-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">${this.role?.company || 'Company'} · ${this.role?.title || 'Role'}</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${this.coverHi.loading ? html`<span class="apply-loading">Annotating…</span>` : nothing}
+              <button class="apply-btn apply-btn--ghost apply-btn--sm"
+                      @click=${() => this._openInTab('cover-letter')}>Edit in full editor ↗</button>
+            </div>
+          </div>
+
+          ${this.coverState === 'loading' ? html`<div class="apply-loading">Loading cover letter…</div>` : nothing}
+          ${this.coverState === 'ready' && !md ? html`
+            <div class="apply-empty">
+              No tailored cover letter yet for this role.
+              <div style="margin-top:12px;">
+                <button class="apply-btn apply-btn--dark apply-btn--sm" @click=${() => this._openInTab('cover-letter')}>Generate one →</button>
+              </div>
+            </div>` : nothing}
+
+          ${md ? html`
+            <div class="apply-cover-split">
+              <article class="apply-cover-body apply-prose" @click=${(e) => this._onCoverPhraseClick(e)}>
+                ${unsafeHTML(rendered)}
+              </article>
+              <aside class="apply-cover-rail">
+                <header class="apply-cover-rail__head">
+                  <h4>Annotations</h4>
+                  <span class="apply-cover-rail__count">${comments.length}</span>
+                </header>
+                ${comments.length === 0
+                  ? html`<p class="apply-cover-rail__empty">${this.coverHi.loading ? 'Working on it…' : 'No load-bearing phrases yet — regenerate the cover letter on the editor tab to refresh annotations.'}</p>`
+                  : html`<div class="apply-cover-rail__list">
+                      ${comments.map(c => html`
+                        <article class="apply-cover-comment ${c.kind === 'opportunity' ? 'is-op' : ''}"
+                                 data-rationale-id=${c.id}
+                                 @click=${() => this._scrollToPhrase(c.id)}>
+                          <header>
+                            <span class="apply-cover-comment__num">${c.kind === 'opportunity' ? '✦' : c.id}</span>
+                            <span class="apply-cover-comment__label">${c.label}</span>
+                          </header>
+                          <div class="apply-cover-comment__body">${unsafeHTML(renderMarkdown(c.text || ''))}</div>
+                          ${c.ask ? html`<p class="apply-cover-comment__ask">${c.ask}</p>` : nothing}
+                        </article>
+                      `)}
+                    </div>`}
+              </aside>
+            </div>
+          ` : nothing}
+        </div>
+      </section>
+    `;
+  }
+  _onCoverPhraseClick(ev) {
+    const m = ev.target?.closest?.('[data-rationale-id]');
+    if (!m) return;
+    this._scrollToPhrase(m.getAttribute('data-rationale-id'));
+  }
+  _scrollToPhrase(id) {
+    const root = this.renderRoot;
+    const card = root?.querySelector(`.apply-cover-comment[data-rationale-id="${id}"]`);
+    const mark = root?.querySelector(`.apply-cover-body [data-rationale-id="${id}"]`);
+    if (card) {
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      card.classList.add('is-flash');
+      setTimeout(() => card.classList.remove('is-flash'), 1200);
+    }
+    if (mark) mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
   _renderQuestions() {
     const qs = this.draft?.fields?.custom_questions || [];
