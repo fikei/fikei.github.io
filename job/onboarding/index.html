@@ -3,45 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="expires" content="0">
   <title>/job</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/job/css/base.css?v=2.2.0">
-  <link rel="stylesheet" href="/job/css/components.css?v=2.2.0">
+  <link rel="stylesheet" href="/job/css/base.css?v=2.3.0">
+  <link rel="stylesheet" href="/job/css/components.css?v=2.3.0">
   <style>
-    /* Full-screen onboarding takeover. No rail, no chrome — the onboarding
-       component is the entire page. The auth gate only renders when we
-       explicitly need it (set body[data-need-auth=true] from app.js). */
+    /* Full-screen onboarding takeover, pre-auth by default. The sign-in
+       modal mounts into #ctrl-auth-root but is only opened by the
+       <job-onboarding> component at finalize time. */
     html, body { height: 100%; }
     body { margin: 0; background: var(--bg); color: var(--fg); }
-    .gate { display: none; }
-    body[data-need-auth="true"] .gate { display: flex; }
-    body[data-need-auth="true"] .onboard-host { display: none; }
     .onboard-host {
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
     }
   </style>
-  <script src="/job/js/theme.js?v=2.2.0"></script>
+  <script src="/job/js/theme.js?v=2.3.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
 <body data-auth-state="loading">
 
-  <section id="signin-gate" class="gate">
-    <div class="gate__card">
-      <h1>/job</h1>
-      <p>Sign in to continue.</p>
-      <button class="btn btn--primary" id="signin-btn">Sign in</button>
-      <div id="ctrl-auth-root"></div>
-    </div>
-  </section>
+  <div id="ctrl-auth-root" style="display:none;"></div>
 
   <div class="onboard-host">
     <job-onboarding></job-onboarding>
   </div>
 
-  <script type="module" src="/job/js/app.js?v=2.2.0"></script>
+  <script type="module" src="/job/js/app.js?v=2.3.0"></script>
 </body>
 </html>
