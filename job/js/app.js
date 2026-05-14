@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.3.0";
-console.log(`[job] v${VERSION} - Pre-render auth check + prominent sign-in + MCP tokens`);
+const VERSION = "2.3.1";
+console.log(`[job] v${VERSION} - Fix blank page: transition out of "loading" when no session`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -295,13 +295,27 @@ setTimeout(() => { _completePendingGmailOAuth(); }, 250);
 
 // Belt-and-braces: even with the listener attached early, some CtrlAuth code
 // paths can settle a restored session without dispatching to a fresh listener.
-// Reconcile from the canonical source after a tick.
+// Reconcile from the canonical source after a tick. If there's no user at
+// all, transition body off "loading" so the sign-in gate becomes visible —
+// CtrlAuth only fires `ctrl:auth:signedout` on a transition, not on initial
+// load with no session, so without this fallback an unauthed visitor sees a
+// permanently blank page (CSS hides everything while data-auth-state="loading").
+setTimeout(() => {
+  const u = window.CtrlAuth?.getUser?.();
+  if (u?.email) {
+    if (document.body.dataset.authState !== 'in') applySignedInState(u.email);
+  } else if (document.body.dataset.authState === 'loading') {
+    document.body.dataset.authState = 'out';
+  }
+}, 0);
+// Second pass after CtrlAuth's async fast-restore (fetchProfile) has had a
+// chance to land — if a user has arrived by then, promote to "in".
 setTimeout(() => {
   const u = window.CtrlAuth?.getUser?.();
   if (u?.email && document.body.dataset.authState !== 'in') {
     applySignedInState(u.email);
   }
-}, 0);
+}, 800);
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('signin-btn');
