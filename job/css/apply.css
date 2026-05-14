@@ -380,6 +380,60 @@
   .apply-cover-body { border-right: 0; border-bottom: 1px solid var(--apply-border); }
 }
 
+/* ----- Custom questions (pager + brief + draft) ---------------------- */
+.apply-qpager {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px;
+  background: var(--apply-surface);
+  border: 1px solid var(--apply-border);
+  border-radius: var(--apply-radius-md);
+}
+.apply-qpager__dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.apply-qpager__dot {
+  appearance: none;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--apply-bg);
+  border: 1px solid var(--apply-border-strong);
+  color: var(--apply-ink-muted);
+  font: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.apply-qpager__dot:hover    { color: var(--apply-ink); border-color: var(--apply-ink); }
+.apply-qpager__dot.is-done  { background: var(--apply-accent-soft); color: var(--apply-accent-soft-fg); border-color: transparent; }
+.apply-qpager__dot.is-active{ outline: 2px solid var(--apply-ink); outline-offset: 2px; }
+
+.apply-qbrief {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.apply-qbrief__col {
+  background: var(--apply-surface);
+  border: 1px solid var(--apply-border);
+  border-radius: var(--apply-radius-md);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.apply-qbrief__eyebrow {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--apply-ink-muted); font-weight: 600;
+}
+.apply-qbrief__body { font-size: 13px; line-height: 1.5; color: var(--apply-ink); }
+.apply-qbrief__body p { margin: 0; }
+.apply-qbrief__stories { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.apply-qbrief__story-title { font-weight: 600; font-size: 13px; }
+.apply-qbrief__story-why   { font-size: 12px; color: var(--apply-ink-muted); }
+
+.apply-qdraft { min-height: 240px; }
+.apply-qdraft__preview { margin-top: 12px; font-size: 12px; color: var(--apply-ink-muted); }
+.apply-qdraft__preview summary { cursor: pointer; padding: 8px 0; user-select: none; }
+.apply-qdraft__preview[open] summary { color: var(--apply-ink); }
+
+@media (max-width: 900px) {
+  .apply-qbrief { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 720px) {
   .apply-body { padding: 28px 16px 140px; }
   .apply-bar  { padding: 12px 16px; }
