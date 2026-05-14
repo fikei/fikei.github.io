@@ -8,6 +8,20 @@
   <meta http-equiv="expires" content="0">
   <title>/job</title>
   <meta name="robots" content="noindex">
+  <script>
+    // Pre-render auth check: an authed user with a completed profile who
+    // somehow lands on /job/onboarding/ (deep link, refresh, stale cache)
+    // gets bounced to /job/jobs/recommended/ BEFORE the onboarding HTML
+    // renders. The completion flag is written by app.js applySignedInState
+    // when it confirms a completed profile, so the check is sync.
+    (function () {
+      try {
+        if (localStorage.getItem('job:profile:completed') === '1') {
+          location.replace('/job/jobs/recommended/');
+        }
+      } catch (e) { /* fall through to render */ }
+    })();
+  </script>
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
   <link rel="stylesheet" href="/job/css/base.css?v=2.3.0">
   <link rel="stylesheet" href="/job/css/components.css?v=2.3.0">
