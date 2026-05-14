@@ -3,6 +3,7 @@
 
 const FN_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/application-draft';
 const EXTRACT_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/extract-application-fields';
+const ANSWER_URL  = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/generate-question-answer';
 
 async function authHeader() {
   const supabase = window.CtrlAuth?.getSupabaseClient?.();
@@ -40,6 +41,24 @@ export async function extractApplicationFields(slug, url) {
     body: JSON.stringify({ slug, url }),
   });
   if (!res.ok) throw new Error(`extract-application-fields ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function generateQuestionAnswer(slug, q) {
+  const headers = await authHeader();
+  const res = await fetch(ANSWER_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slug,
+      question_id: q.id,
+      prompt: q.prompt,
+      type: q.type,
+      max_length: q.max_length || null,
+      options: q.options || null,
+    }),
+  });
+  if (!res.ok) throw new Error(`generate-question-answer ${res.status}: ${await res.text()}`);
   return res.json();
 }
 

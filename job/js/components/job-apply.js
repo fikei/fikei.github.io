@@ -9,15 +9,15 @@
 //   PR4 — Cover letter step (reuse annotation UI)
 //   PR5 — Custom questions step with AI annotated answers
 //   PR6 — Auto-submit handoff
-const VERSION = '0.4.0';
-console.log(`[job-apply] v${VERSION} - + cover letter w/ annotations (PR4)`);
+const VERSION = '0.5.0';
+console.log(`[job-apply] v${VERSION} - + custom-question annotated drafts (PR5)`);
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 
 const V = (new URL(import.meta.url)).search;
 const [
-  { readApplicationDraft, upsertApplicationDraft, extractApplicationFields, STEPS, visibleSteps },
+  { readApplicationDraft, upsertApplicationDraft, extractApplicationFields, generateQuestionAnswer, STEPS, visibleSteps },
   { readRoleAsset },
   { renderMarkdown },
   { diffMarkdown, applyAIHighlights },
@@ -55,6 +55,9 @@ export class JobApply extends LitElement {
     analysisMd: { state: true },   // role analysis JSON (raw markdown blob)
     coverState: { state: true },   // 'idle'|'loading'|'ready'|'error'
     coverHi:    { state: true },   // { highlights, opportunities, loading, error }
+    qIdx:       { state: true },   // active custom-question index
+    qGen:       { state: true },   // { [qid]: 'idle'|'running'|'error' }
+    qErr:       { state: true },   // { [qid]: error message }
   };
 
   constructor() {
@@ -78,6 +81,9 @@ export class JobApply extends LitElement {
     this.analysisMd = '';
     this.coverState = 'idle';
     this.coverHi = { highlights: [], opportunities: [], loading: false, error: '' };
+    this.qIdx = 0;
+    this.qGen = {};
+    this.qErr = {};
     this._answerTimers = {};
   }
 
@@ -625,27 +631,198 @@ export class JobApply extends LitElement {
     }
     if (mark) mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
+  // --- Custom questions ---------------------------------------------------
+  _qAnswer(qid) {
+    const a = this.draft?.answers?.[qid];
+    return (a && typeof a === 'object') ? a : null;
+  }
+  async _generateQuestion(q) {
+    this.qGen = { ...this.qGen, [q.id]: 'running' };
+    this.qErr = { ...this.qErr, [q.id]: '' };
+    try {
+      const result = await generateQuestionAnswer(this.slug, q);
+      // Preserve user edits if they already changed the draft.
+      const existing = this._qAnswer(q.id);
+      const draft = (existing?.user_edited_draft && existing?.user_edited_draft !== existing?.draft)
+        ? existing.user_edited_draft
+        : result.draft;
+      const answer = {
+        question_id: q.id,
+        intent: result.intent,
+        standout: result.standout,
+        stories: result.stories,
+        draft: result.draft,
+        user_edited_draft: draft,
+        highlights: result.highlights,
+        opportunities: result.opportunities,
+        generated_at: result.generated_at,
+      };
+      const answers = { ...(this.draft?.answers || {}), [q.id]: answer };
+      this.draft = { ...this.draft, answers };
+      await this._persist({ answers });
+      this.qGen = { ...this.qGen, [q.id]: 'idle' };
+    } catch (e) {
+      this.qGen = { ...this.qGen, [q.id]: 'error' };
+      this.qErr = { ...this.qErr, [q.id]: e.message || String(e) };
+    }
+  }
+  _setQuestionDraft(qid, value) {
+    const prev = this._qAnswer(qid) || {};
+    const next = { ...prev, question_id: qid, user_edited_draft: value };
+    const answers = { ...(this.draft?.answers || {}), [qid]: next };
+    this.draft = { ...this.draft, answers };
+    clearTimeout(this._answerTimers[qid]);
+    this._answerTimers[qid] = setTimeout(() => this._persist({ answers }), 500);
+  }
+
   _renderQuestions() {
     const qs = this.draft?.fields?.custom_questions || [];
-    return this._stepStub(
-      'Step 4',
-      `Custom questions${qs.length ? ` · ${qs.length}` : ''}`,
-      'For each question on the application, we generate a draft with sourced stories and annotated rationale.',
-      qs.length
-        ? html`
-            <ol class="apply-card" style="margin:0;padding:24px 24px 24px 44px;display:block;">
-              ${qs.map(q => html`
-                <li style="margin-bottom:14px;">
-                  <div style="font-weight:600;">${q.prompt}</div>
-                  <div style="font-size:12px;color:var(--apply-ink-subtle);">
-                    ${q.type}${q.required ? ' · required' : ''}${q.options?.length ? ` · ${q.options.length} options` : ''}
-                  </div>
-                </li>
-              `)}
-            </ol>
-            <p class="apply-card__hint" style="margin:0;">PR5 wraps each of these in its own page with AI intent + annotated draft answers.</p>`
-        : html`<div class="apply-card"><p class="apply-card__hint">No custom questions detected yet — extraction either hasn't run or this ATS has none.</p></div>`,
-    );
+    if (!qs.length) {
+      return this._stepStub(
+        'Step 4',
+        'Custom questions',
+        'For each question on the application, we generate a draft with sourced stories and annotated rationale.',
+        html`<div class="apply-card"><p class="apply-card__hint">No custom questions detected for this application.</p></div>`,
+      );
+    }
+    const idx = Math.max(0, Math.min(this.qIdx, qs.length - 1));
+    const q = qs[idx];
+    const ans = this._qAnswer(q.id);
+    const gen = this.qGen[q.id] || 'idle';
+    const err = this.qErr[q.id] || '';
+
+    const draftMd = ans?.user_edited_draft ?? ans?.draft ?? '';
+    const { html: marked, comments } = (draftMd && ans && (ans.highlights?.length || ans.opportunities?.length))
+      ? applyAIHighlights(draftMd, ans.highlights || [], ans.opportunities || [])
+      : { html: draftMd || '', comments: [] };
+    const renderedDraft = renderMarkdown(marked);
+    const charCount = (draftMd || '').length;
+    const overMax = q.max_length && charCount > q.max_length;
+    const completed = qs.filter(qq => {
+      const a = this._qAnswer(qq.id);
+      return !!(a?.user_edited_draft || a?.draft);
+    }).length;
+
+    return html`
+      <section class="apply-step" style="max-width:1080px;">
+        <div class="apply-step__head">
+          <div class="apply-step__eyebrow">Step 4 · Custom question ${idx + 1} of ${qs.length}</div>
+          <h1 class="apply-step__title">${q.prompt}</h1>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;">
+            <span class="apply-pill">${q.type}</span>
+            ${q.required ? html`<span class="apply-pill apply-pill--warn">required</span>` : nothing}
+            ${q.max_length ? html`<span class="apply-pill ${overMax ? 'apply-pill--warn' : ''}">${charCount}/${q.max_length} chars</span>` : nothing}
+            <span class="apply-pill apply-pill--info">${completed}/${qs.length} drafted</span>
+          </div>
+        </div>
+
+        <!-- Pager -->
+        <nav class="apply-qpager">
+          <button class="apply-btn apply-btn--ghost apply-btn--sm" ?disabled=${idx === 0} @click=${() => this.qIdx = idx - 1}>← Previous</button>
+          <div class="apply-qpager__dots">
+            ${qs.map((qq, i) => html`
+              <button class="apply-qpager__dot ${i === idx ? 'is-active' : ''} ${this._qAnswer(qq.id) ? 'is-done' : ''}"
+                      title=${qq.prompt}
+                      @click=${() => this.qIdx = i}>${i + 1}</button>
+            `)}
+          </div>
+          <button class="apply-btn apply-btn--ghost apply-btn--sm" ?disabled=${idx === qs.length - 1} @click=${() => this.qIdx = idx + 1}>Next →</button>
+        </nav>
+
+        <!-- Intent + standout + stories -->
+        <div class="apply-qbrief">
+          <div class="apply-qbrief__col">
+            <div class="apply-qbrief__eyebrow">What they're really asking</div>
+            <div class="apply-qbrief__body">
+              ${ans?.intent ? html`<p>${ans.intent}</p>`
+                : gen === 'running' ? html`<span class="apply-loading">Thinking…</span>`
+                : html`<p class="apply-card__hint">Generate a draft to see the intent breakdown.</p>`}
+            </div>
+          </div>
+          <div class="apply-qbrief__col">
+            <div class="apply-qbrief__eyebrow">A standout answer</div>
+            <div class="apply-qbrief__body">
+              ${ans?.standout ? html`<p>${ans.standout}</p>`
+                : gen === 'running' ? html`<span class="apply-loading">Thinking…</span>`
+                : html`<p class="apply-card__hint">—</p>`}
+            </div>
+          </div>
+          <div class="apply-qbrief__col">
+            <div class="apply-qbrief__eyebrow">Story matches</div>
+            <div class="apply-qbrief__body">
+              ${ans?.stories?.length ? html`
+                <ul class="apply-qbrief__stories">
+                  ${ans.stories.map(s => html`
+                    <li>
+                      <div class="apply-qbrief__story-title">${s.title}</div>
+                      <div class="apply-qbrief__story-why">${s.why}</div>
+                    </li>`)}
+                </ul>`
+                : gen === 'running' ? html`<span class="apply-loading">Sourcing…</span>`
+                : html`<p class="apply-card__hint">—</p>`}
+            </div>
+          </div>
+        </div>
+
+        <!-- Draft + annotations -->
+        <div class="apply-card apply-cover-card">
+          <div class="apply-card__head">
+            <h2 class="apply-card__title">Draft answer</h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${err ? html`<span class="apply-pill apply-pill--warn" title=${err}>Generation error</span>` : nothing}
+              <button class="apply-btn ${ans ? 'apply-btn--ghost' : 'apply-btn--primary'} apply-btn--sm"
+                      ?disabled=${gen === 'running'}
+                      @click=${() => this._generateQuestion(q)}>
+                ${gen === 'running' ? 'Generating…' : ans ? 'Regenerate' : 'Generate draft'}
+              </button>
+            </div>
+          </div>
+
+          ${!ans && gen !== 'running' ? html`
+            <div class="apply-empty">
+              Click <strong>Generate draft</strong> to source stories from your profile and write an annotated first pass.
+            </div>` : nothing}
+
+          ${ans ? html`
+            <div class="apply-cover-split">
+              <div style="display:flex;flex-direction:column;gap:0;">
+                <textarea class="apply-textarea apply-qdraft"
+                          .value=${ans?.user_edited_draft ?? ans?.draft ?? ''}
+                          @input=${(e) => this._setQuestionDraft(q.id, e.target.value)}></textarea>
+                <details class="apply-qdraft__preview">
+                  <summary>Preview with annotations</summary>
+                  <article class="apply-prose apply-cover-body" style="border-right:0;max-height:40vh;"
+                           @click=${(e) => this._onCoverPhraseClick(e)}>
+                    ${unsafeHTML(renderedDraft)}
+                  </article>
+                </details>
+              </div>
+              <aside class="apply-cover-rail">
+                <header class="apply-cover-rail__head">
+                  <h4>Annotations</h4>
+                  <span class="apply-cover-rail__count">${comments.length}</span>
+                </header>
+                ${comments.length === 0
+                  ? html`<p class="apply-cover-rail__empty">No annotations on this draft yet — try regenerating after edits.</p>`
+                  : html`<div class="apply-cover-rail__list">
+                      ${comments.map(c => html`
+                        <article class="apply-cover-comment ${c.kind === 'opportunity' ? 'is-op' : ''}"
+                                 data-rationale-id=${c.id}
+                                 @click=${() => this._scrollToPhrase(c.id)}>
+                          <header>
+                            <span class="apply-cover-comment__num">${c.kind === 'opportunity' ? '✦' : c.id}</span>
+                            <span class="apply-cover-comment__label">${c.label}</span>
+                          </header>
+                          <div class="apply-cover-comment__body">${unsafeHTML(renderMarkdown(c.text || ''))}</div>
+                          ${c.ask ? html`<p class="apply-cover-comment__ask">${c.ask}</p>` : nothing}
+                        </article>`)}
+                    </div>`}
+              </aside>
+            </div>
+          ` : nothing}
+        </div>
+      </section>
+    `;
   }
   _renderReview() {
     return this._stepStub(
