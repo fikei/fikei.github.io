@@ -1701,6 +1701,11 @@ export class JobRoleDetail extends LitElement {
   }
 
   render() {
+    // <job-apply> always renders so the launch button on every state
+    // path can reach it. Lit reuses the element across re-renders so
+    // its internal state survives state transitions.
+    const takeover = html`<job-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></job-apply>`;
+
     if (this.state === 'idle' || this.state === 'loading') {
       // If the user came from the pipeline we already have title/company/tags
       // in sessionStorage — paint that instantly with a shimmer body below.
@@ -1718,6 +1723,7 @@ export class JobRoleDetail extends LitElement {
           <section class="asset-panel">
             ${this._renderShimmerBody()}
           </section>
+          ${takeover}
         `;
       }
       return html`
@@ -1725,13 +1731,14 @@ export class JobRoleDetail extends LitElement {
         <div class="skeleton" style="width:60%;height:36px;margin-bottom:var(--space-2);display:block;"></div>
         <div class="skeleton" style="width:40%;height:18px;margin-bottom:var(--space-5);display:block;"></div>
         ${this._renderShimmerBody()}
+        ${takeover}
       `;
     }
     if (this.state === 'error') {
       return html`<div class="placeholder" style="border-color:var(--error);color:var(--error);">
         <h2>Couldn't load this role</h2>
         <p style="font-family:var(--font-mono);font-size:13px;">${this.error}</p>
-      </div>`;
+      </div>${takeover}`;
     }
     const r = this.role;
     return html`
@@ -1797,7 +1804,7 @@ export class JobRoleDetail extends LitElement {
         : this._renderAssetTab(this.activeTab)}
       </section>
 
-      <job-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></job-apply>
+      ${takeover}
     `;
   }
 

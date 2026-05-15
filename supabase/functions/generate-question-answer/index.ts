@@ -24,12 +24,37 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
-import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.30.1?target=deno&deno-std=0.168.0';
 
-const VERSION = '0.1.0';
-console.log(`[generate-question-answer] v${VERSION} - per-question annotated drafts`);
+const VERSION = '0.2.0';
+console.log(`[generate-question-answer] v${VERSION} - raw-fetch Anthropic (no SDK)`);
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const MODEL = 'claude-haiku-4-5';
+
+async function callClaude(system: string, user: string, maxTokens = 3000): Promise<string> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: user }],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`anthropic ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const data = await res.json() as { content: { type: string; text: string }[] };
+  return (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+}
 
 const SYS = `You write application answers for a senior product / strategy operator (the user) and return them in a strict JSON shape that downstream UI consumes.
 
@@ -93,9 +118,6 @@ serve(async (req) => {
     if (!/^[a-z0-9_-]+$/.test(slug)) return err('invalid slug', 400);
     if (!prompt) return err('prompt required', 400);
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) return err('ANTHROPIC_API_KEY unset', 500);
-
     const sql = db();
     const ctx = await loadContext(sql, user.id, slug);
     const analysis = parseAnalysis(ctx.analysisMd);
@@ -148,14 +170,7 @@ ${lengthLine}
 
 Produce the JSON object now. JSON only.`;
 
-    const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 3000,
-      system: SYS,
-      messages: [{ role: 'user', content: userMsg }],
-    });
-    const text = msg.content?.[0]?.type === 'text' ? msg.content[0].text : '';
+    const text = await callClaude(SYS, userMsg, 3000);
     const cleaned = text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(cleaned); }

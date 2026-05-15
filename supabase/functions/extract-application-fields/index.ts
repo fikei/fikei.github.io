@@ -18,10 +18,37 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUserDetailed, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
-import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.30.1?target=deno&deno-std=0.168.0';
 
-const VERSION = '0.1.0';
-console.log(`[extract-application-fields] v${VERSION} - greenhouse/lever/ashby + HTML fallback`);
+const VERSION = '0.2.0';
+console.log(`[extract-application-fields] v${VERSION} - raw-fetch Anthropic (no SDK)`);
+
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';
+
+async function callClaude(system: string, user: string, maxTokens = 4000): Promise<string> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: user }],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`anthropic ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const data = await res.json() as { content: { type: string; text: string }[] };
+  return (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+}
 
 // ----- ATS detection -----------------------------------------------------
 type Ats =
@@ -326,7 +353,6 @@ async function extractHtmlFallback(sourceUrl: string, html: string, ats: string,
     .replace(/\s+/g, ' ')
     .slice(0, 40_000);
 
-  const client = new Anthropic({ apiKey });
   const sys = `You analyze a job application form's raw HTML and return a strict JSON schema describing the fields the applicant must fill out.
 
 Output ONLY valid JSON matching this TypeScript type — no prose, no markdown fences:
@@ -348,13 +374,7 @@ Rules:
 
   const user = `Application URL: ${sourceUrl}\nATS guess: ${ats}\n\nHTML (truncated):\n${trimmed}`;
 
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4000,
-    system: sys,
-    messages: [{ role: 'user', content: user }],
-  });
-  const text = msg.content?.[0]?.type === 'text' ? msg.content[0].text : '';
+  const text = await callClaude(sys, user, 4000);
   let parsed: Partial<Schema> = {};
   try {
     const jsonStart = text.indexOf('{');
