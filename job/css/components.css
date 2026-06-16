@@ -2549,6 +2549,17 @@
 }
 .recs-health-banner__msg { font-size: var(--font-size-body-sm); }
 
+/* Infinite-scroll footer for the For You table. The sentinel is an
+   invisible trip-wire the IntersectionObserver watches; the loadmore row
+   shows a status line while the next page is fetched. */
+.recs-sentinel { height: 1px; }
+.recs-loadmore {
+  text-align: center;
+  padding: var(--space-3);
+  font-size: var(--font-size-caption);
+  min-height: 1.5em;
+}
+
 /* Columns specific to the recs table — sizes mirror existing pipeline
    col-* declarations (around line 2500). */
 .pipeline-table .col-location { width: 14%; min-width: 120px; color: var(--text-muted); }

@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.7.0';
-console.log(`[recommendations] v${VERSION} - sourceHealth in GET (surface dead sources / gmail reauth)`);
+const VERSION = '0.8.0';
+console.log(`[recommendations] v${VERSION} - paginated view=all (limit/offset/sort/dir + total) for infinite scroll`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -26,6 +26,43 @@ serve(async (req) => {
       const url = new URL(req.url);
       const view = url.searchParams.get('view') || 'default';
       const isAll = view === 'all';
+
+      // Pagination (view=all only). The default carousel view stays a
+      // single 60-row pull. limit caps at 200; the table loads pages via
+      // infinite scroll and reads `total` to show "X of Y".
+      const limit = isAll
+        ? Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10) || 100))
+        : 60;
+      const offset = isAll ? Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0) : 0;
+
+      // Server-side sort — whitelist of sortable columns mapped to the
+      // table's sortKeys. Anything else falls back to fit_score. dir is
+      // validated to asc/desc. Both are safe to splice via sql.unsafe
+      // because they only ever come from these fixed sets.
+      const SORT_COLS: Record<string, string> = {
+        fitScore:    'r.fit_score',
+        title:       'r.title',
+        location:    'r.location',
+        source:      'r.source',
+        suggestedAt: 'r.suggested_at',
+      };
+      const sortCol = SORT_COLS[url.searchParams.get('sort') || ''] || 'r.fit_score';
+      const sortDir = (url.searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+      // Shared filter — reused by the page query and the count so "X of Y"
+      // counts exactly what the list would show.
+      const whereClause = sql`
+        where r.dismissed_at is null
+          and r.added_to_pipeline_slug is null
+          and (${isAll} or r.fit_score is null or r.fit_score >= 50)
+          and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
+          and not exists (
+            select 1
+              from job.pipeline_roles p
+             where lower(p.company_name) = lower(r.company)
+               and lower(p.title) = lower(r.title)
+          )`;
+
       const rows = await sql`
         select r.id, r.source, r.source_label as "sourceLabel", r.url, r.company, r.title, r.location,
                r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
@@ -46,19 +83,16 @@ serve(async (req) => {
                     then 'https://mail.google.com/mail/u/0/#inbox/' || (r.payload->>'gmailApiId')
                     else null end as "sourceEmailUrl"
         from job.recommended_roles r
-        where r.dismissed_at is null
-          and r.added_to_pipeline_slug is null
-          and (${isAll} or r.fit_score is null or r.fit_score >= 50)
-          and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
-          and not exists (
-            select 1
-              from job.pipeline_roles p
-             where lower(p.company_name) = lower(r.company)
-               and lower(p.title) = lower(r.title)
-          )
-        order by r.fit_score desc nulls last, r.suggested_at desc
-        limit ${isAll ? 500 : 60};
+        ${whereClause}
+        order by ${sql.unsafe(sortCol)} ${sql.unsafe(sortDir)} nulls last, r.suggested_at desc
+        limit ${limit} offset ${offset};
       `;
+      // Total matching count — only needed for the paginated view.
+      let total = rows.length;
+      if (isAll) {
+        const [{ n }] = await sql`select count(*)::int as n from job.recommended_roles r ${whereClause}`;
+        total = n;
+      }
       // Source health — lets the UI tell "no new recs" apart from "a
       // source is dead". needs_reauth is true when the gmail-jobs source
       // errored with a token problem OR the scan-state row carries one.
@@ -85,7 +119,13 @@ serve(async (req) => {
       } catch (e) {
         console.warn(`[recommendations] sourceHealth failed: ${(e as Error).message}`);
       }
-      return jsonResp({ ok: true, version: VERSION, view, count: rows.length, recommendations: rows, sourceHealth });
+      return jsonResp({
+        ok: true, version: VERSION, view,
+        count: rows.length, total,
+        offset, limit,
+        hasMore: isAll && offset + rows.length < total,
+        recommendations: rows, sourceHealth,
+      });
     }
 
     if (req.method === 'POST') {
