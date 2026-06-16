@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.16.0';
-console.log(`[pull-recommendations] v${VERSION} - loud source failures (no silent no-token), durable run summaries in job.pull_runs`);
+const VERSION = '0.16.1';
+console.log(`[pull-recommendations] v${VERSION} - time-box gmail application-scan (40s) so a large pipeline can't 504 the whole run`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
