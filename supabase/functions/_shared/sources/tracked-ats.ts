@@ -18,15 +18,34 @@ interface TrackedCompany {
   sector: string | null;
 }
 
+// Strip HTML to plain text for the JD body. Greenhouse/Ashby return the
+// description as HTML; Lever offers a plain variant we prefer when present.
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ---------- Per-ATS adapters ----------
 // Each returns the same RecommendedRoleInput shape so the worker
 // downstream is ATS-agnostic.
 
 async function pullGreenhouse(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
-  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(c.ats_slug!)}/jobs`;
+  // ?content=true returns each posting's HTML body so we can store the JD —
+  // without it the role lands with no description and can never be graded.
+  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(c.ats_slug!)}/jobs?content=true`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`greenhouse ${c.ats_slug} → ${res.status}`);
-  const data = await res.json() as { jobs: Array<{ id: number; title: string; absolute_url: string; updated_at: string; location?: { name: string } }> };
+  const data = await res.json() as { jobs: Array<{ id: number; title: string; absolute_url: string; updated_at: string; location?: { name: string }; content?: string }> };
   return (data.jobs || []).map(j => ({
     source:      'tracked-ats',
     sourceId:    `gh:${c.ats_slug}:${j.id}`,
@@ -35,6 +54,7 @@ async function pullGreenhouse(c: TrackedCompany): Promise<RecommendedRoleInput[]
     company:     c.name,
     title:       j.title,
     location:    j.location?.name,
+    description: stripHtml(j.content || '') || undefined,
     postedAt:    j.updated_at,
     payload:     { ats: 'Greenhouse', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));
@@ -44,7 +64,7 @@ async function pullLever(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
   const url = `https://api.lever.co/v0/postings/${encodeURIComponent(c.ats_slug!)}?mode=json`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`lever ${c.ats_slug} → ${res.status}`);
-  const data = await res.json() as Array<{ id: string; text: string; hostedUrl: string; createdAt: number; categories?: { location?: string } }>;
+  const data = await res.json() as Array<{ id: string; text: string; hostedUrl: string; createdAt: number; categories?: { location?: string }; descriptionPlain?: string; description?: string }>;
   return (data || []).map(j => ({
     source:      'tracked-ats',
     sourceId:    `lever:${c.ats_slug}:${j.id}`,
@@ -53,6 +73,7 @@ async function pullLever(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
     company:     c.name,
     title:       j.text,
     location:    j.categories?.location,
+    description: (j.descriptionPlain || stripHtml(j.description || '')) || undefined,
     postedAt:    j.createdAt ? new Date(j.createdAt).toISOString() : undefined,
     payload:     { ats: 'Lever', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));
@@ -62,7 +83,7 @@ async function pullAshby(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
   const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(c.ats_slug!)}?includeCompensation=true`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`ashby ${c.ats_slug} → ${res.status}`);
-  const data = await res.json() as { jobs?: Array<{ id: string; title: string; jobUrl: string; publishedAt?: string; locationName?: string; compensationTierSummary?: string }> };
+  const data = await res.json() as { jobs?: Array<{ id: string; title: string; jobUrl: string; publishedAt?: string; locationName?: string; compensationTierSummary?: string; descriptionPlain?: string; descriptionHtml?: string }> };
   return (data.jobs || []).map(j => ({
     source:      'tracked-ats',
     sourceId:    `ashby:${c.ats_slug}:${j.id}`,
@@ -72,6 +93,7 @@ async function pullAshby(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
     title:       j.title,
     location:    j.locationName,
     salary:      j.compensationTierSummary,
+    description: (j.descriptionPlain || stripHtml(j.descriptionHtml || '')) || undefined,
     postedAt:    j.publishedAt,
     payload:     { ats: 'Ashby', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));

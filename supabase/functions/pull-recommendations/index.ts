@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.18.0';
-console.log(`[pull-recommendations] v${VERSION} - ingest Jack & Jill curated roles (prose multi-extract, comp, no per-role url)`);
+const VERSION = '0.19.0';
+console.log(`[pull-recommendations] v${VERSION} - tracked-ats captures JD; backfill JD into existing JD-less rows on re-pull`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -371,7 +371,12 @@ serve(async (req) => {
       });
       const droppedAsDup = pipeFiltered.length - filtered.length;
       if (droppedAsDup > 0) console.log(`[pull-recommendations] dropped ${droppedAsDup} duplicate(s) vs existing/within-batch`);
-      const inserted = await insertNew(sql, src, filtered);
+      const upserted = await insertNew(sql, src, filtered);
+      // Only genuinely-new rows go through inline enrich+grade. Rows that
+      // were conflict-updated to backfill a missing JD are drained by the
+      // grade-ungraded cron instead — inline-grading a whole tracked-ats
+      // re-pull (hundreds of backfills) would time out the run.
+      const inserted = upserted.filter(r => r.isNew);
       // Productize the v3 fit pipeline: every NEW recommendation gets a
       // JD fetch (if the plugin didn't provide one) + Haiku-graded role
       // match + a v3 rescore using the structured fields. Cron pulls feed
@@ -688,7 +693,7 @@ async function insertNew(
   sql: ReturnType<typeof db>,
   src: UserSourceRow,
   rows: ScoredRow[],
-): Promise<Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null }>> {
+): Promise<Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null; isNew: boolean }>> {
   if (!rows.length) return [];
   const values = rows.map(r => ({
     user_email:     src.user_email,
@@ -715,12 +720,23 @@ async function insertNew(
     canonical_url:       r.input.canonicalUrl       ?? null,
     company_id:          r.input.companyId          ?? null,
   }));
+  // on conflict: backfill the JD (and salary) into an existing row that
+  // landed without one — e.g. tracked-ats roles created before the adapter
+  // captured descriptions. Only when the existing row lacks a real JD and
+  // the new pull has one, so we never overwrite good data. `xmax = 0`
+  // distinguishes a fresh insert from a backfill-update so the caller only
+  // inline-grades genuinely new rows (the grade-ungraded cron drains the
+  // backfilled ones — re-grading hundreds at once would time out the run).
   const inserted = await sql`
     insert into job.recommended_roles ${sql(values)}
-    on conflict (source, source_id) do nothing
-    returning id, company, title, url, fit_score as "fitScore", fit_breakdown as "breakdown", payload
+    on conflict (source, source_id) do update
+       set description = excluded.description,
+           salary      = coalesce(job.recommended_roles.salary, excluded.salary)
+     where coalesce(length(job.recommended_roles.description), 0) < 200
+       and coalesce(length(excluded.description), 0) >= 200
+    returning id, company, title, url, fit_score as "fitScore", fit_breakdown as "breakdown", payload, (xmax = 0) as "isNew"
   `;
-  return inserted as unknown as Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null }>;
+  return inserted as unknown as Array<{ id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null; isNew: boolean }>;
 }
 
 // ---------- Bullet generation ----------
