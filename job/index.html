@@ -9,8 +9,8 @@
   <title>/job — ctrl.rodeo</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/job/css/base.css?v=2.3.2">
-  <script src="/job/js/theme.js?v=2.3.2"></script>
+  <link rel="stylesheet" href="/job/css/base.css?v=2.3.3">
+  <script src="/job/js/theme.js?v=2.3.3"></script>
 
 
 
@@ -30,6 +30,14 @@
     // no network call.
     (function () {
       try {
+        // Gmail OAuth callback lands on /job/?code=…&state=gmail:… — do NOT
+        // pre-route, or location.replace() strips the ?code before app.js can
+        // capture it and the token exchange never happens (every refresh then
+        // looks "disconnected"). Let app.js handle the callback on this page.
+        var _sp = new URLSearchParams(location.search);
+        if (_sp.get('code') && (_sp.get('state') || '').indexOf('gmail:') === 0) {
+          return;
+        }
         var raw = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
         var hasSession = false;
         if (raw) {
@@ -67,7 +75,7 @@
     </main>
   </div>
 
-  <script type="module" src="/job/js/app.js?v=2.3.2"></script>
+  <script type="module" src="/job/js/app.js?v=2.3.3"></script>
 
 
 
