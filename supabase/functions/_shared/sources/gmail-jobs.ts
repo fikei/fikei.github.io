@@ -101,16 +101,24 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     const sb = getServiceClient();
 
     // Resolve user_id for the email so we can look up the Google token.
+    // Missing user/token is NOT an empty inbox — it means the pipe is
+    // blind. Surface it loudly: stamp gmail_scan_state.last_error and
+    // throw so pull-recommendations writes user_sources.last_error and
+    // the run summary shows an error instead of a clean pulled:0.
     const userId = await userIdForEmail(sb, ctx.userEmail);
     if (!userId) {
-      console.warn(`[gmail-jobs] no user_id for ${ctx.userEmail}; not connected?`);
-      return [];
+      const err = `gmail not connected: no auth user for ${ctx.userEmail}`;
+      console.warn(`[gmail-jobs] ${err}`);
+      await markScanError(db(), ctx.userEmail, err);
+      throw new Error(err);
     }
 
     const tokenRes = await getAccessToken(sb, userId, [GMAIL_READONLY_SCOPE]);
     if (!tokenRes) {
-      console.warn(`[gmail-jobs] no gmail token for ${ctx.userEmail}; user has not consented`);
-      return [];
+      const err = 'gmail token missing or revoked — reauth required';
+      console.warn(`[gmail-jobs] ${err} (${ctx.userEmail})`);
+      await markScanError(db(), ctx.userEmail, err);
+      throw new Error(err);
     }
     const accessToken = tokenRes.accessToken;
 
@@ -165,7 +173,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     const ids = listRes.messageIds;
     let newWork = 0;
     let cappedRun = false;
-    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidates from gmail (history=${!!state.history_id}, cap=${maxMessages})`);
+    console.log(`[gmail-jobs] ${ctx.userEmail} → ${ids.length} candidates from gmail (history=${!!state.history_id}, cap=${maxMessages}${listRes.truncated ? ', TRUNCATED — window larger than list cap' : ''})`);
 
     const out: RecommendedRoleInput[] = [];
     // Track every Gmail API id that contributed at least one emit, so
@@ -403,8 +411,13 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       return out;
     }
 
+    // history.list returns the new cursor; the timestamp path (first run
+    // OR history-expired fallback) doesn't. Re-seed from the profile in
+    // BOTH cases — previously we only seeded when history_id was null,
+    // so an expired cursor stayed stale forever and every run re-ran the
+    // expensive timestamp query.
     let nextHistory: string | null = listRes.nextHistoryId;
-    if (!nextHistory && !state.history_id) {
+    if (!nextHistory) {
       nextHistory = await getProfileHistoryId(accessToken);
     }
     await sql`
