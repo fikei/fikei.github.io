@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.16.1';
-console.log(`[pull-recommendations] v${VERSION} - time-box gmail application-scan (40s) so a large pipeline can't 504 the whole run`);
+const VERSION = '0.16.2';
+console.log(`[pull-recommendations] v${VERSION} - targeted grading drain (?rescore=1&ungraded=1&limit=N) for batched candidate scoring`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -147,13 +147,25 @@ serve(async (req) => {
   // after weight/shape changes so existing rows pick up the new model.
   if (rescoreOnly) {
     const ctx = await loadFitContext(sql);
-    const useHaiku = new URL(req.url).searchParams.get('haiku') !== '0';
-    const force = new URL(req.url).searchParams.get('force') === '1';
+    const qp = new URL(req.url).searchParams;
+    const useHaiku = qp.get('haiku') !== '0';
+    const force = qp.get('force') === '1';
+    // Targeted grading drain: ?ungraded=1 restricts to rows that still
+    // need a Haiku grade (no candidate_score yet) and that actually have
+    // a JD to grade against — the only rows a grade pass can move. Pair
+    // with ?limit=N (newest first) so each call finishes well under the
+    // function wall-clock and the backlog drains across repeated calls
+    // instead of one giant pass that times out before reaching anything.
+    const ungradedOnly = qp.get('ungraded') === '1';
+    const limitN = Math.max(0, Math.min(100, parseInt(qp.get('limit') || '0', 10) || 0));
     const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null }>>`
       select id, title, company, description, sector, investors, salary, source,
              role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary, candidate_score
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
+         ${ungradedOnly ? sql`and candidate_score is null and length(coalesce(description,'')) > 200` : sql``}
+       order by suggested_at desc
+       ${limitN ? sql`limit ${limitN}` : sql``}
     `;
     let updated = 0, haikuCalls = 0;
     for (const r of rows) {
