@@ -96,6 +96,16 @@ Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). 
 
 ---
 
+## 8. Backfill cursor-lock on all-duplicate batches (gmail-jobs)
+
+Surfaced while backfilling the post-outage gap. In timestamp/backfill mode (re-listing a window), a message whose extracted role(s) all dedup at insert (on_conflict on source_id, or the new #4 cross-rec dedup) leaves **no trace** — no rec row carries its `gmailApiId`, no `gmail_skipped` row — so the pre-fetch dedup doesn't skip it next run, it's re-processed, `newWork` increments, the run caps, and the cursor never advances. Result: the window re-scans forever, `inserted=0`, cursor stuck. Item #4's dedup makes this MORE likely (more inserts collapse to dup).
+
+Note: this only bites in **re-list/backfill mode**. Normal `history.list` incremental operation returns each message once, so it's unaffected (and the cursor was restored to incremental mode after the gap backfill yielded ~0 net-new — recurring LinkedIn digests meant the gap's still-open roles were already re-captured).
+
+**Fix:** when a message is fully processed (Haiku'd) but produces no NEW insert, still record it so the pre-fetch dedup skips it next run — e.g. log a lightweight `gmail_skipped` row with reason `all_dup`, or don't count dedup-collision messages toward `newWork`. Required before any future windowed backfill.
+
+---
+
 ## Investigation finding: enrichment-resolution gap (the "VERIFYING" ceiling)
 
 Context for the above: ~half of Gmail/LinkedIn-sourced roles stay `enrichment_status='unresolved'` ("VERIFYING") and therefore **cannot be candidate-scored** (Haiku grading needs a JD).
@@ -128,6 +138,20 @@ Two distinct gaps:
 **Staffing-agency caveat:** Actalent is a staffing agency — the "company" is the recruiter, not the employer. These are fundamentally unresolvable and should be flagged/down-weighted, not retried.
 
 **Recommended build order:** (1) extract apply-URL from email body + stronger slug candidates → fixes gap A; (2) add Workday detector (covers the enterprise tail) → biggest chunk of gap B; (3) add Workable; (4) LinkedIn-JD fallback for the genuinely-unresolvable remainder so they can still be candidate-scored.
+
+### ATS-gap, EMPIRICALLY REVISED (2026-06-16, second pass)
+
+Direct testing against the live ATS APIs **disproved the "slug-guessing bug" hypothesis** — slug detection already works:
+- Ashby `ambiencehealthcare` → 200, `betterup` → 200 (with jobs), `baseten` → 200; Greenhouse `betterhelp`/`betterhelpcom` → 200. The `compact` candidate slug already generates these.
+- `job.hiring_companies` confirms Ambience/Baseten/Beam/Benepass/BetterUp are all **`resolution_status='resolved'`** with the correct provider+slug, `retry_count=0`. The COMPANY resolves fine.
+
+**The actual blocker is `resolveCanonicalForTitle` (title → posting match), not slug detection.** Example: our LinkedIn role "Senior Product Manager @ Ambience Healthcare", but Ambience's Ashby board only lists "**Product Lead, Platform**" / "Product Lead, Emergency Department" — no "Product Manager". `titleSimilar` (needs ≥2 shared tokens after `product manager`→`pm` normalization) can't bridge "Senior PM" ↔ "Product Lead", so it returns no match → role stays `unresolved` with a 7-day backoff. Re-running enrichment after resetting the backoff resolved **0/15** — same matcher, same miss.
+
+**Two confirmed gaps:**
+1. **Brittle title matching.** Token overlap can't handle synonymy (Product Lead / Head of Product / Director of Product ≈ PM-family) or qualifier drift ("Senior PM" vs "PM, Platform"). **Proposed fix (the right one): Haiku-assisted match** — `resolveCanonicalForTitle` already fetches the company's full board list; replace the `titleSimilar` find() with a Haiku call that picks the best-matching posting *or returns none* (conservative, to avoid attaching the WRONG JD → wrong candidate score). Cheaper/safer interim: expand the role-core synonym normalization (product lead/head of product/director of product → pm) and relax the shared-token rule for short titles **with a seniority-conflict guard**.
+2. **No enrichment-retry cron.** `enrich-job-source?action=backfill` exists but nothing calls it on a schedule — so once a role is `unresolved` with a future `enrichment_retry_at`, it's only retried if re-pulled (which only happens for NEW messages). Unresolved roles are effectively stuck. **Proposed:** a pg_cron (like `grade-ungraded-10min`) that POSTs `enrich-job-source {action:backfill, limit:N}` every ~10 min. (Auth: needs an `Authorization: Bearer` JWT, not just apikey.)
+
+**Net:** the durable-listing answer to "do these companies have a source of truth beyond LinkedIn?" is **yes** — they're on Ashby/Greenhouse/Lever/Workday and we resolve the company; the unlock is matching the *role title* to the right posting (Haiku) + an auto-retry cron, NOT slug detection.
 
 **Already shipped (2026-06-16):**
 - Batched grading drain: `pull-recommendations?rescore=1&ungraded=1&limit=N` (v0.16.2) — grades only ungraded rows that have a JD, newest first.
