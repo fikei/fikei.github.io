@@ -50,6 +50,11 @@ export interface ListResult {
   // the historyId we sent was too old (Gmail expires history after ~7
   // days). Caller catches this and re-runs with the timestamp fallback.
   historyExpired: boolean;
+  // True when the timestamp path hit its page cap and there were more
+  // results — the oldest messages in the window were silently dropped.
+  // Caller should log this so a long backfill is visible, not assumed
+  // complete.
+  truncated?: boolean;
 }
 
 // ---------- Listing ----------
@@ -89,8 +94,10 @@ export async function listSinceCursor(
   const q = [query || '', `after:${afterEpoch}`].filter(Boolean).join(' ');
   const ids: string[] = [];
   let pageToken: string | undefined;
+  let truncated = false;
   // Cap pages so a runaway query can't burn the whole tick.
-  for (let page = 0; page < 5; page++) {
+  const MAX_PAGES = 5;
+  for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${GMAIL_BASE}/messages`);
     url.searchParams.set('q', q);
     url.searchParams.set('maxResults', '100');
@@ -101,11 +108,15 @@ export async function listSinceCursor(
     for (const m of (data.messages || [])) ids.push(m.id);
     if (!data.nextPageToken) break;
     pageToken = data.nextPageToken;
+    if (page === MAX_PAGES - 1) truncated = true;   // more pages remained
+  }
+  if (truncated) {
+    console.warn(`[gmail] messages.list hit ${MAX_PAGES}-page cap for q="${q.slice(0, 120)}" — oldest results dropped this tick`);
   }
   // messages.list doesn't return historyId; caller should ask
   // getProfileHistoryId after a successful timestamp scan to seed the
   // history cursor for the next tick.
-  return { messageIds: dedupe(ids), nextHistoryId: null, historyExpired: false };
+  return { messageIds: dedupe(ids), nextHistoryId: null, historyExpired: false, truncated };
 }
 
 // Fetch the user's profile to seed a historyId on first scan. Cheaper

@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.6.0';
-console.log(`[recommendations] v${VERSION} - return enrichment fields (status, retry, canonical_url)`);
+const VERSION = '0.7.0';
+console.log(`[recommendations] v${VERSION} - sourceHealth in GET (surface dead sources / gmail reauth)`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -59,7 +59,33 @@ serve(async (req) => {
         order by r.fit_score desc nulls last, r.suggested_at desc
         limit ${isAll ? 500 : 60};
       `;
-      return jsonResp({ ok: true, version: VERSION, view, count: rows.length, recommendations: rows });
+      // Source health — lets the UI tell "no new recs" apart from "a
+      // source is dead". needs_reauth is true when the gmail-jobs source
+      // errored with a token problem OR the scan-state row carries one.
+      // Never fail the page over health bookkeeping.
+      let sourceHealth: unknown[] = [];
+      try {
+        sourceHealth = await sql`
+          select s.type,
+                 s.enabled,
+                 s.last_run_at   as "lastRunAt",
+                 s.last_run_count as "lastRunCount",
+                 s.last_error    as "lastError",
+                 case when s.type = 'gmail-jobs' and (
+                        coalesce(s.last_error, '')    ilike '%reauth%' or
+                        coalesce(s.last_error, '')    ilike '%not connected%' or
+                        coalesce(g.last_error, '')    ilike '%reauth%' or
+                        coalesce(g.last_error, '')    ilike '%not connected%'
+                      )
+                      then true else false end as "needsReauth"
+            from job.user_sources s
+            left join job.gmail_scan_state g on g.user_email = s.user_email
+           where s.user_email = ${email}
+           order by s.type`;
+      } catch (e) {
+        console.warn(`[recommendations] sourceHealth failed: ${(e as Error).message}`);
+      }
+      return jsonResp({ ok: true, version: VERSION, view, count: rows.length, recommendations: rows, sourceHealth });
     }
 
     if (req.method === 'POST') {

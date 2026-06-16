@@ -2533,6 +2533,22 @@
 .recs-page__refresh { align-self: center; }
 .recs-page__refresh-status { font-size: var(--font-size-caption); }
 
+/* Source-health banner — shown above the recs table when a source is
+   dead (e.g. Gmail token revoked). Distinguishes "no new recs" from
+   "we're blind". */
+.recs-health-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+.recs-health-banner__msg { font-size: var(--font-size-body-sm); }
+
 /* Columns specific to the recs table — sizes mirror existing pipeline
    col-* declarations (around line 2500). */
 .pipeline-table .col-location { width: 14%; min-width: 120px; color: var(--text-muted); }

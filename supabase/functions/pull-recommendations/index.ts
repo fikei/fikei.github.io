@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.15.0';
-console.log(`[pull-recommendations] v${VERSION} - surface all recs (no off-target/geo/min drops) + LinkedIn 'and more' digest detection`);
+const VERSION = '0.16.0';
+console.log(`[pull-recommendations] v${VERSION} - loud source failures (no silent no-token), durable run summaries in job.pull_runs`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -357,6 +357,20 @@ serve(async (req) => {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
     }
+  }
+
+  // Durable copy of the run summary — net._http_response gets pruned,
+  // job.pull_runs doesn't (30-day opportunistic retention). Never let
+  // bookkeeping fail the run.
+  try {
+    const hadError = summary.some(s => s.error != null);
+    const totalInserted = summary.reduce((n, s) => n + (typeof s.inserted === 'number' ? s.inserted : 0), 0);
+    await sql`
+      insert into job.pull_runs (version, sources, had_error, total_inserted)
+        values (${VERSION}, ${sql.json(summary)}, ${hadError}, ${totalInserted})`;
+    await sql`delete from job.pull_runs where ran_at < now() - interval '30 days'`;
+  } catch (e) {
+    console.warn(`[pull-recommendations] pull_runs bookkeeping failed: ${(e as Error).message}`);
   }
 
   return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary }, null, 2), {

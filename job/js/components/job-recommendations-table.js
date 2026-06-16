@@ -59,6 +59,8 @@ export class JobRecommendationsTable extends LitElement {
     selectedScoreWhich:  { state: true },
     _refreshing:         { state: true },
     _refreshFeedback:    { state: true },
+    _health:             { state: true },
+    _reconnecting:       { state: true },
   };
 
   constructor() {
@@ -73,6 +75,64 @@ export class JobRecommendationsTable extends LitElement {
     this.selectedRec = null;
     this._refreshing = false;
     this._refreshFeedback = '';
+    this._health = [];
+    this._reconnecting = false;
+  }
+
+  // ----- Source health banner ------------------------------------------
+  // The recommendations GET returns sourceHealth rows. Anything with
+  // needsReauth (dead Gmail token) or a lastError gets surfaced above the
+  // table — "no new recs" and "a source is blind" must look different.
+
+  _healthIssues() {
+    if (!Array.isArray(this._health)) return [];
+    return this._health.filter(s => s.enabled !== false && (s.needsReauth || s.lastError));
+  }
+
+  async _onReconnectGmail() {
+    if (this._reconnecting) return;
+    this._reconnecting = true;
+    try {
+      const supabase = window.CtrlAuth?.getSupabaseClient?.();
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      const r = await fetch('https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gmail-auth', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auth-url' }),
+      });
+      const j = await r.json();
+      if (j.url) { window.location.assign(j.url); return; }
+      console.warn('[recs-table] reconnect: no auth url', j);
+    } catch (e) {
+      console.warn('[recs-table] reconnect failed', e);
+    } finally {
+      this._reconnecting = false;
+    }
+  }
+
+  _renderHealthBanner() {
+    const issues = this._healthIssues();
+    if (!issues.length) return nothing;
+    const gmailDead = issues.find(s => s.type === 'gmail-jobs' && s.needsReauth);
+    return html`
+      <div class="recs-health-banner" role="alert">
+        ${gmailDead ? html`
+          <span class="recs-health-banner__msg">
+            <strong>Gmail is disconnected</strong> — new job-alert emails aren't being scanned.
+          </span>
+          <button class="btn btn--sm btn--accent" ?disabled=${this._reconnecting}
+                  @click=${() => this._onReconnectGmail()}>
+            ${this._reconnecting ? 'Opening…' : 'Reconnect Gmail'}
+          </button>
+        ` : html`
+          <span class="recs-health-banner__msg">
+            <strong>Source issue:</strong>
+            ${issues.map(s => `${s.type}: ${s.lastError || 'needs attention'}`).join(' · ')}
+          </span>
+        `}
+      </div>
+    `;
   }
 
   async _onRefresh() {
@@ -141,6 +201,7 @@ export class JobRecommendationsTable extends LitElement {
     try {
       const data = await fetchRecommendations({ view: 'all' });
       this.items = data.recommendations || [];
+      this._health = Array.isArray(data.sourceHealth) ? data.sourceHealth : [];
       this.state = 'loaded';
     } catch (e) {
       this.error = String(e);
@@ -354,6 +415,7 @@ export class JobRecommendationsTable extends LitElement {
         </button>
         ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
       </header>
+      ${this._renderHealthBanner()}
       ${rows.length === 0 ? html`
         <div class="placeholder">
           <h2>No recommendations yet</h2>
