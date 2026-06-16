@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.17.0';
-console.log(`[pull-recommendations] v${VERSION} - dedup new recs vs existing (normalized LinkedIn url / canonical / company|title)`);
+const VERSION = '0.18.0';
+console.log(`[pull-recommendations] v${VERSION} - ingest Jack & Jill curated roles (prose multi-extract, comp, no per-role url)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
