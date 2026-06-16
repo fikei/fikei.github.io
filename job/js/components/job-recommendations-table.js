@@ -75,8 +75,10 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'idle';
     this.items = [];
     this.error = '';
-    // Default: same order as the widget (fit score desc).
-    this.sortKey = 'fitScore';
+    // Default: server-side "best overall match" ranking — a blend of the
+    // Haiku candidate grade and heuristic fit (see recommendations fn).
+    // Clicking a column header switches to that explicit server sort.
+    this.sortKey = 'best';
     this.sortDir = 'desc';
     this.addingId = null;
     this.selectedRec = null;

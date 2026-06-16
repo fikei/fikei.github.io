@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.8.0';
-console.log(`[recommendations] v${VERSION} - paginated view=all (limit/offset/sort/dir + total) for infinite scroll`);
+const VERSION = '0.9.0';
+console.log(`[recommendations] v${VERSION} - default 'best' blended rank (candidate+fit) + candidate-score floor (drop graded <30)`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -36,9 +36,8 @@ serve(async (req) => {
       const offset = isAll ? Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0) : 0;
 
       // Server-side sort — whitelist of sortable columns mapped to the
-      // table's sortKeys. Anything else falls back to fit_score. dir is
-      // validated to asc/desc. Both are safe to splice via sql.unsafe
-      // because they only ever come from these fixed sets.
+      // table's sortKeys. dir is validated to asc/desc. Both are safe to
+      // splice via sql.unsafe because they only come from these fixed sets.
       const SORT_COLS: Record<string, string> = {
         fitScore:    'r.fit_score',
         title:       'r.title',
@@ -46,8 +45,26 @@ serve(async (req) => {
         source:      'r.source',
         suggestedAt: 'r.suggested_at',
       };
-      const sortCol = SORT_COLS[url.searchParams.get('sort') || ''] || 'r.fit_score';
+      // Follow-up #3 — default "best overall match" ranking. Blend the
+      // Haiku candidate grade (responsibilities match — what the user
+      // actually cares about) with heuristic fit, weighted toward
+      // candidate. Ungraded rows fall back to fit with a 0.8 discount so a
+      // graded-strong role outranks an un-graded high-fit one (the
+      // Nava-PBC "high fit, no/low candidate" leakage). When the user
+      // clicks a column header the explicit column wins.
+      const BLENDED_RANK =
+        `(case when r.candidate_score is not null
+               then (r.candidate_score * 0.6 + coalesce(r.fit_score,0) * 0.4)
+               else coalesce(r.fit_score,0) * 0.8 end)`;
+      const sortParam = url.searchParams.get('sort') || 'best';
+      const sortExpr = SORT_COLS[sortParam] || BLENDED_RANK;
       const sortDir = (url.searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+      // Follow-up #2 — candidate-score low-end threshold. Drop roles the
+      // Haiku grader scored as a clearly weak responsibilities match
+      // (< 30). Only applies to GRADED rows — un-graded (candidate_score
+      // null, still "verifying") rows are never dropped on this basis.
+      const CANDIDATE_FLOOR = 30;
 
       // Shared filter — reused by the page query and the count so "X of Y"
       // counts exactly what the list would show.
@@ -56,6 +73,7 @@ serve(async (req) => {
           and r.added_to_pipeline_slug is null
           and (${isAll} or r.fit_score is null or r.fit_score >= 50)
           and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
+          and not (r.candidate_score is not null and r.candidate_score < ${CANDIDATE_FLOOR})
           and not exists (
             select 1
               from job.pipeline_roles p
@@ -84,7 +102,7 @@ serve(async (req) => {
                     else null end as "sourceEmailUrl"
         from job.recommended_roles r
         ${whereClause}
-        order by ${sql.unsafe(sortCol)} ${sql.unsafe(sortDir)} nulls last, r.suggested_at desc
+        order by ${sql.unsafe(sortExpr)} ${sql.unsafe(sortDir)} nulls last, r.suggested_at desc
         limit ${limit} offset ${offset};
       `;
       // Total matching count — only needed for the paginated view.
