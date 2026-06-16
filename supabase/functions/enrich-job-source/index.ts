@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.3.1';
-console.log(`[enrich-job-source] v${VERSION} - always set future retry on unresolved (was looping on same rows)`);
+const VERSION = '0.4.0';
+console.log(`[enrich-job-source] v${VERSION} - Haiku semantic title→posting match when token overlap misses`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -401,39 +401,72 @@ async function resolveCanonicalForTitle(
 ): Promise<CanonicalHit | null> {
   if (!row.ats_provider || !row.ats_slug || !title) return null;
   const titleLc = title.toLowerCase();
+
+  // Pull the company's live postings into a uniform shape, then match. We
+  // try cheap token overlap first; if that misses we ask Haiku to pick the
+  // same role semantically (board titles drift — "Product Lead, Platform"
+  // for an alert that said "Senior Product Manager"). Haiku returns none
+  // when nothing is clearly the same role, so we never attach the wrong JD.
+  let postings: Array<{ title: string; url: string; jd: string }> = [];
   try {
     if (row.ats_provider === 'Greenhouse') {
       const r = await fetch(`https://boards-api.greenhouse.io/v1/boards/${row.ats_slug}/jobs?content=true`, {
-        headers: { 'User-Agent': UA },
-        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return null;
       const data = await r.json() as { jobs?: Array<{ title: string; absolute_url: string; content?: string }> };
-      const match = (data.jobs || []).find(j => titleSimilar(j.title.toLowerCase(), titleLc));
-      if (match) return { url: match.absolute_url, jd: stripHtml(match.content || '') };
-    }
-    if (row.ats_provider === 'Lever') {
+      postings = (data.jobs || []).map(j => ({ title: j.title, url: j.absolute_url, jd: stripHtml(j.content || '') }));
+    } else if (row.ats_provider === 'Lever') {
       const r = await fetch(`https://api.lever.co/v0/postings/${row.ats_slug}?mode=json`, {
-        headers: { 'User-Agent': UA },
-        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return null;
       const data = await r.json() as Array<{ text: string; hostedUrl: string; descriptionPlain?: string; description?: string }>;
-      const match = (data || []).find(j => titleSimilar(j.text.toLowerCase(), titleLc));
-      if (match) return { url: match.hostedUrl, jd: match.descriptionPlain || stripHtml(match.description || '') };
-    }
-    if (row.ats_provider === 'Ashby') {
+      postings = (data || []).map(j => ({ title: j.text, url: j.hostedUrl, jd: j.descriptionPlain || stripHtml(j.description || '') }));
+    } else if (row.ats_provider === 'Ashby') {
       const r = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${row.ats_slug}`, {
-        headers: { 'User-Agent': UA },
-        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return null;
       const data = await r.json() as { jobs?: Array<{ title: string; jobUrl: string; descriptionPlain?: string; descriptionHtml?: string }> };
-      const match = (data.jobs || []).find(j => titleSimilar(j.title.toLowerCase(), titleLc));
-      if (match) return { url: match.jobUrl, jd: match.descriptionPlain || stripHtml(match.descriptionHtml || '') };
+      postings = (data.jobs || []).map(j => ({ title: j.title, url: j.jobUrl, jd: j.descriptionPlain || stripHtml(j.descriptionHtml || '') }));
     }
-  } catch { /* fall through */ }
+  } catch { return null; }
+  if (!postings.length) return null;
+
+  // 1) Fast path — token overlap.
+  let idx = postings.findIndex(p => titleSimilar(p.title.toLowerCase(), titleLc));
+  // 2) Semantic fallback — Haiku picks the same role or none.
+  if (idx < 0) idx = await haikuPickPosting(title, postings.map(p => p.title));
+  if (idx >= 0 && idx < postings.length) return { url: postings[idx].url, jd: postings[idx].jd };
   return null;
+}
+
+// Haiku semantic title match. Given the alert title and the company's live
+// posting titles, return the 0-based index of the posting that is the SAME
+// role (function + seniority) or -1 if none clearly matches. Strict on
+// purpose — a wrong match attaches a wrong JD and corrupts candidate scoring.
+const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_MODEL = 'claude-haiku-4-5';
+async function haikuPickPosting(target: string, titles: string[]): Promise<number> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!key || !titles.length) return -1;
+  const list = titles.slice(0, 60).map((t, i) => `${i + 1}. ${t}`).join('\n');
+  const system = `You match a job title to a company's live job postings. The target title came from a job alert; the numbered list is that company's current openings. Titles may be phrased differently across systems (e.g. "Product Lead, Platform" vs "Senior Product Manager"). Return ONLY a number: the posting that is the SAME role — same function AND same seniority band — or 0 if none is clearly the same role. Be strict: a different function (e.g. engineering vs product), a different seniority (e.g. manager vs director/VP), or only vague overlap = 0.`;
+  const user = `Target role: "${target}"\n\nOpenings:\n${list}\n\nAnswer with just the number (0 = no clear same-role match).`;
+  try {
+    const r = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 8, system, messages: [{ role: 'user', content: user }] }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return -1;
+    const data = await r.json() as { content?: Array<{ text?: string }> };
+    const txt = (data.content || []).map(c => c.text || '').join('').trim();
+    const n = parseInt(txt.match(/\d+/)?.[0] || '0', 10);
+    return (n >= 1 && n <= Math.min(60, titles.length)) ? n - 1 : -1;
+  } catch { return -1; }
 }
 
 // Token-overlap similarity. Posting titles drift between aggregator
