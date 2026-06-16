@@ -66,6 +66,9 @@ const DEFAULT_ALLOW_SENDERS = [
   '@builtin.com',
   '@yc.startup.jobs',
   '@workatastartup.com',
+  // Jack & Jill — AI recruiter that emails curated, comp-included, pre-
+  // matched roles in conversational prose (multi-role digests). High signal.
+  '@jackandjill.ai',
 ];
 
 // Subjects/senders that are almost always multi-role digests. We log
@@ -90,6 +93,9 @@ interface ExtractedJob {
   title: string;
   location?: string;
   alertUrl?: string;
+  // Comp string when the email states it ("$232k-$320k base", "$200k+").
+  // Jack & Jill digests include this inline; most aggregators don't.
+  salary?: string;
   // Haiku confidence 0–1; below 0.5 we drop / log as no_company.
   confidence?: number;
 }
@@ -322,7 +328,10 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       let emitted = 0;
       for (let i = 0; i < jobs.length; i++) {
         const job = jobs[i];
-        if (!job.alertUrl || !job.company || !job.title) continue;
+        // Require company + title. alertUrl is optional (prose digests like
+        // Jack & Jill have no per-role link) — we synthesize a fallback
+        // below and let enrichment upgrade it to the canonical posting.
+        if (!job.company || !job.title) continue;
 
         // Phase 1.5 enrichment — resolve to canonical Greenhouse/Lever/
         // Ashby URL via the cache cascade. Best-effort: failures don't
@@ -340,7 +349,12 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           console.warn(`[gmail-jobs] enrich ${job.company} failed: ${(e as Error).message}`);
         }
 
-        const finalUrl = enriched.canonicalUrl || job.alertUrl;
+        // Synthesize a fallback link when the email gave no per-role URL
+        // (prose digests). A careers search is a sane landing spot until
+        // enrichment resolves the canonical ATS posting.
+        const fallbackUrl = job.alertUrl
+          || `https://www.google.com/search?q=${encodeURIComponent(`${job.company} ${job.title} careers`)}`;
+        const finalUrl = enriched.canonicalUrl || fallbackUrl;
         const finalLabel = enriched.resolved && enriched.atsProvider
           ? `Gmail · ${senderLabel(sender)} → ${enriched.atsProvider}`
           : `Gmail · ${senderLabel(sender)}`;
@@ -353,6 +367,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           company:     job.company,
           title:       job.title,
           location:    job.location,
+          salary:      job.salary,
           postedAt:    msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : undefined,
           description: enriched.jdText ? enriched.jdText.slice(0, 4000) : undefined,
           enrichmentStatus:  enriched.resolved ? 'resolved' : 'unresolved',
@@ -570,6 +585,11 @@ function looksLikeDigest(subject: string, sender: string): boolean {
   if (DIGEST_HINTS.some(h => subj.includes(h))) return true;
   // hnhiring / yc.startup.jobs digests are always multi-role
   if (/(hnhiring\.com|hackernewsletter\.com)/.test(sender)) return true;
+  // Jack & Jill emails are conversational prose packing several roles
+  // ("Lead PM at Hinge Health — $232k…", "PM at Abridge — …"), with no
+  // per-role job-view links the link-counter would catch. Force the
+  // multi-extractor so we don't grab just the first role.
+  if (/@jackandjill\.ai/i.test(sender)) return true;
   return false;
 }
 
@@ -675,17 +695,20 @@ const EXTRACT_MULTI_SYSTEM = `You extract ALL distinct job postings from a singl
 Return STRICT JSON: an array of role objects, nothing else.
 
 [
-  { "company": "...", "title": "...", "location": "...", "alertUrl": "..." },
+  { "company": "...", "title": "...", "location": "...", "salary": "...", "alertUrl": "..." },
   ...
 ]
 
 Rules:
 - One object per distinct role. Same company + same title = one role.
-- "alertUrl" is the link to that specific role's posting/apply page. Required.
-- "company" is the hiring company, never the email sender. e.g. "Anthropic" not "LinkedIn".
-- "location" is the role's location string ("San Francisco, CA", "Remote, US"). Empty string if absent.
-- If you cannot identify a clear company AND title AND alertUrl for a role, OMIT it. Empty array is better than guesses.
-- Cap at 30 roles per message. Skip "you might also like" filler if it's not part of the main digest content.`;
+- Some digests are conversational prose, e.g. "Lead PM, Agentic AI at Hinge Health - $232k-$320k base ... SF hybrid". Extract those too — the role is "<title> at <company>".
+- "company" is the hiring company, never the email sender. e.g. "Hinge Health" not "Jack & Jill", "Anthropic" not "LinkedIn".
+- "title" and "company" are REQUIRED. If you can't identify BOTH for a role, omit it.
+- "location" is the role's location string ("San Francisco, CA", "Remote, US", "SF hybrid"). Empty string if absent.
+- "salary" is the comp string if stated ("$232k-$320k base", "$200k+", "$140k-$175k base + equity"). Empty string if absent.
+- "alertUrl" is the link to that specific role's posting/apply page if present; empty string if the email only describes the role in prose with no usable per-role link.
+- Skip vague mentions with no concrete role (e.g. "~20 more roles in your dashboard", "and several others"). Only extract roles with a clear title AND company.
+- Cap at 30 roles per message.`;
 
 async function extractJobsMulti(args: { subject: string; sender: string; body: string }): Promise<ExtractedJob[]> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -723,16 +746,20 @@ async function extractJobsMulti(args: { subject: string; sender: string; body: s
   const parsed = extractFirstJsonArray(text);
   if (!parsed) throw new Error(`bad JSON array from haiku: ${text.slice(0, 120)}`);
   const out: ExtractedJob[] = [];
-  for (const r of parsed as Array<{ company?: string; title?: string; location?: string; alertUrl?: string }>) {
+  for (const r of parsed as Array<{ company?: string; title?: string; location?: string; salary?: string; alertUrl?: string }>) {
     const company  = (r.company || '').trim();
     const title    = (r.title || '').trim();
     const alertUrl = (r.alertUrl || '').trim();
-    if (!company || !title || !alertUrl) continue;
+    // Require company + title. alertUrl is optional now — prose digests
+    // (Jack & Jill) describe roles without a per-role link; the emit step
+    // synthesizes a fallback and enrichment resolves the canonical posting.
+    if (!company || !title) continue;
     out.push({
       company,
       title,
       location: (r.location || '').trim() || undefined,
-      alertUrl,
+      salary:   (r.salary || '').trim() || undefined,
+      alertUrl: alertUrl || undefined,
       confidence: 0.85,
     });
     if (out.length >= 30) break;
