@@ -200,27 +200,34 @@ export class JobRecommendationsTable extends LitElement {
       this.requestUpdate();
     };
     document.addEventListener('job:gmail:connected', this._onGmailConnected);
+    // Infinite scroll: when the viewport nears the bottom of the document,
+    // pull the next page. A plain scroll listener is more reliable across
+    // layouts than an IntersectionObserver on a 1px sentinel.
+    this._onScroll = () => {
+      if (!this._hasMore || this._loadingMore) return;
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 900;
+      if (nearBottom) this._loadMore();
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    window.addEventListener('resize', this._onScroll, { passive: true });
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('job:gmail:connected', this._onGmailConnected);
-    if (this._io) { this._io.disconnect(); this._io = null; }
+    window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('resize', this._onScroll);
     super.disconnectedCallback();
   }
 
-  // Observe the bottom sentinel — when it scrolls into view, pull the next
-  // page. rootMargin pre-fetches ~600px early so scrolling stays smooth.
+  // After each render, if the page isn't tall enough to scroll yet there
+  // are more rows, pull another page so a short first page can't strand
+  // the rest (no scroll event would ever fire).
   updated() {
-    const sentinel = this.querySelector('.recs-sentinel');
-    if (!sentinel) return;
-    if (!this._io) {
-      this._io = new IntersectionObserver((entries) => {
-        if (entries.some(e => e.isIntersecting)) this._loadMore();
-      }, { rootMargin: '600px 0px' });
+    if (this._hasMore && !this._loadingMore &&
+        document.body.scrollHeight <= window.innerHeight + 100) {
+      this._loadMore();
     }
-    this._io.disconnect();
-    this._io.observe(sentinel);
   }
 
   async _maybeLoad() {
