@@ -187,10 +187,19 @@ export class JobRecommendationsTable extends LitElement {
     this._onAuth = () => this._maybeLoad();
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
     document.addEventListener('job:auth:ready', this._onAuth);
+    // Gmail just reconnected (app.js fires this after a successful token
+    // exchange) → hide the disconnected banner optimistically without
+    // waiting for the next scan to clear last_error server-side.
+    this._onGmailConnected = () => {
+      this._health = (this._health || []).filter(s => s.type !== 'gmail-jobs');
+      this.requestUpdate();
+    };
+    document.addEventListener('job:gmail:connected', this._onGmailConnected);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
+    document.removeEventListener('job:gmail:connected', this._onGmailConnected);
     super.disconnectedCallback();
   }
 

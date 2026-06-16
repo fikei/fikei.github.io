@@ -13,8 +13,8 @@
 // don't need a new client registration. The redirect URI for gmail
 // connect points at /job/ — calendar-api keeps /calendar/.
 
-const VERSION = '0.2.0';
-console.log(`[gmail-auth] v${VERSION} - oauth requests gmail.modify (superset of readonly) so pipeline can apply Ladder label`);
+const VERSION = '0.3.0';
+console.log(`[gmail-auth] v${VERSION} - clear stale last_error on connect so reconnect banner clears immediately`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -27,6 +27,7 @@ import {
   markRevoked,
   upsertToken,
 } from '../_shared/google-tokens.ts';
+import { db } from '../_shared/job-db.ts';
 
 // gmail.modify is a strict superset of gmail.readonly. We request both
 // so the scope_set on the token row covers callers that look up by
@@ -179,6 +180,20 @@ serve(async (req) => {
         google_email: profile.email ?? null,
         granted_for: 'gmail-jobs',
       });
+
+      // Clear the stale reauth error so the "Gmail disconnected" banner
+      // (driven by *_sources.last_error / gmail_scan_state.last_error)
+      // clears immediately on reconnect, instead of lingering until the
+      // next successful scan. Best-effort — never fail the connect over it.
+      try {
+        const sql = db();
+        await sql`update job.user_sources set last_error = null
+                   where user_email = ${user.email} and type = 'gmail-jobs'`;
+        await sql`update job.gmail_scan_state set last_error = null
+                   where user_email = ${user.email}`;
+      } catch (e) {
+        console.warn('[gmail-auth] clear last_error failed:', (e as Error).message);
+      }
 
       return json({ connected: true, email: profile.email ?? null });
     }
