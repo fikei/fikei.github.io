@@ -37,6 +37,25 @@ Status: open investigation items. Logged 2026-06-16 during the Gmail→recs pipe
 
 ---
 
+## 4. Duplicate entries — make a best-effort dedup to keep the list clean
+
+**Observation.** The recs list has visible duplicates (e.g. OpenAI PM roles, plus many others). A scan of active recs (`group by lower(company), lower(title) having count(*) > 1`) shows three distinct duplication modes:
+
+1. **Same LinkedIn job, different tracking params (most common).** The same posting appears 3-5× because the dedup keys on the full `url`, but LinkedIn alert URLs carry per-email `?trackingId=…&refId=…&eid=…` query strings that differ every send. Examples: Talently SPM (`/jobs/view/4405461200`) ×4, Curana SPM (`/jobs/view/4378986845`) ×3, BioRender Product Lead (`/jobs/view/4377259538`) ×3 — **same `/jobs/view/<id>`**, different query string.
+   → **Fix:** normalize LinkedIn URLs to canonical `linkedin.com/jobs/view/<id>` (strip query) before any dedup/insert.
+
+2. **Cross-source duplicates.** The same role arrives from multiple sources and all land, because insert-time dedup only checks `pipeline_roles`, not existing `recommended_roles`. Examples: Heidi "PM, Integrations" from `gmail-jobs` + `tracked-ats`; Collectly SPM from `gmail-jobs` + `theirstack`.
+   → **Fix:** dedup new inserts against existing active `recommended_roles` on a normalized key (canonical_url when resolved, else `lower(company)|lower(title)`), merging source labels rather than inserting a second row.
+
+3. **Same canonical posting via different resolved URLs.** Once enrichment resolves `canonical_url`, two rows that resolve to the same ATS posting should collapse into one.
+   → **Fix:** dedup/merge on `canonical_url` after enrichment resolves.
+
+**Note:** not every same-company/same-title cluster is a dupe — Heidi legitimately has many distinct openings. Key dedup on normalized URL / canonical posting id, with `(company,title)` as a secondary signal, not the sole key. Goal is best-effort cleanliness, not aggressive collapsing that hides real distinct roles.
+
+**Where:** `supabase/functions/pull-recommendations/index.ts` (insert/dedup path — currently only the `pipeline_roles` NOT EXISTS check), `gmail-jobs.ts` (`hasMultipleJobLinks` already normalizes `/jobs/view/<id>` — reuse that normalization for dedup keys), `recommended_roles` (consider a normalized-url unique index or a merge-on-insert).
+
+---
+
 ## Investigation finding: enrichment-resolution gap (the "VERIFYING" ceiling)
 
 Context for the above: ~half of Gmail/LinkedIn-sourced roles stay `enrichment_status='unresolved'` ("VERIFYING") and therefore **cannot be candidate-scored** (Haiku grading needs a JD).
