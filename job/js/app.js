@@ -274,7 +274,32 @@ window.CtrlAuth.init({
   }
 })();
 
+// Single-flight guard so the event listener + timer + poller don't fire
+// three concurrent exchanges of the same single-use code.
+let _gmailConnectInFlight = false;
+
+// Wait for a Supabase session token, polling for up to ~timeoutMs. The
+// OAuth redirect lands before CtrlAuth has necessarily restored the
+// session, and ctrl:auth:signedin can fire before our listener attaches —
+// so a one-shot check raced and silently dropped the code. Poll instead.
+async function _waitForSessionToken(timeoutMs = 12000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const supabase = window.CtrlAuth?.getSupabaseClient?.();
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data?.session?.access_token;
+        if (token) return token;
+      } catch { /* keep polling */ }
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return null;
+}
+
 async function _completePendingGmailOAuth() {
+  if (_gmailConnectInFlight) return;
   let pending;
   try { pending = JSON.parse(sessionStorage.getItem('job:pendingGmailOAuth') || 'null'); } catch { return; }
   if (!pending?.code) return;
@@ -283,12 +308,15 @@ async function _completePendingGmailOAuth() {
     sessionStorage.removeItem('job:pendingGmailOAuth');
     return;
   }
-  const supabase = window.CtrlAuth?.getSupabaseClient?.();
-  if (!supabase) return;
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (!token) return;
+  _gmailConnectInFlight = true;
   try {
+    const token = await _waitForSessionToken();
+    if (!token) {
+      // Leave pending in place — a later signedin event or page load
+      // will retry while the code is still within its 10-min window.
+      console.warn('[job] gmail connect: no session yet, will retry');
+      return;
+    }
     const r = await fetch('https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/gmail-auth', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -298,11 +326,19 @@ async function _completePendingGmailOAuth() {
     if (r.ok) {
       console.log('[job] Gmail connected — token stored with gmail.modify scope');
       sessionStorage.removeItem('job:pendingGmailOAuth');
+      document.dispatchEvent(new CustomEvent('job:gmail:connected'));
     } else {
-      console.warn('[job] gmail-auth connect failed:', await r.text());
+      // The code is single-use; a failed exchange can't be retried with
+      // the same code. Drop it so we don't loop, and surface the error.
+      const body = await r.text();
+      console.warn('[job] gmail-auth connect failed:', r.status, body);
+      sessionStorage.removeItem('job:pendingGmailOAuth');
+      document.dispatchEvent(new CustomEvent('job:gmail:connect-failed', { detail: { status: r.status, body } }));
     }
   } catch (e) {
     console.warn('[job] gmail-auth connect error:', e.message);
+  } finally {
+    _gmailConnectInFlight = false;
   }
 }
 document.addEventListener('ctrl:auth:signedin', () => { _completePendingGmailOAuth(); });
