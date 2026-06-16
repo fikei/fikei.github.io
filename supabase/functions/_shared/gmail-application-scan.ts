@@ -81,11 +81,22 @@ export async function scanApplicationResponses(args: {
   windowDays?: number;
   // backfill optional role-slug filter (process one role at a time)
   roleSlug?: string;
+  // wall-clock budget in ms (default 40s) — caps the per-role Gmail
+  // searches + message processing so this side-effect can't time out the
+  // host run.
+  budgetMs?: number;
 }): Promise<ApplicationScanResult> {
   const sql = db();
   const mode = args.mode ?? 'live';
   const maxMessages = Math.max(1, Math.min(50, args.maxMessages ?? (mode === 'backfill' ? 5 : 30)));
   const windowDays = Math.max(1, args.windowDays ?? (mode === 'backfill' ? 30 : 7));
+  // Wall-clock budget. This scan runs inside gmail-jobs.pull() BEFORE the
+  // recs cursor write + insert, so if it overruns the 150s function limit
+  // the whole run 504s and NOTHING commits — no recs, no cursor advance.
+  // With a large pipeline (50+ roles × sequential Gmail searches) that was
+  // exactly the failure. Time-box it: when the budget is spent, stop and
+  // let the rest of the run finish. Side-effect, not critical path.
+  const deadline = Date.now() + Math.max(5_000, args.budgetMs ?? 40_000);
 
   const out: ApplicationScanResult = {
     classified: 0, inserted: 0, autoAdvanced: 0, needsReview: 0, skippedNoMatch: 0,
@@ -183,6 +194,10 @@ export async function scanApplicationResponses(args: {
   // first, then by most-recent engagement. If the pipeline ever grows
   // past this, the tail is silently skipped — bump or paginate.
   for (const role of roles.slice(0, 60)) {
+    if (Date.now() > deadline) {
+      console.warn(`[gmail-app-scan] name-search budget spent; scanned subset of ${roles.length} roles`);
+      break;
+    }
     // Build a candidate-name set per role. Start with company_name when
     // it looks real; add the title-derived company token when it
     // doesn't (rows added via /add-role sometimes land as
@@ -207,6 +222,10 @@ export async function scanApplicationResponses(args: {
   let processed = 0;
   for (const id of ids) {
     if (processed >= maxMessages) break;
+    if (Date.now() > deadline) {
+      console.warn(`[gmail-app-scan] processing budget spent after ${processed} msgs`);
+      break;
+    }
 
     let msg: GmailMessage;
     try {
