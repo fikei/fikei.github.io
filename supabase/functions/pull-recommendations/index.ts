@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.16.2';
-console.log(`[pull-recommendations] v${VERSION} - targeted grading drain (?rescore=1&ungraded=1&limit=N) for batched candidate scoring`);
+const VERSION = '0.16.3';
+console.log(`[pull-recommendations] v${VERSION} - gmail-jobs pre-fetch dedup on raw id (cheap re-list/backfill, no re-download)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

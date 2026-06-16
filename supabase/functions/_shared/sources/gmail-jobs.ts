@@ -180,8 +180,32 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     // we can stamp the Ladder label at end-of-pull in one batch call.
     const labelTargets: string[] = [];
 
+    // Pre-fetch dedup set — every Gmail API id we've already processed
+    // (emitted a rec for, or logged as skipped), loaded in TWO queries up
+    // front. The per-message dedup below keys on the Message-ID header,
+    // which needs a full getMessage first — so re-list/backfill runs over
+    // a window of mostly-processed mail used to re-download the whole
+    // window and time out before reaching new messages. Skipping on the
+    // raw id BEFORE getMessage makes those runs cheap and lets a backlog
+    // actually drain across successive ticks.
+    const processedIds = new Set<string>();
+    {
+      const recRows = await sql<{ gid: string | null }[]>`
+        select distinct payload->>'gmailApiId' as gid
+          from job.recommended_roles
+         where source = 'gmail-jobs' and payload ? 'gmailApiId'`;
+      for (const r of recRows) if (r.gid) processedIds.add(r.gid);
+      const skipRows = await sql<{ gmail_id: string | null }[]>`
+        select distinct gmail_id from job.gmail_skipped
+         where user_email = ${ctx.userEmail} and gmail_id is not null`;
+      for (const r of skipRows) if (r.gmail_id) processedIds.add(r.gmail_id);
+    }
+
     for (const id of ids) {
       if (newWork >= maxMessages) { cappedRun = true; break; }
+      // Cheap skip: already processed this Gmail message in a prior run.
+      // Avoids the getMessage body download + Haiku on re-list/backfill.
+      if (processedIds.has(id)) continue;
       let msg: GmailMessage;
       try {
         msg = await getMessage(accessToken, id, 'full');
