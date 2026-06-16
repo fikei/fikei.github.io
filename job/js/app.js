@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.3.3";
-console.log(`[job] v${VERSION} - Gmail OAuth callback no longer stripped by /job/ pre-route; robust token exchange`);
+const VERSION = "2.3.4";
+console.log(`[job] v${VERSION} - For You infinite scroll (server-side paginate + sort), no 500-row cap`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

@@ -25,6 +25,10 @@ const COLUMNS = [
   { id: 'menu',     label: '',         sortKey: null },
 ];
 
+// Page size for the infinite-scroll fetch. Server caps at 200; 100 keeps
+// each round-trip light while filling a tall viewport in one or two pages.
+const PAGE_SIZE = 100;
+
 function relTime(iso) {
   if (!iso) return '';
   const ms = Date.now() - Date.parse(iso);
@@ -61,6 +65,9 @@ export class JobRecommendationsTable extends LitElement {
     _refreshFeedback:    { state: true },
     _health:             { state: true },
     _reconnecting:       { state: true },
+    _total:              { state: true },
+    _loadingMore:        { state: true },
+    _hasMore:            { state: true },
   };
 
   constructor() {
@@ -77,6 +84,10 @@ export class JobRecommendationsTable extends LitElement {
     this._refreshFeedback = '';
     this._health = [];
     this._reconnecting = false;
+    this._total = 0;
+    this._offset = 0;
+    this._loadingMore = false;
+    this._hasMore = false;
   }
 
   // ----- Source health banner ------------------------------------------
@@ -145,13 +156,7 @@ export class JobRecommendationsTable extends LitElement {
         ? 'Recently refreshed — try again in a few minutes.'
         : 'Scanning Gmail for new roles…';
       setTimeout(async () => {
-        try {
-          const data = await fetchRecommendations({ view: 'all' });
-          // /functions/v1/recommendations returns { recommendations: [...] }
-          // — same shape _maybeLoad uses. Wrong field name made
-          // this.items become an object and _sorted() crash next render.
-          this.items = Array.isArray(data?.recommendations) ? data.recommendations : [];
-        } catch { /* keep stale */ }
+        await this._fetchPage({ reset: true });
         this.requestUpdate();
       }, 8000);
     } finally {
@@ -200,22 +205,63 @@ export class JobRecommendationsTable extends LitElement {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('job:gmail:connected', this._onGmailConnected);
+    if (this._io) { this._io.disconnect(); this._io = null; }
     super.disconnectedCallback();
+  }
+
+  // Observe the bottom sentinel — when it scrolls into view, pull the next
+  // page. rootMargin pre-fetches ~600px early so scrolling stays smooth.
+  updated() {
+    const sentinel = this.querySelector('.recs-sentinel');
+    if (!sentinel) return;
+    if (!this._io) {
+      this._io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) this._loadMore();
+      }, { rootMargin: '600px 0px' });
+    }
+    this._io.disconnect();
+    this._io.observe(sentinel);
   }
 
   async _maybeLoad() {
     if (document.body.dataset.authState !== 'in') return;
     if (this.state === 'loading' || this.state === 'loaded') return;
     this.state = 'loading';
+    await this._fetchPage({ reset: true });
+    if (this.state === 'loading') this.state = 'loaded';
+  }
+
+  // Fetch one page from the server (server-side sorted). reset=true starts
+  // a fresh list at offset 0 (initial load, sort change, refresh); otherwise
+  // appends the next page for infinite scroll.
+  async _fetchPage({ reset = false } = {}) {
+    if (reset) { this._offset = 0; this._hasMore = false; }
     try {
-      const data = await fetchRecommendations({ view: 'all' });
-      this.items = data.recommendations || [];
-      this._health = Array.isArray(data.sourceHealth) ? data.sourceHealth : [];
-      this.state = 'loaded';
+      const data = await fetchRecommendations({
+        view:   'all',
+        limit:  PAGE_SIZE,
+        offset: this._offset,
+        sort:   this.sortKey,
+        dir:    this.sortDir,
+      });
+      const page = Array.isArray(data?.recommendations) ? data.recommendations : [];
+      this.items   = reset ? page : [...this.items, ...page];
+      this._offset = this.items.length;
+      this._total  = Number.isFinite(data?.total) ? data.total : this.items.length;
+      this._hasMore = !!data?.hasMore;
+      if (reset && Array.isArray(data?.sourceHealth)) this._health = data.sourceHealth;
     } catch (e) {
-      this.error = String(e);
-      this.state = 'error';
+      if (reset) { this.error = String(e); this.state = 'error'; }
+      // append failures are non-fatal — keep what we have, allow retry
     }
+  }
+
+  async _loadMore() {
+    if (this._loadingMore || !this._hasMore) return;
+    this._loadingMore = true;
+    this.requestUpdate();
+    try { await this._fetchPage({ reset: false }); }
+    finally { this._loadingMore = false; this.requestUpdate(); }
   }
 
   _onSortClick(c) {
@@ -227,28 +273,15 @@ export class JobRecommendationsTable extends LitElement {
       // Numeric / date default to desc (highest/newest first), text asc.
       this.sortDir = (c.numeric || c.date) ? 'desc' : 'asc';
     }
+    // Sorting is server-side now (the full set is larger than one page),
+    // so a sort change re-fetches from offset 0 in the new order.
+    this._fetchPage({ reset: true });
   }
 
+  // Rows are returned already sorted by the server; this is just an
+  // array guard so a transient bad state can't crash render.
   _sorted() {
-    // Defensive: bad refresh response or transient state can leave
-    // this.items as something other than an array. Don't crash render.
-    if (!Array.isArray(this.items)) return [];
-    const col = COLUMNS.find(c => c.sortKey === this.sortKey);
-    if (!col) return this.items;
-    const dir = this.sortDir === 'asc' ? 1 : -1;
-    const get = (r) => {
-      const v = r[col.sortKey];
-      if (v == null) return col.numeric ? -Infinity : '';
-      if (col.numeric) return Number(v);
-      if (col.date) return Date.parse(v) || 0;
-      return String(v).toLowerCase();
-    };
-    return [...this.items].sort((a, b) => {
-      const va = get(a), vb = get(b);
-      if (va < vb) return -1 * dir;
-      if (va > vb) return  1 * dir;
-      return 0;
-    });
+    return Array.isArray(this.items) ? this.items : [];
   }
 
   async _onDismiss(rec) {
@@ -416,7 +449,9 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <header class="recs-page__head">
         <h1>For You</h1>
-        <span class="muted">${rows.length} ${rows.length === 1 ? 'role' : 'roles'}</span>
+        <span class="muted">${this._total > rows.length
+          ? `${rows.length} of ${this._total} roles`
+          : `${rows.length} ${rows.length === 1 ? 'role' : 'roles'}`}</span>
         <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
                 title="Scan Gmail for new role alerts and application updates"
                 @click=${() => this._onRefresh()}>
@@ -436,6 +471,10 @@ export class JobRecommendationsTable extends LitElement {
             <thead>${this._renderHeader()}</thead>
             <tbody>${rows.map(r => this._renderRow(r))}</tbody>
           </table>
+          ${this._hasMore ? html`
+            <div class="recs-sentinel" aria-hidden="true"></div>
+            <div class="recs-loadmore muted">${this._loadingMore ? 'Loading more…' : ''}</div>
+          ` : nothing}
         </div>
       `}
       ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
