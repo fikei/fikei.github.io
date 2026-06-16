@@ -1,10 +1,15 @@
 # Job Recs — Scoring & Enrichment Follow-ups
 
-Status: open investigation items. Logged 2026-06-16 during the Gmail→recs pipeline recovery. Not yet scheduled into the plan — use `/plan` to break these into stories when prioritized.
+Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). Items 4-5 open. Use `/plan` to schedule the open ones.
+
+**Shipped 2026-06-16 (recommendations v0.9.0 + /job v2.3.6) — addresses items 1, 2, 3:**
+- **#3 ranking:** For You now defaults to a "best overall match" sort — `candidate_score*0.6 + fit_score*0.4` for graded rows, `fit_score*0.8` for un-graded — so strong responsibilities-matches surface first and un-graded high-fit roles can't dominate the top. Clicking a column header still switches to that explicit sort.
+- **#2 candidate floor:** graded rows with `candidate_score < 30` are dropped from the list (un-graded "verifying" rows are never dropped on this basis).
+- **#1 leakage:** addressed *via* #2/#3 — this is the score-based approach the item itself called the target end-state. The Nava-PBC ops/proposals roles (high company-fit, low responsibilities-match) now sink or drop once graded, rather than being gated by brittle title strings. The substring title gate was intentionally removed by the earlier "surface all recs" change; we are NOT re-adding it — ranking on the candidate (responsibilities) grade is the durable fix. Revisit only if un-graded leakage proves persistent.
 
 ---
 
-## 1. Title-filter leakage on greenlit companies (Nava PBC)
+## 1. Title-filter leakage on greenlit companies (Nava PBC) — ADDRESSED via #2/#3
 
 **Observation.** Roles from greenlit companies (e.g. Nava PBC) are getting past the job-title rules — surfacing titles that the title filter (`blocked_titles` / `target_titles` in `pull-recommendations`) should screen out. Symptom: a lot of **High Fit, Low Candidate** combos, where the heuristic fit score is high (company/domain/values match) but the Haiku candidate grade (roles & responsibilities match) is low.
 
@@ -67,6 +72,27 @@ Context for the above: ~half of Gmail/LinkedIn-sourced roles stay `enrichment_st
 On failure it backs off with `nextRetryAt` capped at **7 days**, so unresolved roles linger as VERIFYING for up to a week (kept on their `linkedin.com/comm/jobs/view/<id>` URL with no JD).
 
 **Highest-leverage fix (proposed, not yet built):** when ATS resolution fails, fetch the JD directly from the LinkedIn job page (the alert URL already in `url`) so candidate scoring can proceed without a canonical ATS match. Secondary: broaden ATS detection (Workday, etc.) and shorten the first-retry backoff (7d is too long for a fresh miss).
+
+### ATS-gap investigation (2026-06-16): where do unresolved companies actually list?
+
+Researched 16 currently-unresolved companies (all hiring PMs) to answer "do they have a durable listing beyond LinkedIn, and on what platform?" **Answer: yes — nearly all have a durable ATS-backed careers page.** Our detector (`detectAts` in `enrich-job-source/index.ts`) only probes **Greenhouse, Lever, Ashby** and guesses the slug from a normalized company name.
+
+Two distinct gaps:
+
+**A. Slug-guessing fails for companies that ARE on a supported ATS (higher ROI).** 8 of 16 are on Greenhouse/Lever/Ashby — which we already probe — yet stay unresolved, because `probeSlug` guesses the wrong slug from the company name:
+- Ashby (already supported): Ambience Healthcare → `ambiencehealthcare`, Ascertain → `ascertain`, Baseten → `baseten`, Benepass → `benepass`, BetterUp → `betterup`, Brain Co. → `brainco`
+- Greenhouse: BetterHelp → `betterhelpcom`
+- Lever: Beam (Benefits) → `beam`
+- **Fix:** extract the real ATS slug/URL from the email body (LinkedIn alerts often include the apply link), and/or generate better slug candidates (drop "Inc/Co/Health/Healthcare" suffixes, try concatenated + hyphenated + `…com` variants). This alone would resolve ~half the misses with no new providers.
+
+**B. Missing ATS providers.** Companies on platforms we don't probe at all:
+- **Workday** — Alteryx (`alteryx.wd5.myworkdayjobs.com`), Availity (`availity.wd1…`), Bonterra (`bonterra.wd1…`). Public JSON: `POST https://{tenant}.wd{N}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs`. Highest-value add (enterprise/healthcare default).
+- **Workable** — Applause (`apply.workable.com/applause-4`). Public: `apply.workable.com/api/v3/accounts/{slug}/jobs`.
+- Low ROI / no public API: UltiPro (Baylor Genetics), Gem (BioRender, `jobs.gem.com`), Phenom (Actalent).
+
+**Staffing-agency caveat:** Actalent is a staffing agency — the "company" is the recruiter, not the employer. These are fundamentally unresolvable and should be flagged/down-weighted, not retried.
+
+**Recommended build order:** (1) extract apply-URL from email body + stronger slug candidates → fixes gap A; (2) add Workday detector (covers the enterprise tail) → biggest chunk of gap B; (3) add Workable; (4) LinkedIn-JD fallback for the genuinely-unresolvable remainder so they can still be candidate-scored.
 
 **Already shipped (2026-06-16):**
 - Batched grading drain: `pull-recommendations?rescore=1&ungraded=1&limit=N` (v0.16.2) — grades only ungraded rows that have a JD, newest first.
