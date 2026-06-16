@@ -61,6 +61,41 @@ Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). 
 
 ---
 
+## 6. Use the decline signal from "For You" (we log it; we don't use it)
+
+**Question raised:** are we logging all the roles I decline in For You? **Yes** — dismissing a rec sets `recommended_roles.dismissed_at = now()` and the row persists with full data (company, title, fit_score, candidate_score, breakdown). As of 2026-06-16 there are **243 dismissed roles** spanning 2026-05-09 → today. So the data exists and is queryable.
+
+**The gap:** we capture the dismissal *event* but (a) no **reason**, and (b) we don't **use** it. This is high-value negative-preference data — "what roles Ian doesn't like."
+
+**Proposed:**
+- Optional lightweight reason on dismiss (e.g. quick chips: wrong role / wrong domain / wrong seniority / comp / location / not interested). UI: `job-recommendations-table` dismiss button → small reason popover; store `dismissed_reason`.
+- A "what you decline" analysis (cluster dismissed roles by domain/title/seniority) to surface patterns.
+- Feed the signal back into scoring/preferences: recurring dismissed titles → suggest `vision.blocked_titles`; dismissed-domain skew → down-weight; or a learned negative-preference term in `fit.ts`. Closes the loop with follow-up #1 (move filtering toward responsibilities/preference signal, not title strings).
+
+**Where:** `recommendations/index.ts` (dismiss POST — add `dismissed_reason`), `job-recommendations-table.js` (reason UI), a new analysis surface (could live on `/job/vision` or a settings insight).
+
+---
+
+## 7. Capture Jack & Jill curated roles (high-value, not currently ingested)
+
+**What:** [Jack & Jill](https://www.jackandjill.ai/) is an AI recruiting platform (raised $20M seed, 2025). "Jack" is a candidate-side AI agent that interviews the user and emails **curated, comp-included, pre-matched roles** — i.e. a similar product to what /job is building, already doing the matching + scoring. Emails come from **`jack@jackandjill.ai`** (to `fikei@uw.edu`, same connected inbox). Example subjects: "Role details: Hinge Health, Roger, Sailor, Abridge, Everlywell, Luro + more"; "Following up: Healthtech roles and a new Director of Product lead"; "Deep dive: Paraform, Protagonist, Incredible Health".
+
+**Why high value:**
+- Human+AI-curated roles with **salary** ($232k–$320k base + equity), location, stage — richer than LinkedIn alerts.
+- Each digest has a **"TOP PICKS YOU'VE LIKED"** section = explicit *positive*-preference signal (pairs with item 6's negative signal).
+- These are already filtered to Ian's healthtech / zero-to-one sweet spot by a peer product.
+
+**Are we capturing them? No.** `DEFAULT_ALLOW_SENDERS` in `gmail-jobs.ts` covers linkedin/wellfound/otta/builtin/yc/hnhiring/workatastartup — **not `@jackandjill.ai`** — so these are silently skipped (out-of-allowlist).
+
+**Proposed:**
+- Add `@jackandjill.ai` to the allowlist.
+- The format is **conversational prose with multiple roles + comp**, not clean `/jobs/view/<id>` links — route to the Haiku multi-extractor (`extractJobsMulti`) with a prompt variant tuned for this digest shape (extract company, title, comp, location, and the like/recommended status per role).
+- Mine the "roles you've liked" as explicit positive-preference signal into vision/preferences and the candidate scorer.
+
+**Where:** `gmail-jobs.ts` (`DEFAULT_ALLOW_SENDERS`, `looksLikeDigest`/`hasMultipleJobLinks`, `extractJobsMulti` prompt), preference plumbing for the like-signal.
+
+---
+
 ## Investigation finding: enrichment-resolution gap (the "VERIFYING" ceiling)
 
 Context for the above: ~half of Gmail/LinkedIn-sourced roles stay `enrichment_status='unresolved'` ("VERIFYING") and therefore **cannot be candidate-scored** (Haiku grading needs a JD).

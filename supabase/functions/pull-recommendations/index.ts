@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.16.3';
-console.log(`[pull-recommendations] v${VERSION} - gmail-jobs pre-fetch dedup on raw id (cheap re-list/backfill, no re-download)`);
+const VERSION = '0.17.0';
+console.log(`[pull-recommendations] v${VERSION} - dedup new recs vs existing (normalized LinkedIn url / canonical / company|title)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -331,11 +331,46 @@ serve(async (req) => {
          where company_name is not null and title is not null
       `;
       const pipelineSet = new Set(pipelineKeys.map(r => r.key));
-      const filtered = kept.filter(r => {
+      const pipeFiltered = kept.filter(r => {
         const k = `${(r.input.company || '').toLowerCase()}|${(r.input.title || '').toLowerCase()}`;
         return !pipelineSet.has(k);
       });
-      const droppedToPipeline = kept.length - filtered.length;
+      const droppedToPipeline = kept.length - pipeFiltered.length;
+      // Follow-up #4 — dedup against EXISTING active recs (the on-conflict
+      // in insertNew only catches an identical source+source_id). Catches:
+      //   - same LinkedIn job re-sent with different ?trackingId (we key on
+      //     the normalized /jobs/view/<id>, not the raw url)
+      //   - the same canonical ATS posting (canonical_url)
+      //   - the same role arriving from a second source (company|title)
+      // Also dedups within this batch. Conservative: URL/canonical match is
+      // exact; company|title requires BOTH to match so Heidi's genuinely
+      // distinct openings (different titles) aren't collapsed.
+      const existing = await sql<{ url: string | null; canonical_url: string | null; company: string | null; title: string | null }[]>`
+        select url, canonical_url, company, title
+          from job.recommended_roles
+         where dismissed_at is null and added_to_pipeline_slug is null
+      `;
+      const seenKeys = new Set<string>();
+      const addKeys = (url: string | null, canonical: string | null, company: string | null, title: string | null) => {
+        const nu = normalizeJobUrl(canonical || url || '');
+        if (nu) seenKeys.add('u:' + nu);
+        if (company && title) seenKeys.add('ct:' + company.toLowerCase().trim() + '|' + title.toLowerCase().trim());
+      };
+      const hitsKey = (url: string | null, canonical: string | null, company: string | null, title: string | null) => {
+        const nu = normalizeJobUrl(canonical || url || '');
+        if (nu && seenKeys.has('u:' + nu)) return true;
+        if (company && title && seenKeys.has('ct:' + company.toLowerCase().trim() + '|' + title.toLowerCase().trim())) return true;
+        return false;
+      };
+      for (const e of existing) addKeys(e.url, e.canonical_url, e.company, e.title);
+      const filtered = pipeFiltered.filter(r => {
+        if (hitsKey(r.input.url, r.input.canonicalUrl ?? null, r.input.company ?? null, r.input.title ?? null)) return false;
+        // accept — register its keys so a later row in THIS batch dedups too
+        addKeys(r.input.url, r.input.canonicalUrl ?? null, r.input.company ?? null, r.input.title ?? null);
+        return true;
+      });
+      const droppedAsDup = pipeFiltered.length - filtered.length;
+      if (droppedAsDup > 0) console.log(`[pull-recommendations] dropped ${droppedAsDup} duplicate(s) vs existing/within-batch`);
       const inserted = await insertNew(sql, src, filtered);
       // Productize the v3 fit pipeline: every NEW recommendation gets a
       // JD fetch (if the plugin didn't provide one) + Haiku-graded role
@@ -623,6 +658,32 @@ function toRoleRow(r: RecommendedRoleInput): RoleRow {
 
 // ---------- Insert ----------
 
+// Normalize a job URL into a stable dedup key. LinkedIn alert URLs carry
+// per-email tracking params (?trackingId/refId/eid) that differ every send,
+// so the same posting otherwise looks unique — collapse to the canonical
+// /jobs/view/<id>. For other hosts, drop the query and trailing slash and
+// lowercase. Returns '' for empty input.
+function normalizeJobUrl(u: string): string {
+  if (!u) return '';
+  const li = u.match(/linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/i);
+  if (li) return `linkedin.com/jobs/view/${li[1]}`;
+  try {
+    const url = new URL(u);
+    return (url.host + url.pathname).toLowerCase().replace(/\/+$/, '');
+  } catch {
+    return u.toLowerCase().trim();
+  }
+}
+
+// For storage: collapse a LinkedIn tracking URL to its clean canonical form
+// (still resolves, far shorter, dedup-stable). Non-LinkedIn URLs untouched
+// so apply links that depend on query params keep working.
+function cleanStoredUrl(u: string): string {
+  if (!u) return u;
+  const li = u.match(/linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/i);
+  return li ? `https://www.linkedin.com/jobs/view/${li[1]}/` : u;
+}
+
 async function insertNew(
   sql: ReturnType<typeof db>,
   src: UserSourceRow,
@@ -635,7 +696,7 @@ async function insertNew(
     source:         r.input.source,
     source_id:      r.input.sourceId,
     source_label:   r.input.sourceLabel ?? null,
-    url:            r.input.url,
+    url:            cleanStoredUrl(r.input.url),
     company:        r.input.company ?? null,
     title:          r.input.title ?? null,
     location:       r.input.location ?? null,
