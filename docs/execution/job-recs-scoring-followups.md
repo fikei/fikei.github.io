@@ -96,6 +96,23 @@ Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). 
 
 ---
 
+## 9. Concrete role-closure detection — when is a role closed, and how do we log it?
+
+**Question raised:** how do we know a role has actually been closed/filled, and how do we record it? Today a `recommended_roles` row lives forever once created; we have no closure signal, so the list accumulates stale (filled/expired) postings.
+
+**Closure signals, by source:**
+- **tracked-ats (strongest):** we re-pull the company's FULL open-roles list each cycle. A previously-seen `source_id` that's no longer returned = the posting was taken down = closed. (The `/jobs` careers-page skill already does exactly this — marks disappeared roles "Not Listed".) Implement: stamp `last_seen_at` on every pull; if a tracked-ats `source_id` isn't in the latest pull for its company, mark it closed.
+- **gmail / LinkedIn / canonical ATS:** re-fetch the canonical posting (or the LinkedIn page) on a schedule; a `404`/`410`, a "No longer accepting applications" banner, or the title vanishing from the company's board = closed. The enrich-retry cron is a natural place to also do a liveness re-check on resolved roles.
+- **Greenhouse/Lever/Ashby:** the posting id disappearing from the board list API = closed (same as tracked-ats).
+
+**How to log:** add `closed_at timestamptz` (+ maybe `closure_reason` = not_listed / 404 / delisted) and a rolling `last_seen_at` to `recommended_roles`. A closed role is filtered out of For You (like dismissed) but kept for history/analytics — it pairs with the decline signal (item 6) to understand the full lifecycle. Consider a small `liveness-check` cron (or fold into enrich-retry) that re-verifies resolved roles and the tracked-ats "disappeared since last pull" diff.
+
+**Open questions:** grace period before marking closed (1 missed pull vs N)? Re-open if it reappears? Distinguish "filled" from "paused/expired" (we usually can't from the outside — `closure_reason='delisted'` is the honest default).
+
+**Where:** `tracked-ats.ts` (diff seen-vs-pulled per company), `enrich-job-source` (liveness re-check), `recommended_roles` (schema), `recommendations` read filter, a new cron.
+
+---
+
 ## 8. Backfill cursor-lock on all-duplicate batches (gmail-jobs)
 
 Surfaced while backfilling the post-outage gap. In timestamp/backfill mode (re-listing a window), a message whose extracted role(s) all dedup at insert (on_conflict on source_id, or the new #4 cross-rec dedup) leaves **no trace** — no rec row carries its `gmailApiId`, no `gmail_skipped` row — so the pre-fetch dedup doesn't skip it next run, it's re-processed, `newWork` increments, the run caps, and the cursor never advances. Result: the window re-scans forever, `inserted=0`, cursor stuck. Item #4's dedup makes this MORE likely (more inserts collapse to dup).
@@ -152,6 +169,19 @@ Direct testing against the live ATS APIs **disproved the "slug-guessing bug" hyp
 2. **No enrichment-retry cron.** `enrich-job-source?action=backfill` exists but nothing calls it on a schedule — so once a role is `unresolved` with a future `enrichment_retry_at`, it's only retried if re-pulled (which only happens for NEW messages). Unresolved roles are effectively stuck. **Proposed:** a pg_cron (like `grade-ungraded-10min`) that POSTs `enrich-job-source {action:backfill, limit:N}` every ~10 min. (Auth: needs an `Authorization: Bearer` JWT, not just apikey.)
 
 **Net:** the durable-listing answer to "do these companies have a source of truth beyond LinkedIn?" is **yes** — they're on Ashby/Greenhouse/Lever/Workday and we resolve the company; the unlock is matching the *role title* to the right posting (Haiku) + an auto-retry cron, NOT slug detection.
+
+### LinkedIn "Apply" → real ATS (third pass, 2026-06-16)
+
+For the LinkedIn-sourced roles that stay unresolved, clicking **"Apply on company website"** on the LinkedIn job page redirects to the company's real ATS — a reliable way to discover where they actually list. Sampled:
+- **Humana** "Lead PM, Automation" → `centerwellcareers.com/us/en/job/HUMCEN…` — **Phenom People** career site (`utm_medium=phenom-feeds`).
+- **LivaNova** "Digital Health Sr PM" → `careers.livanova.com/us/en/job/LIKLIV…` — **Phenom People** (same `/us/en/job/<ID>` + `phenom-feeds` signature).
+- (Cadence and others followed the same enterprise-careers-site pattern.)
+
+**Takeaway:** a big slice of the "unmatchable" enterprise/healthcare roles are on **Phenom People** hosted career sites (`*careers.com` / `careers.*.com`, path `/us/en/job/<id>`), which we don't detect. Phenom pages embed JSON-LD `JobPosting` structured data, so the JD IS scrapable even without a clean API.
+
+**Two concrete unlocks:**
+1. **Follow the LinkedIn apply redirect during enrichment.** The LinkedIn job page's "Apply on company website" link resolves (via a LinkedIn redirect) to the canonical careers URL. Capturing that gives us the durable ATS URL + a page to scrape the JD from — no slug/title guessing needed. This is likely the single highest-yield fix for the LinkedIn remainder.
+2. **Add a Phenom detector + JSON-LD JD scraper** (`/us/en/job/` host pattern → fetch page → parse `<script type="application/ld+json">` JobPosting.description). Covers Humana/CenterWell/LivaNova and the enterprise tail.
 
 **Already shipped (2026-06-16):**
 - Batched grading drain: `pull-recommendations?rescore=1&ungraded=1&limit=N` (v0.16.2) — grades only ungraded rows that have a JD, newest first.
