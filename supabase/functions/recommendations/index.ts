@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.9.0';
-console.log(`[recommendations] v${VERSION} - default 'best' blended rank (candidate+fit) + candidate-score floor (drop graded <30)`);
+const VERSION = '0.10.0';
+console.log(`[recommendations] v${VERSION} - multi-level sort + candidateScore col + block-company filter/action`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -36,35 +36,50 @@ serve(async (req) => {
       const offset = isAll ? Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0) : 0;
 
       // Server-side sort — whitelist of sortable columns mapped to the
-      // table's sortKeys. dir is validated to asc/desc. Both are safe to
-      // splice via sql.unsafe because they only come from these fixed sets.
+      // table's sortKeys. Splicing via sql.unsafe is safe because keys and
+      // dirs only ever come from these fixed sets after validation.
       const SORT_COLS: Record<string, string> = {
-        fitScore:    'r.fit_score',
-        title:       'r.title',
-        location:    'r.location',
-        source:      'r.source',
-        suggestedAt: 'r.suggested_at',
+        fitScore:       'r.fit_score',
+        candidateScore: 'r.candidate_score',   // "Strength" column
+        title:          'r.title',
+        location:       'r.location',
+        source:         'r.source',
+        suggestedAt:    'r.suggested_at',
       };
-      // Follow-up #3 — default "best overall match" ranking. Blend the
-      // Haiku candidate grade (responsibilities match — what the user
-      // actually cares about) with heuristic fit, weighted toward
-      // candidate. Ungraded rows fall back to fit with a 0.8 discount so a
-      // graded-strong role outranks an un-graded high-fit one (the
-      // Nava-PBC "high fit, no/low candidate" leakage). When the user
-      // clicks a column header the explicit column wins.
+      // Default "best overall match" ranking — blend the Haiku candidate
+      // grade with heuristic fit, weighted toward candidate; ungraded rows
+      // fall back to fit with a 0.8 discount.
       const BLENDED_RANK =
         `(case when r.candidate_score is not null
                then (r.candidate_score * 0.6 + coalesce(r.fit_score,0) * 0.4)
                else coalesce(r.fit_score,0) * 0.8 end)`;
-      const sortParam = url.searchParams.get('sort') || 'best';
-      const sortExpr = SORT_COLS[sortParam] || BLENDED_RANK;
-      const sortDir = (url.searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+      // Multi-level (Google-Sheets-style) sort: sort=k1,k2,… & dir=d1,d2,…
+      // most-significant first. Each layer must be a whitelisted column (or
+      // 'best'); unknown layers are dropped. A stable tiebreaker always
+      // trails so pagination stays deterministic.
+      const sortKeys = (url.searchParams.get('sort') || 'best').split(',').map(s => s.trim()).filter(Boolean);
+      const sortDirs = (url.searchParams.get('dir') || '').split(',').map(s => s.trim().toLowerCase());
+      const layers: string[] = [];
+      sortKeys.forEach((k, i) => {
+        const dir = sortDirs[i] === 'asc' ? 'asc' : 'desc';
+        if (k === 'best') layers.push(`${BLENDED_RANK} ${dir} nulls last`);
+        else if (SORT_COLS[k]) layers.push(`${SORT_COLS[k]} ${dir} nulls last`);
+      });
+      if (!layers.length) layers.push(`${BLENDED_RANK} desc nulls last`);
+      const orderBy = layers.join(', ') + ', r.suggested_at desc, r.id desc';
 
-      // Follow-up #2 — candidate-score low-end threshold. Drop roles the
-      // Haiku grader scored as a clearly weak responsibilities match
-      // (< 30). Only applies to GRADED rows — un-graded (candidate_score
-      // null, still "verifying") rows are never dropped on this basis.
+      // Candidate-score low-end threshold — drop clearly-weak graded roles
+      // (< 30). Un-graded rows are never dropped on this basis.
       const CANDIDATE_FLOOR = 30;
+
+      // Per-user blocked companies (the "Don't recommend this company"
+      // action). Filtered here so they vanish from For You immediately.
+      let blocked: string[] = [];
+      try {
+        const br = await sql<{ company_norm: string }[]>`
+          select company_norm from job.blocked_companies where user_email = ${email}`;
+        blocked = br.map(b => b.company_norm);
+      } catch { /* table absent / transient — don't fail the page */ }
 
       // Shared filter — reused by the page query and the count so "X of Y"
       // counts exactly what the list would show.
@@ -74,6 +89,7 @@ serve(async (req) => {
           and (${isAll} or r.fit_score is null or r.fit_score >= 50)
           and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
           and not (r.candidate_score is not null and r.candidate_score < ${CANDIDATE_FLOOR})
+          and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
           and not exists (
             select 1
               from job.pipeline_roles p
@@ -102,7 +118,7 @@ serve(async (req) => {
                     else null end as "sourceEmailUrl"
         from job.recommended_roles r
         ${whereClause}
-        order by ${sql.unsafe(sortExpr)} ${sql.unsafe(sortDir)} nulls last, r.suggested_at desc
+        order by ${sql.unsafe(orderBy)}
         limit ${limit} offset ${offset};
       `;
       // Total matching count — only needed for the paginated view.
@@ -148,6 +164,30 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
+
+      // "Don't recommend this company" — add to the per-user block list and
+      // dismiss its current recs in one shot. Future pulls also skip it.
+      if (body.blockCompany) {
+        const company = String(body.blockCompany).trim();
+        if (!company) return err('blockCompany required', 400);
+        const norm = company.toLowerCase();
+        await sql`insert into job.blocked_companies (user_email, company_norm)
+                    values (${email}, ${norm})
+                  on conflict (user_email, company_norm) do nothing`;
+        const dis = await sql`
+          update job.recommended_roles set dismissed_at = now()
+           where user_email = ${email} and dismissed_at is null
+             and lower(trim(company)) = ${norm}
+          returning id`;
+        return jsonResp({ ok: true, blockedCompany: company, dismissed: dis.length });
+      }
+      // Un-block (optional, for an undo affordance).
+      if (body.unblockCompany) {
+        const norm = String(body.unblockCompany).trim().toLowerCase();
+        await sql`delete from job.blocked_companies where user_email = ${email} and company_norm = ${norm}`;
+        return jsonResp({ ok: true, unblockedCompany: norm });
+      }
+
       const id = body.id ? String(body.id) : '';
       if (!id) return err('id required', 400);
       if (body.dismiss) {

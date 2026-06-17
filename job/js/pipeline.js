@@ -178,6 +178,19 @@ export async function dismissRecommendation(id) {
   return res.json();
 }
 
+// "Don't recommend this company" — blocks the company for this user and
+// dismisses its current recs server-side. Returns { dismissed: N }.
+export async function blockCompany(company) {
+  const headers = await authHeader();
+  const res = await fetch(REC_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blockCompany: company }),
+  });
+  if (!res.ok) throw new Error(`block-company ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 export async function checkLiveness({ slug } = {}) {
   const headers = await authHeader();
   const res = await fetch(LIVENESS_URL, {

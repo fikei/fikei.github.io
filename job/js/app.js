@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /job/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.3.6";
-console.log(`[job] v${VERSION} - For You default ranks by best overall match (candidate+fit blend)`);
+const VERSION = "2.3.7";
+console.log(`[job] v${VERSION} - For You: Fit + Strength columns, multi-level sort, hide-company menu`);
 window.JOB_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.20.0';
-console.log(`[pull-recommendations] v${VERSION} - role-universe gate on tracked-ats firehose (vision.target_titles or product default)`);
+const VERSION = '0.21.0';
+console.log(`[pull-recommendations] v${VERSION} - filter blocked companies at the source ("don't recommend this company")`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -305,6 +305,15 @@ serve(async (req) => {
         pulled = pulledRaw.filter(r => matchesRoleUniverse(r.title || '', universe));
         if (pulled.length !== before) console.log(`[pull-recommendations] tracked-ats role-universe: kept ${pulled.length}/${before}`);
       }
+      // "Don't recommend this company" — drop blocked companies at the
+      // source so they never re-accumulate (the recommendations read filter
+      // hides any that slip through). Applies to every source.
+      const blockedCos = await loadBlockedCompanies(sql, src.user_email);
+      if (blockedCos.size) {
+        const before = pulled.length;
+        pulled = pulled.filter(r => !blockedCos.has((r.company || '').toLowerCase().trim()));
+        if (pulled.length !== before) console.log(`[pull-recommendations] blocked-company filter: kept ${pulled.length}/${before}`);
+      }
       // Surface every rec — don't drop at off-target / off-geo / min_score.
       // The fit_score breakdown already factors sector/geo/experience
       // mismatch into the score itself, so a poor match just gets a low
@@ -496,6 +505,17 @@ function matchesRoleUniverse(title: string, universe: string[]): boolean {
   if (!universe.length) return true;          // no universe defined → keep all
   const t = title.toLowerCase();
   return universe.some(u => u && t.includes(u));
+}
+
+// Per-user "Don't recommend this company" set (normalized company names).
+async function loadBlockedCompanies(sql: ReturnType<typeof db>, userEmail: string): Promise<Set<string>> {
+  try {
+    const rows = await sql<{ company_norm: string }[]>`
+      select company_norm from job.blocked_companies where user_email = ${userEmail}`;
+    return new Set(rows.map(r => r.company_norm));
+  } catch {
+    return new Set();
+  }
 }
 
 // Geography filter — read vision.target_geographies; fall back to the
