@@ -40,12 +40,14 @@ function stripHtml(html: string): string {
 // downstream is ATS-agnostic.
 
 async function pullGreenhouse(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
-  // ?content=true returns each posting's HTML body so we can store the JD —
-  // without it the role lands with no description and can never be graded.
-  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(c.ats_slug!)}/jobs?content=true`;
+  // NOTE: do NOT use ?content=true here — it returns the full HTML body for
+  // EVERY posting at EVERY tracked company, which blows the edge function's
+  // memory budget (WORKER_RESOURCE_LIMIT 546). Greenhouse roles get their JD
+  // lazily via enrichAndScoreNewRows/grading (per-role fetchJdText) instead.
+  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(c.ats_slug!)}/jobs`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`greenhouse ${c.ats_slug} → ${res.status}`);
-  const data = await res.json() as { jobs: Array<{ id: number; title: string; absolute_url: string; updated_at: string; location?: { name: string }; content?: string }> };
+  const data = await res.json() as { jobs: Array<{ id: number; title: string; absolute_url: string; updated_at: string; location?: { name: string } }> };
   return (data.jobs || []).map(j => ({
     source:      'tracked-ats',
     sourceId:    `gh:${c.ats_slug}:${j.id}`,
@@ -54,10 +56,16 @@ async function pullGreenhouse(c: TrackedCompany): Promise<RecommendedRoleInput[]
     company:     c.name,
     title:       j.title,
     location:    j.location?.name,
-    description: stripHtml(j.content || '') || undefined,
     postedAt:    j.updated_at,
     payload:     { ats: 'Greenhouse', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));
+}
+
+// JD bodies can be many KB; cap so accumulating a few hundred roles across
+// all tracked companies stays well under the function memory limit.
+function capJd(s: string): string | undefined {
+  const t = (s || '').trim();
+  return t ? t.slice(0, 5000) : undefined;
 }
 
 async function pullLever(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
@@ -73,7 +81,7 @@ async function pullLever(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
     company:     c.name,
     title:       j.text,
     location:    j.categories?.location,
-    description: (j.descriptionPlain || stripHtml(j.description || '')) || undefined,
+    description: capJd(j.descriptionPlain || stripHtml(j.description || '')),
     postedAt:    j.createdAt ? new Date(j.createdAt).toISOString() : undefined,
     payload:     { ats: 'Lever', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));
@@ -93,7 +101,7 @@ async function pullAshby(c: TrackedCompany): Promise<RecommendedRoleInput[]> {
     title:       j.title,
     location:    j.locationName,
     salary:      j.compensationTierSummary,
-    description: (j.descriptionPlain || stripHtml(j.descriptionHtml || '')) || undefined,
+    description: capJd(j.descriptionPlain || stripHtml(j.descriptionHtml || '')),
     postedAt:    j.publishedAt,
     payload:     { ats: 'Ashby', companySlug: c.slug, atsSlug: c.ats_slug, jobId: j.id },
   }));
