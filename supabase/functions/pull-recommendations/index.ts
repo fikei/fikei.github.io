@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.19.1';
-console.log(`[pull-recommendations] v${VERSION} - tracked-ats JD capture w/o OOM (no greenhouse content=true; cap lever/ashby JD)`);
+const VERSION = '0.20.0';
+console.log(`[pull-recommendations] v${VERSION} - role-universe gate on tracked-ats firehose (vision.target_titles or product default)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -290,7 +290,21 @@ serve(async (req) => {
     }
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
-      const pulled = await plugin.pull(src.config, { userEmail: src.user_email, since });
+      const pulledRaw = await plugin.pull(src.config, { userEmail: src.user_email, since });
+      // Firehose gate. tracked-ats pulls a company's ENTIRE board (every
+      // eng/design/sales/ops opening), so without a title gate it floods the
+      // pipeline with off-target roles and burns grading on them. Keep only
+      // roles inside the user's role universe — vision.target_titles when
+      // set (scales to ANY role a user searches for), else a broad
+      // product-family default. Pre-targeted sources (gmail alerts, Jack &
+      // Jill, theirstack queries) are already scoped, so they skip this.
+      let pulled = pulledRaw;
+      if (src.type === 'tracked-ats') {
+        const universe = await loadRoleUniverse(sql);
+        const before = pulledRaw.length;
+        pulled = pulledRaw.filter(r => matchesRoleUniverse(r.title || '', universe));
+        if (pulled.length !== before) console.log(`[pull-recommendations] tracked-ats role-universe: kept ${pulled.length}/${before}`);
+      }
       // Surface every rec — don't drop at off-target / off-geo / min_score.
       // The fit_score breakdown already factors sector/geo/experience
       // mismatch into the score itself, so a poor match just gets a low
@@ -451,6 +465,38 @@ const DEFAULT_TARGET_TITLES = [
   'senior product manager', 'senior pm', 'sr product manager',
   'director, product', 'director of product',
 ];
+
+// Role universe for the firehose gate (tracked-ats). Broader than the
+// seniority-prefixed target_titles above so a bare "Product Manager" or
+// "Lead Product Manager" still qualifies — these are core role-family
+// phrases matched as substrings. Used only when the user hasn't defined
+// their own vision.target_titles. To support a DIFFERENT track (design,
+// eng, etc.), a user sets target_titles and that becomes their universe —
+// the mechanism is role-agnostic; only this default is product-flavored.
+const DEFAULT_ROLE_UNIVERSE = [
+  'product manager', 'product management', 'product lead', 'product owner',
+  'head of product', 'director of product', 'director, product',
+  'vp of product', 'vp product', 'chief product', 'cpo',
+  'group product manager', 'gpm', 'principal product', 'staff product',
+  'senior product', 'founding product', 'founding pm', 'product strategy',
+  'platform product', 'technical product manager', 'tpm',
+];
+
+// The role universe = the user's vision.target_titles when set (scales to
+// any role they search for), else the broad product-family default.
+async function loadRoleUniverse(sql: ReturnType<typeof db>): Promise<string[]> {
+  const fromVision = await loadVisionStringArray(sql, 'target_titles');
+  return (fromVision.length ? fromVision : DEFAULT_ROLE_UNIVERSE).map(s => s.toLowerCase().trim()).filter(Boolean);
+}
+
+// Inclusive substring match — a role is in-universe if its title contains
+// any universe phrase. Broad on purpose: better to keep a borderline role
+// (the candidate score + floor sort it out) than to drop a real one.
+function matchesRoleUniverse(title: string, universe: string[]): boolean {
+  if (!universe.length) return true;          // no universe defined → keep all
+  const t = title.toLowerCase();
+  return universe.some(u => u && t.includes(u));
+}
 
 // Geography filter — read vision.target_geographies; fall back to the
 // usual PM hubs + remote so empty vision still gives sane defaults.
