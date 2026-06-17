@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./job-fit-modal.js' + V),
@@ -17,7 +17,8 @@ const [{ fetchRecommendations, dismissRecommendation, addRole, refreshSources },
 // Column shape mirrors job-pipeline's COLUMNS: id drives the col class,
 // sortKey gates sortability, label is what the header shows.
 const COLUMNS = [
-  { id: 'fit',      label: 'Fit',      sortKey: 'fitScore',    numeric: true },
+  { id: 'fit',      label: 'Fit',      sortKey: 'fitScore',       numeric: true },
+  { id: 'strength', label: 'Strength', sortKey: 'candidateScore', numeric: true },
   { id: 'role',     label: 'Role',     sortKey: 'title' },
   { id: 'location', label: 'Location', sortKey: 'location' },
   { id: 'sector',   label: 'Source',   sortKey: 'source' },
@@ -56,8 +57,8 @@ export class JobRecommendationsTable extends LitElement {
     state:    { state: true },
     items:    { state: true },
     error:    { state: true },
-    sortKey:  { state: true },
-    sortDir:  { state: true },
+    _sortLayers: { state: true },
+    _menuOpenId: { state: true },
     addingId: { state: true },
     selectedRec:         { state: true },
     selectedScoreWhich:  { state: true },
@@ -75,11 +76,12 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'idle';
     this.items = [];
     this.error = '';
-    // Default: server-side "best overall match" ranking — a blend of the
-    // Haiku candidate grade and heuristic fit (see recommendations fn).
-    // Clicking a column header switches to that explicit server sort.
-    this.sortKey = 'best';
-    this.sortDir = 'desc';
+    // Multi-level sort stack (Google-Sheets style): most-significant layer
+    // first. Empty → the server's "best overall match" blended ranking.
+    // Clicking a header pushes/toggles that column to the front; earlier
+    // layers become tiebreakers.
+    this._sortLayers = [];
+    this._menuOpenId = null;
     this.addingId = null;
     this.selectedRec = null;
     this._refreshing = false;
@@ -212,11 +214,15 @@ export class JobRecommendationsTable extends LitElement {
     };
     window.addEventListener('scroll', this._onScroll, { passive: true });
     window.addEventListener('resize', this._onScroll, { passive: true });
+    // Close any open row menu on an outside click.
+    this._onDocClick = () => { if (this._menuOpenId) this._menuOpenId = null; };
+    document.addEventListener('click', this._onDocClick);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('job:gmail:connected', this._onGmailConnected);
+    document.removeEventListener('click', this._onDocClick);
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onScroll);
     super.disconnectedCallback();
@@ -246,12 +252,15 @@ export class JobRecommendationsTable extends LitElement {
   async _fetchPage({ reset = false } = {}) {
     if (reset) { this._offset = 0; this._hasMore = false; }
     try {
+      const layers = this._sortLayers;
       const data = await fetchRecommendations({
         view:   'all',
         limit:  PAGE_SIZE,
         offset: this._offset,
-        sort:   this.sortKey,
-        dir:    this.sortDir,
+        // Multi-level: comma-joined keys + dirs, most-significant first.
+        // Empty stack → 'best' blended default on the server.
+        sort:   layers.length ? layers.map(l => l.key).join(',') : 'best',
+        dir:    layers.length ? layers.map(l => l.dir).join(',') : 'desc',
       });
       const page = Array.isArray(data?.recommendations) ? data.recommendations : [];
       this.items   = reset ? page : [...this.items, ...page];
@@ -273,17 +282,38 @@ export class JobRecommendationsTable extends LitElement {
     finally { this._loadingMore = false; this.requestUpdate(); }
   }
 
+  // Max sort layers kept. 3 is plenty (primary + two tiebreakers) and keeps
+  // the header indicators readable.
+  static SORT_DEPTH = 3;
+
+  _layerIndex(key) {
+    return this._sortLayers.findIndex(l => l.key === key);
+  }
+
   _onSortClick(c) {
     if (!c.sortKey) return;
-    if (this.sortKey === c.sortKey) {
-      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    const key = c.sortKey;
+    const defaultDir = (c.numeric || c.date) ? 'desc' : 'asc';
+    const layers = [...this._sortLayers];
+    const idx = layers.findIndex(l => l.key === key);
+    if (idx === 0) {
+      // Re-clicking the current primary toggles its direction.
+      layers[0] = { key, dir: layers[0].dir === 'asc' ? 'desc' : 'asc' };
     } else {
-      this.sortKey = c.sortKey;
-      // Numeric / date default to desc (highest/newest first), text asc.
-      this.sortDir = (c.numeric || c.date) ? 'desc' : 'asc';
+      // Promote this column to primary; previous layers slide down as
+      // tiebreakers. Pull it from its old position first if present.
+      if (idx > 0) layers.splice(idx, 1);
+      layers.unshift({ key, dir: defaultDir });
     }
-    // Sorting is server-side now (the full set is larger than one page),
-    // so a sort change re-fetches from offset 0 in the new order.
+    this._sortLayers = layers.slice(0, JobRecommendationsTable.SORT_DEPTH);
+    // Server-side sort — re-fetch from offset 0 in the new (layered) order.
+    this._fetchPage({ reset: true });
+  }
+
+  // Shift-click (or the header's reset affordance) clears the stack back to
+  // the default "best" ranking.
+  _clearSort() {
+    this._sortLayers = [];
     this._fetchPage({ reset: true });
   }
 
@@ -341,19 +371,23 @@ export class JobRecommendationsTable extends LitElement {
   }
 
   _renderHeader() {
+    const multi = this._sortLayers.length > 1;
     return html`
       <tr>
         ${COLUMNS.map(c => {
           const cls = `col col-${c.id}`;
           if (!c.sortKey) return html`<th class=${cls}>${c.label}</th>`;
-          const active = this.sortKey === c.sortKey;
-          const arrow = active ? (this.sortDir === 'asc' ? '↑' : '↓') : '↕';
+          const idx = this._layerIndex(c.sortKey);
+          const layer = idx >= 0 ? this._sortLayers[idx] : null;
+          const arrow = layer ? (layer.dir === 'asc' ? '↑' : '↓') : '↕';
           return html`
             <th class=${cls}>
-              <button class=${'th-sort' + (active ? ' is-active' : '')}
+              <button class=${'th-sort' + (layer ? ' is-active' : '')}
+                      title=${layer ? `Sort layer ${idx + 1} — click to toggle / re-prioritize` : 'Click to sort; click another column to layer'}
                       @click=${() => this._onSortClick(c)}>
                 <span>${c.label}</span>
                 <span class="th-sort__arrow">${arrow}</span>
+                ${layer && multi ? html`<span class="th-sort__rank">${idx + 1}</span>` : nothing}
               </button>
             </th>
           `;
@@ -377,12 +411,10 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <tr class="pipeline-row" @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
-          ${renderScorePair(r, {
-            onFit:       (row) => this._openFitModal(row),
-            onCandidate: (row) => this._openCandidateModal(row),
-            fitClass,
-            candClass: fitClass,
-          })}
+          ${this._scorePill(r.fitScore, () => this._openFitModal(r), 'Fit score — tap for breakdown')}
+        </td>
+        <td class="col col-strength" data-label="Strength">
+          ${this._scorePill(r.candidateScore, () => this._openCandidateModal(r), 'Candidate strength — tap for breakdown')}
         </td>
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
@@ -422,10 +454,55 @@ export class JobRecommendationsTable extends LitElement {
             <button class="btn-dismiss" aria-label="Dismiss recommendation"
                     title="Dismiss"
                     @click=${() => this._onDismiss(r)}>×</button>
+            <div class="row-menu">
+              <button class="row-menu__trigger" aria-label="More actions" title="More"
+                      @click=${(e) => this._toggleMenu(r.id, e)}>⋯</button>
+              ${this._menuOpenId === r.id ? html`
+                <div class="row-menu__pop" @click=${(e) => e.stopPropagation()}>
+                  <button class="row-menu__item" @click=${() => this._onBlockCompany(r)}>
+                    Don't recommend ${r.company || 'this company'}
+                  </button>
+                  <button class="row-menu__item" @click=${() => { this._onDismiss(r); this._menuOpenId = null; }}>
+                    Dismiss this role
+                  </button>
+                </div>
+              ` : nothing}
+            </div>
           </div>
         </td>
       </tr>
     `;
+  }
+
+  // Single score pill (Fit or Strength). null score renders an em dash.
+  _scorePill(score, onClick, title) {
+    const cls = fitClass(score) + ' fit-pill--button';
+    return html`
+      <button class=${cls} title=${title}
+              @click=${(e) => { e.stopPropagation(); onClick(); }}>
+        ${score == null ? '—' : Math.round(score)}
+      </button>`;
+  }
+
+  _toggleMenu(id, e) {
+    e.stopPropagation();
+    this._menuOpenId = this._menuOpenId === id ? null : id;
+  }
+
+  async _onBlockCompany(r) {
+    const company = r.company;
+    this._menuOpenId = null;
+    if (!company) return;
+    // Optimistic: drop every loaded row from this company immediately.
+    const norm = company.toLowerCase().trim();
+    this.items = this.items.filter(x => (x.company || '').toLowerCase().trim() !== norm);
+    this.requestUpdate();
+    try {
+      await blockCompany(company);
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Won't recommend ${company} anymore` } }));
+    } catch (e) {
+      console.warn('[recs-table] blockCompany failed', e);
+    }
   }
 
   render() {
@@ -467,6 +544,12 @@ export class JobRecommendationsTable extends LitElement {
           ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
         </button>
         ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
+        ${this._sortLayers.length ? html`
+          <button class="btn btn--sm recs-page__clearsort" title="Back to best-match order"
+                  @click=${() => this._clearSort()}>
+            Sorted by ${this._sortLayers.map(l => l.key === 'candidateScore' ? 'Strength' : l.key === 'fitScore' ? 'Fit' : l.key === 'suggestedAt' ? 'Date' : l.key).join(' › ')} · reset
+          </button>
+        ` : nothing}
       </header>
       ${this._renderHealthBanner()}
       ${rows.length === 0 ? html`

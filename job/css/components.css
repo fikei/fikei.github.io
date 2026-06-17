@@ -2562,8 +2562,51 @@
 
 /* Columns specific to the recs table — sizes mirror existing pipeline
    col-* declarations (around line 2500). */
+.pipeline-table .col-fit      { width: 64px; white-space: nowrap; }
+.pipeline-table .col-strength { width: 78px; white-space: nowrap; }
 .pipeline-table .col-location { width: 14%; min-width: 120px; color: var(--text-muted); }
 .pipeline-table .col-added    { width: 88px;  white-space: nowrap; color: var(--text-muted); }
+
+/* Multi-level sort: small rank badge next to the arrow (1 = primary). */
+.th-sort__rank {
+  display: inline-block;
+  margin-left: 2px;
+  min-width: 13px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 13px;
+  text-align: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+}
+.recs-page__clearsort { align-self: center; font-size: var(--font-size-caption); }
+
+/* Row triple-dot menu ("Don't recommend this company" etc.). */
+.row-menu { position: relative; display: inline-flex; }
+.row-menu__trigger {
+  border: none; background: none; cursor: pointer;
+  color: var(--text-muted); font-size: 18px; line-height: 1;
+  padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.row-menu__trigger:hover { color: var(--text); background: var(--surface-2, rgba(127,127,127,.12)); }
+.row-menu__pop {
+  position: absolute; top: 100%; right: 0; z-index: 30;
+  margin-top: 4px; min-width: 220px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(127,127,127,.25));
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  padding: 4px;
+}
+.row-menu__item {
+  display: block; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  font-size: var(--font-size-body-sm); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row-menu__item:hover { background: var(--surface-2, rgba(127,127,127,.12)); }
 
 .rec-source {
   font-size: var(--font-size-body-sm);
