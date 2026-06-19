@@ -2564,8 +2564,23 @@
    col-* declarations (around line 2500). */
 .pipeline-table .col-fit      { width: 64px; white-space: nowrap; }
 .pipeline-table .col-strength { width: 78px; white-space: nowrap; }
-.pipeline-table .col-location { width: 14%; min-width: 120px; color: var(--text-muted); }
+.pipeline-table .col-source   { width: 1%; min-width: 116px; white-space: nowrap; }
 .pipeline-table .col-added    { width: 88px;  white-space: nowrap; color: var(--text-muted); }
+
+/* Location nested under Role (company line) on every list view. Muted,
+   single-line, with a small pin. Multiple locations collapse to "+N". */
+.role-cell__loc {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle, var(--text-muted));
+  min-width: 0;
+}
+.role-cell__loc .loc-pin { flex: none; opacity: 0.7; }
+.role-cell__loc-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-cell__loc-more { flex: none; opacity: 0.8; }
 
 /* Multi-level sort: small rank badge next to the arrow (1 = primary). */
 .th-sort__rank {
@@ -2609,8 +2624,25 @@
 .row-menu__item:hover { background: var(--surface-2, rgba(127,127,127,.12)); }
 
 .rec-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--font-size-body-sm);
   color: var(--text-muted);
+  min-width: 0;
+  vertical-align: middle;
+}
+.rec-source__icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+.rec-source__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rec-source-email {
   display: inline-block;
@@ -3658,31 +3690,22 @@
     border-radius: var(--radius-pill);
   }
 
-  /* Recs table extras — collapse location / source / added into the meta line.
-     col-menu on rec rows holds the Save + Dismiss actions (rec-actions ~96px
-     wide), so widen the menu column there. col-sector (which carries the
-     "source" string for recs, NOT a sector chip cluster) is hidden because
-     the company name already appears in col-role. */
-  .pipeline-table tr:has(.col-location) {
+  /* Recs (For You) table on mobile. Location now lives inside the Role cell
+     (title / company / location), so the row is the standard two-area card.
+     Strength, Source and Added columns are secondary — hidden on phones to
+     keep the row scannable; col-menu carries Save + Dismiss so it widens. */
+  .pipeline-table--recs tr {
     grid-template-columns: 48px minmax(0, 1fr) auto;
     grid-template-areas:
-      "fit role     menu"
-      "fit metarec  menu";
+      "fit role menu"
+      "fit role menu";
     column-gap: var(--space-3);
   }
-  .pipeline-table tr:has(.col-location) .col-sector { display: none; }
-  .pipeline-table tr:has(.col-location) .col-source { display: none; }
-  .pipeline-table .col-location,
-  .pipeline-table .col-added {
-    grid-area: metarec;
-    width: auto;
-    font-size: var(--font-size-caption);
-    color: var(--fg-muted);
-    align-self: start;
-  }
-  .pipeline-table tr:has(.col-location) .col-location { justify-self: start; white-space: nowrap; }
-  .pipeline-table tr:has(.col-location) .col-added    { justify-self: end;   white-space: nowrap; }
-  .pipeline-table tr:has(.col-location) .col-menu {
+  .pipeline-table--recs .col-role { align-self: center; }
+  .pipeline-table--recs .col-strength,
+  .pipeline-table--recs .col-source,
+  .pipeline-table--recs .col-added { display: none; }
+  .pipeline-table--recs .col-menu {
     width: auto;
     min-width: 96px;
     align-self: center;

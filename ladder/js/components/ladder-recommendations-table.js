@@ -8,20 +8,21 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
+  import('../format.js' + V),
 ]);
 
 // Column shape mirrors job-pipeline's COLUMNS: id drives the col class,
 // sortKey gates sortability, label is what the header shows.
+// Location is nested under Role (no standalone column) — sort still offered.
 const COLUMNS = [
   { id: 'fit',      label: 'Fit',      sortKey: 'fitScore',       numeric: true },
   { id: 'strength', label: 'Strength', sortKey: 'candidateScore', numeric: true },
   { id: 'role',     label: 'Role',     sortKey: 'title' },
-  { id: 'location', label: 'Location', sortKey: 'location' },
-  { id: 'sector',   label: 'Source',   sortKey: 'source' },
+  { id: 'source',   label: 'Source',   sortKey: 'source' },
   { id: 'added',    label: 'Added',    sortKey: 'suggestedAt', date: true },
   { id: 'menu',     label: '',         sortKey: null },
 ];
@@ -49,6 +50,7 @@ function fitClass(s) {
   if (s >= 30) return 'fit-pill fit-pill--weak';
   return 'fit-pill fit-pill--poor';
 }
+
 
 export class JobRecommendationsTable extends LitElement {
   createRenderRoot() { return this; }
@@ -336,6 +338,7 @@ export class JobRecommendationsTable extends LitElement {
         url: rec.url,
         title: rec.title,
         company: rec.company,
+        location: rec.location,
         source: 'Network',
         fromRecommendationId: rec.id,
       });
@@ -422,14 +425,12 @@ export class JobRecommendationsTable extends LitElement {
             <div class="role-cell__text">
               <div class="role-cell__title">${r.title || '(untitled)'}</div>
               <div class="role-cell__company">${r.company || ''}</div>
+              ${renderLocation(r.location)}
             </div>
           </div>
         </td>
-        <td class="col col-location" data-label="Location">
-          ${r.location ? r.location : html`<span class="muted">—</span>`}
-        </td>
-        <td class="col col-sector" data-label="Source">
-          <span class="rec-source">${r.sourceLabel || r.source || ''}</span>
+        <td class="col col-source" data-label="Source">
+          ${renderSource(r)}
           ${r.enrichmentStatus === 'unresolved' ? html`
             <span class="enrichment-badge" title="Still resolving the canonical posting. Aggregator URL in the meantime.">verifying</span>
           ` : nothing}
@@ -512,7 +513,7 @@ export class JobRecommendationsTable extends LitElement {
           <h1>For You</h1>
         </header>
         <div class="pipeline-table-wrap">
-          <table class="pipeline-table">
+          <table class="pipeline-table pipeline-table--recs">
             <thead>${this._renderHeader()}</thead>
             <tbody>
               ${Array.from({ length: 6 }).map(() => html`
@@ -559,7 +560,7 @@ export class JobRecommendationsTable extends LitElement {
         </div>
       ` : html`
         <div class="pipeline-table-wrap">
-          <table class="pipeline-table">
+          <table class="pipeline-table pipeline-table--recs">
             <thead>${this._renderHeader()}</thead>
             <tbody>${rows.map(r => this._renderRow(r))}</tbody>
           </table>

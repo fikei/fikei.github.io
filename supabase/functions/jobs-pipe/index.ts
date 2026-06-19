@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.10.2';
-console.log(`[jobs-pipe] v${VERSION} - return updatedAt so drill page can auto-regen stale assets`);
+const VERSION = '0.11.0';
+console.log(`[jobs-pipe] v${VERSION} - return location for Role-cell nesting on list views`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -42,7 +42,7 @@ async function listRoles() {
   const rows = await sql`
     select
       r.slug, r.source_row as "rowNumber",
-      r.company_name as company, r.title, r.url, r.source, r.status,
+      r.company_name as company, r.title, r.url, r.location, r.source, r.status,
       r.stage, r.exit_reason as "exitReason", r.exit_context as "exitContext",
       r.contact, r.salary_range as salary, r.salary_low, r.salary_high,
       r.sector, r.investors, r.fit_score as score, r.fit_breakdown as breakdown,

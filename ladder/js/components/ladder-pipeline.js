@@ -6,6 +6,7 @@ const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, ch
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
+const { renderLocation } = await import('../format.js' + V);
 // Mount the recommendations widget. It self-loads when the user is signed in.
 import('./ladder-recommendations.js' + V);
 
@@ -894,6 +895,7 @@ export class JobPipeline extends LitElement {
                   : nothing}
               </div>
               <div class="role-cell__company">${r.company || ''}</div>
+              ${renderLocation(r.location)}
             </div>
           </div>
         </td>

@@ -102,7 +102,9 @@ export class JobRail extends LitElement {
       const roles = (pipe?.roles || []).filter(isVisibleRole);
       const leads  = roles.filter(r => bucketFor(r) === 'leads').length;
       const active = roles.filter(r => bucketFor(r) === 'active').length;
-      const recommended = recs?.count ?? (recs?.recommendations?.length ?? 0);
+      // `total` is the true count of all matching recs; `count` is only the
+      // returned page size (caps at the server's page limit, e.g. 100).
+      const recommended = recs?.total ?? recs?.count ?? (recs?.recommendations?.length ?? 0);
       this.counts = { leads, active, recommended };
       // Broadcast so other mobile chrome (the segmented .subnav-bar in
       // app.js) can pull the same counts without re-fetching.
