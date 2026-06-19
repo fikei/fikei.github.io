@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.5.0';
-console.log(`[enrich-job-source] v${VERSION} - layer-2 role-liveness: re-check ATS-resolved roles against the live board API`);
+const VERSION = '0.6.0';
+console.log(`[enrich-job-source] v${VERSION} - enrich ALL aggregator sources (not just gmail) + gh_jid/ashby_jid vanity-URL liveness`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -199,10 +199,17 @@ serve(async (req) => {
 
 async function backfillBatch(limit: number): Promise<Response> {
   const sql = db();
+  // Enrich EVERY aggregator source, not just gmail-jobs — theirstack, wwr,
+  // remotive, hn, etc. arrive on aggregator/vanity URLs (workatastartup,
+  // weworkremotely, linkedin) and otherwise never get a canonical ATS URL,
+  // so they're invisible to liveness AND dedup. tracked-ats is excluded:
+  // it's already ATS-native (its url IS the board posting) and liveness
+  // layer 1 handles it. resolveOne() leans on company-name ATS detection
+  // when the URL itself isn't an ATS link, so non-gmail sources resolve too.
   const rows = await sql<Array<{ id: string; company: string | null; title: string | null; url: string; payload: Record<string, unknown> | null }>>`
     select id, company, title, url, payload
       from job.recommended_roles
-     where source = 'gmail-jobs'
+     where source <> 'tracked-ats'
        and dismissed_at is null
        and added_to_pipeline_slug is null
        and (
@@ -284,6 +291,42 @@ function parseAtsPosting(u: string): AtsPosting | null {
   return null;
 }
 
+// Vanity / embedded ATS ids: a company hosts its board on its own domain
+// (e.g. guild.com/open-positions?gh_jid=7944042, zoominfo.com/careers?gh_jid=…)
+// but the posting actually lives on Greenhouse/Ashby. The job id rides in a
+// query param; the board SLUG is NOT in the URL, so we pair it with the
+// company's resolved hiring_companies.ats_slug.
+function embeddedJobId(u: string): { provider: 'Greenhouse' | 'Ashby'; jobId: string } | null {
+  try {
+    const q = new URL(u).searchParams;
+    const gh = q.get('gh_jid');
+    if (gh) return { provider: 'Greenhouse', jobId: gh };
+    const ash = q.get('ashby_jid');
+    if (ash) return { provider: 'Ashby', jobId: ash };
+  } catch { /* not a url */ }
+  return null;
+}
+
+// Resolve a role to a checkable (provider, slug, jobId): a clean ATS URL
+// carries all three; a vanity URL carries only the embedded job id, so we
+// borrow the slug from the company we already resolved into hiring_companies.
+function resolvePosting(
+  url: string | null,
+  canonical: string | null,
+  hc: { provider: string | null; slug: string | null },
+): AtsPosting | null {
+  const direct = parseAtsPosting(canonical || '') || parseAtsPosting(url || '');
+  if (direct) return direct;
+  for (const u of [canonical, url]) {
+    if (!u) continue;
+    const emb = embeddedJobId(u);
+    if (emb && hc.provider === emb.provider && hc.slug) {
+      return { provider: emb.provider, slug: hc.slug, jobId: emb.jobId };
+    }
+  }
+  return null;
+}
+
 // Fetch a board's open postings and return the set of open ids as strings
 // (Ashby ids are UUIDs, Greenhouse numbers, Lever strings — compare as
 // strings). Returns null on any fetch/parse failure so the caller skips
@@ -305,19 +348,24 @@ async function fetchOpenIds(provider: AtsPosting['provider'], slug: string): Pro
 async function livenessBatch(limit: number): Promise<Response> {
   const sql = db();
   // Longest-unchecked first so the cron sweeps the whole pool over time.
-  const rows = await sql<Array<{ id: string; url: string | null; canonical_url: string | null }>>`
-    select id, url, canonical_url
-      from job.recommended_roles
-     where closed_at is null
-       and dismissed_at is null
-       and added_to_pipeline_slug is null
-       and coalesce(canonical_url, url) ~* '(greenhouse|lever|ashbyhq)'
-     order by last_seen_at asc nulls first, suggested_at asc
+  // Join the resolved company so vanity-domain postings (gh_jid/ashby_jid on
+  // the company's own careers site) can borrow the board slug we already
+  // resolved into hiring_companies.
+  const rows = await sql<Array<{ id: string; url: string | null; canonical_url: string | null; hc_provider: string | null; hc_slug: string | null }>>`
+    select r.id, r.url, r.canonical_url,
+           hc.ats_provider as hc_provider, hc.ats_slug as hc_slug
+      from job.recommended_roles r
+      left join job.hiring_companies hc on hc.id = r.company_id
+     where r.closed_at is null
+       and r.dismissed_at is null
+       and r.added_to_pipeline_slug is null
+       and coalesce(r.canonical_url, r.url) ~* '(greenhouse|lever|ashbyhq|gh_jid=|ashby_jid=)'
+     order by r.last_seen_at asc nulls first, r.suggested_at asc
      limit ${limit}
   `;
 
   const parsed = rows
-    .map(r => ({ id: r.id, p: parseAtsPosting(r.canonical_url || '') || parseAtsPosting(r.url || '') }))
+    .map(r => ({ id: r.id, p: resolvePosting(r.url, r.canonical_url, { provider: r.hc_provider, slug: r.hc_slug }) }))
     .filter((x): x is { id: string; p: AtsPosting } => x.p !== null);
 
   const boardCache = new Map<string, Set<string> | null>();
