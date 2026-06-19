@@ -135,10 +135,7 @@ export class JobRail extends LitElement {
               <line x1="6.5" y1="17" x2="17.5" y2="17"/>
             </svg>
           </span>
-          <span class="brand__text">
-            Ladder
-            <span class="brand__sub">ctrl.rodeo</span>
-          </span>
+          <span class="brand__text">Ladder</span>
         </a>
         <nav>
           <ul class="nav-list">
