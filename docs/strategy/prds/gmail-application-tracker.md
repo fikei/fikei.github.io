@@ -208,7 +208,7 @@ Saved/Active pipeline rows get a 🔔 chip with relative time of last event:
 
 Clickable → drill page Activity tab.
 
-### 4. "Needs your attention" widget on /job/jobs/
+### 4. "Needs your attention" widget on /ladder/jobs/
 
 Above the Active table. Surfaces:
 
@@ -250,7 +250,7 @@ User can override anything from the drill page menu (existing flow). Override re
 2. **Stage taxonomy unchanged.** Top-level `stage` stays the 4-value enum. Granularity (which round, what kind) lives in `application_events.round_label` and `pipeline_roles.process_outline`.
 3. **Process detection: 3 sources, ranked.** Recruiter email > JD extract > inferred from events. Higher-confidence source never gets overwritten by a lower one.
 4. **Backfill: 30 days, Active applied roles only.** Process_outline only updated from explicit signals on backfill; inferred-from-events is disabled retroactively.
-5. **Stale-14d nudge is on-open only.** No banner, no push. Renders as a yellow chip on row + Needs-Attention card only when the user lands on /job/jobs/. Reason: banners are reserved for live arrivals in the last 30 min; a 14d-quiet signal is the inverse of live and would dilute the banner contract.
+5. **Stale-14d nudge is on-open only.** No banner, no push. Renders as a yellow chip on row + Needs-Attention card only when the user lands on /ladder/jobs/. Reason: banners are reserved for live arrivals in the last 30 min; a 14d-quiet signal is the inverse of live and would dilute the banner contract.
 6. **Calendar read pulled into 2.0 (narrow slice).** `calendar-api` already holds the `calendar` scope from Phase 1. 2.0 adds a single `events.list(timeMin=now, timeMax=now+48h)` query, matched to a role by attendee email domain first, title-token second. No write-back, no recurring-event handling, no calendar-event creation. Ambiguous matches → no chip (silent fail beats wrong chip). Tightening match precision + reply-cadence analytics move to 2.1.
 
 ---
@@ -270,7 +270,7 @@ The UI exposes exactly five signal types per role. Each role surfaces **the sing
 ### Surface rules
 
 - **Row chip**: single highest-priority signal only. No chip = nothing actionable.
-- **Needs-Attention widget** (above /job/jobs/?bucket=active table): one card per actionable role. Hidden entirely when the actionable set is empty. Cards are clickable → drill page.
+- **Needs-Attention widget** (above /ladder/jobs/?bucket=active table): one card per actionable role. Hidden entirely when the actionable set is empty. Cards are clickable → drill page.
 - **Banner**: ONLY for live arrivals in the last 30 min — auto-advance just happened, offer just arrived, or calendar event within 2h. Auto-fades after 30 min. Same trigger never re-banners. Stale + reply-pending are *never* banners (no live arrival).
 - **Auto-advance toast** (sub-case of banner): when auto-advance moves a role forward, the banner names the transition ("Auto-advanced Acme → Interviewing"). User can undo within 30 min.
 

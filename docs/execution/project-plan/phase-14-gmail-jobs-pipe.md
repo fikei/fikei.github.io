@@ -2,7 +2,7 @@
 
 > Back to [Project Plan](./index.md)
 >
-> **Reference**: [PRD: Job Product](/docs/strategy/prds/job-product.md)
+> **Reference**: [PRD: Job Product](/docs/strategy/prds/ladder-product.md)
 >
 > **Vision**: Scan Gmail for recruiter outreach and surface scored, deduplicated, canonically-linked role recommendations inside the existing Jobs recommendations widget — with zero manual input from Ian. Phase 1 is strictly the recommendations pipe: Gmail OAuth, token storage, job-source enrichment, Gmail scanning, and source plugin wiring. Contacts, connections, network overlay, and LinkedIn CSV import are deferred to Phase 2.
 

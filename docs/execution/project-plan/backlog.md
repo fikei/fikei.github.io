@@ -139,7 +139,7 @@ Derived from [Known Risks](../../infrastructure/risks.md). Items here are longer
 | Keep CORS proxies as anonymous-user fallback | Pending |
 | Add scrape health monitoring (success rates per domain) | Pending |
 
-### Headless-Browser JD Fetcher for `/job` Fit Scoring
+### Headless-Browser JD Fetcher for `/ladder` Fit Scoring
 
 The current `fetchJdText()` in `_shared/job-fit-haiku.ts` does a static HTML fetch with browser-shaped headers. It works for ~75% of postings but fails on:
 - **Cloudflare bot challenges** — Code for America (now fetched but flaky), Harvey, Sully.ai
@@ -544,11 +544,11 @@ Advanced content discovery features requiring ML infrastructure.
 
 ---
 
-## /job — Pipeline & Career KB
+## /ladder — Pipeline & Career KB
 
-Improvements flagged while shipping the /job product (PRs #633–#645). Tracked here until promoted into Phase 1+ work.
+Improvements flagged while shipping the /ladder product (PRs #633–#645). Tracked here until promoted into Phase 1+ work.
 
-> See: [Job product PRD](../../strategy/prds/job-product.md), [Tech design](../../infrastructure/technical-design/job-product.md).
+> See: [Job product PRD](../../strategy/prds/ladder-product.md), [Tech design](../../infrastructure/technical-design/ladder-product.md).
 
 ### Performance & caching
 
@@ -556,7 +556,7 @@ Improvements flagged while shipping the /job product (PRs #633–#645). Tracked 
 |-------|--------|
 | **gen-asset KB caching** — Cache the 01-job-history + 02-goals-intents KB load per Edge Function instance (5-min TTL). Currently ~30 GitHub blob fetches on every generate call adds ~3-5s. | Pending |
 | **gen-asset selective context** — Send only the companies / projects / skills relevant to the target role (matched by sector + role title) instead of the entire KB. Cuts prompt tokens by ~70%. | Pending |
-| **jobs-pipe response cache** — 5-min in-memory cache so back-to-back `/job/jobs/` loads don't re-pull the sheet + GitHub tree on every navigation. | Pending |
+| **jobs-pipe response cache** — 5-min in-memory cache so back-to-back `/ladder/jobs/` loads don't re-pull the sheet + GitHub tree on every navigation. | Pending |
 | **kb-read response cache** — Per-path 60s LRU cache (deferred from #635 to avoid stale-after-edit issues; revisit with shared KV store). | Pending |
 | **kb-manifest endpoint** — Single endpoint that returns `{ slug → route }` so the wiki-link resolver in markdown.js can drop its prefix-based heuristic. | Pending |
 
@@ -566,7 +566,7 @@ Improvements flagged while shipping the /job product (PRs #633–#645). Tracked 
 |-------|--------|
 | **Auto-sync cover-letter rules** — `gen-asset/prompts.ts` mirrors `~/.claude/projects/.../memory/cover_letter_rules.md` by hand. Either pull at runtime via a public URL, or commit the rules into fikei/job and read via kb-read. | Pending |
 | **Auto-sync resume voice rules** — Same problem, less acute (resume rules are shorter and changed less often). | Pending |
-| **Vision-driven RELEVANCE.md sync** — When Vision is edited in /job, propagate the changes back to `~/.claude/skills/jobs/RELEVANCE.md` so the /jobs scan skill stays in sync. (Tech-design open question #2.) | Pending |
+| **Vision-driven RELEVANCE.md sync** — When Vision is edited in /ladder, propagate the changes back to `~/.claude/skills/jobs/RELEVANCE.md` so the /jobs scan skill stays in sync. (Tech-design open question #2.) | Pending |
 
 ### Slug + sheet schema
 
@@ -608,7 +608,7 @@ Improvements flagged while shipping the /job product (PRs #633–#645). Tracked 
 
 | Story | Status |
 |-------|--------|
-| **Supabase URL allow-list** (one-time config) — Add `https://ctrl.rodeo/job/**` to the Boards project's Auth → URL Configuration → Redirect URLs so sign-in returns to /job/, not /boards/. | Pending |
+| **Supabase URL allow-list** (one-time config) — Add `https://ctrl.rodeo/ladder/**` to the Boards project's Auth → URL Configuration → Redirect URLs so sign-in returns to /ladder/, not /boards/. | Pending |
 | **Rotate GITHUB_PAT to fine-grained PAT** — Currently using the broadly-scoped `gh auth token`. Generate a fine-grained PAT scoped to `fikei/job` only and `supabase secrets set GITHUB_PAT=<token>`. | Pending |
 | **CTRL theme alternate** (Phase 1 milestone i) — Author tokens-ctrl-{light,dark}.css against the abstract token contract; enable in the rail's theme picker. | Pending |
 | **Asset existence detection scaling** — jobs-pipe currently fetches the entire repo tree on every GET to compute hasResume/hasCoverLetter flags. Cache or scope to 03-jobs/. | Pending |

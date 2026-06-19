@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Chat — /ladder</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+  <link rel="stylesheet" href="/ladder/css/base.css?v=2.4.0">
+  <script src="/ladder/js/theme.js?v=2.4.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.97.0"></script>
+  <script src="/auth/ctrl-auth.js"></script>
+</head>
+<body data-auth-state="loading">
+
+  <section id="signin-gate" class="gate">
+    <div class="gate__card">
+      <h1>/ladder</h1>
+      <p>Sign in to read your chat history.</p>
+      <button class="btn btn--primary" id="signin-btn">Sign in</button>
+      <div id="ctrl-auth-root"></div>
+    </div>
+  </section>
+
+  <div class="app">
+    <ladder-rail></ladder-rail>
+    <main class="app__main">
+      <header class="page-header">
+        <h1>Chat</h1>
+        <p>Your conversation history with the /ladder agent.</p>
+      </header>
+      <ladder-chat-page></ladder-chat-page>
+    </main>
+  </div>
+
+  <script type="module" src="/ladder/js/app.js?v=2.4.0"></script>
+</body>
+</html>
