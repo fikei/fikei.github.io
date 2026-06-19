@@ -1,6 +1,6 @@
 # Job Recs — Scoring & Enrichment Follow-ups
 
-Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). Items 4-5 open. Use `/plan` to schedule the open ones.
+Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). Item 9 shipped 2026-06-19 (role-closure detection). Items 4-5, 6-8 open. Use `/plan` to schedule the open ones.
 
 **Shipped 2026-06-16 (recommendations v0.9.0 + /job v2.3.6) — addresses items 1, 2, 3:**
 - **#3 ranking:** For You now defaults to a "best overall match" sort — `candidate_score*0.6 + fit_score*0.4` for graded rows, `fit_score*0.8` for un-graded — so strong responsibilities-matches surface first and un-graded high-fit roles can't dominate the top. Clicking a column header still switches to that explicit sort.
@@ -98,7 +98,16 @@ Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). 
 
 ## 9. Concrete role-closure detection — when is a role closed, and how do we log it?
 
-**Question raised:** how do we know a role has actually been closed/filled, and how do we record it? Today a `recommended_roles` row lives forever once created; we have no closure signal, so the list accumulates stale (filled/expired) postings.
+**Shipped 2026-06-19** (`pull-recommendations` v0.22.0, `enrich-job-source` v0.5.0, `recommendations` v0.11.0):
+- **Migration 082_role_liveness.sql:** `recommended_roles` gained `closed_at timestamptz`, `last_seen_at timestamptz`, `closure_reason text` ('delisted' | 'ats-delisted'), plus partial index on active rows.
+- **Layer 1 — tracked-ats "disappeared since last pull" diff:** POST `pull-recommendations` v0.22.0. After each pull, diff full board against active recs. Ids present → stamp `last_seen_at`, clear `closed_at`; ids in fetched-slug set but absent → `closed_at = now()`, `closure_reason = 'delisted'`. Only operates on fetched slugs (safe from transient failures). Known v1 limit: zero-open-postings tail uncaught by layer 1; layer 2 catches via age-out.
+- **Layer 2 — ATS board-API liveness re-check:** `enrich-job-source` v0.5.0, new `action: 'liveness'`. Selects up to `limit` (default 40) active ATS roles ordered `last_seen_at nulls first`, fetches live open-id set per provider:slug, closes roles absent from live set (`closure_reason = 'ats-delisted'`); skips on fetch error. Returns {checked, open, closed, skipped}.
+- **Read filter:** `recommendations` v0.11.0: `and r.closed_at is null` added to whereClause — closed roles hidden from For You + widget, kept for history (like dismissed).
+- **Cron:** `liveness-check-6h` (`0 */6 * * *`) POSTs `{action:'liveness', limit:40}` to enrich-job-source.
+- **Verification (2026-06-19):** forced tracked-ats pull closed 2 (sane), seen 55, `last_seen_at` populated; liveness ×3 closed only genuinely-gone roles (3/3 verified absent from live boards); read-filter passed (0 closed-row leaks). PRs #941 merged, functions deployed, cron registered.
+- **Open/deferred:** grace period before closing; distinguishing "filled" vs "paused"; zero-open-postings tail; gmail/LinkedIn non-ATS roles (Phenom, etc.) lack liveness signal.
+
+**Question raised (pre-ship):** how do we know a role has actually been closed/filled, and how do we record it? Today a `recommended_roles` row lives forever once created; we have no closure signal, so the list accumulates stale (filled/expired) postings.
 
 **Closure signals, by source:**
 - **tracked-ats (strongest):** we re-pull the company's FULL open-roles list each cycle. A previously-seen `source_id` that's no longer returned = the posting was taken down = closed. (The `/jobs` careers-page skill already does exactly this — marks disappeared roles "Not Listed".) Implement: stamp `last_seen_at` on every pull; if a tracked-ats `source_id` isn't in the latest pull for its company, mark it closed.
