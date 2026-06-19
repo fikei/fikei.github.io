@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.10.0';
-console.log(`[recommendations] v${VERSION} - multi-level sort + candidateScore col + block-company filter/action`);
+const VERSION = '0.11.0';
+console.log(`[recommendations] v${VERSION} - hide closed (delisted/filled) roles from For You (backlog #9)`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -85,6 +85,7 @@ serve(async (req) => {
       // counts exactly what the list would show.
       const whereClause = sql`
         where r.dismissed_at is null
+          and r.closed_at is null
           and r.added_to_pipeline_slug is null
           and (${isAll} or r.fit_score is null or r.fit_score >= 50)
           and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
