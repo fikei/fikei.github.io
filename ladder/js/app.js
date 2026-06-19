@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.5.0";
-console.log(`[ladder] v${VERSION} - For You count=total; location nested under Role; source favicon+label`);
+const VERSION = "2.5.1";
+console.log(`[ladder] v${VERSION} - drop ctrl.rodeo subtitle from rail brand`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
