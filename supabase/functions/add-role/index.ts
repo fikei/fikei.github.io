@@ -11,11 +11,11 @@ import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 import { scoreOne } from '../_shared/job-fit-haiku.ts';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
-console.log(`[add-role] v${VERSION} - v3 fit at insert time: inherit Haiku from source rec OR fetch+grade fresh URLs`);
+console.log(`[add-role] v${VERSION} - persist location (from source rec or JSON-LD jobLocation)`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -73,7 +73,7 @@ function decodeEntities(s: string): string {
 
 // Returns the structured JobPosting JSON-LD if the page ships one. Most
 // modern ATSes (careerspage.io, Greenhouse, Workable, Ashby) embed it.
-function parseJobPostingLd(html: string): { title?: string; company?: string; description?: string; salaryLow?: number; salaryHigh?: number; datePosted?: string } | null {
+function parseJobPostingLd(html: string): { title?: string; company?: string; description?: string; salaryLow?: number; salaryHigh?: number; datePosted?: string; location?: string } | null {
   const blocks = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
   for (const m of blocks) {
     try {
@@ -98,6 +98,23 @@ function parseJobPostingLd(html: string): { title?: string; company?: string; de
           if (Number.isFinite(lo)) out.salaryLow = lo;
           if (Number.isFinite(hi)) out.salaryHigh = hi;
         }
+        // jobLocation → "City, Region"; multiple locations joined with "; ".
+        // Fully-remote postings advertise jobLocationType: TELECOMMUTE.
+        const fmtAddr = (loc: any): string | null => {
+          const ad = loc?.address || loc;
+          if (!ad || typeof ad !== 'object') return null;
+          const parts = [ad.addressLocality, ad.addressRegion].filter((x: unknown) => typeof x === 'string' && x);
+          if (parts.length) return parts.join(', ');
+          const country = ad.addressCountry?.name || ad.addressCountry;
+          return typeof country === 'string' ? country : null;
+        };
+        const jl = c.jobLocation;
+        if (jl) {
+          const arr = Array.isArray(jl) ? jl : [jl];
+          const locs = Array.from(new Set(arr.map(fmtAddr).filter(Boolean) as string[]));
+          if (locs.length) out.location = locs.join('; ');
+        }
+        if (!out.location && c.jobLocationType === 'TELECOMMUTE') out.location = 'Remote';
         if (out.title || out.company || out.description) return out;
       }
     } catch { /* malformed JSON-LD; try next block */ }
@@ -363,6 +380,10 @@ serve(async (req) => {
     const { source, sourceLabel } = detectSource(url);
     const finalSource = body.source ? String(body.source) : source;
 
+    // Location: caller-supplied (rec carry-over) wins, then JSON-LD jobLocation.
+    // The rec-link block below also backfills from the source rec when present.
+    const location = (String(body.location || '').trim() || meta.ld?.location || '') || null;
+
     const sql = db();
     const companySlug = slugify(company) || null;
 
@@ -381,16 +402,17 @@ serve(async (req) => {
           returning slug
         )
         insert into job.pipeline_roles (
-          slug, company_slug, company_name, title, url, source, status
+          slug, company_slug, company_name, title, url, location, source, status
         ) values (
           ${slug}, ${companySlug}, ${company}, ${title},
-          ${url}, ${finalSource}, 'Saved'
+          ${url}, ${location}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
           title = excluded.title,
           company_name = excluded.company_name,
           company_slug = excluded.company_slug,
+          location = coalesce(job.pipeline_roles.location, excluded.location),
           source = coalesce(job.pipeline_roles.source, excluded.source),
           deleted_at = null,
           archived_at = null,
@@ -400,16 +422,17 @@ serve(async (req) => {
       // No company slug — insert without the FK link.
       await sql`
         insert into job.pipeline_roles (
-          slug, company_slug, company_name, title, url, source, status
+          slug, company_slug, company_name, title, url, location, source, status
         ) values (
           ${slug}, null, ${company}, ${title},
-          ${url}, ${finalSource}, 'Saved'
+          ${url}, ${location}, ${finalSource}, 'Saved'
         )
         on conflict (slug) do update set
           url = excluded.url,
           title = excluded.title,
           company_name = excluded.company_name,
           company_slug = excluded.company_slug,
+          location = coalesce(job.pipeline_roles.location, excluded.location),
           source = coalesce(job.pipeline_roles.source, excluded.source),
           deleted_at = null,
           archived_at = null,
@@ -561,8 +584,8 @@ serve(async (req) => {
     // user can re-open the originating thread from the role detail.
     if (body.fromRecommendationId) {
       try {
-        const recRows = await sql<{ source: string; payload: Record<string, unknown> | null }[]>`
-          select source, payload from job.recommended_roles
+        const recRows = await sql<{ source: string; payload: Record<string, unknown> | null; location: string | null }[]>`
+          select source, payload, location from job.recommended_roles
            where id = ${body.fromRecommendationId} limit 1`;
         await sql`
           update job.recommended_roles
@@ -570,6 +593,14 @@ serve(async (req) => {
           where id = ${body.fromRecommendationId};
         `;
         const rec = recRows[0];
+        // Backfill location from the source rec when the page parse missed it.
+        if (rec?.location && String(rec.location).trim()) {
+          await sql`
+            update job.pipeline_roles
+               set location = coalesce(location, ${rec.location})
+             where slug = ${slug};
+          `;
+        }
         const gmailApiId = rec?.source === 'gmail-jobs'
           ? (rec.payload as Record<string, unknown> | null)?.gmailApiId
           : null;

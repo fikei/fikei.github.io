@@ -138,12 +138,12 @@ export async function deleteRole(slug) {
   return res.json();
 }
 
-export async function addRole({ url, title, company, sector, source, fromRecommendationId } = {}) {
+export async function addRole({ url, title, company, location, sector, source, fromRecommendationId } = {}) {
   const headers = await authHeader();
   const res = await fetch(ADD_ROLE_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, title, company, sector, source, fromRecommendationId }),
+    body: JSON.stringify({ url, title, company, location, sector, source, fromRecommendationId }),
   });
   if (!res.ok) throw new Error(`add-role ${res.status}: ${await res.text()}`);
   return res.json();
