@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.4.0";
-console.log(`[ladder] v${VERSION} - renamed product /job → /ladder (frontend + branding)`);
+const VERSION = "2.4.1";
+console.log(`[ladder] v${VERSION} - rail brand reworked to Ladder + ladder icon`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -129,10 +129,10 @@ function injectMobileBar() {
 
   const isHome = location.pathname === '/ladder/' || location.pathname === '/ladder';
   const title = isHome
-    ? '/ job'
+    ? 'Ladder'
     : (document.querySelector('.page-header h1')?.textContent?.trim()
-       || document.title.replace(/\s*[—|]\s*\/?job.*$/i, '').trim()
-       || 'ctrl.rodeo');
+       || document.title.replace(/\s*[—|]\s*\/?(ladder|job).*$/i, '').trim()
+       || 'Ladder');
 
   const bar = document.createElement('header');
   bar.className = 'mobile-bar';

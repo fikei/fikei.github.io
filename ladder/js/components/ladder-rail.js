@@ -123,10 +123,21 @@ export class JobRail extends LitElement {
   render() {
     return html`
       <aside class="app__rail">
-        <div class="brand">
-          ctrl.rodeo
-          <span class="brand__sub">/ job</span>
-        </div>
+        <a class="brand" href="/ladder/">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="6.5" y1="2.5" x2="6.5" y2="21.5"/>
+              <line x1="17.5" y1="2.5" x2="17.5" y2="21.5"/>
+              <line x1="6.5" y1="7" x2="17.5" y2="7"/>
+              <line x1="6.5" y1="12" x2="17.5" y2="12"/>
+              <line x1="6.5" y1="17" x2="17.5" y2="17"/>
+            </svg>
+          </span>
+          <span class="brand__text">
+            Ladder
+            <span class="brand__sub">ctrl.rodeo</span>
+          </span>
+        </a>
         <nav>
           <ul class="nav-list">
             ${ROUTES.map(r => {
