@@ -37,7 +37,7 @@ export class JobFooter extends LitElement {
     return html`
       <footer class="app__footer">
         <div>
-          <span class="footer__brand">ctrl.rodeo / job</span>
+          <span class="footer__brand">Ladder · ctrl.rodeo</span>
           ${window.LADDER_VERSION ? html`<span class="footer__version" style="margin-left:var(--space-3);">${window.LADDER_VERSION}</span>` : ''}
         </div>
         <div class="footer__controls">
