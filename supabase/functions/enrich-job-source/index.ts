@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.4.0';
-console.log(`[enrich-job-source] v${VERSION} - Haiku semantic title→posting match when token overlap misses`);
+const VERSION = '0.5.0';
+console.log(`[enrich-job-source] v${VERSION} - layer-2 role-liveness: re-check ATS-resolved roles against the live board API`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -85,6 +85,15 @@ serve(async (req) => {
   // URL + status back. Lets the user drain after a Phase 1.5 cold-start.
   if (body.action === 'backfill') {
     return backfillBatch(Math.max(1, Math.min(15, body.limit ?? 8)));
+  }
+
+  // Liveness mode (backlog #9, layer 2) — re-check active ATS-resolved recs
+  // against the live board-API open-id set and close the ones whose posting
+  // is gone. Covers the Gmail/LinkedIn/theirstack roles that resolved to a
+  // Greenhouse/Lever/Ashby posting (tracked-ats is handled by layer 1 in
+  // pull-recommendations). Never closes on a board-fetch error.
+  if (body.action === 'liveness') {
+    return livenessBatch(Math.max(1, Math.min(100, body.limit ?? 40)));
   }
 
   const company = (body.company || '').trim();
@@ -235,6 +244,102 @@ async function backfillBatch(limit: number): Promise<Response> {
     resolved:  results.filter(x => x.resolved).length,
     results,
   };
+  return new Response(JSON.stringify(summary, null, 2), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+// ---------- Liveness (layer 2) ----------
+//
+// Select up to `limit` active ATS-resolved recs, re-check each against its
+// board's live open-id set, and close the ones whose posting is gone. We
+// fetch each board's list ONCE per invocation (cached by provider:slug) so
+// N roles at one company cost a single API call. A board-fetch failure
+// SKIPS that slug — we only ever close on a definitive "id absent from a
+// successfully-fetched board", never on an error.
+
+interface AtsPosting { provider: 'Greenhouse' | 'Lever' | 'Ashby'; slug: string; jobId: string }
+
+// Parse (provider, slug, jobId) out of a canonical ATS posting URL.
+//   Greenhouse: (job-)boards.greenhouse.io/<slug>/jobs/<id>
+//   Lever:      jobs.lever.co/<slug>/<id>
+//   Ashby:      jobs.ashbyhq.com/<slug>/<id>
+function parseAtsPosting(u: string): AtsPosting | null {
+  try {
+    const url = new URL(u);
+    const host = url.hostname.toLowerCase();
+    const seg = url.pathname.split('/').filter(Boolean);
+    if (/(?:^|\.)(boards|job-boards)\.greenhouse\.io$/.test(host)) {
+      const jobsIdx = seg.indexOf('jobs');
+      if (jobsIdx >= 1 && seg[jobsIdx + 1]) return { provider: 'Greenhouse', slug: seg[0], jobId: seg[jobsIdx + 1] };
+    }
+    if (/(?:^|\.)jobs\.lever\.co$/.test(host) && seg.length >= 2) {
+      return { provider: 'Lever', slug: seg[0], jobId: seg[seg.length - 1] };
+    }
+    if (/(?:^|\.)jobs\.ashbyhq\.com$/.test(host) && seg.length >= 2) {
+      return { provider: 'Ashby', slug: seg[0], jobId: seg[seg.length - 1] };
+    }
+  } catch { /* not a URL */ }
+  return null;
+}
+
+// Fetch a board's open postings and return the set of open ids as strings
+// (Ashby ids are UUIDs, Greenhouse numbers, Lever strings — compare as
+// strings). Returns null on any fetch/parse failure so the caller skips
+// rather than closing on error.
+async function fetchOpenIds(provider: AtsPosting['provider'], slug: string): Promise<Set<string> | null> {
+  const url =
+    provider === 'Greenhouse' ? `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`
+    : provider === 'Lever'    ? `https://api.lever.co/v0/postings/${slug}?mode=json`
+    :                           `https://api.ashbyhq.com/posting-api/job-board/${slug}`;
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const jobs: Array<{ id: unknown }> = Array.isArray(data) ? data : ((data?.jobs as Array<{ id: unknown }>) || []);
+    return new Set(jobs.map(j => String(j.id)));
+  } catch { return null; }
+}
+
+async function livenessBatch(limit: number): Promise<Response> {
+  const sql = db();
+  // Longest-unchecked first so the cron sweeps the whole pool over time.
+  const rows = await sql<Array<{ id: string; url: string | null; canonical_url: string | null }>>`
+    select id, url, canonical_url
+      from job.recommended_roles
+     where closed_at is null
+       and dismissed_at is null
+       and added_to_pipeline_slug is null
+       and coalesce(canonical_url, url) ~* '(greenhouse|lever|ashbyhq)'
+     order by last_seen_at asc nulls first, suggested_at asc
+     limit ${limit}
+  `;
+
+  const parsed = rows
+    .map(r => ({ id: r.id, p: parseAtsPosting(r.canonical_url || '') || parseAtsPosting(r.url || '') }))
+    .filter((x): x is { id: string; p: AtsPosting } => x.p !== null);
+
+  const boardCache = new Map<string, Set<string> | null>();
+  let checked = 0, open = 0, closed = 0, skipped = rows.length - parsed.length;
+
+  for (const { id, p } of parsed) {
+    const key = `${p.provider}:${p.slug}`;
+    if (!boardCache.has(key)) boardCache.set(key, await fetchOpenIds(p.provider, p.slug));
+    const ids = boardCache.get(key);
+    if (!ids) { skipped++; continue; }          // board fetch failed → never close
+    checked++;
+    if (ids.has(String(p.jobId))) {
+      open++;
+      await sql`update job.recommended_roles set last_seen_at = now(), closed_at = null, closure_reason = null where id = ${id}`;
+    } else {
+      closed++;
+      await sql`update job.recommended_roles set closed_at = now(), closure_reason = 'ats-delisted' where id = ${id}`;
+    }
+  }
+
+  const summary = { ok: true, version: VERSION, checked, open, closed, skipped };
+  console.log(`[enrich-job-source] liveness: checked=${checked} open=${open} closed=${closed} skipped=${skipped}`);
   return new Response(JSON.stringify(summary, null, 2), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.21.0';
-console.log(`[pull-recommendations] v${VERSION} - filter blocked companies at the source ("don't recommend this company")`);
+const VERSION = '0.22.0';
+console.log(`[pull-recommendations] v${VERSION} - layer-1 role-liveness: close tracked-ats roles that disappeared since last pull`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -395,6 +395,17 @@ serve(async (req) => {
       const droppedAsDup = pipeFiltered.length - filtered.length;
       if (droppedAsDup > 0) console.log(`[pull-recommendations] dropped ${droppedAsDup} duplicate(s) vs existing/within-batch`);
       const upserted = await insertNew(sql, src, filtered);
+      // Layer 1 role-liveness (backlog #9) — tracked-ats re-pulls EVERY open
+      // posting from each tracked board every run, so a previously-seen
+      // source_id that's no longer in the pull = the posting was taken down.
+      // Use `pulledRaw` (the full board BEFORE the role-universe gate) so a
+      // still-open posting that's merely filtered out of recs isn't falsely
+      // closed. Only operate on slugs we actually fetched this run — a
+      // transient board-fetch failure yields zero rows for that slug, and we
+      // must never mass-close a company on an error.
+      if (src.type === 'tracked-ats') {
+        await trackedAtsLiveness(sql, pulledRaw);
+      }
       // Only genuinely-new rows go through inline enrich+grade. Rows that
       // were conflict-updated to backfill a missing JD are drained by the
       // grade-ungraded cron instead — inline-grading a whole tracked-ats
@@ -633,6 +644,48 @@ function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: Fi
   return { kept, dropped };
 }
 
+
+// ---------- Layer 1 role-liveness (tracked-ats disappeared-since-pull) ----------
+// Given the FULL board pull (pre-universe-gate), reopen/stamp every active
+// tracked-ats rec whose source_id is in the pull, and close every active
+// rec whose slug WAS fetched this run but whose source_id is NOT in the
+// pull. tracked-ats source_ids encode the board as `<provider>:<slug>:<id>`,
+// so the slug is the middle (split_part …, 2) segment.
+async function trackedAtsLiveness(
+  sql: ReturnType<typeof db>,
+  pulledRaw: RecommendedRoleInput[],
+): Promise<void> {
+  const pulledIds = [...new Set(pulledRaw.map(r => r.sourceId).filter(Boolean))] as string[];
+  // Slugs we successfully fetched this run = the middle segment of every
+  // pulled source_id. Only these slugs are eligible to close anything.
+  const fetchedSlugs = [...new Set(
+    pulledIds.map(sid => sid.split(':')[1]).filter(Boolean),
+  )] as string[];
+  if (!fetchedSlugs.length) return;   // nothing fetched → never close
+
+  // 1) Stamp last_seen + reopen every active rec present in this pull.
+  const seen = await sql`
+    update job.recommended_roles
+       set last_seen_at   = now(),
+           closed_at      = null,
+           closure_reason = null
+     where source = 'tracked-ats'
+       and dismissed_at is null
+       and source_id = any(${pulledIds}::text[])`;
+  // 2) Close every active rec whose slug we fetched but whose id vanished.
+  const closed = await sql`
+    update job.recommended_roles
+       set closed_at      = now(),
+           closure_reason = 'delisted'
+     where source = 'tracked-ats'
+       and closed_at is null
+       and dismissed_at is null
+       and split_part(source_id, ':', 2) = any(${fetchedSlugs}::text[])
+       and source_id <> all(${pulledIds}::text[])`;
+  const seenN   = (seen   as unknown as { count: number }).count;
+  const closedN = (closed as unknown as { count: number }).count;
+  console.log(`[pull-recommendations] tracked-ats liveness: closed ${closedN}, seen ${seenN}`);
+}
 
 // ---------- Productize: enrich + Haiku-grade + rescore new inserts ----------
 // Each new row from a cron pull walks the same pipeline as the manual
