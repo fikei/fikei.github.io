@@ -891,7 +891,7 @@ body {
       // Gmail OAuth callback (state=gmail:<user_id>). Google's OAuth
       // client has /calendar/ registered as a redirect_uri so this
       // page is the landing spot for BOTH Calendar and Gmail consent
-      // flows. Forward Gmail callbacks to /job/ where the handler
+      // flows. Forward Gmail callbacks to /ladder/ where the handler
       // lives.
       var gmailMatch = gstate.match(/^gmail:(.+)$/);
       if (gmailMatch) {
@@ -900,7 +900,7 @@ body {
         qs.set('state', gstate);
         var scope = params.get('scope');
         if (scope) qs.set('scope', scope);
-        window.location.replace('/job/?' + qs.toString());
+        window.location.replace('/ladder/?' + qs.toString());
         return;
       }
       // admin:UUID or visitor:UUID format

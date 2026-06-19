@@ -1,6 +1,6 @@
 # apt walkthrough — captured Q&A + language style notes
 
-Walked https://www.tryapt.ai/quiz end-to-end as Ian Fike (Head of Product, healthtech/civic-tech, Toronto). Used to extract apt's question intents, ordering, reflection style, and language so we can apply the same texture to `/job/onboarding`. 20+ turns captured.
+Walked https://www.tryapt.ai/quiz end-to-end as Ian Fike (Head of Product, healthtech/civic-tech, Toronto). Used to extract apt's question intents, ordering, reflection style, and language so we can apply the same texture to `/ladder/onboarding`. 20+ turns captured.
 
 ---
 

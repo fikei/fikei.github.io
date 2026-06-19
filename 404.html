@@ -43,23 +43,23 @@ permalink: /404.html
         return;
       }
 
-      // /job/history/{kind}/{slug}/ — drilldown handled by /job/history/drill/.
+      // /ladder/history/{kind}/{slug}/ — drilldown handled by /ladder/history/drill/.
       // Negative lookahead skips the literal /drill/ target so the router
       // never matches its own destination.
-      var jobMatch = path.match(/^\/job\/history\/(companies|projects|skills|wins|roles)\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
+      var jobMatch = path.match(/^\/ladder\/history\/(companies|projects|skills|wins|roles)\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
       if (jobMatch) {
         sessionStorage.setItem('job:prettyPath', path);
-        window.location.replace('/job/history/drill/?kind=' + jobMatch[1] + '&slug=' + jobMatch[2]);
+        window.location.replace('/ladder/history/drill/?kind=' + jobMatch[1] + '&slug=' + jobMatch[2]);
         return;
       }
 
-      // /job/jobs/{slug}/ — per-role detail handled by /job/jobs/drill/.
-      var roleMatch = path.match(/^\/job\/jobs\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
+      // /ladder/jobs/{slug}/ — per-role detail handled by /ladder/jobs/drill/.
+      var roleMatch = path.match(/^\/ladder\/jobs\/(?!drill\/?$)([a-z0-9-]+)\/?$/);
       if (roleMatch) {
         sessionStorage.setItem('job:prettyPath', path);
         var qs = window.location.search.replace(/^\?/, '');
         var sep = qs ? '&' : '';
-        window.location.replace('/job/jobs/drill/?slug=' + roleMatch[1] + sep + qs);
+        window.location.replace('/ladder/jobs/drill/?slug=' + roleMatch[1] + sep + qs);
         return;
       }
 

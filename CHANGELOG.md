@@ -6,6 +6,14 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-06-19] - Product rename: /job → /ladder (frontend + branding)
+
+### Changed
+- **Renamed the `/job` product to `/ladder`** across the frontend and docs. Directory `job/` → `ladder/`; route `/job/...` → `/ladder/...`; all `job-*` web components → `ladder-*` (files, custom-element tags, `customElements.define` registrations). Page titles, the `[job]` console prefix, and `window.JOB_VERSION` → `[ladder]` / `window.LADDER_VERSION`. `ladder/js/app.js` `VERSION` bumped to 2.4.0 with cache-bust refreshed across all pages.
+- External redirectors updated: `404.html` (deep-link drill routing) and `calendar/index.html` (Gmail OAuth callback forward) now target `/ladder/`.
+- Docs renamed + cross-links updated: PRD + tech design → `ladder-product.md`, `ladder-onboarding-flow.md`, `ladder-recs-scoring-followups.md`.
+- **Unchanged (out of scope):** Supabase edge functions (`job-mcp`, `job-entity`, `jobs-pipe`, `ask-job-agent`, `_shared/job-*.ts`), the `job.*` Postgres schema, and the `fikei/job` markdown-KB GitHub repo all keep their names. Deploy requires updating the Supabase Auth redirect allow-list from `/job/**` to `/ladder/**`.
+
 ## [2026-05-11] - Gmail Application Tracker (Phase 2.0)
 
 ### Added
@@ -22,7 +30,7 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 ### Changed
 - `pull-recommendations` v0.7.0 — fires application-scan side-effect.
 - Pipeline table gains a `signal` column between Role and Sector.
-- /job cache-bust to v=0.75.0 across all /job pages; app.js VERSION bumped to match so dynamic imports refresh component graph.
+- /ladder cache-bust to v=0.75.0 across all /ladder pages; app.js VERSION bumped to match so dynamic imports refresh component graph.
 
 ### Infrastructure
 - Three edge functions deployed: `pull-recommendations`, `application-events`, `calendar-api`.

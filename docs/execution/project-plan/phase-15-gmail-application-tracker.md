@@ -6,7 +6,7 @@
 >
 > **Predecessor**: [Phase 14 — Gmail Jobs Pipe](./phase-14-gmail-jobs-pipe.md)
 >
-> **Vision**: Same Gmail OAuth + scan tick as Phase 1, second pass: classify inbox messages that look like progress on open applications, attach them to a `pipeline_role`, auto-advance forward stages, surface offers / rejections / stale / calendar-today / new-update as a single chip on the pipeline row and a Needs-Attention card on /job/jobs/.
+> **Vision**: Same Gmail OAuth + scan tick as Phase 1, second pass: classify inbox messages that look like progress on open applications, attach them to a `pipeline_role`, auto-advance forward stages, surface offers / rejections / stale / calendar-today / new-update as a single chip on the pipeline row and a Needs-Attention card on /ladder/jobs/.
 
 ---
 
@@ -113,7 +113,7 @@ Every email response on an open application gets classified, attached to the rol
 
 | Task | Status |
 |------|--------|
-| `job/js/applicationEvents.js` — list / needs-attention / ack / backfill / role-matched-events | ✓ |
+| `ladder/js/applicationEvents.js` — list / needs-attention / ack / backfill / role-matched-events | ✓ |
 | `loadRoleSignals()` aggregates needs-attention + calendar matches into one `Map<roleSlug, highestPrioritySignal>` | ✓ |
 
 ### Story 3.2 — Pipeline row chip + widget + banners

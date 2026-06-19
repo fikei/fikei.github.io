@@ -1,0 +1,128 @@
+/* @import querystrings are bumped alongside LADDER_VERSION in app.js so a
+   release that only touches components.css/tokens busts the browser
+   disk cache. The HTML cache-buster only refreshes base.css itself. */
+@import url("./tokens-generic-light.css?v=1.9.0");
+@import url("./tokens-generic-dark.css?v=1.9.0");
+@import url("./tokens-ctrl-light.css?v=1.9.0");
+@import url("./tokens-ctrl-dark.css?v=1.9.0");
+@import url("./components.css?v=1.9.0");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+/* Named breakpoints. Use as `@media (max-width: 720px)` etc. in CSS — the
+   custom properties exist so JS can read them via getComputedStyle(:root). */
+:root {
+  --bp-xs: 480px;
+  --bp-sm: 720px;
+  --bp-md: 960px;
+  --bp-lg: 1240px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--fg-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font: inherit; cursor: pointer; }
+
+::selection { background: var(--accent-muted); color: var(--fg); }
+
+/* Auth gating: gate visible only when auth definitely resolved to signed-out.
+   During the loading window (initial paint → session restored from cookie)
+   we hide both the gate and the app so neither flashes briefly during page
+   navigations. Once ctrl-auth dispatches signedin/signedout, the matching
+   surface fades in. */
+body[data-auth-state="loading"] #signin-gate,
+body[data-auth-state="loading"] .app { visibility: hidden; }
+body[data-auth-state="in"] #signin-gate { display: none; }
+body[data-auth-state="out"] .app { display: none; }
+
+/* Hide the floating CtrlAuth bar while signed-out (own gate has the CTA). */
+body:not([data-auth-state="in"]) #ctrlAuthBar { display: none !important; }
+
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    "rail main"
+    "footer footer";
+  min-height: 100vh;
+}
+
+.app__rail {
+  grid-area: rail;
+  border-right: 1px solid var(--border);
+  background: var(--bg-surface);
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.app__main {
+  grid-area: main;
+  padding: var(--space-7) var(--space-7);
+  max-width: 1240px;
+}
+
+.app__footer {
+  grid-area: footer;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+}
+.app__footer .footer__brand { font-weight: var(--fw-semibold); color: var(--fg); }
+.app__footer .footer__version { font-family: var(--font-mono); font-size: var(--font-size-caption); color: var(--fg-subtle); }
+.app__footer .footer__controls { display: inline-flex; align-items: center; gap: var(--space-3); }
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 20px;
+  letter-spacing: -0.015em;
+}
+.brand__sub {
+  display: block;
+  font-size: var(--font-size-small);
+  font-weight: 400;
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
+.rail-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+}
+
+/* Mobile responsive rules for .app, .app__rail (drawer), .mobile-bar, and
+   the bottom .app-tabbar live in components.css. base.css used to redefine
+   them here, which silently won the cascade (base @imports components, then
+   its own rules run last) and neutralized the drawer. */
