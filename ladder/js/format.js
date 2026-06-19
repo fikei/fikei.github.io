@@ -49,21 +49,35 @@ function favicon(host) {
 //   → { iconUrl, label, title }   label is a tight platform name.
 // Favicon: Gmail for inbox-sourced rows; otherwise the posting URL's host
 // (which IS the platform for ATS/company-page/LinkedIn sources).
+// Syndicated/aggregator sources re-post jobs from many different hosts, so the
+// posting URL's host is NOT the source — pin one fixed favicon + label per
+// platform so the icon stays consistent (e.g. all TheirStack rows look alike,
+// not one icon per underlying company). Keyed on the stable `source` enum.
+const PLATFORM = {
+  'gmail-jobs':   { host: 'mail.google.com',      label: 'Gmail' },
+  'theirstack':   { host: 'theirstack.com',       label: 'TheirStack' },
+  'wwr':          { host: 'weworkremotely.com',   label: 'We Work Remotely' },
+  'remotive':     { host: 'remotive.com',         label: 'Remotive' },
+  'hn':           { host: 'news.ycombinator.com', label: 'Hacker News' },
+  'linkedin-rss': { host: 'linkedin.com',         label: 'LinkedIn' },
+};
+
 export function sourceMeta(r) {
   const rawLabel = String(r.sourceLabel || r.source || '').trim();
   const src = String(r.source || '').toLowerCase();
 
-  if (src.includes('gmail') || r.sourceEmailUrl) {
-    return { iconUrl: favicon('mail.google.com'), label: 'Gmail', title: rawLabel || 'Gmail' };
+  const platform = PLATFORM[src] || (r.sourceEmailUrl ? PLATFORM['gmail-jobs'] : null);
+  if (platform) {
+    return { iconUrl: favicon(platform.host), label: platform.label, title: rawLabel || platform.label };
   }
 
-  // Platform = text before a "·"/"|" separator ("Greenhouse · Abridge" → "Greenhouse").
+  // Direct sources (tracked-ats, company pages, manual): the posting host IS
+  // the source, so its favicon is meaningful and matches the label. Label is
+  // the platform name before a "·" separator ("Greenhouse · Abridge" → "Greenhouse").
   let label = rawLabel.split(/\s*[·|]\s*/)[0].trim();
   const lower = label.toLowerCase();
-  if (/linkedin/.test(lower) || src.includes('linkedin')) label = 'LinkedIn';
-  else if (lower === 'from company pages' || src === 'tracked-ats') label = label && lower !== 'from company pages' ? label : 'Company site';
+  if (lower === 'from company pages') label = 'Company site';
   else if (lower === 'manual') label = 'Added';
-  else if (lower === 'rss' || src.includes('rss')) label = 'RSS';
   if (!label) label = rawLabel || 'Source';
 
   let iconUrl = null;
