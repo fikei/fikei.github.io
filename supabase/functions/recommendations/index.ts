@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.11.0';
-console.log(`[recommendations] v${VERSION} - hide closed (delisted/filled) roles from For You (backlog #9)`);
+const VERSION = '0.12.0';
+console.log(`[recommendations] v${VERSION} - dedup For You against pipeline by normalized URL too (saved/applied/rejected reappearing fix)`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -81,8 +81,31 @@ serve(async (req) => {
         blocked = br.map(b => b.company_norm);
       } catch { /* table absent / transient — don't fail the page */ }
 
+      // URL normalizer — strips scheme, leading www., query string,
+      // fragment, and trailing slashes so the same posting matches across
+      // sources (e.g. a Gmail-sourced rec vs. the URL the user pasted when
+      // saving). Returns '' for nulls so empty never equals empty. Columns
+      // are fixed literals, so sql.unsafe is safe here.
+      const normUrl = (col: string) => `
+        regexp_replace(
+          regexp_replace(
+            regexp_replace(
+              regexp_replace(lower(trim(coalesce(${col}, ''))), '^https?://', ''),
+              '^www\\.', ''),
+            '[?#].*$', ''),
+          '/+$', '')`;
+
       // Shared filter — reused by the page query and the count so "X of Y"
       // counts exactly what the list would show.
+      //
+      // The `not exists` dedup keeps anything already in the pipeline out of
+      // For You — whether it's Saved, Applied, or Rejected, since all live in
+      // pipeline_roles and we don't filter on status. It matches two ways:
+      //   1. exact (company, title) — the original check.
+      //   2. normalized URL (rec.url OR rec.canonical_url == pipeline.url) —
+      //      catches the same posting when title/company text drifted between
+      //      the saved copy and a later re-ingested recommendation (the cause
+      //      of saved jobs reappearing in For You).
       const whereClause = sql`
         where r.dismissed_at is null
           and r.closed_at is null
@@ -94,8 +117,17 @@ serve(async (req) => {
           and not exists (
             select 1
               from job.pipeline_roles p
-             where lower(p.company_name) = lower(r.company)
-               and lower(p.title) = lower(r.title)
+             where (
+                     lower(p.company_name) = lower(r.company)
+                     and lower(p.title) = lower(r.title)
+                   )
+                or (
+                     ${sql.unsafe(normUrl('p.url'))} <> ''
+                     and ${sql.unsafe(normUrl('p.url'))} in (
+                           ${sql.unsafe(normUrl('r.url'))},
+                           ${sql.unsafe(normUrl('r.canonical_url'))}
+                         )
+                   )
           )`;
 
       const rows = await sql`
