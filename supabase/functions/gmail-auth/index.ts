@@ -13,8 +13,8 @@
 // don't need a new client registration. The redirect URI for gmail
 // connect points at /job/ — calendar-api keeps /calendar/.
 
-const VERSION = '0.3.0';
-console.log(`[gmail-auth] v${VERSION} - clear stale last_error on connect so reconnect banner clears immediately`);
+const VERSION = '0.3.1';
+console.log(`[gmail-auth] v${VERSION} - fix: imported db() shadowed by local SupabaseClient, so last_error clear silently threw; reconnect banner never cleared`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -27,7 +27,7 @@ import {
   markRevoked,
   upsertToken,
 } from '../_shared/google-tokens.ts';
-import { db } from '../_shared/job-db.ts';
+import { db as jobSql } from '../_shared/job-db.ts';
 
 // gmail.modify is a strict superset of gmail.readonly. We request both
 // so the scope_set on the token row covers callers that look up by
@@ -186,7 +186,7 @@ serve(async (req) => {
       // clears immediately on reconnect, instead of lingering until the
       // next successful scan. Best-effort — never fail the connect over it.
       try {
-        const sql = db();
+        const sql = jobSql();
         await sql`update job.user_sources set last_error = null
                    where user_email = ${user.email} and type = 'gmail-jobs'`;
         await sql`update job.gmail_scan_state set last_error = null
