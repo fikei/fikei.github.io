@@ -5657,3 +5657,81 @@ body[data-auth-state="out"] job-chat { display: none; }
   cursor: pointer;
 }
 .deeper-prompt:hover { border-color: var(--border-strong); background: var(--bg); }
+
+/* ── LinkedIn connections ─────────────────────────────────────────────
+   "People you may know here" — Ian's 1st-degree connections currently at a
+   lead's company. Avatar stack in the leads table (.conn-stack) + a full
+   chip list on the role detail page (.conn-list). Data joined in by
+   jobs-pipe as r.connections. */
+.conn-stack {
+  display: inline-flex;
+  align-items: center;
+}
+.conn-stack__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--bg-elevated);
+  margin-left: -8px;
+  background: var(--bg-surface);
+}
+.conn-stack__avatar:first-child { margin-left: 0; }
+.conn-stack__avatar--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+}
+.conn-stack__more {
+  margin-left: var(--space-2);
+  font-size: var(--font-size-small);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.role-connections__sub { margin: 0 0 var(--space-3); }
+.conn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.conn-item { margin: 0; }
+.conn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  color: var(--fg);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.conn-link:hover { border-color: var(--border-strong); background: var(--bg-surface); }
+.conn-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--bg-surface);
+}
+.conn-avatar--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+}
+.conn-text { display: flex; flex-direction: column; line-height: 1.25; }
+.conn-name { font-weight: var(--fw-semibold); font-size: var(--font-size-small); }
+.conn-title { color: var(--fg-subtle); font-size: var(--font-size-small); max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.11.0';
-console.log(`[jobs-pipe] v${VERSION} - return location for Role-cell nesting on list views`);
+const VERSION = '0.12.0';
+console.log(`[jobs-pipe] v${VERSION} - include LinkedIn connections per company (company_connections join)`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -66,7 +66,21 @@ async function listRoles() {
         from job.role_sector_tags rt
         join job.sector_tags t on t.slug = rt.tag_slug
         where rt.role_slug = r.slug
-      ), array[]::json[]) as "sectorTags"
+      ), array[]::json[]) as "sectorTags",
+      -- Ian's 1st-degree LinkedIn connections who currently work at this
+      -- company (matched on company_slug). Surfaced as a "People you may
+      -- know here" card on the detail page + an avatar stack in the leads
+      -- table. Mined manually for the pilot — see docs brief on productizing.
+      coalesce((
+        select array_agg(json_build_object(
+          'name', c.full_name,
+          'title', coalesce(nullif(c.current_title, ''), c.headline),
+          'profileUrl', c.profile_url,
+          'photoUrl', c.photo_url
+        ) order by c.full_name)
+        from job.company_connections c
+        where c.company_slug = r.company_slug
+      ), array[]::json[]) as "connections"
     from job.pipeline_roles r
     left join job.role_assets ra_resume on ra_resume.role_slug = r.slug and ra_resume.kind = 'resume'
     left join job.role_assets ra_cover  on ra_cover.role_slug = r.slug and ra_cover.kind = 'cover-letter'
