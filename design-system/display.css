@@ -144,8 +144,19 @@
 .d-subnav__link:hover { color: var(--fg-muted, #8a8885); }
 .d-subnav__link--active { color: var(--fg, #e8e6e3); border-bottom-color: var(--fg, #e8e6e3); }
 
+@media (max-width: 768px) {
+  /* Let the nav wrap instead of overflowing off the right edge.
+     JS re-pins the subnav below the (now taller) nav on resize. */
+  .d-nav { flex-wrap: wrap; padding: 12px 20px; row-gap: 8px; }
+  .d-nav__links { flex-wrap: wrap; gap: 12px 16px; justify-content: flex-start; }
+  .d-nav__group { flex-wrap: wrap; row-gap: 8px; }
+  .d-nav__group--expanded { gap: 12px; }
+  .d-nav__group-items { gap: 16px; }
+  .d-nav__group--expanded .d-nav__group-items { padding-inline: 14px; }
+}
+
 @media (max-width: 600px) {
-  .d-nav__links { gap: 16px; }
+  .d-nav__links { gap: 12px; }
   .d-subnav { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .d-subnav__link { white-space: nowrap; }
 }
@@ -677,6 +688,72 @@
   padding: 48px 0;
   transition: opacity 0.3s ease;
   /* opacity set by JS based on distance from viewport center */
+}
+
+/* Stack the sticky phone above the scrolling text on mobile */
+@media (max-width: 768px) {
+  .d-sticky-scroll { flex-direction: column; gap: 0; }
+  .d-sticky-scroll__phone { width: 100%; }
+  .d-sticky-scroll__layers {
+    height: 52vh;
+    width: calc(100% + 2 * var(--gutter-page, clamp(20px, 5vw, 64px)));
+    margin-left: calc(-1 * var(--gutter-page, clamp(20px, 5vw, 64px)));
+    margin-right: calc(-1 * var(--gutter-page, clamp(20px, 5vw, 64px)));
+  }
+  .d-sticky-scroll__step { min-height: 80vh; padding: 32px 0; }
+}
+
+/* ── Case study hero (Field header) ── */
+
+.d-case-hero {
+  display: flex;
+  gap: 32px;
+  padding: 48px 0 0;
+  align-items: flex-start;
+}
+
+.d-case-hero__media {
+  width: 500px;
+  height: 500px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #0A0A0A;
+}
+
+.d-case-hero__content { flex: 1; min-width: 0; }
+
+@media (max-width: 768px) {
+  .d-case-hero { flex-direction: column; gap: 24px; padding-top: 32px; }
+  .d-case-hero__media { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+}
+
+/* ── Case study two-column layout (Design Systems) ── */
+
+.d-ds-layout {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+.d-ds-layout__swatches {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.d-ds-layout__principles {
+  flex: 1;
+  min-width: 0;
+  position: sticky;
+  top: 140px;
+}
+
+@media (max-width: 768px) {
+  .d-ds-layout { flex-direction: column; gap: 32px; }
+  .d-ds-layout__swatches { width: 100%; order: 2; }
+  .d-ds-layout__principles { width: 100%; position: static; top: auto; order: 1; }
 }
 
 /* ── Utilities ── */
