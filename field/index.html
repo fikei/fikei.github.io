@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
-  <link rel="stylesheet" href="/design-system/display.css?v=506">
+  <link rel="stylesheet" href="/design-system/display.css?v=507">
 </head>
 <body class="d-page">
 
@@ -40,13 +40,13 @@
 <div class="d-contain">
 
   <!-- Header — side by side -->
-  <div style="display: flex; gap: 32px; padding: 48px 0 0; align-items: flex-start;">
+  <div class="d-case-hero">
     <!-- Hero animation — 500×500 square -->
-    <div style="width: 500px; height: 500px; flex-shrink: 0; overflow: hidden; background: #0A0A0A;">
-      <iframe src="/animations/hero.html" style="width: 500px; height: 500px; border: none; pointer-events: none; display: block;" id="heroFrame"></iframe>
+    <div class="d-case-hero__media">
+      <iframe src="/animations/hero.html" style="width: 100%; height: 100%; border: none; pointer-events: none; display: block;" id="heroFrame"></iframe>
     </div>
     <!-- Content -->
-    <div style="flex: 1;">
+    <div class="d-case-hero__content">
       <span class="d-status d-status--dev">Beta</span>
       <p class="d-headline d-headline--xl" style="margin-top: 12px;">Field</p>
       <p class="d-body" style="margin-top: 12px;">Turning the voices of a complex on-scene interactions into structured medical notes - all offline.</p>
@@ -268,10 +268,10 @@
       <p class="d-headline d-headline--md" style="margin-top: 4px;">Design Systems</p>
     </div>
 
-    <div style="display: flex; gap: 48px; align-items: flex-start;">
+    <div class="d-ds-layout">
 
       <!-- Right: Token swatches (scrolls) -->
-      <div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 32px;">
+      <div class="d-ds-layout__swatches">
 
         <!-- Background -->
         <div>
@@ -344,7 +344,7 @@
       </div>
 
       <!-- Left: Principles (sticky, fits single page height) -->
-      <div style="flex: 1; position: sticky; top: 140px;">
+      <div class="d-ds-layout__principles">
         <p class="d-mono d-text--subtle" style="font-size: 10px; letter-spacing: 0.05em; margin-bottom: 20px;">DESIGN PRINCIPLES</p>
         <div style="display: flex; flex-direction: column; gap: 24px;">
           <!-- Information -->
@@ -483,10 +483,9 @@
   var started = {}; // track which iframes have been triggered
   var activeStep = 0;
 
-  var PAD = 48; // padding around phone inside the black box
-
   // Size phones to fit their layer container minus padding
   function sizePhones() {
+    var PAD = window.innerWidth <= 768 ? 20 : 48; // tighter padding on mobile
     var phones = document.querySelectorAll('.d-anim-phone');
     for (var i = 0; i < phones.length; i++) {
       var layer = phones[i].parentElement;
