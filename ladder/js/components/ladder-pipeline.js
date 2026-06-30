@@ -57,6 +57,7 @@ const COLUMNS = [
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
   { id: 'signal', label: '',       sortKey: null },
   { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
+  { id: 'connections', label: 'Network', sortKey: null },
   { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
 ];
@@ -818,8 +819,13 @@ export class JobPipeline extends LitElement {
     // Status column is meaningless on Leads (it's always New/empty there).
     // On the Active bucket the column shows the interview stage, so the
     // header reads "Stage" rather than "Status".
+    // 'connections' (warm-intro avatars) only appears on the Leads bucket —
+    // that's where Ian is deciding whether to pursue, so "who do I know
+    // here?" is most actionable. It replaces the Status column there (Status
+    // is meaningless on Leads anyway).
     return COLUMNS
       .filter(c => !(c.id === 'status' && this.bucket === 'leads'))
+      .filter(c => !(c.id === 'connections' && this.bucket !== 'leads'))
       .map(c => (c.id === 'status' && this.bucket === 'active') ? { ...c, label: 'Stage', sortKey: 'stage' } : c);
   }
 
@@ -901,6 +907,7 @@ export class JobPipeline extends LitElement {
         </td>
         <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
         <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
+        ${this.bucket === 'leads' ? html`<td class="col col-connections" data-label="Network">${this._renderConnectionsCell(r)}</td>` : nothing}
         ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
@@ -924,6 +931,34 @@ export class JobPipeline extends LitElement {
              span.textContent = logoInitial(r.company);
              e.target.replaceWith(span);
            }}/>
+    `;
+  }
+
+  // Avatar stack of Ian's 1st-degree LinkedIn connections who currently work
+  // at this lead's company (r.connections, joined in by jobs-pipe). Shows up
+  // to 4 faces + an overflow count; empty cell when there are none. Clicking
+  // the row still navigates to the detail page where the full list + intro
+  // links live.
+  _renderConnectionsCell(r) {
+    const conns = r.connections || [];
+    if (!conns.length) return nothing;
+    const shown = conns.slice(0, 4);
+    const extra = conns.length - shown.length;
+    const title = conns.map(c => c.name + (c.title ? ` — ${c.title}` : '')).join('\n');
+    return html`
+      <span class="conn-stack" title=${title} aria-label=${`${conns.length} connection${conns.length === 1 ? '' : 's'} here`}>
+        ${shown.map(c => c.photoUrl
+          ? html`<img class="conn-stack__avatar" src=${c.photoUrl} alt=${c.name}
+                   loading="lazy" decoding="async"
+                   @error=${(e) => {
+                     const span = document.createElement('span');
+                     span.className = 'conn-stack__avatar conn-stack__avatar--placeholder';
+                     span.textContent = (c.name || '?').trim().charAt(0).toUpperCase() || '?';
+                     e.target.replaceWith(span);
+                   }}/>`
+          : html`<span class="conn-stack__avatar conn-stack__avatar--placeholder">${(c.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>`)}
+        ${extra > 0 ? html`<span class="conn-stack__more">+${extra}</span>` : nothing}
+      </span>
     `;
   }
 
@@ -962,6 +997,7 @@ export class JobPipeline extends LitElement {
         </td>
         <td class="col col-signal"></td>
         <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
+        ${this.bucket === 'leads' ? html`<td class="col col-connections"><span class="skeleton skeleton--pill" style="width:64px;height:28px;"></span></td>` : nothing}
         ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>

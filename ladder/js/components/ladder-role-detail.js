@@ -620,6 +620,51 @@ export class JobRoleDetail extends LitElement {
     `;
   }
 
+  // "People you may know here" — Ian's 1st-degree LinkedIn connections who
+  // currently work at this role's company, joined in by jobs-pipe on
+  // r.connections. Each chip links out to the person's LinkedIn profile so
+  // Ian can ask for a warm intro / referral. Hidden when there are none.
+  _renderConnections() {
+    const conns = this.role?.connections || [];
+    if (!conns.length) return nothing;
+    return html`
+      <article class="role-card role-connections">
+        <header class="role-card__head"><h3>People you may know here</h3></header>
+        <div class="role-card__body">
+          <p class="muted role-connections__sub">${conns.length} 1st-degree LinkedIn connection${conns.length === 1 ? '' : 's'} at ${this.role.company || 'this company'} — worth a warm intro.</p>
+          <ul class="conn-list">
+            ${conns.map(c => html`
+              <li class="conn-item">
+                <a class="conn-link" href=${c.profileUrl || '#'} target="_blank" rel="noopener">
+                  ${c.photoUrl
+                    ? html`<img class="conn-avatar" src=${c.photoUrl} alt="" loading="lazy" decoding="async"
+                             @error=${(e) => { e.target.replaceWith(this._connInitialEl(c.name)); }}/>`
+                    : this._connInitial(c.name)}
+                  <span class="conn-text">
+                    <span class="conn-name">${c.name}</span>
+                    ${c.title ? html`<span class="conn-title">${c.title}</span>` : nothing}
+                  </span>
+                </a>
+              </li>
+            `)}
+          </ul>
+        </div>
+      </article>
+    `;
+  }
+
+  _connInitial(name) {
+    const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
+    return html`<span class="conn-avatar conn-avatar--placeholder" aria-hidden="true">${ch}</span>`;
+  }
+  _connInitialEl(name) {
+    const span = document.createElement('span');
+    span.className = 'conn-avatar conn-avatar--placeholder';
+    span.setAttribute('aria-hidden', 'true');
+    span.textContent = (name || '?').trim().charAt(0).toUpperCase() || '?';
+    return span;
+  }
+
   _renderDetails() {
     const a = this.assets['analysis'];
     const status = !a ? 'loading' : a.saving ? 'loading' : a.error ? 'error' : a.mode === 'empty' ? 'loading' : 'ok';
@@ -628,6 +673,7 @@ export class JobRoleDetail extends LitElement {
     const candidate = this._scoreFromAnalysis(parsed, 'candidateScore');
     return html`
       ${this._renderMetaRow()}
+      ${this._renderConnections()}
       ${parsed?.description ? html`
         <section class="role-summary">
           <div class="kb-doc">${unsafeHTML(renderMarkdown(parsed.description))}</div>
