@@ -5824,13 +5824,6 @@ body[data-auth-state="out"] job-chat { display: none; }
   border-radius: 4px;
 }
 .company-edit-btn:hover { text-decoration: underline; text-underline-offset: 2px; }
-.company-edit-pencil {
-  font-size: 0.8em;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-.company-edit-btn:hover .company-edit-pencil,
-.company-edit-btn:focus-visible .company-edit-pencil { opacity: 0.55; }
 .company-edit-input {
   font: inherit;
   color: var(--fg);
