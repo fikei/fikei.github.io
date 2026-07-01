@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.14.0';
-console.log(`[jobs-pipe] v${VERSION} - editable company_name (inline rename from detail header)`);
+const VERSION = '0.15.0';
+console.log(`[jobs-pipe] v${VERSION} - editable company_name + title (inline rename from detail header)`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -167,6 +167,21 @@ serve(async (req) => {
           returning slug;`;
         if (!upd[0]) return err('role not found', 404);
         return jsonResp({ ok: true, slug, company_name: name });
+      }
+
+      // Title edit — inline rename from the detail header (e.g. fixing a
+      // mis-parsed "ŌURA hiring Senior PM" → "Senior Product Manager").
+      // updated_at bumps so stale-analysis detection re-runs on next open.
+      if (typeof body.title === 'string') {
+        const title = body.title.trim().slice(0, 300);
+        if (!title) return err('title cannot be empty', 400);
+        const upd = await sql`
+          update job.pipeline_roles
+             set title = ${title}, updated_at = now()
+           where slug = ${slug}
+          returning slug;`;
+        if (!upd[0]) return err('role not found', 404);
+        return jsonResp({ ok: true, slug, title });
       }
 
       // Status / stage / exit_reason writeback.

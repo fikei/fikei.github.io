@@ -5835,3 +5835,30 @@ body[data-auth-state="out"] job-chat { display: none; }
   max-width: 360px;
 }
 .company-edit-input:focus { outline: none; border-color: var(--accent-strong); }
+
+/* Editable role title (h1) — same interaction as the company name, sized to
+   inherit the h1 typography. */
+.title-edit-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  margin: -1px -2px;
+  font: inherit;
+  color: inherit;
+  cursor: text;
+  text-align: left;
+  border-radius: 4px;
+}
+.title-edit-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+.title-edit-input {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0 8px;
+  width: 100%;
+  max-width: 720px;
+  box-sizing: border-box;
+}
+.title-edit-input:focus { outline: none; border-color: var(--accent-strong); }
