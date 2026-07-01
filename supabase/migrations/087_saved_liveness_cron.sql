@@ -28,8 +28,13 @@ select cron.schedule(
   $$
   select net.http_post(
     url     := 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/check-liveness',
+    -- check-liveness has verify_jwt=true, so the platform gateway needs a
+    -- valid Authorization header (anon key satisfies it) BEFORE the request
+    -- reaches the function; the x-cron-secret then bypasses the function's
+    -- own per-user auth. Mirrors the liveness-check-6h / enrich-backfill crons.
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI',
       'x-cron-secret', '850f11f7cf611308809c5ac44233cdc6e60f5abddf3e56b9a1e068d3efa18ca1'
     ),
     body    := '{}'::jsonb,
