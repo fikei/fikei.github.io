@@ -56,8 +56,8 @@ const COLUMNS = [
   { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
   { id: 'signal', label: '',       sortKey: null },
-  { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
   { id: 'connections', label: 'Network', sortKey: null },
+  { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
   { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
 ];
@@ -131,6 +131,8 @@ export class JobPipeline extends LitElement {
     // reply_pending / new_update / stale_14d). Keyed by role slug.
     roleSignals:     { state: true },
     liveBanners:     { state: true },
+    // Hover-card state for the Network column: { conns, x, y } | null.
+    hoverConns:      { state: true },
   };
 
   constructor() {
@@ -142,6 +144,7 @@ export class JobPipeline extends LitElement {
     this._dragSlug = null;
     this._dragOverSlug = null;
     this.selectedRow = null;
+    this.hoverConns = null;
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
     this.bucket = (b === 'leads' || b === 'active' || b === 'archive') ? b : 'leads';
@@ -906,8 +909,8 @@ export class JobPipeline extends LitElement {
           </div>
         </td>
         <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
-        <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
         ${this.bucket === 'leads' ? html`<td class="col col-connections" data-label="Network">${this._renderConnectionsCell(r)}</td>` : nothing}
+        <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
         ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
@@ -945,14 +948,13 @@ export class JobPipeline extends LitElement {
     const firstN = conns.filter(c => c.degree !== '2nd').length;
     const shown = conns.slice(0, 4);
     const extra = conns.length - shown.length;
-    const title = conns
-      .map(c => `${c.degree === '2nd' ? '2nd' : '1st'} · ${c.name}${c.title ? ` — ${c.title}` : ''}${c.degree === '2nd' && c.mutuals ? ` (${c.mutuals} mutual)` : ''}`)
-      .join('\n');
     const aria = firstN
       ? `${firstN} direct, ${conns.length - firstN} second-degree connection(s) here`
       : `${conns.length} second-degree connection(s) here`;
     return html`
-      <span class="conn-stack" title=${title} aria-label=${aria}>
+      <span class="conn-stack" aria-label=${aria}
+            @mouseenter=${(e) => this._showConnTip(conns, e)}
+            @mouseleave=${() => this._hideConnTip()}>
         ${shown.map(c => {
           const cls = 'conn-stack__avatar' + (c.degree === '2nd' ? ' conn-stack__avatar--2nd' : '');
           return c.photoUrl
@@ -968,6 +970,59 @@ export class JobPipeline extends LitElement {
         })}
         ${extra > 0 ? html`<span class="conn-stack__more">+${extra}</span>` : nothing}
       </span>
+    `;
+  }
+
+  // Hover card for the Network column — anchored to the hovered avatar
+  // stack, shows the full connection list (grouped 1st / 2nd degree) so Ian
+  // can eyeball who's there without opening the detail page. Fixed-position
+  // so it escapes the table's horizontal scroll container.
+  _showConnTip(conns, e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    this.hoverConns = { conns, x: rect.left, y: rect.bottom + 6 };
+  }
+  _hideConnTip() { this.hoverConns = null; }
+
+  _renderConnTip() {
+    const h = this.hoverConns;
+    if (!h) return nothing;
+    const conns = h.conns || [];
+    const firsts  = conns.filter(c => c.degree !== '2nd');
+    const seconds = conns.filter(c => c.degree === '2nd');
+    // Clamp to viewport so the card never spills off-screen.
+    const width = 300;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, h.x));
+    const top = Math.min(window.innerHeight - 20, h.y);
+    const row = (c) => html`
+      <li class="conn-tip__item">
+        ${c.photoUrl
+          ? html`<img class="conn-tip__avatar ${c.degree === '2nd' ? 'conn-tip__avatar--2nd' : ''}" src=${c.photoUrl} alt="" loading="lazy"
+                   @error=${(e) => {
+                     const s = document.createElement('span');
+                     s.className = 'conn-tip__avatar conn-tip__avatar--ph';
+                     s.textContent = (c.name || '?').trim().charAt(0).toUpperCase();
+                     e.target.replaceWith(s);
+                   }}/>`
+          : html`<span class="conn-tip__avatar conn-tip__avatar--ph">${(c.name || '?').trim().charAt(0).toUpperCase()}</span>`}
+        <span class="conn-tip__text">
+          <span class="conn-tip__name">${c.name}</span>
+          ${c.title ? html`<span class="conn-tip__title">${c.title}</span>` : nothing}
+          ${c.degree === '2nd' && c.mutuals ? html`<span class="conn-tip__mutuals">${c.mutuals} mutual</span>` : nothing}
+        </span>
+      </li>`;
+    return html`
+      <div class="conn-tip" style=${`left:${left}px;top:${top}px;width:${width}px;`}>
+        ${firsts.length ? html`
+          <div class="conn-tip__group">
+            <div class="conn-tip__head"><span class="conn-badge conn-badge--1st">1st</span> You're connected</div>
+            <ul class="conn-tip__list">${firsts.map(row)}</ul>
+          </div>` : nothing}
+        ${seconds.length ? html`
+          <div class="conn-tip__group">
+            <div class="conn-tip__head"><span class="conn-badge conn-badge--2nd">2nd</span> Worth a connection request</div>
+            <ul class="conn-tip__list">${seconds.map(row)}</ul>
+          </div>` : nothing}
+      </div>
     `;
   }
 
@@ -1005,8 +1060,8 @@ export class JobPipeline extends LitElement {
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
         </td>
         <td class="col col-signal"></td>
-        <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
         ${this.bucket === 'leads' ? html`<td class="col col-connections"><span class="skeleton skeleton--pill" style="width:64px;height:28px;"></span></td>` : nothing}
+        <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
         ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
       </tr>
@@ -1228,6 +1283,7 @@ export class JobPipeline extends LitElement {
           <tbody>${rows.map(r => this._renderRow(r))}</tbody>
         </table>
       </div>
+      ${this._renderConnTip()}
       ${this._renderArchiveModal()}
 
       ${rows.length === 0 ? html`
