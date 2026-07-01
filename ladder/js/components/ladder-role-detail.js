@@ -707,7 +707,6 @@ export class JobRoleDetail extends LitElement {
     return html`<button class="company-edit-btn" title="Click to edit the company name"
                   @click=${() => this._startEditCompany()}>
                   <span class="company-edit-name">${company || 'Add company'}</span>
-                  <span class="company-edit-pencil" aria-hidden="true">✎</span>
                 </button>`;
   }
 
