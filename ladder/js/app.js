@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.10.2";
-console.log(`[ladder] v${VERSION} - remove For You carousel from Saved (leads) view`);
+const VERSION = "2.11.0";
+console.log(`[ladder] v${VERSION} - split Saved table into separate Fit + Strength columns (match For You)`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
