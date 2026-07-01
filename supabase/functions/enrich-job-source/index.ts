@@ -18,8 +18,8 @@
 //           canonicalUrl?: string, jdText?: string,
 //           nextRetryAt?: ISO8601 }
 
-const VERSION = '0.6.0';
-console.log(`[enrich-job-source] v${VERSION} - enrich ALL aggregator sources (not just gmail) + gh_jid/ashby_jid vanity-URL liveness`);
+const VERSION = '0.7.0';
+console.log(`[enrich-job-source] v${VERSION} - enrich ALL aggregator sources + layer-3 generic liveness (non-ATS URL probe, LinkedIn guest API) + stale age-out`);
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
@@ -345,6 +345,106 @@ async function fetchOpenIds(provider: AtsPosting['provider'], slug: string): Pro
   } catch { return null; }
 }
 
+// ---------- Liveness (layer 3) — generic non-ATS + stale age-out ----------
+//
+// Layers 1/2 only cover tracked-ats and Greenhouse/Lever/Ashby-resolved recs.
+// The majority of For You (LinkedIn email alerts, weworkremotely, remotive,
+// misc ATS hosts) never got a liveness check and lived forever. Layer 3:
+//   * genericLivenessBatch — HEAD/GET-probe non-ATS active recs, close on a
+//     definitive 404/410/451. LinkedIn blocks bots on the posting page, so we
+//     query its public jobs-guest posting API by job id instead.
+//   * ageOutStale — backstop: any active rec we haven't confirmed open in
+//     STALE_TTL_DAYS gets closed as 'stale'. Guarantees For You can't show a
+//     months-old posting even when the host lies with a 200 (LinkedIn, most
+//     aggregators). tracked-ats/ATS-resolved live recs keep last_seen_at
+//     fresh via layers 1/2, so this only ever reaps genuinely-stale rows.
+const CLOSE_STATUSES = new Set([404, 410, 451]);
+const STALE_TTL_DAYS = 45;
+const GENERIC_BATCH = 30;
+
+// LinkedIn job id from /jobs/view/<id> or ?currentJobId=<id>.
+function linkedInJobId(u: string): string | null {
+  try {
+    const url = new URL(u);
+    if (!/(?:^|\.)linkedin\.com$/.test(url.hostname.toLowerCase())) return null;
+    const q = url.searchParams.get('currentJobId');
+    if (q && /^\d+$/.test(q)) return q;
+    const m = url.pathname.match(/\/jobs\/view\/(\d+)/);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
+
+// 'closed' = definitively gone, 'live' = reachable, 'skip' = inconclusive
+// (timeout, anti-bot 429/999, soft 403). We NEVER close on 'skip' — age-out
+// is the backstop for postings we can't authoritatively probe.
+async function probeRecUrl(u: string): Promise<'closed' | 'live' | 'skip'> {
+  const li = linkedInJobId(u);
+  if (li) {
+    try {
+      const r = await fetch(`https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/${li}`, {
+        headers: { 'User-Agent': UA }, redirect: 'follow', signal: AbortSignal.timeout(8000),
+      });
+      if (r.status === 200) return 'live';
+      if (r.status === 404 || r.status === 410 || r.status === 400) return 'closed';
+      return 'skip';
+    } catch { return 'skip'; }
+  }
+  try {
+    let r = await fetch(u, { method: 'HEAD', redirect: 'follow', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(8000) });
+    if (r.status === 405 || r.status === 501) {
+      r = await fetch(u, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(8000) });
+    }
+    if (CLOSE_STATUSES.has(r.status)) return 'closed';
+    return 'live';
+  } catch { return 'skip'; }
+}
+
+async function genericLivenessBatch(
+  sql: ReturnType<typeof db>,
+  limit: number,
+): Promise<{ checked: number; open: number; closed: number; skipped: number }> {
+  const rows = await sql<Array<{ id: string; url: string }>>`
+    select id, coalesce(canonical_url, url) as url
+      from job.recommended_roles
+     where closed_at is null
+       and dismissed_at is null
+       and added_to_pipeline_slug is null
+       and source <> 'tracked-ats'
+       and coalesce(canonical_url, url) is not null
+       and coalesce(canonical_url, url) !~* '(greenhouse|lever|ashbyhq|gh_jid=|ashby_jid=)'
+     order by last_seen_at asc nulls first, suggested_at asc
+     limit ${limit}
+  `;
+  const verdicts = await Promise.all(rows.map(async r => ({ id: r.id, v: await probeRecUrl(r.url) })));
+  let open = 0, closed = 0, skipped = 0;
+  for (const { id, v } of verdicts) {
+    if (v === 'closed') {
+      closed++;
+      await sql`update job.recommended_roles set closed_at = now(), closure_reason = 'url-dead' where id = ${id} and closed_at is null`;
+    } else if (v === 'live') {
+      open++;
+      await sql`update job.recommended_roles set last_seen_at = now() where id = ${id}`;
+    } else {
+      skipped++;
+    }
+  }
+  return { checked: open + closed, open, closed, skipped };
+}
+
+// Close every active rec last confirmed open (or, if never confirmed, first
+// suggested) more than STALE_TTL_DAYS ago. Single UPDATE, negligible cost.
+async function ageOutStale(sql: ReturnType<typeof db>): Promise<number> {
+  const res = await sql`
+    update job.recommended_roles
+       set closed_at = now(), closure_reason = 'stale'
+     where closed_at is null
+       and dismissed_at is null
+       and added_to_pipeline_slug is null
+       and coalesce(last_seen_at, suggested_at) < now() - make_interval(days => ${STALE_TTL_DAYS})
+  `;
+  return (res as unknown as { count: number }).count;
+}
+
 async function livenessBatch(limit: number): Promise<Response> {
   const sql = db();
   // Longest-unchecked first so the cron sweeps the whole pool over time.
@@ -386,8 +486,21 @@ async function livenessBatch(limit: number): Promise<Response> {
     }
   }
 
-  const summary = { ok: true, version: VERSION, checked, open, closed, skipped };
-  console.log(`[enrich-job-source] liveness: checked=${checked} open=${open} closed=${closed} skipped=${skipped}`);
+  // Layer 3: probe the non-ATS active recs (LinkedIn/wwr/remotive/misc), then
+  // age-out anything we haven't confirmed open in STALE_TTL_DAYS.
+  const generic = await genericLivenessBatch(sql, GENERIC_BATCH);
+  const agedOut = await ageOutStale(sql);
+
+  const summary = {
+    ok: true, version: VERSION,
+    ats: { checked, open, closed, skipped },
+    generic,
+    agedOut,
+    // legacy top-level fields (kept for callers that read them)
+    checked: checked + generic.checked,
+    closed: closed + generic.closed + agedOut,
+  };
+  console.log(`[enrich-job-source] liveness: ats(checked=${checked} closed=${closed}) generic(checked=${generic.checked} closed=${generic.closed} skipped=${generic.skipped}) agedOut=${agedOut}`);
   return new Response(JSON.stringify(summary, null, 2), {
     status: 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
