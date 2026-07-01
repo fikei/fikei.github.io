@@ -281,6 +281,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
         try {
           jobs = await extractJobsMulti({ subject, sender, body });
         } catch (e) {
+          await abortRunIfAiUnavailable(sql, ctx.userEmail, e as Error);
           await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message, digest: true });
           continue;
         }
@@ -296,6 +297,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           try {
             job = await extractJob({ subject, sender, body });
           } catch (e) {
+            await abortRunIfAiUnavailable(sql, ctx.userEmail, e as Error);
             await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message });
             continue;
           }
@@ -314,6 +316,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           try {
             jobs = await extractJobsMulti({ subject, sender, body });
           } catch (e) {
+            await abortRunIfAiUnavailable(sql, ctx.userEmail, e as Error);
             await logSkipped(sql, ctx.userEmail, msg, messageId, 'parse_error', { reason: (e as Error).message, digestRetry: true });
             continue;
           }
@@ -617,6 +620,43 @@ async function markScanError(sql: ReturnType<typeof db>, userEmail: string, erro
       values (${userEmail}, ${error}, now())
     on conflict (user_email) do update
       set last_error = excluded.last_error, updated_at = now()`;
+}
+
+// ── Transient AI-outage handling ───────────────────────────────────────
+// A Haiku extraction failure caused by the Anthropic API being *unavailable*
+// (credit balance exhausted → 400, rate-limit → 429, overloaded/5xx) is
+// transient: every message this tick fails the same way. We must NOT
+// tombstone the message in job.gmail_skipped — a permanent skip row lands in
+// the dedup pre-check forever, so even after credits are topped up the
+// message is never re-extracted (this is exactly what silently dropped a
+// week of roles on 2026-06-27). Instead abort the whole run WITHOUT
+// advancing the scan cursor. Because the cursor stays put, the next
+// scheduled tick re-lists the same window and re-extracts it automatically
+// once the API is healthy again — no manual delete/rewind needed.
+class AiUnavailableError extends Error {}
+
+function isRetryableAiError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes('credit balance is too low')          // billing exhausted (400)
+    || m.includes('overloaded')                            // 529
+    || m.includes('rate limit') || m.includes('rate_limit')// 429
+    || /anthropic\s+(429|500|502|503|529)\b/.test(m);      // explicit 429/5xx
+}
+
+// Throws AiUnavailableError (aborting the run, cursor untouched) when `e` is
+// a transient Anthropic outage; otherwise returns so the caller logs a
+// normal terminal skip. Stamps gmail_scan_state.last_error on abort so the
+// outage surfaces in the reconnect/retry banner instead of failing silent.
+async function abortRunIfAiUnavailable(
+  sql: ReturnType<typeof db>,
+  userEmail: string,
+  e: Error,
+): Promise<void> {
+  if (!isRetryableAiError(e.message)) return;
+  const msg = `AI extraction temporarily unavailable — will retry (${e.message.slice(0, 120)})`;
+  console.warn(`[gmail-jobs] ${msg}`);
+  await markScanError(sql, userEmail, msg);
+  throw new AiUnavailableError(msg);
 }
 
 // ---------- Haiku extraction ----------
