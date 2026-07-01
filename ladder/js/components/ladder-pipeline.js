@@ -934,29 +934,38 @@ export class JobPipeline extends LitElement {
     `;
   }
 
-  // Avatar stack of Ian's 1st-degree LinkedIn connections who currently work
-  // at this lead's company (r.connections, joined in by jobs-pipe). Shows up
-  // to 4 faces + an overflow count; empty cell when there are none. Clicking
-  // the row still navigates to the detail page where the full list + intro
-  // links live.
+  // Avatar stack of Ian's LinkedIn connections tied to this lead's company
+  // (r.connections, joined in by jobs-pipe; ordered 1st-degree then 2nd).
+  // 1st-degree faces are solid; high-quality 2nd-degree (worth an intro) get
+  // a dashed ring. Shows up to 4 faces + an overflow count. Clicking the row
+  // opens the detail page where the grouped list + intro hints live.
   _renderConnectionsCell(r) {
     const conns = r.connections || [];
     if (!conns.length) return nothing;
+    const firstN = conns.filter(c => c.degree !== '2nd').length;
     const shown = conns.slice(0, 4);
     const extra = conns.length - shown.length;
-    const title = conns.map(c => c.name + (c.title ? ` — ${c.title}` : '')).join('\n');
+    const title = conns
+      .map(c => `${c.degree === '2nd' ? '2nd' : '1st'} · ${c.name}${c.title ? ` — ${c.title}` : ''}${c.degree === '2nd' && c.mutuals ? ` (${c.mutuals} mutual)` : ''}`)
+      .join('\n');
+    const aria = firstN
+      ? `${firstN} direct, ${conns.length - firstN} second-degree connection(s) here`
+      : `${conns.length} second-degree connection(s) here`;
     return html`
-      <span class="conn-stack" title=${title} aria-label=${`${conns.length} connection${conns.length === 1 ? '' : 's'} here`}>
-        ${shown.map(c => c.photoUrl
-          ? html`<img class="conn-stack__avatar" src=${c.photoUrl} alt=${c.name}
-                   loading="lazy" decoding="async"
-                   @error=${(e) => {
-                     const span = document.createElement('span');
-                     span.className = 'conn-stack__avatar conn-stack__avatar--placeholder';
-                     span.textContent = (c.name || '?').trim().charAt(0).toUpperCase() || '?';
-                     e.target.replaceWith(span);
-                   }}/>`
-          : html`<span class="conn-stack__avatar conn-stack__avatar--placeholder">${(c.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>`)}
+      <span class="conn-stack" title=${title} aria-label=${aria}>
+        ${shown.map(c => {
+          const cls = 'conn-stack__avatar' + (c.degree === '2nd' ? ' conn-stack__avatar--2nd' : '');
+          return c.photoUrl
+            ? html`<img class=${cls} src=${c.photoUrl} alt=${c.name}
+                     loading="lazy" decoding="async"
+                     @error=${(e) => {
+                       const span = document.createElement('span');
+                       span.className = cls + ' conn-stack__avatar--placeholder';
+                       span.textContent = (c.name || '?').trim().charAt(0).toUpperCase() || '?';
+                       e.target.replaceWith(span);
+                     }}/>`
+            : html`<span class=${cls + ' conn-stack__avatar--placeholder'}>${(c.name || '?').trim().charAt(0).toUpperCase() || '?'}</span>`;
+        })}
         ${extra > 0 ? html`<span class="conn-stack__more">+${extra}</span>` : nothing}
       </span>
     `;
