@@ -53,7 +53,8 @@ function bucketFor(r) {
 // Each column entry: { id, label, sortKey | null, type: 'num'|'text'|'bool' }.
 // sortKey null → header isn't clickable.
 const COLUMNS = [
-  { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
+  { id: 'fit',      label: 'Fit',      sortKey: 'score',          type: 'num', defaultDir: 'desc' },
+  { id: 'strength', label: 'Strength', sortKey: 'candidateScore',  type: 'num', defaultDir: 'desc' },
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
   { id: 'signal', label: '',       sortKey: null },
   { id: 'connections', label: 'Network', sortKey: 'connections', type: 'num', defaultDir: 'desc' },
@@ -441,6 +442,18 @@ export class JobPipeline extends LitElement {
     if (s >= 50) return 'fit-pill fit-pill--ok';
     if (s >= 30) return 'fit-pill fit-pill--weak';
     return 'fit-pill fit-pill--poor';
+  }
+
+  // Single score pill (Fit or Strength), mirroring the For You table so the
+  // two views read identically. null score → em dash. Click opens the
+  // breakdown modal.
+  _scorePill(score, onClick, title) {
+    const cls = this._scoreClass(score) + ' fit-pill--button';
+    return html`
+      <button class=${cls} title=${title}
+              @click=${(e) => { e.stopPropagation(); onClick(); }}>
+        ${score == null ? '—' : Math.round(score)}
+      </button>`;
   }
 
   _openFitModal(r)       { this.selectedRow = r; this.selectedScoreWhich = 'fit'; }
@@ -877,12 +890,10 @@ export class JobPipeline extends LitElement {
           @dragend=${() => this._onDragEnd()}
           @click=${(e) => this._onRowClick(r, e)}>
         <td class="col col-fit" data-label="Fit">
-          ${renderScorePair(r, {
-            onFit:       (row) => this._openFitModal(row),
-            onCandidate: (row) => this._openCandidateModal(row),
-            fitClass:    (s) => this._scoreClass(s),
-            candClass:   (s) => this._scoreClass(s),
-          })}
+          ${this._scorePill(r.score, () => this._openFitModal(r), 'Fit score — tap for breakdown')}
+        </td>
+        <td class="col col-strength" data-label="Strength">
+          ${this._scorePill(r.candidateScore, () => this._openCandidateModal(r), 'Candidate strength — tap for breakdown')}
         </td>
         <td class="col col-role role-cell" data-label="Role">
           <div class="role-cell__inner">
@@ -1057,6 +1068,7 @@ export class JobPipeline extends LitElement {
     return html`
       <tr class="skeleton-row">
         <td class="col col-fit"><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
+        <td class="col col-strength"><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
         <td class="col col-role">
           <span class="skeleton" style="width:80%;height:14px;display:block;margin-bottom:6px;"></span>
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
