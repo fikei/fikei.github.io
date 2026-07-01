@@ -56,7 +56,7 @@ const COLUMNS = [
   { id: 'fit',    label: 'Fit',    sortKey: 'score',   type: 'num',  defaultDir: 'desc' },
   { id: 'role',   label: 'Role',   sortKey: 'title',   type: 'text' },
   { id: 'signal', label: '',       sortKey: null },
-  { id: 'connections', label: 'Network', sortKey: null },
+  { id: 'connections', label: 'Network', sortKey: 'connections', type: 'num', defaultDir: 'desc' },
   { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
   { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
@@ -425,9 +425,10 @@ export class JobPipeline extends LitElement {
       });
       return arr;
     }
+    const valFor = (r) => key === 'connections' ? this._connScore(r) : r[key];
     arr.sort((a, b) => {
-      const av = a[key];
-      const bv = b[key];
+      const av = valFor(a);
+      const bv = valFor(b);
       // null/undefined always sorted to bottom regardless of direction.
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
@@ -935,6 +936,17 @@ export class JobPipeline extends LitElement {
              e.target.replaceWith(span);
            }}/>
     `;
+  }
+
+  // Weighted "network strength" score for sorting the Network column. Direct
+  // (1st-degree) contacts dominate (×100) so a lead where Ian knows someone
+  // outranks one with only 2nd-degree; 2nd-degree adds 1 + its mutual count
+  // as a tiebreaker. 0 when there are no connections.
+  _connScore(r) {
+    const conns = r.connections || [];
+    let s = 0;
+    for (const c of conns) s += (c.degree === '2nd' ? 1 + (c.mutuals || 0) : 100);
+    return s;
   }
 
   // Avatar stack of Ian's LinkedIn connections tied to this lead's company
