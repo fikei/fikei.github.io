@@ -1211,8 +1211,6 @@ export class JobPipeline extends LitElement {
     const showAddedBanner = added.length > 0 && !this.addedBanner.dismissed;
 
     return html`
-      ${this.bucket === 'leads' ? html`<ladder-recommendations></ladder-recommendations>` : nothing}
-
       ${this.bucket === 'active' ? this._renderLiveBanners() : nothing}
       ${this.bucket === 'active' ? this._renderNeedsAttention() : nothing}
 
