@@ -5672,7 +5672,7 @@ body[data-auth-state="out"] job-chat { display: none; }
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--success);   /* 1st-degree: green ring */
+  border: 2px solid var(--accent-strong);   /* 1st-degree: bright green ring */
   margin-left: -8px;
   background: var(--bg-surface);
 }
@@ -5722,7 +5722,7 @@ body[data-auth-state="out"] job-chat { display: none; }
   object-fit: cover;
   flex: none;
   background: var(--bg-surface);
-  border: 2px solid var(--success);   /* 1st-degree: green ring */
+  border: 2px solid var(--accent-strong);   /* 1st-degree: bright green ring */
 }
 .conn-avatar--placeholder {
   display: inline-flex;
@@ -5760,13 +5760,14 @@ body[data-auth-state="out"] job-chat { display: none; }
 }
 .conn-badge--1st { background: var(--accent-strong); color: var(--accent-strong-fg); }
 .conn-badge--2nd { background: transparent; color: var(--fg-subtle); border: 1px dashed var(--border-strong); }
-.conn-link--2nd .conn-avatar { border: none; }   /* 2nd+ degree: no ring */
+.conn-link--2nd .conn-avatar { border: 2px solid #ffffff; }   /* 2nd+ degree: white border */
 .conn-mutuals { color: var(--fg-subtle); font-size: var(--font-size-small); opacity: 0.85; }
 
-/* 2nd-degree (or greater) avatars carry no ring — only direct (1st-degree)
-   connections get the green ring, so a green face = "you already know them". */
+/* 2nd-degree (or greater) avatars get a white border; only direct
+   (1st-degree) connections get the bright-green ring, so a green face =
+   "you already know them". */
 .conn-stack__avatar--2nd {
-  border: none;
+  border: 2px solid #ffffff;
 }
 
 /* ── Network column hover card ────────────────────────────────────────── */
@@ -5795,9 +5796,9 @@ body[data-auth-state="out"] job-chat { display: none; }
 .conn-tip__item { display: flex; align-items: center; gap: var(--space-2); }
 .conn-tip__avatar {
   width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none;
-  background: var(--bg-surface); border: 2px solid var(--success);   /* 1st: green ring */
+  background: var(--bg-surface); border: 2px solid var(--accent-strong);   /* 1st: bright green ring */
 }
-.conn-tip__avatar--2nd { border: none; }   /* 2nd+ degree: no ring */
+.conn-tip__avatar--2nd { border: 2px solid #ffffff; }   /* 2nd+ degree: white border */
 .conn-tip__avatar--ph {
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: var(--fw-semibold); color: var(--fg-subtle); text-transform: uppercase;
