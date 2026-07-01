@@ -189,6 +189,74 @@ function computeFitScore(role: Role, vision: Vision): {
 
 ---
 
+## Job liveness / expiry detection
+
+The system maintains two separate tables for job recommendations and tracks their liveness independently:
+
+**For You (recommended_roles):** Hidden from view when `closed_at is not null`. Filtering happens in the `recommendations` edge function (`recommendations/index.ts`). Closed rows are retained for historical analysis.
+
+**Saved (pipeline_roles):** Closed rows get `status='Closed'` and `archived_at` timestamp. Separate liveness tracking and status.
+
+### For You liveness (three layers)
+
+**Layer 1 — ATS board re-pulls** (every 15 minutes)
+- Edge function: `pull-recommendations`
+- Cron: `pull-recommendations-15min` (x-cron-secret auth)
+- Process: Re-pulls tracked ATS boards (Greenhouse, Lever, Ashby, etc.) and compares against stored recommendations by ID. If a rec ID disappears from the live board, sets `closed_at` + `closure_reason='delisted'`. If the same ID reappears later, clears `closed_at` (reopens the rec).
+- Data retention: Closed recs stay in the DB for history.
+
+**Layer 2 — ATS open-id API checks** (every 6 hours)
+- Edge function: `enrich-job-source` with `action=liveness`
+- Cron: `liveness-check-6h` (anon Bearer auth)
+- Process: Re-checks recs whose URL resolves to Greenhouse/Lever/Ashby against each ATS's open-id API. Sets `closure_reason='ats-delisted'` on closure.
+
+**Layer 3 — URL liveness probes + age-out** (every 6 hours, same call as Layer 2)
+- Edge function: `enrich-job-source` with `action=liveness` (v0.7.0+)
+- Process:
+  1. **genericLivenessBatch:** HEAD/GET-probes remaining non-ATS active recs (LinkedIn, weworkremotely, remotive, misc ATS). Closes on HTTP 404/410/451 → `closure_reason='url-dead'`. LinkedIn is probed via its public `jobs-guest` posting API (the posting page itself is bot-blocked).
+  2. **ageOutStale:** Closes any active rec not confirmed open in STALE_TTL_DAYS (45 days) → `closure_reason='stale'`. Tracks freshness via `last_seen_at` (set by Layer 1/2/3 on confirmation), falling back to `suggested_at`. This is the backstop for LinkedIn and aggregator URLs that return HTTP 200 even after expiration.
+
+**Known limitation:** LinkedIn returns 200 even for expired postings. Neither HEAD probes nor the guest-API check reliably closes them. The 45-day age-out is the real mechanism.
+
+**UX signal (v0.13.0+):** The `recommendations` GET endpoint returns `recentlyExpired` = count of recs closed in the last 7 days. The For You table header displays a "· N expired removed" note, making pruning visible instead of silent.
+
+### Saved liveness
+
+**URL probing** (every 3 hours)
+- Edge function: `check-liveness` (verify_jwt=true, single-user auth)
+- Cron: `saved-liveness-3h` (migration 087, requires both anon Bearer + x-cron-secret to bypass per-user auth)
+- Process: HEAD-probes `job.pipeline_roles` URLs. Closes only on 404/410/451 → sets `status='Closed'`, `archived_at`, `is_live=false`.
+- Frontend also runs this on 1h debounce when the Saved tab opens (optimistic liveness check from the user's perspective).
+
+**Auth note:** `check-liveness` verifies JWT, so the cron task must include both an anon Bearer token (satisfying the Supabase gateway) and `x-cron-secret` (the function checks this to bypass per-user auth).
+
+### Data schema
+
+**recommended_roles columns:**
+- `closed_at` — null while active; timestamp when closed
+- `closure_reason` — one of: `'delisted'` (Layer 1, ID no longer on ATS board), `'ats-delisted'` (Layer 2, failed open-id check), `'url-dead'` (Layer 3, HTTP 404/410/451), `'stale'` (Layer 3, age-out after 45 days)
+- `last_seen_at` — timestamp of last confirmation by any liveness layer
+- `suggested_at` — timestamp of initial recommendation
+- `dismissed_at` — user-dismissal timestamp (independent of liveness)
+- `added_to_pipeline_slug` — if user saved this rec to their pipeline
+
+**pipeline_roles columns:**
+- `liveness_checked_at` — timestamp of last `check-liveness` probe
+- `is_live` — boolean; false if closed
+- `liveness_status_code` — last HTTP status from probe (200, 404, 410, 451, etc.)
+- `closed_detected_at` — timestamp when closure detected
+- `status` — user-facing status: `'New'`, `'Apply'`, `'Talking'`, `'Applied'`, `'Pass'`, `'Rejected'`, `'Closed'`, `'Not Listed'`
+- `archived_at` — when marked Closed
+
+### Design notes
+
+- **Non-interchangeable layers:** `check-liveness` (Saved) and `enrich-job-source action=liveness` (For You) are separate functions serving distinct tables. They are not interchangeable.
+- **Closure is idempotent:** re-probing a closed rec and re-closing it writes the same `closure_reason` and timestamp (no double-entry).
+- **History preservation:** closed recs stay in the DB indefinitely. The UI hides them (For You) or marks them Closed (Saved), but analysis queries can still reference them.
+- **Cron auth pattern:** functions with verify_jwt=true need cron tasks to send both anon Bearer (for the gateway) and x-cron-secret (to bypass JWT check). This is documented in migration 087.
+
+---
+
 ## Data sources (v1)
 
 | What | Where | Read by | Write by |
