@@ -5808,3 +5808,37 @@ body[data-auth-state="out"] job-chat { display: none; }
 .conn-tip__title { color: var(--fg-subtle); font-size: var(--font-size-caption); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
 .conn-tip__mutuals { color: var(--fg-subtle); font-size: var(--font-size-caption); opacity: 0.85; }
 .conn-stack { cursor: default; }
+
+/* ── Editable company name (role detail header) ───────────────────────── */
+.company-edit-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  margin: -1px -2px;
+  font: inherit;
+  color: inherit;
+  cursor: text;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+}
+.company-edit-btn:hover { text-decoration: underline; text-underline-offset: 2px; }
+.company-edit-pencil {
+  font-size: 0.8em;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.company-edit-btn:hover .company-edit-pencil,
+.company-edit-btn:focus-visible .company-edit-pencil { opacity: 0.55; }
+.company-edit-input {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 1px 6px;
+  min-width: 180px;
+  max-width: 360px;
+}
+.company-edit-input:focus { outline: none; border-color: var(--accent-strong); }

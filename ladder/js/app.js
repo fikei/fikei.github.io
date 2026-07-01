@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.9.1";
-console.log(`[ladder] v${VERSION} - default Saved sort is fit score, not manual order`);
+const VERSION = "2.10.0";
+console.log(`[ladder] v${VERSION} - editable company name on the role detail header`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

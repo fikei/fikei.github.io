@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.13.0';
-console.log(`[jobs-pipe] v${VERSION} - connections include degree (1st/2nd) + mutual count`);
+const VERSION = '0.14.0';
+console.log(`[jobs-pipe] v${VERSION} - editable company_name (inline rename from detail header)`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -150,6 +150,23 @@ serve(async (req) => {
           where slug = ${slug};
         `;
         return jsonResp({ ok: true, slug, deleted: true });
+      }
+
+      // Company-name edit — inline rename from the detail header (e.g. fixing
+      // a mis-parsed "Care Delivery Systems" → "Midi Health"). company_slug
+      // is deliberately left untouched: connections + KB linkage key off the
+      // slug, not the display name. updated_at bumps so stale-analysis
+      // detection re-runs on next open.
+      if (typeof body.company_name === 'string') {
+        const name = body.company_name.trim().slice(0, 200);
+        if (!name) return err('company_name cannot be empty', 400);
+        const upd = await sql`
+          update job.pipeline_roles
+             set company_name = ${name}, updated_at = now()
+           where slug = ${slug}
+          returning slug;`;
+        if (!upd[0]) return err('role not found', 404);
+        return jsonResp({ ok: true, slug, company_name: name });
       }
 
       // Status / stage / exit_reason writeback.
