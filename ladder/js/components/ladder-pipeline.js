@@ -148,15 +148,10 @@ export class JobPipeline extends LitElement {
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
     this.bucket = (b === 'leads' || b === 'active' || b === 'archive') ? b : 'leads';
-    // Default to manual order in Saved if the user has dragged something
-    // before; otherwise fall back to fit-score.
-    if (this.bucket === 'leads' && this._manualOrders.leads.length) {
-      this.sortKey = 'manual';
-      this.sortDir = 'asc';
-    } else {
-      this.sortKey = 'score';
-      this.sortDir = 'desc';
-    }
+    // Default to fit-score (desc) on every bucket, including Saved. A saved
+    // manual drag order is still one click away via "Use my order".
+    this.sortKey = 'score';
+    this.sortDir = 'desc';
     if (b !== this.bucket) {
       // Normalise URL so subnav highlight matches.
       const qs = new URLSearchParams(location.search);
@@ -511,15 +506,10 @@ export class JobPipeline extends LitElement {
       qs.delete('stage');
       history.replaceState(null, '', `${location.pathname}?${qs}`);
     }
-    // On Saved, prefer manual order if the user has one; otherwise reset to
-    // fit-desc. The other buckets always default to fit-desc.
-    if (bucket === 'leads' && this._manualOrders.leads.length) {
-      this.sortKey = 'manual';
-      this.sortDir = 'asc';
-    } else {
-      this.sortKey = 'score';
-      this.sortDir = 'desc';
-    }
+    // All buckets default to fit-desc, including Saved. The user's manual drag
+    // order is still available via "Use my order".
+    this.sortKey = 'score';
+    this.sortDir = 'desc';
     const qs = new URLSearchParams(location.search);
     qs.set('bucket', bucket);
     history.pushState(null, '', `${location.pathname}?${qs}`);
