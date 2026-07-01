@@ -5735,3 +5735,37 @@ body[data-auth-state="out"] job-chat { display: none; }
 .conn-text { display: flex; flex-direction: column; line-height: 1.25; }
 .conn-name { font-weight: var(--fw-semibold); font-size: var(--font-size-small); }
 .conn-title { color: var(--fg-subtle); font-size: var(--font-size-small); max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Connections: 1st vs 2nd degree ───────────────────────────────────── */
+.conn-group__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-small);
+  color: var(--fg-subtle);
+}
+.conn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  flex: none;
+}
+.conn-badge--1st { background: var(--accent-strong); color: var(--accent-strong-fg); }
+.conn-badge--2nd { background: transparent; color: var(--fg-subtle); border: 1px dashed var(--border-strong); }
+.conn-link--2nd .conn-avatar { border: 2px dashed var(--border-strong); }
+.conn-mutuals { color: var(--fg-subtle); font-size: var(--font-size-small); opacity: 0.85; }
+
+/* 2nd-degree avatars in the leads-table stack get a dashed ring so they read
+   as "reachable through a mutual" rather than "already connected". */
+.conn-stack__avatar--2nd {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  opacity: 0.9;
+}

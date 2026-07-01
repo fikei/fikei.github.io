@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.6.0";
-console.log(`[ladder] v${VERSION} - LinkedIn connections on lead detail + leads-table avatars`);
+const VERSION = "2.7.0";
+console.log(`[ladder] v${VERSION} - 1st + high-quality 2nd-degree LinkedIn connections on leads`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.12.0';
-console.log(`[jobs-pipe] v${VERSION} - include LinkedIn connections per company (company_connections join)`);
+const VERSION = '0.13.0';
+console.log(`[jobs-pipe] v${VERSION} - connections include degree (1st/2nd) + mutual count`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -76,8 +76,10 @@ async function listRoles() {
           'name', c.full_name,
           'title', coalesce(nullif(c.current_title, ''), c.headline),
           'profileUrl', c.profile_url,
-          'photoUrl', c.photo_url
-        ) order by c.full_name)
+          'photoUrl', c.photo_url,
+          'degree', c.degree,
+          'mutuals', c.mutuals
+        ) order by c.degree, c.mutuals desc nulls last, c.full_name)
         from job.company_connections c
         where c.company_slug = r.company_slug
       ), array[]::json[]) as "connections"

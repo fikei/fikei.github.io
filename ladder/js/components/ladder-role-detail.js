@@ -620,36 +620,59 @@ export class JobRoleDetail extends LitElement {
     `;
   }
 
-  // "People you may know here" — Ian's 1st-degree LinkedIn connections who
-  // currently work at this role's company, joined in by jobs-pipe on
-  // r.connections. Each chip links out to the person's LinkedIn profile so
-  // Ian can ask for a warm intro / referral. Hidden when there are none.
+  // "People you may know here" — Ian's LinkedIn connections tied to this
+  // role's company, joined in by jobs-pipe on r.connections. Split into
+  // 1st-degree ("you know them directly" → warm intro/referral) and
+  // high-quality 2nd-degree ("worth a connection request" → decision-makers
+  // reachable through a mutual). Hidden when there are none.
   _renderConnections() {
     const conns = this.role?.connections || [];
     if (!conns.length) return nothing;
+    const firsts  = conns.filter(c => c.degree !== '2nd');
+    const seconds = conns.filter(c => c.degree === '2nd');
     return html`
       <article class="role-card role-connections">
         <header class="role-card__head"><h3>People you may know here</h3></header>
         <div class="role-card__body">
-          <p class="muted role-connections__sub">${conns.length} 1st-degree LinkedIn connection${conns.length === 1 ? '' : 's'} at ${this.role.company || 'this company'} — worth a warm intro.</p>
-          <ul class="conn-list">
-            ${conns.map(c => html`
-              <li class="conn-item">
-                <a class="conn-link" href=${c.profileUrl || '#'} target="_blank" rel="noopener">
-                  ${c.photoUrl
-                    ? html`<img class="conn-avatar" src=${c.photoUrl} alt="" loading="lazy" decoding="async"
-                             @error=${(e) => { e.target.replaceWith(this._connInitialEl(c.name)); }}/>`
-                    : this._connInitial(c.name)}
-                  <span class="conn-text">
-                    <span class="conn-name">${c.name}</span>
-                    ${c.title ? html`<span class="conn-title">${c.title}</span>` : nothing}
-                  </span>
-                </a>
-              </li>
-            `)}
-          </ul>
+          ${firsts.length ? html`
+            <p class="conn-group__label">
+              <span class="conn-badge conn-badge--1st">1st</span>
+              You're connected — ${firsts.length} direct contact${firsts.length === 1 ? '' : 's'} at ${this.role.company || 'this company'}. Ask for a warm intro or referral.
+            </p>
+            <ul class="conn-list">
+              ${firsts.map(c => this._renderConnItem(c))}
+            </ul>
+          ` : nothing}
+          ${seconds.length ? html`
+            <p class="conn-group__label" style=${firsts.length ? 'margin-top:var(--space-4);' : ''}>
+              <span class="conn-badge conn-badge--2nd">2nd</span>
+              Worth a connection request — ${seconds.length} senior/decision-maker${seconds.length === 1 ? '' : 's'} reachable through a mutual.
+            </p>
+            <ul class="conn-list">
+              ${seconds.map(c => this._renderConnItem(c))}
+            </ul>
+          ` : nothing}
         </div>
       </article>
+    `;
+  }
+
+  _renderConnItem(c) {
+    const isSecond = c.degree === '2nd';
+    return html`
+      <li class="conn-item">
+        <a class="conn-link ${isSecond ? 'conn-link--2nd' : ''}" href=${c.profileUrl || '#'} target="_blank" rel="noopener">
+          ${c.photoUrl
+            ? html`<img class="conn-avatar" src=${c.photoUrl} alt="" loading="lazy" decoding="async"
+                     @error=${(e) => { e.target.replaceWith(this._connInitialEl(c.name)); }}/>`
+            : this._connInitial(c.name)}
+          <span class="conn-text">
+            <span class="conn-name">${c.name}</span>
+            ${c.title ? html`<span class="conn-title">${c.title}</span>` : nothing}
+            ${isSecond && c.mutuals ? html`<span class="conn-mutuals">${c.mutuals} mutual connection${c.mutuals === 1 ? '' : 's'}</span>` : nothing}
+          </span>
+        </a>
+      </li>
     `;
   }
 

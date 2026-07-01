@@ -1,24 +1,36 @@
 # Brief: Productizing "Who do I know here?" (LinkedIn connection mining)
 
-**Status:** Pilot shipped (manual mining, 6 companies) · **Owner:** Ian · **Date:** 2026-06-30
+**Status:** Full manual sweep shipped (all leads, 1st + 2nd degree) · **Owner:** Ian · **Date:** 2026-06-30
 
-## 1. What shipped (the pilot)
+## 1. What shipped
 
-For every saved lead in `/ladder`, the app now shows Ian's 1st-degree LinkedIn
-connections who **currently work at that company**, so a warm intro or referral
-is one click away.
+For every saved lead in `/ladder`, the app now shows the LinkedIn people tied to
+that company, in two tiers:
 
-- **Detail page** (`/ladder/jobs/{slug}/`) — a "People you may know here" card:
-  avatar, name, current title, link to their LinkedIn profile.
+- **1st degree** — connections who **currently work there** → ask for a warm
+  intro / referral.
+- **2nd degree (high quality)** — senior/decision-maker profiles (CPO, CTO,
+  CEO, VP/Head/Director of Product, founders) reachable **through a mutual** →
+  worth a connection request. Ranked by mutual-connection count.
+
+Surfaces:
+
+- **Detail page** (`/ladder/jobs/{slug}/`) — a "People you may know here" card,
+  grouped into a "You're connected" (1st) section and a "Worth a connection
+  request" (2nd) section with mutual counts. Each row links to the profile.
 - **Leads table** (`?bucket=leads`) — a "Network" column with an
-  overlapping-avatar stack per row.
-- **Data** — `job.company_connections` (migration 085), keyed on
-  `company_slug`; joined into every role at that company by `jobs-pipe`
-  (`r.connections`).
+  overlapping-avatar stack; 1st-degree faces are solid, 2nd-degree get a dashed
+  ring.
+- **Data** — `job.company_connections` (migrations 085 + 086), keyed on
+  `company_slug` with a `degree` (1st/2nd) + `mutuals` count; joined into every
+  role at that company by `jobs-pipe` (`r.connections`, ordered 1st then 2nd).
 
-The pilot was mined **by hand** for 6 companies: Anthropic (3), Abridge (1),
-Mercury (1), OpenAI (1); Plaid and Code for America returned no current
-1st-degree connections. Result: 6 connections, all with photos.
+**Coverage:** all 40 unique lead companies swept. Result: **81 connections —
+12 first-degree, 69 high-quality second-degree — across 30 companies**, nearly
+all with photos. Mining used a single people-search per company filtered to
+1st+2nd degree (`network=["F","S"]`), splitting on each card's degree marker.
+The `linkedin` slug lead (an Oura role) was mined against Oura; the
+`maven-clinic`/`mavenclinic` duplicate slugs share one mined set.
 
 ## 2. How the pilot was actually done (and why it's not yet a product)
 
