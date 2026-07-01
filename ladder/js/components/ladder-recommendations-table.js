@@ -71,6 +71,7 @@ export class JobRecommendationsTable extends LitElement {
     _total:              { state: true },
     _loadingMore:        { state: true },
     _hasMore:            { state: true },
+    _recentlyExpired:    { state: true },
   };
 
   constructor() {
@@ -94,6 +95,7 @@ export class JobRecommendationsTable extends LitElement {
     this._offset = 0;
     this._loadingMore = false;
     this._hasMore = false;
+    this._recentlyExpired = 0;
   }
 
   // ----- Source health banner ------------------------------------------
@@ -270,6 +272,7 @@ export class JobRecommendationsTable extends LitElement {
       this._total  = Number.isFinite(data?.total) ? data.total : this.items.length;
       this._hasMore = !!data?.hasMore;
       if (reset && Array.isArray(data?.sourceHealth)) this._health = data.sourceHealth;
+      if (reset) this._recentlyExpired = Number.isFinite(data?.recentlyExpired) ? data.recentlyExpired : 0;
     } catch (e) {
       if (reset) { this.error = String(e); this.state = 'error'; }
       // append failures are non-fatal — keep what we have, allow retry
@@ -539,6 +542,12 @@ export class JobRecommendationsTable extends LitElement {
         <span class="muted">${this._total > rows.length
           ? `${rows.length} of ${this._total} roles`
           : `${rows.length} ${rows.length === 1 ? 'role' : 'roles'}`}</span>
+        ${this._recentlyExpired > 0 ? html`
+          <span class="muted recs-page__pruned"
+                title="Postings the liveness checks found expired and removed in the last 7 days">
+            · ${this._recentlyExpired} expired removed
+          </span>
+        ` : nothing}
         <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
                 title="Scan Gmail for new role alerts and application updates"
                 @click=${() => this._onRefresh()}>
