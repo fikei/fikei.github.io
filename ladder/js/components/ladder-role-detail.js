@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole, updateRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -95,6 +95,7 @@ export class JobRoleDetail extends LitElement {
     activityState:  { state: true },  // 'idle' | 'loading' | 'loaded' | 'error'
     activityEvents: { state: true },  // EventRow[]
     processOutline: { state: true },  // { rounds, expected_total_rounds, source, ... } | null
+    editingCompany: { state: true },  // inline company-name edit in the header
   };
 
   constructor() {
@@ -123,6 +124,7 @@ export class JobRoleDetail extends LitElement {
     this.activityState  = 'idle';
     this.activityEvents = [];
     this.processOutline = null;
+    this.editingCompany = false;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/ladder\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -686,6 +688,56 @@ export class JobRoleDetail extends LitElement {
     span.setAttribute('aria-hidden', 'true');
     span.textContent = (name || '?').trim().charAt(0).toUpperCase() || '?';
     return span;
+  }
+
+  // --- Inline company-name edit (header subtitle) --------------------------
+  // The crawler sometimes stores a mis-parsed company (e.g. the legal entity
+  // "Care Delivery Systems" instead of the brand "Midi Health"). Clicking the
+  // company name in the header turns it into an input; Enter/blur saves via
+  // jobs-pipe (company_name only — company_slug is left intact so connections
+  // and KB linkage keep working).
+  _renderCompanyEditable(r) {
+    const company = r?.company || '';
+    if (this.editingCompany) {
+      return html`<input class="company-edit-input" .value=${company}
+                   placeholder="Company name" aria-label="Company name"
+                   @keydown=${(e) => this._onCompanyKeydown(e)}
+                   @blur=${(e) => this._saveCompany(e.target.value)}>`;
+    }
+    return html`<button class="company-edit-btn" title="Click to edit the company name"
+                  @click=${() => this._startEditCompany()}>
+                  <span class="company-edit-name">${company || 'Add company'}</span>
+                  <span class="company-edit-pencil" aria-hidden="true">✎</span>
+                </button>`;
+  }
+
+  _startEditCompany() {
+    this.editingCompany = true;
+    this.updateComplete.then(() => {
+      const el = this.querySelector('.company-edit-input');
+      if (el) { el.focus(); el.select(); }
+    });
+  }
+
+  _onCompanyKeydown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); this._companyCancel = true; this.editingCompany = false; }
+  }
+
+  async _saveCompany(value) {
+    if (this._companyCancel) { this._companyCancel = false; this.editingCompany = false; return; }
+    const name = (value || '').trim();
+    this.editingCompany = false;
+    if (!name || name === (this.role?.company || '')) return;
+    const prev = this.role?.company;
+    this.role = { ...this.role, company: name };
+    document.title = `${name} — ${this.role?.title || this.slug} — /ladder`;
+    try {
+      await updateRole(this.slug, { company_name: name });
+    } catch (e) {
+      this.role = { ...this.role, company: prev };
+      console.warn('[role-detail] company save failed:', (e && e.message) || e);
+    }
   }
 
   _renderDetails() {
@@ -1713,7 +1765,7 @@ export class JobRoleDetail extends LitElement {
           })()}
           <div class="role-header__title">
             <h1>${r.title || this.slug}</h1>
-            <p class="role-header__sub">${r.company || ''}${r.sector ? ` · ${r.sector}` : ''}</p>
+            <p class="role-header__sub">${this._renderCompanyEditable(r)}${r.sector ? html`<span class="role-header__sub-sep"> · ${r.sector}</span>` : nothing}</p>
           </div>
         </div>
         <div class="role-header__actions">
@@ -1836,7 +1888,7 @@ export class JobRoleDetail extends LitElement {
           })()}
           <div class="role-header__title">
             <h1>${r?.title || this.slug}</h1>
-            <p class="role-header__sub">${r?.company || ''}${r?.sector ? ` · ${r.sector}` : ''}</p>
+            <p class="role-header__sub">${this._renderCompanyEditable(r)}${r?.sector ? html`<span class="role-header__sub-sep"> · ${r.sector}</span>` : nothing}</p>
           </div>
         </div>
         <div class="role-header__actions">
