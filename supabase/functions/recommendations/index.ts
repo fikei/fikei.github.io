@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.12.0';
-console.log(`[recommendations] v${VERSION} - dedup For You against pipeline by normalized URL too (saved/applied/rejected reappearing fix)`);
+const VERSION = '0.13.0';
+console.log(`[recommendations] v${VERSION} - return recentlyExpired (recs auto-retired by liveness in last 7d) so For You can show "N expired removed"`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -160,6 +160,21 @@ serve(async (req) => {
         const [{ n }] = await sql`select count(*)::int as n from job.recommended_roles r ${whereClause}`;
         total = n;
       }
+      // Count of recs the liveness layers auto-retired in the last 7 days.
+      // Lets For You reassure the user that expired postings are being pruned
+      // ("N expired removed") instead of silently vanishing. Never fail the
+      // page over this — it's a cosmetic count.
+      let recentlyExpired = 0;
+      try {
+        const [{ n }] = await sql`
+          select count(*)::int as n
+            from job.recommended_roles
+           where closed_at is not null
+             and closed_at > now() - interval '7 days'`;
+        recentlyExpired = n;
+      } catch (e) {
+        console.warn(`[recommendations] recentlyExpired count failed: ${(e as Error).message}`);
+      }
       // Source health — lets the UI tell "no new recs" apart from "a
       // source is dead". needs_reauth is true when the gmail-jobs source
       // errored with a token problem OR the scan-state row carries one.
@@ -188,7 +203,7 @@ serve(async (req) => {
       }
       return jsonResp({
         ok: true, version: VERSION, view,
-        count: rows.length, total,
+        count: rows.length, total, recentlyExpired,
         offset, limit,
         hasMore: isAll && offset + rows.length < total,
         recommendations: rows, sourceHealth,
