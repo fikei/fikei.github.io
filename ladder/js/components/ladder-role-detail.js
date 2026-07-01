@@ -96,6 +96,7 @@ export class JobRoleDetail extends LitElement {
     activityEvents: { state: true },  // EventRow[]
     processOutline: { state: true },  // { rounds, expected_total_rounds, source, ... } | null
     editingCompany: { state: true },  // inline company-name edit in the header
+    editingTitle:   { state: true },  // inline role-title edit in the header
   };
 
   constructor() {
@@ -125,6 +126,7 @@ export class JobRoleDetail extends LitElement {
     this.activityEvents = [];
     this.processOutline = null;
     this.editingCompany = false;
+    this.editingTitle = false;
 
     const pretty = sessionStorage.getItem('job:prettyPath');
     if (pretty && /^\/ladder\/jobs\/[a-z0-9-]+\/?$/.test(pretty)) {
@@ -736,6 +738,52 @@ export class JobRoleDetail extends LitElement {
     } catch (e) {
       this.role = { ...this.role, company: prev };
       console.warn('[role-detail] company save failed:', (e && e.message) || e);
+    }
+  }
+
+  // --- Inline role-title edit (header h1) ----------------------------------
+  // Same pattern as the company edit: click the title to turn it into an
+  // input; Enter/blur saves via jobs-pipe (title only).
+  _renderTitleEditable(r) {
+    const title = r?.title || '';
+    if (this.editingTitle) {
+      return html`<input class="title-edit-input" .value=${title}
+                   placeholder="Role title" aria-label="Role title"
+                   @keydown=${(e) => this._onTitleKeydown(e)}
+                   @blur=${(e) => this._saveTitle(e.target.value)}>`;
+    }
+    return html`<button class="title-edit-btn" title="Click to edit the role title"
+                  @click=${() => this._startEditTitle()}>
+                  <span class="title-edit-name">${title || this.slug}</span>
+                </button>`;
+  }
+
+  _startEditTitle() {
+    this.editingTitle = true;
+    this.updateComplete.then(() => {
+      const el = this.querySelector('.title-edit-input');
+      if (el) { el.focus(); el.select(); }
+    });
+  }
+
+  _onTitleKeydown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); this._titleCancel = true; this.editingTitle = false; }
+  }
+
+  async _saveTitle(value) {
+    if (this._titleCancel) { this._titleCancel = false; this.editingTitle = false; return; }
+    const title = (value || '').trim();
+    this.editingTitle = false;
+    if (!title || title === (this.role?.title || '')) return;
+    const prev = this.role?.title;
+    this.role = { ...this.role, title };
+    document.title = `${this.role?.company || ''} — ${title} — /ladder`;
+    try {
+      await updateRole(this.slug, { title });
+    } catch (e) {
+      this.role = { ...this.role, title: prev };
+      console.warn('[role-detail] title save failed:', (e && e.message) || e);
     }
   }
 
@@ -1763,7 +1811,7 @@ export class JobRoleDetail extends LitElement {
               : html`<span class="company-logo company-logo--lg company-logo--placeholder" aria-hidden="true">${logoInitial(r.company)}</span>`;
           })()}
           <div class="role-header__title">
-            <h1>${r.title || this.slug}</h1>
+            <h1>${this._renderTitleEditable(r)}</h1>
             <p class="role-header__sub">${this._renderCompanyEditable(r)}${r.sector ? html`<span class="role-header__sub-sep"> · ${r.sector}</span>` : nothing}</p>
           </div>
         </div>
@@ -1886,7 +1934,7 @@ export class JobRoleDetail extends LitElement {
               : html`<span class="company-logo company-logo--lg company-logo--placeholder" aria-hidden="true">${logoInitial(r?.company)}</span>`;
           })()}
           <div class="role-header__title">
-            <h1>${r?.title || this.slug}</h1>
+            <h1>${this._renderTitleEditable(r)}</h1>
             <p class="role-header__sub">${this._renderCompanyEditable(r)}${r?.sector ? html`<span class="role-header__sub-sep"> · ${r.sector}</span>` : nothing}</p>
           </div>
         </div>
