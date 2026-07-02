@@ -528,8 +528,11 @@ export class JobRecommendationsTable extends LitElement {
   _renderWildcardCard(rec) {
     const weak = weakestFitDims(rec, 2);
     const fails = rec.hardFails || [];
-    const why = [...fails.map(f => `hard fail: ${f}`),
-                 ...weak.map(w => w.rationale || `weak ${w.label.toLowerCase()}`)].slice(0, 2).join(' · ');
+    // Just the reasons — the strip header already explains the concept,
+    // so the card copy stays light. Lead with the weakest dimension label
+    // for scannability; the full rationale lives in the fit modal.
+    const why = [...fails.map(f => `Hard fail: ${f}`),
+                 ...weak.map(w => w.rationale || `Weak ${w.label.toLowerCase()}`)].slice(0, 2).join(' · ');
     return html`
       <article class="rec-card rec-card--wildcard" role="listitem">
         <header class="rec-card__head">
@@ -547,7 +550,7 @@ export class JobRecommendationsTable extends LitElement {
               })}
             </div>
             <p class="rec-card__meta">${[rec.company, rec.location].filter(Boolean).join('  •  ')}</p>
-            ${why ? html`<p class="rec-card__wildcard-why">Standout candidate — low fit because: ${why}</p>` : nothing}
+            ${why ? html`<p class="rec-card__wildcard-why">${why}</p>` : nothing}
           </div>
         </header>
         <footer class="rec-card__foot">
@@ -569,7 +572,7 @@ export class JobRecommendationsTable extends LitElement {
           <h2>🃏 Wildcards</h2>
           <span class="muted">Roles where you'd likely be a standout candidate — but that flunk your stated criteria. A litmus test for the litmus.</span>
         </header>
-        <div class="rec-row" role="list">
+        <div class="rec-row rec-row--wildcards" role="list">
           ${this._wildcards.map(r => this._renderWildcardCard(r))}
         </div>
       </section>
