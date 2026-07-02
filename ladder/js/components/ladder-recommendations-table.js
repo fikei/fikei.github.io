@@ -74,6 +74,7 @@ export class JobRecommendationsTable extends LitElement {
     _hasMore:            { state: true },
     _recentlyExpired:    { state: true },
     _wildcards:          { state: true },
+    _floorOn:            { state: true },
   };
 
   constructor() {
@@ -99,6 +100,9 @@ export class JobRecommendationsTable extends LitElement {
     this._hasMore = false;
     this._recentlyExpired = 0;
     this._wildcards = [];
+    // Quality floors (fit >= 50, strength >= 50, no hard fails) apply by
+    // default; the header toggle flips to the unfiltered audit view.
+    this._floorOn = true;
   }
 
   // ----- Source health banner ------------------------------------------
@@ -268,6 +272,7 @@ export class JobRecommendationsTable extends LitElement {
       const layers = this._sortLayers;
       const data = await fetchRecommendations({
         view:   'all',
+        floor:  this._floorOn,
         limit:  PAGE_SIZE,
         offset: this._offset,
         // Multi-level: comma-joined keys + dirs, most-significant first.
@@ -286,6 +291,14 @@ export class JobRecommendationsTable extends LitElement {
       if (reset) { this.error = String(e); this.state = 'error'; }
       // append failures are non-fatal — keep what we have, allow retry
     }
+  }
+
+  async _toggleFloor() {
+    this._floorOn = !this._floorOn;
+    this.state = 'loading';
+    this.requestUpdate();
+    await this._fetchPage({ reset: true });
+    this.state = 'loaded';
   }
 
   async _loadMore() {
@@ -618,6 +631,13 @@ export class JobRecommendationsTable extends LitElement {
             · ${this._recentlyExpired} expired removed
           </span>
         ` : nothing}
+        <button class="link-subtle recs-page__floor-toggle"
+                title=${this._floorOn
+                  ? 'Quality floors on: fit ≥ 50, strength ≥ 50, no hard fails, graded only. Click to see everything.'
+                  : 'Showing everything, including below-floor and ungraded roles. Click to re-apply the quality floors.'}
+                @click=${() => this._toggleFloor()}>
+          ${this._floorOn ? 'Below-floor hidden · show all' : 'Showing all · apply floors'}
+        </button>
         <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
                 title="Scan Gmail for new role alerts and application updates"
                 @click=${() => this._onRefresh()}>
