@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
@@ -73,6 +73,7 @@ export class JobRecommendationsTable extends LitElement {
     _loadingMore:        { state: true },
     _hasMore:            { state: true },
     _recentlyExpired:    { state: true },
+    _wildcards:          { state: true },
   };
 
   constructor() {
@@ -97,6 +98,7 @@ export class JobRecommendationsTable extends LitElement {
     this._loadingMore = false;
     this._hasMore = false;
     this._recentlyExpired = 0;
+    this._wildcards = [];
   }
 
   // ----- Source health banner ------------------------------------------
@@ -249,6 +251,12 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'loading';
     await this._fetchPage({ reset: true });
     if (this.state === 'loading') this.state = 'loaded';
+    // Wildcards strip loads after the table — never block or fail the
+    // page over it.
+    try {
+      const wc = await fetchRecommendations({ view: 'wildcard' });
+      this._wildcards = Array.isArray(wc?.recommendations) ? wc.recommendations : [];
+    } catch { this._wildcards = []; }
   }
 
   // Fetch one page from the server (server-side sorted). reset=true starts
@@ -331,6 +339,7 @@ export class JobRecommendationsTable extends LitElement {
 
   async _onDismiss(rec) {
     this.items = this.items.filter(r => r.id !== rec.id);
+    this._wildcards = this._wildcards.filter(r => r.id !== rec.id);
     try { await dismissRecommendation(rec.id); } catch {}
   }
 
@@ -347,6 +356,7 @@ export class JobRecommendationsTable extends LitElement {
         fromRecommendationId: rec.id,
       });
       this.items = this.items.filter(x => x.id !== rec.id);
+      this._wildcards = this._wildcards.filter(x => x.id !== rec.id);
       document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
       document.dispatchEvent(new CustomEvent('job:pipeline:added', {
         detail: { role: { slug: r.slug, company: r.company || rec.company, title: r.title || rec.title } },
@@ -507,6 +517,65 @@ export class JobRecommendationsTable extends LitElement {
     }
   }
 
+  // --- Wildcards strip -------------------------------------------------
+  // High candidate-strength / low stated-criteria-fit roles (view=wildcard).
+  // Leads with WHY the fit is low — the strip exists to pressure-test the
+  // search criteria, not to list more of the same.
+  _wildcardDetailUrl(r) {
+    return `/ladder/jobs/${roleSlug(r.company, r.title)}/?rec=${r.id}`;
+  }
+
+  _renderWildcardCard(rec) {
+    const weak = weakestFitDims(rec, 2);
+    const fails = rec.hardFails || [];
+    const why = [...fails.map(f => `hard fail: ${f}`),
+                 ...weak.map(w => w.rationale || `weak ${w.label.toLowerCase()}`)].slice(0, 2).join(' · ');
+    return html`
+      <article class="rec-card rec-card--wildcard" role="listitem">
+        <header class="rec-card__head">
+          <div class="rec-card__title-block">
+            <div class="rec-card__title-row">
+              <h3 class="rec-card__title">
+                <a class="rec-card__title-link" href=${this._wildcardDetailUrl(rec)} target="_blank" rel="noopener"
+                   title="Open role details in a new tab">${rec.title || '(untitled)'}</a>
+              </h3>
+              ${renderScorePair(rec, {
+                onFit:       (row) => this._openFitModal(row),
+                onCandidate: (row) => this._openCandidateModal(row),
+                fitClass:    (s) => fitClass(s),
+                candClass:   (s) => fitClass(s),
+              })}
+            </div>
+            <p class="rec-card__meta">${[rec.company, rec.location].filter(Boolean).join('  •  ')}</p>
+            ${why ? html`<p class="rec-card__wildcard-why">Standout candidate — low fit because: ${why}</p>` : nothing}
+          </div>
+        </header>
+        <footer class="rec-card__foot">
+          <button class="btn btn--sm btn--accent" ?disabled=${this.addingId === rec.id}
+                  @click=${() => this._onAdd(rec)}>
+            ${this.addingId === rec.id ? 'Saving…' : 'Save role'}
+          </button>
+          <button class="link-subtle" @click=${() => this._onDismiss(rec)}>Dismiss</button>
+        </footer>
+      </article>
+    `;
+  }
+
+  _renderWildcards() {
+    if (!this._wildcards.length) return nothing;
+    return html`
+      <section class="rec-wildcards" aria-label="Wildcards">
+        <header class="rec-shell__head rec-wildcards__head">
+          <h2>🃏 Wildcards</h2>
+          <span class="muted">Roles where you'd likely be a standout candidate — but that flunk your stated criteria. A litmus test for the litmus.</span>
+        </header>
+        <div class="rec-row" role="list">
+          ${this._wildcards.map(r => this._renderWildcardCard(r))}
+        </div>
+      </section>
+    `;
+  }
+
   render() {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
@@ -560,6 +629,7 @@ export class JobRecommendationsTable extends LitElement {
         ` : nothing}
       </header>
       ${this._renderHealthBanner()}
+      ${this._renderWildcards()}
       ${rows.length === 0 ? html`
         <div class="placeholder">
           <h2>No recommendations yet</h2>
