@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.14.0';
-console.log(`[recommendations] v${VERSION} - candidate floor 50 (ungraded=pending), view=wildcard (standout candidate / low fit), view=all now unfiltered`);
+const VERSION = '0.14.1';
+console.log(`[recommendations] v${VERSION} - view=all&floor=1 applies the quality floors with pagination; For You table sends it by default`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -67,6 +67,13 @@ serve(async (req) => {
       const view = url.searchParams.get('view') || 'default';
       const isAll = view === 'all';
       const isWildcard = view === 'wildcard';
+      // ?floor=1 (view=all only) → apply the default view's quality floors
+      // (fit >= 50, strength >= 50, no hard fails, ungraded = pending)
+      // while keeping pagination + sort. The For You table sends this by
+      // default; turning it off is the explicit "show below-floor" toggle.
+      const applyFloor = isAll && url.searchParams.get('floor') === '1';
+      // True when this view skips the quality floors entirely.
+      const unfloored = (isAll && !applyFloor) || isWildcard;
 
       // Pagination (view=all only). The default carousel view stays a
       // single 60-row pull; wildcard is a short strip. limit caps at 200;
@@ -165,9 +172,9 @@ serve(async (req) => {
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (${isAll || isWildcard} or r.fit_score is null or r.fit_score >= 50)
-          and (${isAll || isWildcard} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
-          and (${isAll} or (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR}))
+          and (${unfloored} or r.fit_score is null or r.fit_score >= 50)
+          and (${unfloored} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
+          and (${isAll && !applyFloor} or (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR}))
           and (${!isWildcard} or (r.candidate_score >= ${WILDCARD_MIN_STRENGTH}
                                   and coalesce(r.fit_score, 100) < ${WILDCARD_MAX_FIT}))
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))

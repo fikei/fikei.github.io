@@ -163,6 +163,7 @@ export async function fetchRecommendations(opts = {}) {
     if (opts.offset != null) qs.set('offset', String(opts.offset));
     if (opts.sort)           qs.set('sort',   opts.sort);
     if (opts.dir)            qs.set('dir',    opts.dir);
+    if (opts.floor)          qs.set('floor',  '1');   // apply quality floors
     url = `${REC_URL}?${qs}`;
   } else if (opts.view === 'wildcard') {
     url = `${REC_URL}?view=wildcard`;
