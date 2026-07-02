@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.12.0";
-console.log(`[ladder] v${VERSION} - editable role title on the detail header (like company)`);
+const VERSION = "2.13.1";
+console.log(`[ladder] v${VERSION} - Wildcards strip moved to the For You table page (carousel is unmounted); bullet dedupe on rec detail`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -25,7 +25,17 @@ if (location.pathname.startsWith('/ladder/history/drill')) {
   import('./components/ladder-career.js' + V);
 }
 if (location.pathname.startsWith('/ladder/jobs/drill')) {
-  import('./components/ladder-role-detail.js' + V);
+  // ?rec=<id> → pre-save detail for a recommendation (not yet in the
+  // pipeline). Swap the static <ladder-role-detail> mount for the rec
+  // variant; the 404 rewrite preserves the query so pretty URLs like
+  // /ladder/jobs/<slug>/?rec=<id> land here with both params.
+  if (new URLSearchParams(location.search).get('rec')) {
+    import('./components/ladder-rec-detail.js' + V);
+    const mount = document.querySelector('ladder-role-detail');
+    if (mount) mount.replaceWith(document.createElement('ladder-rec-detail'));
+  } else {
+    import('./components/ladder-role-detail.js' + V);
+  }
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
