@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, watchCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
@@ -463,6 +463,9 @@ export class JobRecommendationsTable extends LitElement {
                       @click=${(e) => this._toggleMenu(r.id, e)}>⋯</button>
               ${this._menuOpenId === r.id ? html`
                 <div class="row-menu__pop" @click=${(e) => e.stopPropagation()}>
+                  <button class="row-menu__item" @click=${() => this._onWatchCompany(r)}>
+                    Watch ${r.company || 'this company'}
+                  </button>
                   <button class="row-menu__item" @click=${() => this._onBlockCompany(r)}>
                     Don't recommend ${r.company || 'this company'}
                   </button>
@@ -491,6 +494,23 @@ export class JobRecommendationsTable extends LitElement {
   _toggleMenu(id, e) {
     e.stopPropagation();
     this._menuOpenId = this._menuOpenId === id ? null : id;
+  }
+
+  // "Watch <company>" — green-light the company as a direct source. The
+  // server resolves the careers backend (major-tech registry or an ATS
+  // board probe); unsupported companies surface the server's message.
+  async _onWatchCompany(r) {
+    const company = r.company;
+    this._menuOpenId = null;
+    if (!company) return;
+    try {
+      await watchCompany({ company });
+      document.dispatchEvent(new CustomEvent('job:watch:added', { detail: { company } }));
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds For You now` } }));
+    } catch (e) {
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: e.message || `Couldn't watch ${company}` } }));
+      console.warn('[recs-table] watchCompany failed', e);
+    }
   }
 
   async _onBlockCompany(r) {

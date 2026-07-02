@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.12.0";
-console.log(`[ladder] v${VERSION} - editable role title on the detail header (like company)`);
+const VERSION = "2.13.0";
+console.log(`[ladder] v${VERSION} - watched companies: direct careers-page sources with per-company filter modes on For You`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -28,6 +28,7 @@ if (location.pathname.startsWith('/ladder/jobs/drill')) {
   import('./components/ladder-role-detail.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
+  import('./components/ladder-watched-companies.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
   import('./components/ladder-pipeline.js' + V);
 }

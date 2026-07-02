@@ -5862,3 +5862,77 @@ body[data-auth-state="out"] job-chat { display: none; }
   box-sizing: border-box;
 }
 .title-edit-input:focus { outline: none; border-color: var(--accent-strong); }
+
+/* ---------- Watched companies strip (/ladder/jobs/recommended/) ----------
+   Green-lit direct company sources. Chips show company + active-rec count +
+   a per-company filter-mode select; the trailing form adds a new watch. */
+.watched-strip {
+  margin-bottom: var(--space-5);
+}
+.watched-strip__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.watched-strip__head h2 {
+  margin: 0;
+  font-size: var(--font-size-title-3);
+}
+.watched-strip__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+.watched-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.watched-chip--off { opacity: 0.55; }
+.watched-chip__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.watched-chip__meta { font-size: var(--font-size-caption); white-space: nowrap; }
+.watched-chip__mode {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-caption);
+  padding: 2px var(--space-1);
+}
+.watched-chip__remove {
+  background: none;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+.watched-chip__remove:hover { color: var(--fg); }
+.watched-add {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.watched-add input {
+  background: var(--bg-surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-width: 180px;
+}
+.watched-strip__error {
+  color: var(--error, #e5484d);
+  font-size: var(--font-size-caption);
+  margin: var(--space-2) 0 0;
+}

@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.13.0';
-console.log(`[recommendations] v${VERSION} - return recentlyExpired (recs auto-retired by liveness in last 7d) so For You can show "N expired removed"`);
+const VERSION = '0.14.0';
+console.log(`[recommendations] v${VERSION} - watched-company filter modes: per-company surfacing gates (all / role_level / good_fits / exceptional) via job.watched_companies`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -106,13 +106,34 @@ serve(async (req) => {
       //      catches the same posting when title/company text drifted between
       //      the saved copy and a later re-ingested recommendation (the cause
       //      of saved jobs reappearing in For You).
+      // Watched-company filter modes (job.watched_companies.filter_mode)
+      // gate the carousel per company; unwatched rows keep the standard
+      // gates. The join is inside the fragment so the count query and the
+      // page query stay in lockstep.
+      //   'all'         → everything the watch pulls (even weak grades)
+      //   'role_level'  → role & level match: not below seniority, and
+      //                   Haiku role score ≥13/25 (ungraded rows pass —
+      //                   the watch query already scopes to the role)
+      //   'exceptional' → candidate_score ≥ 60 only
+      //   'good_fits' / unwatched → fit ≥50, no hard-fails, candidate ≥30
       const whereClause = sql`
+        left join job.watched_companies w on w.id = r.watched_company_id
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (${isAll} or r.fit_score is null or r.fit_score >= 50)
-          and (${isAll} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
-          and not (r.candidate_score is not null and r.candidate_score < ${CANDIDATE_FLOOR})
+          and (coalesce(w.filter_mode, '') = 'all'
+               or not (r.candidate_score is not null and r.candidate_score < ${CANDIDATE_FLOOR}))
+          and (${isAll} or
+            case coalesce(w.filter_mode, 'good_fits')
+              when 'all' then true
+              when 'role_level' then
+                (r.role_match_seniority is null or r.role_match_seniority <> 'below')
+                and coalesce(r.role_match_score, 13) >= 13
+              when 'exceptional' then coalesce(r.candidate_score, 0) >= 60
+              else
+                (r.fit_score is null or r.fit_score >= 50)
+                and coalesce(array_length(r.hard_fails, 1), 0) = 0
+            end)
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
           and not exists (
             select 1
@@ -143,6 +164,8 @@ serve(async (req) => {
                r.enrichment_status as "enrichmentStatus",
                r.enrichment_retry_at as "enrichmentRetryAt",
                r.canonical_url as "canonicalUrl",
+               r.watched_company_id as "watchedCompanyId",
+               w.filter_mode as "watchFilterMode",
                -- Source-email URL — derived from payload.gmailApiId for
                -- Gmail-sourced recs so the UI can render a "view source"
                -- link without parsing the JSON client-side.

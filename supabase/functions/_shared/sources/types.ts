@@ -33,6 +33,10 @@ export interface RecommendedRoleInput {
   enrichmentRetryAt?:   string;       // ISO8601
   canonicalUrl?:        string;       // canonical apply URL when resolved
   companyId?:           string;       // job.hiring_companies.id when known
+  // Set by the company-watch plugin: the job.watched_companies row that
+  // produced this posting. Drives per-company filter_mode at read time
+  // and suppresses the public/mega-cap hard-fail at scoring time.
+  watchedCompanyId?:    string;
 }
 
 // A Source<Cfg> is a pure function from config → array of postings. No

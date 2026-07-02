@@ -379,9 +379,15 @@ function scoreArc(r: RoleRow, cap: number, ctx?: UserContext, seniorityHint?: st
 }
 
 // ---------- Stage (cap from weights.stage, default 4) ----------
-function scoreStage(r: RoleRow, cap: number): { v: number; reason: string; fail?: string } {
+function scoreStage(r: RoleRow, cap: number, watchedCompany?: boolean): { v: number; reason: string; fail?: string } {
   const i = (r.investors + ' ' + r.crunchbase).toLowerCase();
   if (/(?:^|\W)(google|meta|amazon|microsoft|apple|salesforce)(?:\W|$)/.test((r.company + ' ' + i).toLowerCase())) {
+    // A watched company is explicitly green-lit by the user, so being a
+    // mega-cap costs stage points but is NOT a hard fail (which would cap
+    // the whole score at 30 and keep every watched role out of For You).
+    if (watchedCompany) {
+      return { v: Math.round(cap * 0.25), reason: 'Public, mega-cap company — outside your usual stage band, but you\'re watching this company.' };
+    }
     return { v: Math.round(cap * 0.25), fail: 'public / mega-cap', reason: 'Public, mega-cap company — outside the company shape you\'re targeting.' };
   }
   if (/series d|series e|late stage/.test(i)) return { v: Math.round(cap * 0.5), reason: 'Later-stage company — past your sweet spot but workable.' };
@@ -415,14 +421,20 @@ function scoreGeo(_r: RoleRow, cap: number): { v: number; reason: string; fail?:
 }
 
 // ---------- Compose ----------
-export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: number | null, seniorityHint?: string | null, haikuRationale?: string | null): FitResult {
+export interface FitOptions {
+  // True when the posting came from a company the user explicitly watches
+  // (job.watched_companies). Suppresses the public/mega-cap hard fail.
+  watchedCompany?: boolean;
+}
+
+export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: number | null, seniorityHint?: string | null, haikuRationale?: string | null, opts?: FitOptions): FitResult {
   const w: FitWeights = { ...DEFAULT_WEIGHTS, ...(ctx?.weights || {}) };
   const values  = scoreValues(r, w.values, ctx);
   const culture = scoreCulture(r, w.culture, ctx);
   const role    = scoreRole(r, w.role, ctx, preComputedRole, haikuRationale);
   const domain  = scoreDomain(r, w.domain, ctx);
   const arc     = scoreArc(r, w.arc, ctx, seniorityHint);
-  const stage   = scoreStage(r, w.stage);
+  const stage   = scoreStage(r, w.stage, opts?.watchedCompany);
   const geo     = scoreGeo(r, w.geo);
   const comp    = scoreComp(r.salary, w.comp);
 

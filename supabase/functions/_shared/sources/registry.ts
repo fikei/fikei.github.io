@@ -7,8 +7,10 @@ import { linkedinRssSource } from './linkedin-rss.ts';
 import { rssSource } from './rss.ts';
 import { theirstackSource } from './theirstack.ts';
 import { gmailJobsSource } from './gmail-jobs.ts';
+import { companyWatchSource } from './company-watch.ts';
 
 export const SOURCES: Record<string, Source> = {
+  [companyWatchSource.type]: companyWatchSource,
   [fixtureSource.type]:     fixtureSource,
   [trackedAtsSource.type]:  trackedAtsSource,
   [linkedinRssSource.type]: linkedinRssSource as unknown as Source,
