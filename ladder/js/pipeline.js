@@ -207,6 +207,56 @@ export async function blockCompany(company) {
   return res.json();
 }
 
+// ----- Watched companies (job.watched_companies) ---------------------------
+// Green-lit companies pulled straight from their careers backends. Each has
+// a filter_mode gating how its roles surface in For You.
+const WATCHED_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/watched-companies';
+
+export async function fetchWatchedCompanies() {
+  const headers = await authHeader();
+  const res = await fetch(WATCHED_URL, { headers });
+  if (!res.ok) throw new Error(`watched-companies ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.watches) ? j.watches : [];
+}
+
+// Add a watch. Server resolves the adapter (Google/Amazon/Workday/… or an
+// ATS board probe) when not provided. Throws with the server's message on
+// a 422 so the UI can tell the user the company isn't supported yet.
+export async function watchCompany({ company, adapter, config, filterMode, titleKeywords, locations } = {}) {
+  const headers = await authHeader();
+  const res = await fetch(WATCHED_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company, adapter, config, filterMode, titleKeywords, locations }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || `watch-company ${res.status}`);
+  return j.watch;
+}
+
+export async function updateWatchedCompany(id, patch) {
+  const headers = await authHeader();
+  const res = await fetch(WATCHED_URL, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...patch }),
+  });
+  if (!res.ok) throw new Error(`update-watch ${res.status}: ${await res.text()}`);
+  return (await res.json()).watch;
+}
+
+export async function unwatchCompany(id) {
+  const headers = await authHeader();
+  const res = await fetch(WATCHED_URL, {
+    method: 'DELETE',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) throw new Error(`unwatch ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 export async function checkLiveness({ slug } = {}) {
   const headers = await authHeader();
   const res = await fetch(LIVENESS_URL, {

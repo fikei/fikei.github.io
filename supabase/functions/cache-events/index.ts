@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.3.2'
-console.log(`[cache-events] v${VERSION} - fix status recovery: consecutive_failures=0 should never be broken`)
+const VERSION = '1.4.0'
+console.log(`[cache-events] v${VERSION} - canonical_key cross-source dedup + decaying peak for count-drop detection`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -29,6 +29,28 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 // Generate SHA-256 event key matching the DB helper function
 async function generateEventKey(source: string, date: string, name: string, venue: string): Promise<string> {
   const normalized = `${source}|${date}|${name.trim().toLowerCase()}|${venue.trim().toLowerCase()}`
+  const data = new TextEncoder().encode(normalized)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+// Source-agnostic key so the same event scraped from two sources can be
+// merged in the UI. Strips diacritics (Café → cafe) and collapses whitespace;
+// SQL backfill in migration 088 matches this except diacritics (converges on
+// next scrape since updates rewrite the key).
+function normalizeForKey(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+async function generateCanonicalKey(date: string, name: string, venue: string): Promise<string> {
+  const normalized = `${date}|${normalizeForKey(name)}|${normalizeForKey(venue)}`
   const data = new TextEncoder().encode(normalized)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(hashBuffer))
@@ -108,10 +130,14 @@ async function upsertSourceHealth(
     const outcomesSeen = existing.outcomes_seen || {}
     outcomesSeen[outcomeKey] = (outcomesSeen[outcomeKey] || 0) + 1
 
-    // Track peak event count (stored in JSONB to avoid migration)
+    // Track peak event count (stored in JSONB to avoid migration).
+    // The peak decays 0.5% per successful scrape (~34%/week at 12 scrapes/day)
+    // so a listing-volume high from months ago doesn't flag the source as
+    // degraded forever — count_drop should mean "recent drop", not
+    // "smaller than the all-time record".
     const previousPeak = outcomesSeen.peak_event_count || 0
-    if (isSuccess && outcome.eventCount > previousPeak) {
-      outcomesSeen.peak_event_count = outcome.eventCount
+    if (isSuccess) {
+      outcomesSeen.peak_event_count = Math.round(Math.max(outcome.eventCount, previousPeak * 0.995) * 10) / 10
     }
     const peakCount = outcomesSeen.peak_event_count || 0
 
@@ -231,8 +257,10 @@ serve(async (req: Request) => {
     const rows = await Promise.all(events.map(async (ev) => {
       if (!ev.source || !ev.date || !ev.name || !ev.venue || !ev.url) return null
       const eventKey = await generateEventKey(ev.source, ev.date, ev.name, ev.venue)
+      const canonicalKey = await generateCanonicalKey(ev.date, ev.name, ev.venue)
       return {
         event_key: eventKey,
+        canonical_key: canonicalKey,
         source_id: ev.source,
         date: ev.date,
         time: ev.time || null,
@@ -311,7 +339,7 @@ serve(async (req: Request) => {
     // if newly available — parsers that didn't used to emit it may now).
     if (toUpdate.length > 0) {
       for (const row of toUpdate) {
-        const patch: Record<string, unknown> = { scraped_at: row.scraped_at }
+        const patch: Record<string, unknown> = { scraped_at: row.scraped_at, canonical_key: row.canonical_key }
         if (row.description) patch.description = row.description
         const { error: updateErr } = await supabase
           .from('events')

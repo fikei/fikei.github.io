@@ -21,6 +21,7 @@ export interface HaikuRoleMatch {
   seniority:  string;
   scope:      string;
   fitSummary: string;
+  location:   string | null;
   // Candidate-side: "are you a good candidate for this role?" Same Haiku
   // call returns both blocks so we don't pay twice.
   candidate?: {
@@ -121,6 +122,7 @@ Output JSON only:
   "seniority":  "below" | "equivalent" | "above" | "founding",
   "scope":      "ic" | "ic_player_coach" | "manager",
   "fitSummary": "<2-4 sentence prose, max 100 words. ONLY explain why this company / role is desirable for the candidate's needs — mission alignment, scope they want, kind of problem they care about, culture traits they care about. DO NOT describe why the candidate is a good fit for the company or what they bring to the role. Speak about the company in third person.>",
+  "location":   "<the role's location exactly as the posting states it, normalized to 'City, ST' / 'City, Country' / 'Remote' / 'Remote (US)' / 'Hybrid — City, ST'. Multiple offices: join with '; '. null if the posting never states one — do not guess from the company name>",
   "candidate": {
     "breakdown": {
       "skills":  <int 0-25>,
@@ -253,7 +255,7 @@ No prose outside the JSON.`;
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]) as {
-      score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string;
+      score?: number; rationale?: string; seniority?: string; scope?: string; fitSummary?: string; location?: string | null;
       candidate?: {
         breakdown?: Partial<CandidateBreakdown>;
         rationales?: Partial<CandidateRationales>;
@@ -304,11 +306,15 @@ No prose outside the JSON.`;
       };
     }
 
+    const location = (typeof parsed.location === 'string' && parsed.location.trim() && parsed.location.trim().toLowerCase() !== 'null')
+      ? parsed.location.trim().slice(0, 200) : null;
+
     return {
       score: Math.max(0, Math.min(25, Math.round(parsed.score))),
       rationale: String(parsed.rationale || '').slice(0, 400),
       seniority, scope,
       fitSummary: String(parsed.fitSummary || '').slice(0, 1200),
+      location,
       candidate,
     };
   } catch (e) {
@@ -328,6 +334,7 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   seniority: string | null;
   scope: string | null;
   fitSummary: string | null;
+  location: string | null;
   description: string;
   candidate: HaikuRoleMatch['candidate'] | null;
 }> {
@@ -345,6 +352,7 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   let seniority: string | null = null;
   let scope: string | null = null;
   let fitSummary: string | null = null;
+  let location: string | null = null;
   let candidate: HaikuRoleMatch['candidate'] | null = null;
   if (description.length > 200) {
     const haiku = await haikuRoleMatch(enriched, ctx);
@@ -352,9 +360,10 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
       roleScore = haiku.score; rationale = haiku.rationale;
       seniority = haiku.seniority; scope = haiku.scope;
       fitSummary = haiku.fitSummary || null;
+      location = haiku.location;
       candidate = haiku.candidate || null;
     }
   }
   const fit = computeFit(enriched, ctx, roleScore, seniority, rationale);
-  return { fit, roleScore, rationale, seniority, scope, fitSummary, description, candidate };
+  return { fit, roleScore, rationale, seniority, scope, fitSummary, location, description, candidate };
 }

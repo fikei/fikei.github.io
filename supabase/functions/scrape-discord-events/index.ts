@@ -13,6 +13,9 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
+const VERSION = '1.1.0'
+console.log(`[scrape-discord-events] v${VERSION} - rate-limit retry cap`)
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -133,7 +136,8 @@ async function fetchDiscordMessages(
   channelId: string,
   botToken: string,
   afterSnowflake: string,
-  limit = 100
+  limit = 100,
+  retriesLeft = 3
 ): Promise<DiscordMessage[]> {
   const url = `${DISCORD_API}/channels/${channelId}/messages?limit=${limit}&after=${afterSnowflake}`
   const resp = await fetch(url, {
@@ -141,9 +145,10 @@ async function fetchDiscordMessages(
   })
 
   if (resp.status === 429) {
+    if (retriesLeft <= 0) throw new Error('Discord API 429: rate limit retries exhausted')
     const retryAfter = parseFloat(resp.headers.get('Retry-After') || '2')
     await new Promise(r => setTimeout(r, retryAfter * 1000))
-    return fetchDiscordMessages(channelId, botToken, afterSnowflake, limit)
+    return fetchDiscordMessages(channelId, botToken, afterSnowflake, limit, retriesLeft - 1)
   }
 
   if (!resp.ok) {
