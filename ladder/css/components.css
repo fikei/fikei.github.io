@@ -2656,6 +2656,17 @@
 }
 .recs-page__head > .muted { margin-right: auto; }
 .recs-page__refresh { align-self: center; }
+.recs-page__floor-toggle {
+  background: transparent;
+  border: 0;
+  align-self: center;
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.recs-page__floor-toggle:hover { color: var(--fg); }
 .recs-page__refresh-status { font-size: var(--font-size-caption); }
 
 /* Source-health banner — shown above the recs table when a source is

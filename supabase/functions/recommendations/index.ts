@@ -8,7 +8,7 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 
 const VERSION = '0.15.0';
-console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the candidate-floor-50 + wildcard-view gates`);
+console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the quality-floor + wildcard gates`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -67,6 +67,13 @@ serve(async (req) => {
       const view = url.searchParams.get('view') || 'default';
       const isAll = view === 'all';
       const isWildcard = view === 'wildcard';
+      // ?floor=1 (view=all only) → apply the default view's quality floors
+      // (fit >= 50, strength >= 50, no hard fails, ungraded = pending)
+      // while keeping pagination + sort. The For You table sends this by
+      // default; turning it off is the explicit "show below-floor" toggle.
+      const applyFloor = isAll && url.searchParams.get('floor') === '1';
+      // True when this view skips the quality floors entirely.
+      const unfloored = (isAll && !applyFloor) || isWildcard;
 
       // Pagination (view=all only). The default carousel view stays a
       // single 60-row pull; wildcard is a short strip. limit caps at 200;
@@ -177,7 +184,7 @@ serve(async (req) => {
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (${isAll || isWildcard} or
+          and (${unfloored} or
             case coalesce(w.filter_mode, 'good_fits')
               when 'all' then true
               when 'role_level' then
