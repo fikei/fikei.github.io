@@ -1613,8 +1613,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.10.0';
-  console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
+  const VERSION = '1.11.0';
+  console.log(`[events] v${VERSION} - DB source registry + cross-source event merge`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2088,16 +2088,40 @@ body {
         .order('date', { ascending: true });
       if (error) { log('L2 cache: query error — ' + error.message); return null; }
       if (!data || data.length === 0) { log('L2 cache: empty'); return null; }
-      const events = data.map(row => ({
-        date: row.date, time: row.time || '', name: row.name, venue: row.venue,
-        address: row.address || '', city: row.city || '', genre: row.genre || '',
-        price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
-        url: row.url, source: row.source_id,
-        contentType: row.content_type || getSourceCategory(row.source_id),
-        description: row.description || '', imageUrl: row.image_url || '',
-        enrichedTags: row.tags || [],
-      }));
-      log(`L2 cache: loaded ${events.length} events`);
+      // Merge rows that are the same physical event scraped from different
+      // sources (shared canonical_key). One row is shown with all source
+      // tokens; richer fields win regardless of which source supplied them.
+      const byCanonical = new Map();
+      let mergedCount = 0;
+      for (const row of data) {
+        const key = row.canonical_key || row.event_key || (row.source_id + '|' + row.url);
+        const ev = {
+          date: row.date, time: row.time || '', name: row.name, venue: row.venue,
+          address: row.address || '', city: row.city || '', genre: row.genre || '',
+          price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
+          url: row.url, source: row.source_id,
+          contentType: row.content_type || getSourceCategory(row.source_id),
+          description: row.description || '', imageUrl: row.image_url || '',
+          enrichedTags: row.tags || [],
+        };
+        const existing = byCanonical.get(key);
+        if (!existing) {
+          ev.sources = [ev.source];
+          byCanonical.set(key, ev);
+        } else {
+          mergedCount++;
+          if (!existing.sources.includes(ev.source)) existing.sources.push(ev.source);
+          if (!existing.time && ev.time) existing.time = ev.time;
+          if (!existing.genre && ev.genre) existing.genre = ev.genre;
+          if (!existing.price && ev.price) existing.price = ev.price;
+          if (!existing.ages && ev.ages) existing.ages = ev.ages;
+          if (!existing.description && ev.description) existing.description = ev.description;
+          if (!existing.imageUrl && ev.imageUrl) existing.imageUrl = ev.imageUrl;
+          if (existing.enrichedTags.length === 0 && ev.enrichedTags.length > 0) existing.enrichedTags = ev.enrichedTags;
+        }
+      }
+      const events = Array.from(byCanonical.values());
+      log(`L2 cache: loaded ${events.length} events` + (mergedCount ? ` (${mergedCount} cross-source duplicates merged)` : ''));
       return events;
     } catch (e) { log('L2 cache: error — ' + e.message); return null; }
   }
@@ -3970,7 +3994,29 @@ body {
   }
 
   // --- Init ---
+  // Refresh the stock source catalog from the event_sources registry table.
+  // The hardcoded STOCK_SOURCES array is the fallback if the table is
+  // unreachable; the array is mutated in place so all existing references
+  // (onboarding pickers, category lookups) see the DB-backed list.
+  async function loadSourceRegistry() {
+    if (!supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('event_sources')
+        .select('id, name, category, type, url, region, description')
+        .eq('enabled', true);
+      if (error || !data || data.length === 0) {
+        log('Source registry: unavailable, using built-in list' + (error ? ' — ' + error.message : ''));
+        return;
+      }
+      STOCK_SOURCES.length = 0;
+      data.forEach(r => STOCK_SOURCES.push(r));
+      log(`Source registry: ${data.length} sources loaded from DB`);
+    } catch (e) { log('Source registry: ' + e.message); }
+  }
+
   async function init() {
+    await loadSourceRegistry();
     loadSettings();
     loadSources();
     bindEvents();
