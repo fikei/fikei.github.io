@@ -2403,18 +2403,55 @@
 
 /* --- Wildcards strip (For You) ---
    High candidate-strength / low stated-criteria-fit roles. Dashed accent
-   border marks them as deliberate outliers, not more of the same list. */
-.rec-wildcards { margin-top: var(--space-6); }
+   border marks them as deliberate outliers, not more of the same list.
+   Compact by design: narrower columns, quieter chrome, smaller type —
+   but airy inside (transparent bg, roomy line-height, real gaps) so the
+   strip reads as marginalia next to the main table, not a second table. */
+.rec-wildcards { margin: var(--space-6) 0 var(--space-5); }
 .rec-wildcards__head { margin-bottom: var(--space-3); }
 .rec-wildcards__head .muted { font-size: var(--font-size-caption); }
-.rec-card--wildcard { border: 1px dashed var(--accent); }
+.rec-row--wildcards {
+  grid-auto-columns: minmax(230px, 268px);
+  gap: var(--space-3);
+}
+.rec-card--wildcard {
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  background: transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-2);
+}
+.rec-card--wildcard:hover { border-color: var(--accent); }
+.rec-card--wildcard .rec-card__title {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.rec-card--wildcard .rec-card__meta {
+  font-size: var(--font-size-caption);
+  margin-top: 1px;
+}
+.rec-card--wildcard .fit-pill {
+  min-width: 30px;
+  padding: 2px var(--space-2);
+  font-size: 11px;
+}
 .rec-card__wildcard-why {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   font-size: var(--font-size-caption);
   color: var(--fg-muted);
   font-style: italic;
-  line-height: var(--lh-tight);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+.rec-card--wildcard .rec-card__foot { padding-top: var(--space-2); }
+.rec-card--wildcard .rec-card__foot .btn {
+  padding: 2px 10px;
+  font-size: var(--font-size-caption);
+}
+.rec-card--wildcard .rec-card__foot .link-subtle { font-size: var(--font-size-caption); }
 
 /* --- Rec pre-save detail page (/ladder/jobs/<slug>/?rec=<id>) --- */
 .rec-detail {

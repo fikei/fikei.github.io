@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.13.1";
-console.log(`[ladder] v${VERSION} - Wildcards strip moved to the For You table page (carousel is unmounted); bullet dedupe on rec detail`);
+const VERSION = "2.13.2";
+console.log(`[ladder] v${VERSION} - compact, lighter Wildcards cards`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
