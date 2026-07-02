@@ -20,11 +20,12 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
+import { extractCompensation } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.24.0';
-console.log(`[pull-recommendations] v${VERSION} - company-watch source: direct careers-page pulls for watched companies (Google/Amazon/Workday/Eightfold/Apple/ATS), mega-cap hard-fail suppressed for watched rows`);
+const VERSION = '0.25.0';
+console.log(`[pull-recommendations] v${VERSION} - comp extraction from JD body text (shared extractCompensation): adapters, pull fallback, enrich + rescore persistence`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -169,10 +170,13 @@ serve(async (req) => {
     `;
     let updated = 0, haikuCalls = 0;
     for (const r of rows) {
+      // Comp fallback so rescoring an old row picks up a pay range that
+      // only ever existed inside the JD body. Persisted below.
+      const extractedComp = r.salary ? null : extractCompensation(r.description);
       const roleRow: RoleRow = {
         status: '', rank: '',
         company: r.company || '', title: r.title || '', url: '',
-        source: r.source || '', contact: '', salary: r.salary || '',
+        source: r.source || '', contact: '', salary: r.salary || extractedComp || '',
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
@@ -201,6 +205,7 @@ serve(async (req) => {
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               salary               = coalesce(salary, ${extractedComp}),
                role_match_score     = ${roleScore},
                role_match_rationale = ${rationale},
                role_match_seniority = ${seniority},
@@ -221,10 +226,11 @@ serve(async (req) => {
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
+      const pipeExtractedComp = r.salary_range ? null : extractCompensation(r.description);
       const roleRow: RoleRow = {
         status: '', rank: '',
         company: r.company_name || '', title: r.title || '', url: '',
-        source: r.source || '', contact: '', salary: r.salary_range || '',
+        source: r.source || '', contact: '', salary: r.salary_range || pipeExtractedComp || '',
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
@@ -253,6 +259,7 @@ serve(async (req) => {
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               salary_range         = coalesce(salary_range, ${pipeExtractedComp}),
                role_match_score     = ${pipeRoleScore},
                role_match_rationale = ${pipeRationale},
                role_match_seniority = ${pipeSeniority},
@@ -344,7 +351,12 @@ serve(async (req) => {
         : stage1;
       const droppedByMust = beforeMust - filteredPull.length;
       if (droppedByMust > 0) console.log(`[pull-recommendations] dropped ${droppedByMust}/${beforeMust} by must_have_keywords`);
-      const { kept } = scoreAndFilter(filteredPull, /* minScore */ 0, fitCtx);
+      // Comp fallback for every source: most postings disclose pay inside
+      // the JD body, not a structured field — without this the comp bucket
+      // grades "not disclosed" while the description plainly states a range.
+      const compFilled = filteredPull.map(r =>
+        r.salary ? r : { ...r, salary: extractCompensation(r.description) ?? undefined });
+      const { kept } = scoreAndFilter(compFilled, /* minScore */ 0, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -759,10 +771,20 @@ async function enrichAndScoreNewRows(
         }
       } catch { /* best effort */ }
     }
+    // Comp fallback — a freshly-fetched JD often carries the pay range the
+    // plugin's structured fields lacked. Persist so the UI shows it too.
+    let salary = r.salary || '';
+    if (!salary) {
+      const comp = extractCompensation(description);
+      if (comp) {
+        salary = comp;
+        await sql`update job.recommended_roles set salary = ${comp} where id = ${r.id}::uuid and salary is null`;
+      }
+    }
     const roleRow: RoleRow = {
       status: '', rank: '',
       company: r.company || '', title: r.title || '', url: r.url || '',
-      source: r.source || '', contact: '', salary: r.salary || '',
+      source: r.source || '', contact: '', salary,
       sector: r.sector || '', investors: (r.investors || []).join(', '),
       website: '', crunchbase: '', description,
     };

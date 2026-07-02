@@ -20,6 +20,7 @@
 
 import type { Source, RecommendedRoleInput } from './types.ts';
 import { db } from '../job-db.ts';
+import { extractCompensation } from '../comp.ts';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
@@ -109,6 +110,10 @@ async function pullGoogle(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]>
     const posted  = (Array.isArray(j[12]) && typeof j[12][0] === 'number')
       ? new Date((j[12][0] as number) * 1000).toISOString() : undefined;
     if (!id || !title) return null;
+    // Extract comp from the UNCAPPED text — Google discloses pay in the
+    // closing paragraph of the about section ("US: $207000 - $301000 …"),
+    // which the 5k description cap can truncate away.
+    const fullText = stripHtml([aboutH, respH, qualH].filter(Boolean).join(' '));
     return {
       source:      'company-watch',
       sourceId:    `cw:google:${id}`,
@@ -117,7 +122,8 @@ async function pullGoogle(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]>
       company:     brand,
       title,
       location:    locs.slice(0, 3).join(' · ') || undefined,
-      description: capJd(stripHtml([aboutH, respH, qualH].filter(Boolean).join(' '))),
+      salary:      extractCompensation(fullText) ?? undefined,
+      description: capJd(fullText),
       postedAt:    posted,
       payload:     { adapter: 'google', watchedCompanyId: w.id, jobId: id },
     } as RecommendedRoleInput;
@@ -134,19 +140,23 @@ async function pullAmazon(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]>
   p.set('sort', 'recent');
   const data = await fetchJson<{ jobs?: Array<Record<string, unknown>> }>(
     `https://www.amazon.jobs/en/search.json?${p}`);
-  return (data.jobs || []).map(j => ({
-    source:      'company-watch',
-    sourceId:    `cw:amazon:${String(j.id_icims ?? j.id ?? '')}`,
-    sourceLabel: `Amazon Careers`,
-    url:         `https://www.amazon.jobs${String(j.job_path || '')}`,
-    company:     w.company,
-    title:       String(j.title || ''),
-    location:    String(j.normalized_location || j.location || '') || undefined,
-    description: capJd(stripHtml([j.description, j.basic_qualifications, j.preferred_qualifications]
-                   .filter(Boolean).map(String).join(' '))),
-    postedAt:    j.posted_date ? new Date(String(j.posted_date)).toISOString() : undefined,
-    payload:     { adapter: 'amazon', watchedCompanyId: w.id, jobId: String(j.id_icims ?? j.id ?? '') },
-  })).filter(r => r.title && r.sourceId !== 'cw:amazon:');
+  return (data.jobs || []).map(j => {
+    const fullText = stripHtml([j.description, j.basic_qualifications, j.preferred_qualifications]
+      .filter(Boolean).map(String).join(' '));
+    return {
+      source:      'company-watch',
+      sourceId:    `cw:amazon:${String(j.id_icims ?? j.id ?? '')}`,
+      sourceLabel: `Amazon Careers`,
+      url:         `https://www.amazon.jobs${String(j.job_path || '')}`,
+      company:     w.company,
+      title:       String(j.title || ''),
+      location:    String(j.normalized_location || j.location || '') || undefined,
+      salary:      extractCompensation(fullText) ?? undefined,
+      description: capJd(fullText),
+      postedAt:    j.posted_date ? new Date(String(j.posted_date)).toISOString() : undefined,
+      payload:     { adapter: 'amazon', watchedCompanyId: w.id, jobId: String(j.id_icims ?? j.id ?? '') },
+    };
+  }).filter(r => r.title && r.sourceId !== 'cw:amazon:');
 }
 
 // ---------- Workday (CXS API — any tenant) ----------
@@ -166,13 +176,16 @@ async function pullWorkday(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]
   for (const j of postings) {
     const reqId = j.bulletFields?.[0] || j.externalPath!;
     let description: string | undefined;
+    let salary: string | undefined;
     let posted: string | undefined;
     if (detailBudget > 0) {
       detailBudget--;
       try {
         const d = await fetchJson<{ jobPostingInfo?: { jobDescription?: string; startDate?: string } }>(
           `${base}${j.externalPath}`);
-        description = capJd(stripHtml(d.jobPostingInfo?.jobDescription || ''));
+        const fullJd = stripHtml(d.jobPostingInfo?.jobDescription || '');
+        description = capJd(fullJd);
+        salary = extractCompensation(fullJd) ?? undefined;
         posted = d.jobPostingInfo?.startDate ? new Date(d.jobPostingInfo.startDate).toISOString() : undefined;
       } catch { /* JD is best-effort; the row still lands and grades later */ }
     }
@@ -184,6 +197,7 @@ async function pullWorkday(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]
       company:     w.company,
       title:       j.title || '',
       location:    j.locationsText || undefined,
+      salary,
       description,
       postedAt:    posted,
       payload:     { adapter: 'workday', watchedCompanyId: w.id, jobId: reqId },
@@ -204,13 +218,13 @@ async function pullEightfold(w: WatchedCompanyRow): Promise<RecommendedRoleInput
   let detailBudget = MAX_DETAIL_FETCHES;
   for (const pos of positions) {
     if (!pos.id || !pos.name) continue;
-    let description = capJd(stripHtml(pos.job_description || ''));
-    if (!description && detailBudget > 0) {
+    let fullJd = stripHtml(pos.job_description || '');
+    if (!fullJd && detailBudget > 0) {
       detailBudget--;
       try {
         const d = await fetchJson<{ job_description?: string }>(
           `${cfg.base}/api/apply/v2/jobs/${pos.id}?domain=${encodeURIComponent(cfg.domain)}`);
-        description = capJd(stripHtml(d.job_description || ''));
+        fullJd = stripHtml(d.job_description || '');
       } catch { /* best effort */ }
     }
     out.push({
@@ -221,7 +235,8 @@ async function pullEightfold(w: WatchedCompanyRow): Promise<RecommendedRoleInput
       company:     w.company,
       title:       pos.name,
       location:    (pos.locations || [pos.location]).filter(Boolean).slice(0, 3).join(' · ') || undefined,
-      description,
+      salary:      extractCompensation(fullJd) ?? undefined,
+      description: capJd(fullJd),
       postedAt:    pos.t_create ? new Date(pos.t_create * 1000).toISOString() : undefined,
       payload:     { adapter: 'eightfold', watchedCompanyId: w.id, jobId: String(pos.id) },
     });
@@ -276,6 +291,7 @@ async function pullApple(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]> 
       company:     w.company,
       title,
       location:    locs.slice(0, 3).join(' · ') || undefined,
+      salary:      extractCompensation(String(j.jobSummary || '')) ?? undefined,
       description: capJd(stripHtml(String(j.jobSummary || ''))),
       postedAt:    j.postDateInGMT ? new Date(String(j.postDateInGMT)).toISOString() : undefined,
       payload:     { adapter: 'apple', watchedCompanyId: w.id, jobId: id },
@@ -308,6 +324,7 @@ async function pullAtsBoard(w: WatchedCompanyRow): Promise<RecommendedRoleInput[
       source: 'company-watch', sourceId: `cw:lever:${cfg.slug}:${j.id}`,
       sourceLabel: `${w.company} Careers`, url: j.hostedUrl,
       company: w.company, title: j.text, location: j.categories?.location,
+      salary: extractCompensation(j.descriptionPlain) ?? undefined,
       description: capJd(j.descriptionPlain),
       postedAt: j.createdAt ? new Date(j.createdAt).toISOString() : undefined,
       payload: { adapter: 'lever', watchedCompanyId: w.id, jobId: j.id },
@@ -320,7 +337,8 @@ async function pullAtsBoard(w: WatchedCompanyRow): Promise<RecommendedRoleInput[
       source: 'company-watch', sourceId: `cw:ashby:${cfg.slug}:${j.id}`,
       sourceLabel: `${w.company} Careers`, url: j.jobUrl,
       company: w.company, title: j.title, location: j.locationName,
-      salary: j.compensationTierSummary, description: capJd(j.descriptionPlain),
+      salary: j.compensationTierSummary || extractCompensation(j.descriptionPlain) || undefined,
+      description: capJd(j.descriptionPlain),
       postedAt: j.publishedAt,
       payload: { adapter: 'ashby', watchedCompanyId: w.id, jobId: j.id },
     }));
