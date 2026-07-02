@@ -8,11 +8,12 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
   import('../format.js' + V),
+  import('../slug.js' + V),
 ]);
 
 // Column shape mirrors job-pipeline's COLUMNS: id drives the col class,
@@ -404,13 +405,10 @@ export class JobRecommendationsTable extends LitElement {
 
   _onRowClick(r, e) {
     if (e.target.closest('button, a, .row-menu, .fit-pill--button')) return;
-    if (!r.url) return;
-    // Plain click → in-page; Cmd/Ctrl/middle → new tab (browser standard).
-    if (e.metaKey || e.ctrlKey || e.button === 1) {
-      window.open(r.url, '_blank', 'noopener');
-    } else {
-      window.location.assign(r.url);
-    }
+    // Row click → pre-save detail page, in a NEW tab so browsing the list
+    // is never hijacked. The external posting link lives on that page.
+    const detail = `/ladder/jobs/${roleSlug(r.company, r.title)}/?rec=${r.id}`;
+    window.open(detail, '_blank', 'noopener');
   }
 
   _renderRow(r) {

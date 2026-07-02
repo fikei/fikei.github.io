@@ -2397,6 +2397,94 @@
 .rec-card__bullets p { display: inline; margin: 0; }
 .rec-card__desc { margin: 0; font-size: var(--font-size-body); color: var(--fg-muted); }
 
+/* Title link inside a rec card — opens the pre-save detail page. */
+.rec-card__title-link { color: inherit; text-decoration: none; }
+.rec-card__title-link:hover { text-decoration: underline; }
+
+/* --- Wildcards strip (For You) ---
+   High candidate-strength / low stated-criteria-fit roles. Dashed accent
+   border marks them as deliberate outliers, not more of the same list. */
+.rec-wildcards { margin-top: var(--space-6); }
+.rec-wildcards__head { margin-bottom: var(--space-3); }
+.rec-wildcards__head .muted { font-size: var(--font-size-caption); }
+.rec-card--wildcard { border: 1px dashed var(--accent); }
+.rec-card__wildcard-why {
+  margin: 6px 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  font-style: italic;
+  line-height: var(--lh-tight);
+}
+
+/* --- Rec pre-save detail page (/ladder/jobs/<slug>/?rec=<id>) --- */
+.rec-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 960px;
+}
+.rec-detail__head { display: flex; gap: var(--space-4); align-items: flex-start; }
+.rec-detail__logo {
+  width: 56px; height: 56px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.rec-detail__logo--placeholder {
+  display: grid; place-items: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-muted);
+}
+.rec-detail__title-block { min-width: 0; flex: 1; }
+.rec-detail__title-block h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 24px;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+.rec-detail__meta { margin: 4px 0 0; color: var(--fg-muted); }
+.rec-detail__source { margin: 4px 0 0; font-size: var(--font-size-caption); }
+.rec-detail__scores { display: flex; gap: var(--space-2); flex-shrink: 0; }
+.rec-detail__actions { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+.rec-detail__wildcard {
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  font-size: var(--font-size-body);
+}
+.rec-detail__wildcard ul { margin: var(--space-2) 0; padding-left: var(--space-5); }
+.rec-detail__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.rec-detail__bullets {
+  list-style: disc;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.rec-detail__bullets li > * { display: inline; }
+.rec-detail__bullets p { display: inline; margin: 0; }
+.rec-detail__jd { padding: 0 var(--space-4) var(--space-4); }
+.rec-detail__banner {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-size: var(--font-size-body);
+}
+.rec-detail__banner--warn { color: var(--warning); }
+@media (max-width: 720px) {
+  .rec-detail__cards { grid-template-columns: 1fr; }
+  .rec-detail__head { flex-wrap: wrap; }
+}
+
 .rec-card__foot {
   margin-top: auto;
   display: flex;

@@ -28,6 +28,20 @@ export const CANDIDATE_DIM_LABELS = {
   comp:    { label: 'Compensation',        max: 1,  hint: 'No money-mismatch risk — range clears your floor.', binary: true },
 };
 
+// The 1-2 fit dimensions dragging a rec's score down, as
+// { key, label, pct, rationale } — used by the Wildcards strip and the
+// pre-save rec detail page to explain "why low fit". Tiebreaker dims
+// (stage/comp/geo, max < 10) are skipped; they never explain a low fit.
+export function weakestFitDims(row, n = 2) {
+  const breakdown = row?.breakdown || row?.fitBreakdown || {};
+  const rationales = row?.rationales || row?.fitRationales || {};
+  return Object.entries(DIM_LABELS)
+    .filter(([, meta]) => meta.max >= 10)
+    .map(([k, meta]) => ({ key: k, label: meta.label, pct: ((breakdown[k] || 0) / meta.max), rationale: rationales[k] || '' }))
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, n);
+}
+
 export function scoreClass(s) {
   if (s == null) return 'fit-pill fit-pill--poor';
   if (s >= 70) return 'fit-pill fit-pill--strong';

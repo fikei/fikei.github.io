@@ -23,8 +23,8 @@ import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.23.0';
-console.log(`[pull-recommendations] v${VERSION} - gmail-jobs: transient Anthropic outages (credits/429/5xx) abort the run instead of tombstoning messages, so the backlog auto-re-drains once the API recovers`);
+const VERSION = '0.23.1';
+console.log(`[pull-recommendations] v${VERSION} - gmail-jobs: Wellfound allowlist matches hi.wellfound.com subdomain sender; "more matches" subject counts as digest`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
