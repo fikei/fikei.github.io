@@ -205,7 +205,7 @@ export class LadderRecDetail extends LitElement {
           <article class="role-card">
             <header class="role-card__head"><h3>Why it surfaced</h3></header>
             <ul class="rec-detail__bullets">
-              ${bullets.map(b => html`<li>${unsafeHTML(renderMarkdown(String(b)))}</li>`)}
+              ${bullets.map(b => html`<li>${unsafeHTML(renderMarkdown(String(b).replace(/^\s*[•\-\*]\s*/, '')))}</li>`)}
             </ul>
           </article>
         ` : nothing}
