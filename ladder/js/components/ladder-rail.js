@@ -95,9 +95,10 @@ export class JobRail extends LitElement {
     try {
       const [pipe, recs] = await Promise.all([
         fetchPipeline().catch(() => null),
-        // view=all so the For You count reflects every candidate JD,
-        // not just the >=50-fit subset the carousel shows.
-        fetchRecommendations({ view: 'all' }).catch(() => null),
+        // floor=1 so the badge matches what the For You page actually
+        // shows by default (fit >= 50, strength >= 50, no hard fails).
+        // limit:1 — we only need `total`, not a page of rows.
+        fetchRecommendations({ view: 'all', floor: true, limit: 1 }).catch(() => null),
       ]);
       const roles = (pipe?.roles || []).filter(isVisibleRole);
       const leads  = roles.filter(r => bucketFor(r) === 'leads').length;

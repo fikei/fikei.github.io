@@ -24,8 +24,8 @@ import { extractCompensation } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.25.0';
-console.log(`[pull-recommendations] v${VERSION} - comp extraction from JD body text (shared extractCompensation): adapters, pull fallback, enrich + rescore persistence`);
+const VERSION = '0.25.1';
+console.log(`[pull-recommendations] v${VERSION} - dedup against ALL recs incl. dismissed — a dismissed role must not resurrect from the next digest`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -380,10 +380,14 @@ serve(async (req) => {
       // Also dedups within this batch. Conservative: URL/canonical match is
       // exact; company|title requires BOTH to match so Heidi's genuinely
       // distinct openings (different titles) aren't collapsed.
+      //
+      // NO dismissed/added filter here: a dismissal is a user decision, and
+      // the next weekly digest re-sending the same posting (fresh source_id,
+      // so insertNew's on-conflict can't catch it) must not resurrect it as
+      // a new rec. Dedup against EVERY known rec, whatever its state.
       const existing = await sql<{ url: string | null; canonical_url: string | null; company: string | null; title: string | null }[]>`
         select url, canonical_url, company, title
           from job.recommended_roles
-         where dismissed_at is null and added_to_pipeline_slug is null
       `;
       const seenKeys = new Set<string>();
       const addKeys = (url: string | null, canonical: string | null, company: string | null, title: string | null) => {
