@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.13.3";
-console.log(`[ladder] v${VERSION} - For You table applies quality floors by default with a show-all toggle`);
+const VERSION = "2.14.0";
+console.log(`[ladder] v${VERSION} - watched companies: direct careers-page sources with per-company filter modes on For You`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -38,6 +38,7 @@ if (location.pathname.startsWith('/ladder/jobs/drill')) {
   }
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
+  import('./components/ladder-watched-companies.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
   import('./components/ladder-pipeline.js' + V);
 }

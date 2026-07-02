@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.15.0';
-console.log(`[jobs-pipe] v${VERSION} - editable company_name + title (inline rename from detail header)`);
+const VERSION = '0.15.1';
+console.log(`[jobs-pipe] v${VERSION} - fit.ts: optional watchedCompany flag suppresses the public/mega-cap hard fail for watched-company roles`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);

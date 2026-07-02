@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.14.1';
-console.log(`[recommendations] v${VERSION} - view=all&floor=1 applies the quality floors with pagination; For You table sends it by default`);
+const VERSION = '0.15.0';
+console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the quality-floor + wildcard gates`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -168,13 +168,34 @@ serve(async (req) => {
       //      catches the same posting when title/company text drifted between
       //      the saved copy and a later re-ingested recommendation (the cause
       //      of saved jobs reappearing in For You).
+      // Watched-company filter modes (job.watched_companies.filter_mode)
+      // gate the carousel per company; unwatched rows keep the standard
+      // gates. The join is inside the fragment so the count query and the
+      // page query stay in lockstep.
+      //   'all'         → everything the watch pulls (even weak grades)
+      //   'role_level'  → role & level match: not below seniority, and
+      //                   Haiku role score ≥13/25 (ungraded rows pass —
+      //                   the watch query already scopes to the role)
+      //   'exceptional' → candidate_score ≥ 65 only (the wildcard "rare
+      //                   air" threshold — nothing live grades above 78)
+      //   'good_fits' / unwatched → fit ≥50, no hard-fails, candidate ≥50
       const whereClause = sql`
+        left join job.watched_companies w on w.id = r.watched_company_id
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (${unfloored} or r.fit_score is null or r.fit_score >= 50)
-          and (${unfloored} or coalesce(array_length(r.hard_fails, 1), 0) = 0)
-          and (${isAll && !applyFloor} or (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR}))
+          and (${unfloored} or
+            case coalesce(w.filter_mode, 'good_fits')
+              when 'all' then true
+              when 'role_level' then
+                (r.role_match_seniority is null or r.role_match_seniority <> 'below')
+                and coalesce(r.role_match_score, 13) >= 13
+              when 'exceptional' then coalesce(r.candidate_score, 0) >= ${WILDCARD_MIN_STRENGTH}
+              else
+                (r.fit_score is null or r.fit_score >= 50)
+                and coalesce(array_length(r.hard_fails, 1), 0) = 0
+                and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
+            end)
           and (${!isWildcard} or (r.candidate_score >= ${WILDCARD_MIN_STRENGTH}
                                   and coalesce(r.fit_score, 100) < ${WILDCARD_MAX_FIT}))
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
@@ -207,6 +228,8 @@ serve(async (req) => {
                r.enrichment_status as "enrichmentStatus",
                r.enrichment_retry_at as "enrichmentRetryAt",
                r.canonical_url as "canonicalUrl",
+               r.watched_company_id as "watchedCompanyId",
+               w.filter_mode as "watchFilterMode",
                -- Source-email URL — derived from payload.gmailApiId for
                -- Gmail-sourced recs so the UI can render a "view source"
                -- link without parsing the JSON client-side.
