@@ -70,6 +70,9 @@ body {
   opacity: 0.6;
 }
 
+/* Date group headers — mobile-only section headers, hidden on desktop */
+.data-table tbody tr.date-group { display: none; }
+
 /* Source chip error state */
 .token--error {
   border-color: var(--border-subtle);
@@ -1261,6 +1264,48 @@ body {
   .data-table .col-ages,
   .data-table .col-promoter { display: none; }
 
+  /* Sticky date headers group the cards; the per-card date is redundant */
+  .data-table tbody tr.date-group {
+    display: block;
+    position: sticky;
+    top: var(--sticky-offset, 0px);
+    z-index: 5;
+    background: var(--bg);
+    border: none;
+    border-radius: 0;
+    padding: var(--space-2) 0;
+    margin-bottom: var(--space-2);
+    border-bottom: var(--border-thin) solid var(--border-subtle);
+  }
+  .data-table tbody td.date-group__label {
+    display: block;
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    color: var(--fg);
+  }
+  .data-table--grouped .col-date { display: none; }
+
+  /* Category chips + type sub-filter: single horizontally scrolling rows
+     (DS .filters pattern) instead of wrapping into a tall stack */
+  .sources-bar__chips {
+    flex: 0 0 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sources-bar__chips::-webkit-scrollbar { display: none; }
+  .sources-bar__chips .token { flex-shrink: 0; white-space: nowrap; }
+  .type-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .type-filter::-webkit-scrollbar { display: none; }
+  .type-filter__chip { flex-shrink: 0; white-space: nowrap; }
+
   /* Filter bar: stack controls full-width (search min-width overflows otherwise) */
   .filter-bar { flex-direction: column; align-items: stretch; }
   .filter-bar .input,
@@ -1680,8 +1725,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.12.0';
-  console.log(`[events] v${VERSION} - mobile card view, filter stacking, touch feedback, admin-gated debug log`);
+  const VERSION = '1.13.0';
+  console.log(`[events] v${VERSION} - sticky date headers + scrolling filter rows on mobile`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2516,7 +2561,7 @@ body {
 
   function renderTable(sorted) {
     const tbody = document.getElementById('eventsBody');
-    tbody.innerHTML = sorted.map(ev => {
+    const rowHtml = ev => {
       const sourceIds = ev.sources || [ev.source];
       const sourceTagsHtml = sourceIds.map(sid => {
         const sName = state.sources.find(s => s.id === sid)?.name || sid;
@@ -2564,7 +2609,25 @@ body {
         <td class="col-promoter">${escHtml(ev.promoter)}</td>
         <td class="col-source">${sourceTagsHtml}</td>
       </tr>`;
-    }).join('');
+    };
+
+    // Group rows under date headers when date-sorted. Headers are hidden on
+    // desktop; on mobile they render as sticky section headers and the
+    // per-card date cell is hidden (data-table--grouped).
+    const grouped = state.sort.key === 'date';
+    document.getElementById('eventsTable').classList.toggle('data-table--grouped', grouped);
+    let html = '';
+    let lastDate = null;
+    for (const ev of sorted) {
+      if (grouped && ev.date !== lastDate) {
+        lastDate = ev.date;
+        const d = new Date(ev.date + 'T00:00:00');
+        const label = isNaN(d) ? ev.date : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        html += `<tr class="date-group"><td colspan="10" class="date-group__label">${escHtml(label)}</td></tr>`;
+      }
+      html += rowHtml(ev);
+    }
+    tbody.innerHTML = html;
 
     // Sort indicators
     document.querySelectorAll('.data-table th').forEach(th => {
@@ -4097,12 +4160,20 @@ body {
     } catch (e) { log('Source registry: ' + e.message); }
   }
 
+  // Sticky date headers pin below the sticky page header — measure its height
+  function setStickyOffset() {
+    const h = document.querySelector('.page-header');
+    document.documentElement.style.setProperty('--sticky-offset', (h ? h.offsetHeight : 0) + 'px');
+  }
+  window.addEventListener('resize', setStickyOffset);
+
   async function init() {
     await loadSourceRegistry();
     loadSettings();
     loadSources();
     bindEvents();
     updateDebugLogVisibility();
+    setStickyOffset();
 
     // Auth already initialized at top via CtrlAuth.init()
     if (currentUser) log('Auth: found existing session for ' + (currentUser.email || 'user'));
