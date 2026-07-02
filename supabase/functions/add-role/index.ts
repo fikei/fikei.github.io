@@ -11,11 +11,11 @@ import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 import { scoreOne } from '../_shared/job-fit-haiku.ts';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
-console.log(`[add-role] v${VERSION} - persist location (from source rec or JSON-LD jobLocation)`);
+console.log(`[add-role] v${VERSION} - Haiku extracts location from JD when JSON-LD/rec have none`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -529,8 +529,8 @@ serve(async (req) => {
       type FitOut = Awaited<ReturnType<typeof scoreOne>>;
       let fitOut: FitOut;
       if (body.fromRecommendationId) {
-        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null; candidate_breakdown: Record<string, number> | null; candidate_rationales: Record<string, string> | null; candidate_summary: string | null; comp_acceptable: boolean | null }[]>`
-          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary,
+        const inherit = await sql<{ description: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; location: string | null; candidate_score: number | null; candidate_breakdown: Record<string, number> | null; candidate_rationales: Record<string, string> | null; candidate_summary: string | null; comp_acceptable: boolean | null }[]>`
+          select description, role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary, location,
                  candidate_score, candidate_breakdown, candidate_rationales, candidate_summary, comp_acceptable
             from job.recommended_roles where id = ${body.fromRecommendationId} limit 1`;
         const src = inherit[0];
@@ -541,7 +541,7 @@ serve(async (req) => {
           fitOut = {
             fit, roleScore: src.role_match_score, rationale: src.role_match_rationale,
             seniority: src.role_match_seniority, scope: src.role_match_scope,
-            fitSummary: src.fit_summary, description: src.description || '',
+            fitSummary: src.fit_summary, location: src.location, description: src.description || '',
             candidate: src.candidate_score != null ? {
               score: src.candidate_score,
               breakdown: src.candidate_breakdown as never,
@@ -570,6 +570,7 @@ serve(async (req) => {
                role_match_seniority = ${fitOut.seniority},
                role_match_scope     = ${fitOut.scope},
                fit_summary          = ${fitOut.fitSummary},
+               location             = coalesce(location, ${fitOut.location}),
                candidate_score      = ${fitOut.candidate?.score ?? null},
                candidate_breakdown  = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.breakdown) : null}::jsonb,
                candidate_rationales = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.rationales) : null}::jsonb,

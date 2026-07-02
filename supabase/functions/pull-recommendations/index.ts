@@ -20,11 +20,12 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
+import { extractCompensation } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.23.1';
-console.log(`[pull-recommendations] v${VERSION} - gmail-jobs: Wellfound allowlist matches hi.wellfound.com subdomain sender; "more matches" subject counts as digest`);
+const VERSION = '0.25.1';
+console.log(`[pull-recommendations] v${VERSION} - dedup against ALL recs incl. dismissed — a dismissed role must not resurrect from the next digest`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -158,8 +159,8 @@ serve(async (req) => {
     // instead of one giant pass that times out before reaching anything.
     const ungradedOnly = qp.get('ungraded') === '1';
     const limitN = Math.max(0, Math.min(100, parseInt(qp.get('limit') || '0', 10) || 0));
-    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null }>>`
-      select id, title, company, description, sector, investors, salary, source,
+    const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null; watched_company_id: string | null }>>`
+      select id, title, company, description, sector, investors, salary, source, watched_company_id,
              role_match_score, role_match_rationale, role_match_seniority, role_match_scope, fit_summary, candidate_score
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
@@ -169,10 +170,13 @@ serve(async (req) => {
     `;
     let updated = 0, haikuCalls = 0;
     for (const r of rows) {
+      // Comp fallback so rescoring an old row picks up a pay range that
+      // only ever existed inside the JD body. Persisted below.
+      const extractedComp = r.salary ? null : extractCompensation(r.description);
       const roleRow: RoleRow = {
         status: '', rank: '',
         company: r.company || '', title: r.title || '', url: '',
-        source: r.source || '', contact: '', salary: r.salary || '',
+        source: r.source || '', contact: '', salary: r.salary || extractedComp || '',
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
@@ -194,13 +198,14 @@ serve(async (req) => {
           haikuCalls++;
         }
       }
-      const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale);
+      const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale, { watchedCompany: !!r.watched_company_id });
       await sql`
         update job.recommended_roles
            set fit_score            = ${fit.score},
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               salary               = coalesce(salary, ${extractedComp}),
                role_match_score     = ${roleScore},
                role_match_rationale = ${rationale},
                role_match_seniority = ${seniority},
@@ -221,10 +226,11 @@ serve(async (req) => {
         from job.pipeline_roles where deleted_at is null`;
     let pipeUpdated = 0;
     for (const r of pipeRows) {
+      const pipeExtractedComp = r.salary_range ? null : extractCompensation(r.description);
       const roleRow: RoleRow = {
         status: '', rank: '',
         company: r.company_name || '', title: r.title || '', url: '',
-        source: r.source || '', contact: '', salary: r.salary_range || '',
+        source: r.source || '', contact: '', salary: r.salary_range || pipeExtractedComp || '',
         sector: r.sector || '', investors: (r.investors || []).join(', '),
         website: '', crunchbase: '', description: r.description || '',
       };
@@ -253,6 +259,7 @@ serve(async (req) => {
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               salary_range         = coalesce(salary_range, ${pipeExtractedComp}),
                role_match_score     = ${pipeRoleScore},
                role_match_rationale = ${pipeRationale},
                role_match_seniority = ${pipeSeniority},
@@ -344,7 +351,12 @@ serve(async (req) => {
         : stage1;
       const droppedByMust = beforeMust - filteredPull.length;
       if (droppedByMust > 0) console.log(`[pull-recommendations] dropped ${droppedByMust}/${beforeMust} by must_have_keywords`);
-      const { kept } = scoreAndFilter(filteredPull, /* minScore */ 0, fitCtx);
+      // Comp fallback for every source: most postings disclose pay inside
+      // the JD body, not a structured field — without this the comp bucket
+      // grades "not disclosed" while the description plainly states a range.
+      const compFilled = filteredPull.map(r =>
+        r.salary ? r : { ...r, salary: extractCompensation(r.description) ?? undefined });
+      const { kept } = scoreAndFilter(compFilled, /* minScore */ 0, fitCtx);
       // Drop anything the user already has in their pipeline (any state —
       // active, archived, deleted). Match on (lower(company), lower(title))
       // so a different ATS URL for the same posting still dedupes.
@@ -368,10 +380,14 @@ serve(async (req) => {
       // Also dedups within this batch. Conservative: URL/canonical match is
       // exact; company|title requires BOTH to match so Heidi's genuinely
       // distinct openings (different titles) aren't collapsed.
+      //
+      // NO dismissed/added filter here: a dismissal is a user decision, and
+      // the next weekly digest re-sending the same posting (fresh source_id,
+      // so insertNew's on-conflict can't catch it) must not resurrect it as
+      // a new rec. Dedup against EVERY known rec, whatever its state.
       const existing = await sql<{ url: string | null; canonical_url: string | null; company: string | null; title: string | null }[]>`
         select url, canonical_url, company, title
           from job.recommended_roles
-         where dismissed_at is null and added_to_pipeline_slug is null
       `;
       const seenKeys = new Set<string>();
       const addKeys = (url: string | null, canonical: string | null, company: string | null, title: string | null) => {
@@ -405,6 +421,15 @@ serve(async (req) => {
       // must never mass-close a company on an error.
       if (src.type === 'tracked-ats') {
         await trackedAtsLiveness(sql, pulledRaw);
+      }
+      // Same disappeared-since-pull liveness for company-watch: each run
+      // re-pulls a company's full (query-scoped) result set, so an active
+      // rec from a watch we fetched this run whose source_id is absent =
+      // the posting was taken down. Keyed by watched_company_id so a
+      // transient adapter failure (no rows for that watch) never closes
+      // anything — failed watches don't appear in the fetched-id set.
+      if (src.type === 'company-watch') {
+        await companyWatchLiveness(sql, pulledRaw);
       }
       // Only genuinely-new rows go through inline enrich+grade. Rows that
       // were conflict-updated to backfill a missing JD are drained by the
@@ -634,7 +659,7 @@ function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: Fi
   const kept: ScoredRow[] = [];
   let dropped = 0;
   for (const r of rows) {
-    const fit = computeFit(toRoleRow(r), ctx);
+    const fit = computeFit(toRoleRow(r), ctx, null, null, null, { watchedCompany: !!r.watchedCompanyId });
     // Surface-all-recs: only drop when min_score floor is set AND not met.
     // Hard-fails are kept with their flag so they show in the UI rather
     // than vanish silently.
@@ -687,6 +712,42 @@ async function trackedAtsLiveness(
   console.log(`[pull-recommendations] tracked-ats liveness: closed ${closedN}, seen ${seenN}`);
 }
 
+// ---------- company-watch disappeared-since-pull liveness ----------
+// Mirror of trackedAtsLiveness keyed on watched_company_id: only watches
+// whose ids appear in this pull are eligible to close rows, so a failed
+// adapter (zero rows for that watch) can never mass-close a company.
+// Caveat: tightening a watch's title/location filters removes rows from
+// the pull, which closes previously-surfaced recs as 'delisted' — that's
+// the intended UX (the watch no longer covers them).
+async function companyWatchLiveness(
+  sql: ReturnType<typeof db>,
+  pulledRaw: RecommendedRoleInput[],
+): Promise<void> {
+  const pulledIds = [...new Set(pulledRaw.map(r => r.sourceId).filter(Boolean))] as string[];
+  const fetchedWatchIds = [...new Set(pulledRaw.map(r => r.watchedCompanyId).filter(Boolean))] as string[];
+  if (!fetchedWatchIds.length) return;
+  const seen = await sql`
+    update job.recommended_roles
+       set last_seen_at   = now(),
+           closed_at      = null,
+           closure_reason = null
+     where source = 'company-watch'
+       and dismissed_at is null
+       and source_id = any(${pulledIds}::text[])`;
+  const closed = await sql`
+    update job.recommended_roles
+       set closed_at      = now(),
+           closure_reason = 'delisted'
+     where source = 'company-watch'
+       and closed_at is null
+       and dismissed_at is null
+       and watched_company_id = any(${fetchedWatchIds}::uuid[])
+       and source_id <> all(${pulledIds}::text[])`;
+  const seenN   = (seen   as unknown as { count: number }).count;
+  const closedN = (closed as unknown as { count: number }).count;
+  console.log(`[pull-recommendations] company-watch liveness: closed ${closedN}, seen ${seenN}`);
+}
+
 // ---------- Productize: enrich + Haiku-grade + rescore new inserts ----------
 // Each new row from a cron pull walks the same pipeline as the manual
 // /rescore endpoint, so cron-fed recommendations score the same as
@@ -698,8 +759,8 @@ async function enrichAndScoreNewRows(
   ctx: FitUserContext,
 ): Promise<void> {
   if (!ids.length) return;
-  const rows = await sql<Array<{ id: string; url: string | null; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null }>>`
-    select id, url, title, company, description, sector, investors, salary, source
+  const rows = await sql<Array<{ id: string; url: string | null; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; watched_company_id: string | null }>>`
+    select id, url, title, company, description, sector, investors, salary, source, watched_company_id
       from job.recommended_roles
      where id = any(${ids}::uuid[])`;
   for (const r of rows) {
@@ -714,10 +775,20 @@ async function enrichAndScoreNewRows(
         }
       } catch { /* best effort */ }
     }
+    // Comp fallback — a freshly-fetched JD often carries the pay range the
+    // plugin's structured fields lacked. Persist so the UI shows it too.
+    let salary = r.salary || '';
+    if (!salary) {
+      const comp = extractCompensation(description);
+      if (comp) {
+        salary = comp;
+        await sql`update job.recommended_roles set salary = ${comp} where id = ${r.id}::uuid and salary is null`;
+      }
+    }
     const roleRow: RoleRow = {
       status: '', rank: '',
       company: r.company || '', title: r.title || '', url: r.url || '',
-      source: r.source || '', contact: '', salary: r.salary || '',
+      source: r.source || '', contact: '', salary,
       sector: r.sector || '', investors: (r.investors || []).join(', '),
       website: '', crunchbase: '', description,
     };
@@ -736,7 +807,7 @@ async function enrichAndScoreNewRows(
         candidate = haiku.candidate || null;
       }
     }
-    const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale);
+    const fit = computeFit(roleRow, ctx, roleScore, seniority, rationale, { watchedCompany: !!r.watched_company_id });
     await sql`
       update job.recommended_roles
          set fit_score            = ${fit.score},
@@ -838,6 +909,7 @@ async function insertNew(
     enrichment_retry_at: r.input.enrichmentRetryAt  ?? null,
     canonical_url:       r.input.canonicalUrl       ?? null,
     company_id:          r.input.companyId          ?? null,
+    watched_company_id:  r.input.watchedCompanyId   ?? null,
   }));
   // on conflict: backfill the JD (and salary) into an existing row that
   // landed without one — e.g. tracked-ats roles created before the adapter

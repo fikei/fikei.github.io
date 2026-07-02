@@ -8,7 +8,7 @@
 // here; this view is the full audit trail.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, watchCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
@@ -74,6 +74,7 @@ export class JobRecommendationsTable extends LitElement {
     _hasMore:            { state: true },
     _recentlyExpired:    { state: true },
     _wildcards:          { state: true },
+    _floorOn:            { state: true },
   };
 
   constructor() {
@@ -99,6 +100,9 @@ export class JobRecommendationsTable extends LitElement {
     this._hasMore = false;
     this._recentlyExpired = 0;
     this._wildcards = [];
+    // Quality floors (fit >= 50, strength >= 50, no hard fails) apply by
+    // default; the header toggle flips to the unfiltered audit view.
+    this._floorOn = true;
   }
 
   // ----- Source health banner ------------------------------------------
@@ -268,6 +272,7 @@ export class JobRecommendationsTable extends LitElement {
       const layers = this._sortLayers;
       const data = await fetchRecommendations({
         view:   'all',
+        floor:  this._floorOn,
         limit:  PAGE_SIZE,
         offset: this._offset,
         // Multi-level: comma-joined keys + dirs, most-significant first.
@@ -286,6 +291,14 @@ export class JobRecommendationsTable extends LitElement {
       if (reset) { this.error = String(e); this.state = 'error'; }
       // append failures are non-fatal — keep what we have, allow retry
     }
+  }
+
+  async _toggleFloor() {
+    this._floorOn = !this._floorOn;
+    this.state = 'loading';
+    this.requestUpdate();
+    await this._fetchPage({ reset: true });
+    this.state = 'loaded';
   }
 
   async _loadMore() {
@@ -471,6 +484,9 @@ export class JobRecommendationsTable extends LitElement {
                       @click=${(e) => this._toggleMenu(r.id, e)}>⋯</button>
               ${this._menuOpenId === r.id ? html`
                 <div class="row-menu__pop" @click=${(e) => e.stopPropagation()}>
+                  <button class="row-menu__item" @click=${() => this._onWatchCompany(r)}>
+                    Watch ${r.company || 'this company'}
+                  </button>
                   <button class="row-menu__item" @click=${() => this._onBlockCompany(r)}>
                     Don't recommend ${r.company || 'this company'}
                   </button>
@@ -501,6 +517,23 @@ export class JobRecommendationsTable extends LitElement {
     this._menuOpenId = this._menuOpenId === id ? null : id;
   }
 
+  // "Watch <company>" — green-light the company as a direct source. The
+  // server resolves the careers backend (major-tech registry or an ATS
+  // board probe); unsupported companies surface the server's message.
+  async _onWatchCompany(r) {
+    const company = r.company;
+    this._menuOpenId = null;
+    if (!company) return;
+    try {
+      await watchCompany({ company });
+      document.dispatchEvent(new CustomEvent('job:watch:added', { detail: { company } }));
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds For You now` } }));
+    } catch (e) {
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: e.message || `Couldn't watch ${company}` } }));
+      console.warn('[recs-table] watchCompany failed', e);
+    }
+  }
+
   async _onBlockCompany(r) {
     const company = r.company;
     this._menuOpenId = null;
@@ -528,8 +561,11 @@ export class JobRecommendationsTable extends LitElement {
   _renderWildcardCard(rec) {
     const weak = weakestFitDims(rec, 2);
     const fails = rec.hardFails || [];
-    const why = [...fails.map(f => `hard fail: ${f}`),
-                 ...weak.map(w => w.rationale || `weak ${w.label.toLowerCase()}`)].slice(0, 2).join(' · ');
+    // Just the reasons — the strip header already explains the concept,
+    // so the card copy stays light. Lead with the weakest dimension label
+    // for scannability; the full rationale lives in the fit modal.
+    const why = [...fails.map(f => `Hard fail: ${f}`),
+                 ...weak.map(w => w.rationale || `Weak ${w.label.toLowerCase()}`)].slice(0, 2).join(' · ');
     return html`
       <article class="rec-card rec-card--wildcard" role="listitem">
         <header class="rec-card__head">
@@ -547,7 +583,7 @@ export class JobRecommendationsTable extends LitElement {
               })}
             </div>
             <p class="rec-card__meta">${[rec.company, rec.location].filter(Boolean).join('  •  ')}</p>
-            ${why ? html`<p class="rec-card__wildcard-why">Standout candidate — low fit because: ${why}</p>` : nothing}
+            ${why ? html`<p class="rec-card__wildcard-why">${why}</p>` : nothing}
           </div>
         </header>
         <footer class="rec-card__foot">
@@ -569,7 +605,7 @@ export class JobRecommendationsTable extends LitElement {
           <h2>🃏 Wildcards</h2>
           <span class="muted">Roles where you'd likely be a standout candidate — but that flunk your stated criteria. A litmus test for the litmus.</span>
         </header>
-        <div class="rec-row" role="list">
+        <div class="rec-row rec-row--wildcards" role="list">
           ${this._wildcards.map(r => this._renderWildcardCard(r))}
         </div>
       </section>
@@ -615,6 +651,13 @@ export class JobRecommendationsTable extends LitElement {
             · ${this._recentlyExpired} expired removed
           </span>
         ` : nothing}
+        <button class="link-subtle recs-page__floor-toggle"
+                title=${this._floorOn
+                  ? 'Quality floors on: fit ≥ 50, strength ≥ 50, no hard fails, graded only. Click to see everything.'
+                  : 'Showing everything, including below-floor and ungraded roles. Click to re-apply the quality floors.'}
+                @click=${() => this._toggleFloor()}>
+          ${this._floorOn ? 'Below-floor hidden · show all' : 'Showing all · apply floors'}
+        </button>
         <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
                 title="Scan Gmail for new role alerts and application updates"
                 @click=${() => this._onRefresh()}>
