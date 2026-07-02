@@ -73,6 +73,9 @@ body {
 /* Date group headers — mobile-only section headers, hidden on desktop */
 .data-table tbody tr.date-group { display: none; }
 
+/* Multi-day range shown in the card's time slot — mobile only */
+.mobile-date-range { display: none; }
+
 /* Source chip error state */
 .token--error {
   border-color: var(--border-subtle);
@@ -1252,16 +1255,45 @@ body {
     max-width: none;
     white-space: normal;
   }
+  /* Hierarchy: time anchors scanning within a date group, name is primary,
+     venue·city one muted line, tags + source demoted to plain text
+     ("show, don't decorate" — no boxes inside boxes). */
+  .data-table tbody tr {
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      "date date date date"
+      "time time ages price"
+      "name name name name"
+      "venue venue venue venue"
+      "genre genre genre source";
+  }
   .data-table .col-date { grid-area: date; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); }
-  .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-2xs); color: var(--fg-muted); }
+  .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg); }
+  .col-time .mobile-date-range { display: inline; }
   .data-table .col-name { grid-area: name; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-tight); margin-top: 2px; }
-  .data-table .col-venue { grid-area: venue; display: block; min-width: 0; font-size: var(--text-xs); color: var(--fg-muted); }
-  .data-table .col-genre { grid-area: genre; display: block; margin-top: var(--space-1); align-self: end; }
-  .data-table .col-price { grid-area: price; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); text-align: right; }
-  .data-table .col-source { grid-area: source; width: auto; text-align: right; margin-top: var(--space-1); align-self: end; }
-  .data-table .col-source .token--source { white-space: nowrap; }
+  .data-table .col-name .event-thumb { display: none; }
+  .data-table .col-venue {
+    grid-area: venue; display: block; min-width: 0;
+    font-size: var(--text-xs); color: var(--fg-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .data-table .col-venue .venue-city { display: inline; }
+  .data-table .col-venue .venue-city::before { content: '\00A0\00B7'; }
+  .data-table .col-ages { grid-area: ages; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-subtle); text-align: right; }
+  .data-table .col-price { grid-area: price; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-subtle); text-align: right; }
+  .data-table .col-genre { grid-area: genre; display: block; min-width: 0; margin-top: var(--space-2); align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .data-table .col-genre .genre-tag {
+    border: none; background: none; padding: 0; margin: 0;
+    font-size: var(--text-2xs); color: var(--fg-subtle);
+  }
+  .data-table .col-genre .genre-tag + .genre-tag::before { content: '\00A0\00B7\00A0'; color: var(--fg-subtle); }
+  .data-table .col-source { grid-area: source; width: auto; text-align: right; margin-top: var(--space-2); align-self: end; }
+  .data-table .col-source .token--source {
+    white-space: nowrap;
+    border: none !important; background: none; padding: 0;
+    font-size: var(--text-2xs); letter-spacing: var(--tracking-wide);
+  }
   .data-table .col-type,
-  .data-table .col-ages,
   .data-table .col-promoter { display: none; }
 
   /* Sticky date headers group the cards; the per-card date is redundant */
@@ -1725,8 +1757,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.13.0';
-  console.log(`[events] v${VERSION} - sticky date headers + scrolling filter rows on mobile`);
+  const VERSION = '1.14.0';
+  console.log(`[events] v${VERSION} - mobile card hierarchy: time anchor, plain-text meta, ages, multi-day ranges, whole-card tap`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2580,6 +2612,9 @@ body {
       const timeStart = timeRaw.split(/[-–]/)[0].split('(')[0].trim();
       const timeDisplay = timeStart ? escHtml(timeStart) : '';
       const timeTip = (timeRaw !== timeStart && timeRaw) ? ` title="${escHtml(timeRaw)}"` : '';
+      // Mobile cards drop the date cell (the sticky date header carries it),
+      // which would lose multi-day ranges — surface those in the time slot
+      const mobileRangeHtml = (!timeStart && ev.endDate) ? `<span class="mobile-date-range">${escHtml(dateDisplay)}</span>` : '';
       // Venue + city combined
       const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
       // Type
@@ -2599,7 +2634,7 @@ body {
       const thumbHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="event-thumb" alt="" loading="lazy">` : '';
       return `<tr>
         <td class="col-date">${dateDisplay}</td>
-        <td class="col-time"${timeTip}>${timeDisplay}</td>
+        <td class="col-time"${timeTip}>${timeDisplay}${mobileRangeHtml}</td>
         <td class="col-name">${thumbHtml}${nameCell}</td>
         <td class="col-venue">${venueHtml}</td>
         <td class="col-type">${escHtml(typeLabel)}</td>
@@ -3440,6 +3475,16 @@ body {
       filterToggleBtn.classList.remove('active');
     });
     document.getElementById('emptyClear').addEventListener('click', clearAllFilters);
+
+    // Mobile cards: the whole card is the tap target, not just the title link
+    document.getElementById('eventsBody').addEventListener('click', (e) => {
+      if (!window.matchMedia('(max-width: 600px)').matches) return;
+      if (e.target.closest('a, button, .token')) return;
+      const tr = e.target.closest('tr');
+      if (!tr || tr.classList.contains('date-group')) return;
+      const link = tr.querySelector('.event-link');
+      if (link) window.open(link.href, '_blank', 'noopener');
+    });
 
     // Column sorting
     document.querySelectorAll('.data-table th[data-sort]').forEach(th => {
