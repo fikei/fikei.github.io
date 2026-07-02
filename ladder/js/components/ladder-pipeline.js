@@ -7,8 +7,6 @@ const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
 const { renderLocation } = await import('../format.js' + V);
-// Mount the recommendations widget. It self-loads when the user is signed in.
-import('./ladder-recommendations.js' + V);
 
 // Status taxonomy (3-value). Bucket name → status name:
 //   leads  → 'Saved'
