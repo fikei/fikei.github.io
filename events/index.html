@@ -1214,6 +1214,73 @@ body {
   /* Stats bar: stack */
   .stats-bar { flex-wrap: wrap; gap: var(--space-2); }
 }
+
+/* ---- Responsive: card layout replaces the table below 600px ----
+   A phone-width table survives only by hiding columns; cards keep
+   date/time/name/venue/tags/price/source all visible. Placed after the
+   480px block so its display overrides win the cascade. */
+@media (max-width: 600px) {
+  .data-table-wrap { border: none; overflow: visible; }
+  .data-table { display: block; }
+  .data-table thead { display: none; }
+  .data-table tbody { display: block; }
+  .data-table tbody tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "date time price"
+      "name name name"
+      "venue venue venue"
+      "genre genre source";
+    column-gap: var(--space-2);
+    row-gap: 2px;
+    padding: var(--space-3);
+    margin-bottom: var(--space-2);
+    border: var(--border-thin) solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+  }
+  .data-table tbody td {
+    display: block;
+    padding: 0;
+    border: none;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    white-space: normal;
+  }
+  .data-table .col-date { grid-area: date; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); }
+  .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-2xs); color: var(--fg-muted); }
+  .data-table .col-name { grid-area: name; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-tight); margin-top: 2px; }
+  .data-table .col-venue { grid-area: venue; display: block; min-width: 0; font-size: var(--text-xs); color: var(--fg-muted); }
+  .data-table .col-genre { grid-area: genre; display: block; margin-top: var(--space-1); align-self: end; }
+  .data-table .col-price { grid-area: price; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); text-align: right; }
+  .data-table .col-source { grid-area: source; width: auto; text-align: right; margin-top: var(--space-1); align-self: end; }
+  .data-table .col-source .token--source { white-space: nowrap; }
+  .data-table .col-type,
+  .data-table .col-ages,
+  .data-table .col-promoter { display: none; }
+
+  /* Filter bar: stack controls full-width (search min-width overflows otherwise) */
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar .input,
+  .filter-bar .select,
+  .filter-bar .input--search,
+  .filter-bar .input--date { width: 100%; min-width: 0; flex: none; }
+}
+
+/* ---- Touch feedback: hover styles never fire on touch devices ---- */
+@media (hover: none) {
+  .data-table tbody tr:active,
+  .calendar__event:active,
+  .calendar__cell:active,
+  .day-view__item:active,
+  .day-detail__item:active,
+  .week-view__event:active,
+  .token--source:active,
+  .recommended-card:active,
+  .exhibition-card:active { opacity: 0.6; }
+}
   </style>
 </head>
 <body>
@@ -1467,8 +1534,8 @@ body {
 
     </div><!-- /eventsContent -->
 
-    <!-- Debug log (visible) -->
-    <details id="debugLog" style="margin-bottom: var(--space-4);">
+    <!-- Debug log (admin only — unhidden by init when CtrlAuth.isAdmin()) -->
+    <details id="debugLog" style="margin-bottom: var(--space-4); display: none;">
       <summary style="font-size: var(--text-2xs); color: var(--fg-subtle); text-transform: uppercase; letter-spacing: var(--tracking-wider); cursor: pointer; display: flex; align-items: center; gap: var(--space-2);">
         Fetch Log
         <button id="resetRepairsBtn" onclick="event.stopPropagation(); resetRepairAttempts();" style="font-size: var(--text-2xs); color: var(--fg-subtle); background: transparent; border: var(--border-thin) solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1px 6px; cursor: pointer; margin-left: auto;">Reset Repairs</button>
@@ -1613,8 +1680,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.10.0';
-  console.log(`[events] v${VERSION} - SFMOMA HTML scraper, multi-day events, exhibitions rail`);
+  const VERSION = '1.12.0';
+  console.log(`[events] v${VERSION} - mobile card view, filter stacking, touch feedback, admin-gated debug log`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1715,9 +1782,16 @@ body {
   }
 
   // Auth events from shared module
+  // Debug log is a dev aid — only admins see it
+  function updateDebugLogVisibility() {
+    const el = document.getElementById('debugLog');
+    if (el) el.style.display = (window.CtrlAuth && CtrlAuth.isAdmin()) ? '' : 'none';
+  }
+
   document.addEventListener('ctrl:auth:signedin', async (e) => {
     const wasLoggedOut = !currentUser;
     currentUser = e.detail.user;
+    updateDebugLogVisibility();
     if (wasLoggedOut) {
       log('Logged in as ' + (currentUser.email || 'user'));
       const cloudLoaded = await loadSourcesCloud();
@@ -1736,6 +1810,7 @@ body {
 
   document.addEventListener('ctrl:auth:signedout', () => {
     currentUser = null;
+    updateDebugLogVisibility();
     log('Logged out');
   });
 
@@ -2080,24 +2155,52 @@ body {
       if (enabledIds.length === 0) return null;
       const today = new Date().toISOString().split('T')[0];
       log(`L2 cache: querying ${enabledIds.length} source(s)`);
-      const { data, error } = await supabaseClient
+      // 12s ceiling so a hung request can't leave the spinner up forever
+      const query = supabaseClient
         .from('events')
         .select('*')
         .in('source_id', enabledIds)
         .gte('date', today)
         .order('date', { ascending: true });
+      const timeout = new Promise(resolve =>
+        setTimeout(() => resolve({ data: null, error: { message: 'timed out after 12s' } }), 12000));
+      const { data, error } = await Promise.race([query, timeout]);
       if (error) { log('L2 cache: query error — ' + error.message); return null; }
       if (!data || data.length === 0) { log('L2 cache: empty'); return null; }
-      const events = data.map(row => ({
-        date: row.date, time: row.time || '', name: row.name, venue: row.venue,
-        address: row.address || '', city: row.city || '', genre: row.genre || '',
-        price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
-        url: row.url, source: row.source_id,
-        contentType: row.content_type || getSourceCategory(row.source_id),
-        description: row.description || '', imageUrl: row.image_url || '',
-        enrichedTags: row.tags || [],
-      }));
-      log(`L2 cache: loaded ${events.length} events`);
+      // Merge rows that are the same physical event scraped from different
+      // sources (shared canonical_key). One row is shown with all source
+      // tokens; richer fields win regardless of which source supplied them.
+      const byCanonical = new Map();
+      let mergedCount = 0;
+      for (const row of data) {
+        const key = row.canonical_key || row.event_key || (row.source_id + '|' + row.url);
+        const ev = {
+          date: row.date, time: row.time || '', name: row.name, venue: row.venue,
+          address: row.address || '', city: row.city || '', genre: row.genre || '',
+          price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
+          url: row.url, source: row.source_id,
+          contentType: row.content_type || getSourceCategory(row.source_id),
+          description: row.description || '', imageUrl: row.image_url || '',
+          enrichedTags: row.tags || [],
+        };
+        const existing = byCanonical.get(key);
+        if (!existing) {
+          ev.sources = [ev.source];
+          byCanonical.set(key, ev);
+        } else {
+          mergedCount++;
+          if (!existing.sources.includes(ev.source)) existing.sources.push(ev.source);
+          if (!existing.time && ev.time) existing.time = ev.time;
+          if (!existing.genre && ev.genre) existing.genre = ev.genre;
+          if (!existing.price && ev.price) existing.price = ev.price;
+          if (!existing.ages && ev.ages) existing.ages = ev.ages;
+          if (!existing.description && ev.description) existing.description = ev.description;
+          if (!existing.imageUrl && ev.imageUrl) existing.imageUrl = ev.imageUrl;
+          if (existing.enrichedTags.length === 0 && ev.enrichedTags.length > 0) existing.enrichedTags = ev.enrichedTags;
+        }
+      }
+      const events = Array.from(byCanonical.values());
+      log(`L2 cache: loaded ${events.length} events` + (mergedCount ? ` (${mergedCount} cross-source duplicates merged)` : ''));
       return events;
     } catch (e) { log('L2 cache: error — ' + e.message); return null; }
   }
@@ -2120,7 +2223,10 @@ body {
       const cachedL1 = loadCachedEvents();
       if (cachedL1) {
         state.events = cachedL1;
-        state.events.forEach(ev => { ev.contentType = getSourceCategory(ev.source); });
+        state.events.forEach(ev => {
+          ev.contentType = getSourceCategory(ev.source);
+          ev.contentType = detectEventType(ev);
+        });
         calAutoNavigate(); updateFilters(); updateContentTypeFilter(); render();
         log('L1 hit: rendered from localStorage');
         // Background L2 freshness check
@@ -3970,10 +4076,33 @@ body {
   }
 
   // --- Init ---
+  // Refresh the stock source catalog from the event_sources registry table.
+  // The hardcoded STOCK_SOURCES array is the fallback if the table is
+  // unreachable; the array is mutated in place so all existing references
+  // (onboarding pickers, category lookups) see the DB-backed list.
+  async function loadSourceRegistry() {
+    if (!supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('event_sources')
+        .select('id, name, category, type, url, region, description')
+        .eq('enabled', true);
+      if (error || !data || data.length === 0) {
+        log('Source registry: unavailable, using built-in list' + (error ? ' — ' + error.message : ''));
+        return;
+      }
+      STOCK_SOURCES.length = 0;
+      data.forEach(r => STOCK_SOURCES.push(r));
+      log(`Source registry: ${data.length} sources loaded from DB`);
+    } catch (e) { log('Source registry: ' + e.message); }
+  }
+
   async function init() {
+    await loadSourceRegistry();
     loadSettings();
     loadSources();
     bindEvents();
+    updateDebugLogVisibility();
 
     // Auth already initialized at top via CtrlAuth.init()
     if (currentUser) log('Auth: found existing session for ' + (currentUser.email || 'user'));

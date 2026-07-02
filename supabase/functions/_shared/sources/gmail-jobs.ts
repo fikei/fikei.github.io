@@ -58,7 +58,9 @@ const DEFAULT_ALLOW_SENDERS = [
   'jobs-noreply@linkedin.com',
   'jobalerts-noreply@linkedin.com',
   '@linkedin.com',
-  '@wellfound.com',
+  // Domain-suffix (no @) — Wellfound digests come from team@hi.wellfound.com,
+  // which '@wellfound.com' never matches under the includes() check below.
+  'wellfound.com',
   '@otta.com',
   '@hellootta.com',
   '@hnhiring.com',
@@ -83,6 +85,7 @@ const DIGEST_HINTS = [
   'roundup',
   'job digest',
   'jobs digest',
+  'more matches',                  // Wellfound: "New job: X at Y, and 24 more matches"
 ];
 
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

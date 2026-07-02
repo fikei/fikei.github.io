@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.14.0';
-console.log(`[recommendations] v${VERSION} - watched-company filter modes: per-company surfacing gates (all / role_level / good_fits / exceptional) via job.watched_companies`);
+const VERSION = '0.15.0';
+console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the candidate-floor-50 + wildcard-view gates`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -18,21 +18,63 @@ serve(async (req) => {
     const sql = db();
 
     if (req.method === 'GET') {
-      // ?view=all   → all active recs regardless of fit score (for the
-      //               "Recommended for you" full-list page). Still excludes
-      //               dismissed + already-in-pipeline; those are signal of
-      //               user intent, not just score thresholds.
-      // (default)   → score floor 50, max 60 rows (drives the carousel).
+      // ?view=all      → all active recs regardless of score (for the
+      //                  "Recommended for you" full-list page). Still excludes
+      //                  dismissed + already-in-pipeline; those are signal of
+      //                  user intent, not just score thresholds. No score
+      //                  floors at all — this is the inspection surface for
+      //                  everything the default view filters out.
+      // ?view=wildcard → "standout candidate, low fit" — roles where the
+      //                  Haiku grade says you'd beat most applicants but the
+      //                  heuristic fit flunks your stated criteria. Meant to
+      //                  pressure-test the litmus, so hard-fails are ALLOWED
+      //                  here (mega-cap / mission conflicts are exactly the
+      //                  cases worth a second look). Top rows by strength.
+      // (default)      → fit floor 50 + strength floor 50, max 60 rows
+      //                  (drives the carousel).
       const url = new URL(req.url);
+
+      // ?id=<uuid> → single-rec lookup for the pre-save detail page.
+      // Returns the row regardless of score/dismissed/closed state (the
+      // page renders those states itself), scoped to the caller's rows.
+      const recId = url.searchParams.get('id');
+      if (recId) {
+        const one = await sql`
+          select r.id, r.source, r.source_label as "sourceLabel", r.url, r.company, r.title, r.location,
+                 r.salary, r.logo_url as "logoUrl", r.posted_at as "postedAt",
+                 r.description, r.match_bullets as "matchBullets", r.suggested_at as "suggestedAt",
+                 r.fit_score as "fitScore", r.fit_breakdown as "breakdown",
+                 r.fit_rationales as "rationales", r.fit_summary as "fitSummary",
+                 r.candidate_score as "candidateScore", r.candidate_breakdown as "candidateBreakdown",
+                 r.candidate_rationales as "candidateRationales", r.candidate_summary as "candidateSummary",
+                 r.comp_acceptable as "compAcceptable",
+                 r.hard_fails as "hardFails", r.sector,
+                 r.enrichment_status as "enrichmentStatus",
+                 r.canonical_url as "canonicalUrl",
+                 r.dismissed_at as "dismissedAt", r.closed_at as "closedAt",
+                 r.closure_reason as "closureReason",
+                 r.added_to_pipeline_slug as "addedToPipelineSlug",
+                 case when r.source = 'gmail-jobs' and r.payload ? 'gmailApiId'
+                      then 'https://mail.google.com/mail/u/0/#inbox/' || (r.payload->>'gmailApiId')
+                      else null end as "sourceEmailUrl"
+            from job.recommended_roles r
+           where r.id = ${recId} and r.user_email = ${email}
+           limit 1`;
+        if (!one.length) return err('not found', 404);
+        return jsonResp({ ok: true, version: VERSION, recommendation: one[0] });
+      }
+
       const view = url.searchParams.get('view') || 'default';
       const isAll = view === 'all';
+      const isWildcard = view === 'wildcard';
 
       // Pagination (view=all only). The default carousel view stays a
-      // single 60-row pull. limit caps at 200; the table loads pages via
-      // infinite scroll and reads `total` to show "X of Y".
+      // single 60-row pull; wildcard is a short strip. limit caps at 200;
+      // the table loads pages via infinite scroll and reads `total` to
+      // show "X of Y".
       const limit = isAll
         ? Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10) || 100))
-        : 60;
+        : isWildcard ? 6 : 60;
       const offset = isAll ? Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0) : 0;
 
       // Server-side sort — whitelist of sortable columns mapped to the
@@ -66,11 +108,24 @@ serve(async (req) => {
         else if (SORT_COLS[k]) layers.push(`${SORT_COLS[k]} ${dir} nulls last`);
       });
       if (!layers.length) layers.push(`${BLENDED_RANK} desc nulls last`);
-      const orderBy = layers.join(', ') + ', r.suggested_at desc, r.id desc';
+      const orderBy = (isWildcard ? 'r.candidate_score desc nulls last' : layers.join(', '))
+        + ', r.suggested_at desc, r.id desc';
 
-      // Candidate-score low-end threshold — drop clearly-weak graded roles
-      // (< 30). Un-graded rows are never dropped on this basis.
-      const CANDIDATE_FLOOR = 30;
+      // Strength (candidate-score) floor for the default view. Raised from
+      // 30 → 50 (2026-07): live distribution has strength median 52 / max 78,
+      // so a floor of 30 only trimmed the bottom ~15% — roles that fit the
+      // criteria but where you'd be a weak applicant still showed. Ungraded
+      // rows are treated as PENDING (excluded) until enrichment grades them;
+      // they remain visible in view=all.
+      const CANDIDATE_FLOOR = 50;
+
+      // Wildcard band: strength high enough to be a standout (the Haiku
+      // rubric's "top 10-15%" band starts at 75 and nothing live scores
+      // above 78, so 65 is genuinely rare air), fit below the default
+      // view's floor. Percentile-anchored intent — revisit if the strength
+      // distribution shifts.
+      const WILDCARD_MIN_STRENGTH = 65;
+      const WILDCARD_MAX_FIT = 50;
 
       // Per-user blocked companies (the "Don't recommend this company"
       // action). Filtered here so they vanish from For You immediately.
@@ -114,26 +169,28 @@ serve(async (req) => {
       //   'role_level'  → role & level match: not below seniority, and
       //                   Haiku role score ≥13/25 (ungraded rows pass —
       //                   the watch query already scopes to the role)
-      //   'exceptional' → candidate_score ≥ 60 only
-      //   'good_fits' / unwatched → fit ≥50, no hard-fails, candidate ≥30
+      //   'exceptional' → candidate_score ≥ 65 only (the wildcard "rare
+      //                   air" threshold — nothing live grades above 78)
+      //   'good_fits' / unwatched → fit ≥50, no hard-fails, candidate ≥50
       const whereClause = sql`
         left join job.watched_companies w on w.id = r.watched_company_id
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (coalesce(w.filter_mode, '') = 'all'
-               or not (r.candidate_score is not null and r.candidate_score < ${CANDIDATE_FLOOR}))
-          and (${isAll} or
+          and (${isAll || isWildcard} or
             case coalesce(w.filter_mode, 'good_fits')
               when 'all' then true
               when 'role_level' then
                 (r.role_match_seniority is null or r.role_match_seniority <> 'below')
                 and coalesce(r.role_match_score, 13) >= 13
-              when 'exceptional' then coalesce(r.candidate_score, 0) >= 60
+              when 'exceptional' then coalesce(r.candidate_score, 0) >= ${WILDCARD_MIN_STRENGTH}
               else
                 (r.fit_score is null or r.fit_score >= 50)
                 and coalesce(array_length(r.hard_fails, 1), 0) = 0
+                and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
             end)
+          and (${!isWildcard} or (r.candidate_score >= ${WILDCARD_MIN_STRENGTH}
+                                  and coalesce(r.fit_score, 100) < ${WILDCARD_MAX_FIT}))
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
           and not exists (
             select 1

@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.2.0'
-console.log(`[scrape-events] v${VERSION} - server-side event scraper`)
+const VERSION = '1.3.0'
+console.log(`[scrape-events] v${VERSION} - DB source registry, maintenance RPC, discord trigger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -60,6 +60,29 @@ function createSemaphore(limit: number) {
   }
 }
 
+// --- Source registry ---
+// Sources live in the event_sources table so adding one of an existing
+// parser type is an INSERT, not a deploy. STOCK_SOURCES remains as the
+// fallback if the table is unreachable or empty.
+
+async function loadSources(supabase: ReturnType<typeof createClient>): Promise<EventSource[]> {
+  try {
+    const { data, error } = await supabase
+      .from('event_sources')
+      .select('id, name, category, type, url, region, description')
+      .eq('enabled', true)
+
+    if (error || !data || data.length === 0) {
+      console.log(`[scrape-events] Registry unavailable (${error?.message || 'empty'}), falling back to STOCK_SOURCES`)
+      return STOCK_SOURCES
+    }
+    return data as EventSource[]
+  } catch (e) {
+    console.log(`[scrape-events] Registry load failed (${(e as Error).message}), falling back to STOCK_SOURCES`)
+    return STOCK_SOURCES
+  }
+}
+
 // --- Parser dispatch ---
 
 async function scrapeSource(source: EventSource): Promise<ScrapedEvent[]> {
@@ -95,6 +118,17 @@ interface SourceOutcome {
   durationMs?: number
 }
 
+// The Supabase edge platform validates Authorization: Bearer <token> at the
+// gateway and requires a valid JWT. Env service/anon keys may be in the new
+// non-JWT "sb_secret_" format, so we fall back to the public anon JWT for
+// internal function-to-function calls (overridable via INTERNAL_ANON_JWT).
+// Callee functions use their own service role for DB writes, so no
+// permission escalation is possible with this token.
+function internalJwt(): string {
+  return Deno.env.get('INTERNAL_ANON_JWT')
+    || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI'
+}
+
 // --- Push events to cache-events ---
 
 async function pushToCache(
@@ -103,12 +137,7 @@ async function pushToCache(
   supabaseUrl: string,
   _serviceKey: string,
 ): Promise<{ cached: number; updated: number; enrichQueued: number }> {
-  // The Supabase edge platform validates Authorization: Bearer <token> at the
-  // gateway and requires a valid JWT. Env service/anon keys may be in the new
-  // non-JWT "sb_secret_" format, so we hardcode the public anon JWT for
-  // internal function-to-function calls. cache-events uses its own service
-  // role for DB writes, so no permission escalation is needed.
-  const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI'
+  const serviceKey = internalJwt()
   void _serviceKey
   // Format events to match ScrapedEvent interface expected by cache-events
   const formatted = events.map(ev => ({
@@ -128,12 +157,16 @@ async function pushToCache(
     description: ev.description || undefined,
   }))
 
-  // Send in batches of 400 (cache-events limit is 500)
+  // Send in batches of 400 (cache-events limit is 500). Source outcomes ride
+  // with the first batch; if that request fails they're retried as a
+  // health-only push at the end so a single failed batch can't lose a whole
+  // run's health tracking.
   let totalCached = 0, totalUpdated = 0, totalEnrichQueued = 0
+  let outcomesDelivered = false
 
   for (let i = 0; i < formatted.length; i += 400) {
     const batch = formatted.slice(i, i + 400)
-    const isLastBatch = i + 400 >= formatted.length
+    const attachOutcomes = !outcomesDelivered && sourceOutcomes.length > 0
 
     try {
       const resp = await fetch(`${supabaseUrl}/functions/v1/cache-events`, {
@@ -144,8 +177,7 @@ async function pushToCache(
         },
         body: JSON.stringify({
           events: batch,
-          // Only send sourceOutcomes with the last batch
-          sourceOutcomes: isLastBatch ? sourceOutcomes : undefined,
+          sourceOutcomes: attachOutcomes ? sourceOutcomes : undefined,
         }),
       })
 
@@ -154,6 +186,7 @@ async function pushToCache(
         totalCached += result.cached || 0
         totalUpdated += result.updated || 0
         totalEnrichQueued += result.enrichQueued || 0
+        if (attachOutcomes) outcomesDelivered = true
       } else {
         const errText = await resp.text()
         console.error(`[scrape-events] cache-events batch failed: ${resp.status} ${errText}`)
@@ -163,8 +196,8 @@ async function pushToCache(
     }
   }
 
-  // If no events but we have outcomes, still send outcomes
-  if (formatted.length === 0 && sourceOutcomes.length > 0) {
+  // Health-only push if outcomes never made it (no events, or first batch failed)
+  if (!outcomesDelivered && sourceOutcomes.length > 0) {
     try {
       await fetch(`${supabaseUrl}/functions/v1/cache-events`, {
         method: 'POST',
@@ -238,6 +271,7 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   const supabase = createClient(supabaseUrl, serviceKey)
 
   const runId = await createRun(supabase, triggeredBy)
+  const sources = await loadSources(supabase)
   const semaphore = createSemaphore(5)
 
   const allEvents: ScrapedEvent[] = []
@@ -246,10 +280,10 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   let sourcesSucceeded = 0
   let sourcesFailed = 0
 
-  console.log(`[scrape-events] Starting refresh-all: ${STOCK_SOURCES.length} sources, concurrency=5`)
+  console.log(`[scrape-events] Starting refresh-all: ${sources.length} sources, concurrency=5`)
 
   const results = await Promise.allSettled(
-    STOCK_SOURCES.map(source =>
+    sources.map(source =>
       semaphore(async () => {
         const start = Date.now()
         try {
@@ -317,7 +351,7 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   // Complete run tracking
   if (runId) {
     await completeRun(supabase, runId, {
-      sourcesAttempted: STOCK_SOURCES.length,
+      sourcesAttempted: sources.length,
       sourcesSucceeded,
       sourcesFailed,
       eventsTotal: allEvents.length,
@@ -327,27 +361,60 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
     })
   }
 
+  // Post-run housekeeping: purge stale events/caches/runs (the cleanup
+  // functions existed since migrations 009/010/039 but nothing invoked them).
+  let maintenance: unknown = null
+  try {
+    const { data, error } = await supabase.rpc('run_events_maintenance')
+    if (error) {
+      console.error(`[scrape-events] Maintenance failed: ${error.message}`)
+    } else {
+      maintenance = data
+      console.log(`[scrape-events] Maintenance: ${JSON.stringify(data)}`)
+    }
+  } catch (e) {
+    console.error(`[scrape-events] Maintenance error: ${(e as Error).message}`)
+  }
+
+  // Kick the Discord scraper (it has no cron of its own; its 4h cache TTL
+  // makes an every-2h kick a no-op half the time). Fire-and-forget.
+  try {
+    fetch(`${supabaseUrl}/functions/v1/scrape-discord-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${internalJwt()}`,
+      },
+      body: JSON.stringify({ action: 'refresh-all' }),
+    }).catch(err => console.error(`[scrape-events] Discord trigger failed: ${err.message}`))
+  } catch (e) {
+    console.error(`[scrape-events] Discord trigger error: ${(e as Error).message}`)
+  }
+
   return {
-    sourcesAttempted: STOCK_SOURCES.length,
+    sourcesAttempted: sources.length,
     sourcesSucceeded,
     sourcesFailed,
     eventsTotal: allEvents.length,
     eventsNew: cacheResult.cached,
     eventsUpdated: cacheResult.updated,
     enrichQueued: cacheResult.enrichQueued,
+    maintenance,
     errorLog: errorLog.length > 0 ? errorLog : undefined,
     runId,
   }
 }
 
 async function scrapeSingle(sourceId: string): Promise<Record<string, unknown>> {
-  const source = STOCK_SOURCES.find(s => s.id === sourceId)
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, serviceKey)
+
+  const sources = await loadSources(supabase)
+  const source = sources.find(s => s.id === sourceId)
   if (!source) {
     return { error: `Source not found: ${sourceId}` }
   }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
   const start = Date.now()
   try {
@@ -409,7 +476,8 @@ async function getStatus(): Promise<Record<string, unknown>> {
     .order('started_at', { ascending: false })
     .limit(5)
 
-  return { runs: data || [], totalSources: STOCK_SOURCES.length }
+  const sources = await loadSources(supabase)
+  return { runs: data || [], totalSources: sources.length }
 }
 
 function classifyError(msg: string): string {

@@ -5,12 +5,19 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendations, dismissRecommendation, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { roleSlug }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
+  import('../slug.js' + V),
 ]);
+
+// Pre-save detail page for a rec. The pretty slug 404-rewrites into
+// /ladder/jobs/drill/?slug=…&rec=… where app.js mounts <ladder-rec-detail>.
+export function recDetailUrl(rec) {
+  return `/ladder/jobs/${roleSlug(rec.company, rec.title)}/?rec=${rec.id}`;
+}
 
 function relTime(iso) {
   if (!iso) return '';
@@ -30,6 +37,7 @@ export class JobRecommendations extends LitElement {
   static properties = {
     state: { state: true },
     items: { state: true },
+    wildcards: { state: true },
     error: { state: true },
     addingId: { state: true },
     selectedRec:        { state: true },
@@ -42,6 +50,7 @@ export class JobRecommendations extends LitElement {
     super();
     this.state = 'idle';
     this.items = [];
+    this.wildcards = [];
     this.error = '';
     this.addingId = null;
     this.selectedRec = null;
@@ -101,10 +110,17 @@ export class JobRecommendations extends LitElement {
       this.error = String(e);
       this.state = 'error';
     }
+    // Wildcards load after the main strip — never block or fail the
+    // carousel over them.
+    try {
+      const wc = await fetchRecommendations({ view: 'wildcard' });
+      this.wildcards = wc.recommendations || [];
+    } catch { this.wildcards = []; }
   }
 
   async _onDismiss(id) {
     this.items = this.items.filter(r => r.id !== id);
+    this.wildcards = this.wildcards.filter(r => r.id !== id);
     try { await dismissRecommendation(id); } catch {}
   }
 
@@ -120,8 +136,9 @@ export class JobRecommendations extends LitElement {
         source: 'Network',
         fromRecommendationId: rec.id,
       });
-      // Optimistic: pop from the carousel.
+      // Optimistic: pop from the carousel + wildcards strip.
       this.items = this.items.filter(x => x.id !== rec.id);
+      this.wildcards = this.wildcards.filter(x => x.id !== rec.id);
       // Invite the pipeline to refresh + surface the new row in the
       // "N new jobs added" banner instead of navigating.
       document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
@@ -182,7 +199,10 @@ export class JobRecommendations extends LitElement {
           })()}
           <div class="rec-card__title-block">
             <div class="rec-card__title-row">
-              <h3 class="rec-card__title">${rec.title || '(untitled)'}</h3>
+              <h3 class="rec-card__title">
+                <a class="rec-card__title-link" href=${recDetailUrl(rec)} target="_blank" rel="noopener"
+                   title="Open role details in a new tab">${rec.title || '(untitled)'}</a>
+              </h3>
               ${renderScorePair(rec, {
                 onFit:       (row) => this._openFitModal(row),
                 onCandidate: (row) => this._openCandidateModal(row),
@@ -220,6 +240,62 @@ export class JobRecommendations extends LitElement {
     `;
   }
 
+  // Wildcard card — high candidate strength, low stated-criteria fit.
+  // Deliberately leads with WHY the fit is low: the strip exists to
+  // pressure-test the search criteria, not just to list more roles.
+  _renderWildcardCard(rec) {
+    const weak = weakestFitDims(rec, 2);
+    const fails = rec.hardFails || [];
+    return html`
+      <article class="rec-card rec-card--wildcard" role="listitem">
+        <header class="rec-card__head">
+          <div class="rec-card__title-block">
+            <div class="rec-card__title-row">
+              <h3 class="rec-card__title">
+                <a class="rec-card__title-link" href=${recDetailUrl(rec)} target="_blank" rel="noopener"
+                   title="Open role details in a new tab">${rec.title || '(untitled)'}</a>
+              </h3>
+              ${renderScorePair(rec, {
+                onFit:       (row) => this._openFitModal(row),
+                onCandidate: (row) => this._openCandidateModal(row),
+                fitClass:    (s) => this._fitClass(s),
+                candClass:   (s) => this._fitClass(s),
+              })}
+            </div>
+            <p class="rec-card__meta">${[rec.company, rec.location].filter(Boolean).join('  •  ')}</p>
+            <p class="rec-card__wildcard-why">
+              Standout candidate — low fit because:
+              ${[...fails.map(f => `hard fail: ${f}`), ...weak.map(w => w.rationale || `weak ${w.label.toLowerCase()}`)]
+                .slice(0, 2).join(' · ')}
+            </p>
+          </div>
+        </header>
+        <footer class="rec-card__foot">
+          <button class="btn btn--sm btn--accent" ?disabled=${this.addingId === rec.id}
+                  @click=${() => this._onAdd(rec)}>
+            ${this.addingId === rec.id ? 'Saving…' : 'Save role'}
+          </button>
+          <button class="link-subtle" @click=${() => this._onDismiss(rec.id)}>Dismiss</button>
+        </footer>
+      </article>
+    `;
+  }
+
+  _renderWildcards() {
+    if (!this.wildcards.length) return nothing;
+    return html`
+      <div class="rec-wildcards">
+        <header class="rec-shell__head rec-wildcards__head">
+          <h2>🃏 Wildcards</h2>
+          <span class="muted">Roles where you'd likely be a standout candidate — but that flunk your stated criteria. A litmus test for the litmus.</span>
+        </header>
+        <div class="rec-row" role="list">
+          ${this.wildcards.map(r => this._renderWildcardCard(r))}
+        </div>
+      </div>
+    `;
+  }
+
   _renderEmpty() {
     return html`
       <div class="rec-empty">
@@ -250,7 +326,11 @@ export class JobRecommendations extends LitElement {
       `;
     }
     if (this.state === 'error' || !this.items.length) {
-      return html`<div class="rec-shell">${this._renderEmpty()}</div>`;
+      return html`<div class="rec-shell">
+        ${this._renderEmpty()}
+        ${this._renderWildcards()}
+        ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
+      </div>`;
     }
     // Show only the top 5 by fit score on the widget; full list lives
     // on /ladder/jobs/recommended/. Items already arrive sorted by
@@ -279,6 +359,7 @@ export class JobRecommendations extends LitElement {
             See all recommendations →
           </a>
         </footer>
+        ${this._renderWildcards()}
         ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
       </section>
     `;
