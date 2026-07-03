@@ -42,6 +42,84 @@ export function weakestFitDims(row, n = 2) {
     .slice(0, n);
 }
 
+// --- Qualitative verdicts ------------------------------------------------
+// Translate the numeric fit/candidate breakdowns into J&J-style dimension
+// verdicts ("Excellent on job-ready skills", "Borderline on compensation").
+// Lists and review surfaces lead with these; the numeric bars stay one tap
+// away in the score modal.
+function verdictTier(pct) {
+  if (pct >= 0.7) return { word: 'Excellent',  tier: 'strong' };
+  if (pct >= 0.4) return { word: 'Solid',      tier: 'ok' };
+  return { word: 'Borderline', tier: 'weak' };
+}
+
+// Collect verdicts from both breakdowns. Major fit dims (max >= 10) plus the
+// two candidate dims a hiring manager weighs first. Ungraded recs (no
+// breakdown data at all) return [] so callers can fall back gracefully.
+export function recVerdicts(row, n = 5) {
+  if (!row) return [];
+  const out = [];
+  const fitB = row.breakdown || row.fitBreakdown || {};
+  const fitR = row.rationales || row.fitRationales || {};
+  const candB = row.candidateBreakdown || {};
+  const candR = row.candidateRationales || {};
+  const graded = Object.keys(fitB).length > 0 || Object.keys(candB).length > 0;
+  if (!graded) return [];
+  for (const k of ['skills', 'scope']) {
+    const meta = CANDIDATE_DIM_LABELS[k];
+    if (!(k in candB)) continue;
+    out.push({ key: `cand:${k}`, label: meta.label, pct: (candB[k] || 0) / meta.max, rationale: candR[k] || '' });
+  }
+  for (const [k, meta] of Object.entries(DIM_LABELS)) {
+    if (meta.max < 10) continue;
+    if (!(k in fitB)) continue;
+    out.push({ key: `fit:${k}`, label: meta.label, pct: (fitB[k] || 0) / meta.max, rationale: fitR[k] || '' });
+  }
+  // Issues first (lowest pct), then strengths — mirrors how a reviewer
+  // scans: what's the catch, then why it's still worth a look. Prefer
+  // dims that have a written rationale when trimming.
+  return out
+    .sort((a, b) => (Boolean(b.rationale) - Boolean(a.rationale)) || (a.pct - b.pct))
+    .slice(0, n)
+    .sort((a, b) => a.pct - b.pct)
+    .map(v => ({ ...v, ...verdictTier(v.pct) }));
+}
+
+// Verdict cards + hard-fail callouts for a rec. The compact variant is a
+// single-line chip row for tight surfaces.
+export function renderVerdicts(row, { compact = false } = {}) {
+  const list = recVerdicts(row);
+  const fails = row?.hardFails || [];
+  if (!list.length && !fails.length) return nothing;
+  if (compact) {
+    return html`
+      <div class="verdict-chips">
+        ${fails.map(f => html`<span class="verdict-chip verdict-chip--fail">${f}</span>`)}
+        ${list.map(v => html`<span class="verdict-chip verdict-chip--${v.tier}">${v.word} · ${v.label.toLowerCase()}</span>`)}
+      </div>
+    `;
+  }
+  return html`
+    <ul class="verdict-list">
+      ${fails.map(f => html`
+        <li class="verdict-card verdict-card--fail">
+          <p class="verdict-card__title">Doesn't clear your bar</p>
+          <p class="verdict-card__body">${f}</p>
+        </li>
+      `)}
+      ${list.map(v => html`
+        <li class="verdict-card verdict-card--${v.tier}">
+          <p class="verdict-card__title">
+            <span class="verdict-card__dot" aria-hidden="true"></span>
+            ${v.word} on ${v.label.toLowerCase()}
+          </p>
+          ${v.rationale ? html`<p class="verdict-card__body">${v.rationale}</p>` : nothing}
+        </li>
+      `)}
+    </ul>
+  `;
+}
+
 export function scoreClass(s) {
   if (s == null) return 'fit-pill fit-pill--poor';
   if (s >= 70) return 'fit-pill fit-pill--strong';

@@ -210,7 +210,11 @@ export class JobChat extends LitElement {
               aria-label=${this.open ? 'Close chat' : 'Open chat'}
               aria-expanded=${this.open ? 'true' : 'false'}
               @click=${() => this._toggle()}>
-        <span class="chat-fab__icon" aria-hidden="true">${this.open ? '×' : '✨'}</span>
+        <span class="chat-fab__icon" aria-hidden="true">${this.open ? '×' : html`
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0 0 1-3.2-.6L3 21l1.9-5.1a8 8 0 0 1-1.4-4.4A8.4 8.4 0 0 1 12 3.2a8.4 8.4 0 0 1 9 8.3z"/>
+          </svg>`}</span>
       </button>
 
       ${this.open ? html`

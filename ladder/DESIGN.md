@@ -10,7 +10,7 @@ These are the Wise rules we follow strictly. Don't break them when adding compon
 2. **Inter for body, Inter SemiBold for display.** Wise Sans is Wise's display face but it's not freely distributable; we substitute Inter SemiBold and tighten letter-spacing on titles. If we ever ship Wise Sans we drop it into `--font-display`.
 3. **4px base spacing scale.** Use `var(--space-N)` only — 1=4, 2=8, 3=12, 4=16, 5=24, 6=32, 7=48, 8=64. No magic numbers.
 4. **Generous radius.** Wise's smallest desktop radius is 16px. Cards 30px, buttons pill (`--radius-pill: 999px`). Don't use `border-radius: 4px` anywhere — looks wrong.
-5. **Forest Green and Bright Green own the brand.** Light theme: Forest Green (`#163300`) is `--accent` (interactive primary); Bright Green (`#9FE870`) is `--accent-strong` (highlighted nav, accent CTAs, active fit pills). Dark theme inverts: Forest is the base, Bright is the accent everywhere.
+5. **Forest Green and Bright Green own the brand — but only for actions.** Light theme: Forest Green (`#163300`) is `--accent` (interactive primary); Bright Green (`#9FE870`) is `--accent-strong`. Green is reserved for **the primary action on each screen** (accent CTAs, active fit pills in score modals). Active nav, tabs, and selected states are **neutral** (`--bg-overlay` + semibold), never green fills — one accented moment per screen. Red appears only on destructive/error surfaces, never in browse lists. Dark theme inverts: Forest is the base, Bright is the accent.
 6. **Token contract.** Every component reads `var(--bg)`, `var(--fg)`, `var(--accent)`, etc. Never hardcode hex values. The CTRL alternate must expose the same custom-property names.
 7. **No emoji or decorative icons unless the user adds them.**
 
@@ -29,6 +29,19 @@ These are the Wise rules we follow strictly. Don't break them when adding compon
 | `--font-size-caption` | 12 | chips, captions |
 
 Line heights: `--lh-display: 1.1`, `--lh-title: 1.25`, `--lh-body: 1.55`, `--lh-tight: 1.35`.
+
+## Core patterns (v2.15)
+
+The For You surface follows a **triage, don't browse** model (inbox → review → decide):
+
+| Pattern | Classes | Rules |
+|-|-|-|
+| Inbox groups | `.inbox`, `.inbox-group`, `.inbox-card`, `.inbox-row` | New roles batch by arrival date ("Today · 3 roles"). One elevated card per day, hairline dividers between rows. Rows show logo + full wrapped title + `company · location` and exactly one affordance: **Review**. Never put scores, accept/reject buttons, or kebab menus on inbox rows. |
+| Review overlay | `.review`, `.review__dots`, `.review__foot` | Full-screen, one role at a time, progress dots (≤12) or an "n of N" counter. Sticky footer with exactly two decisions: "Not for me" (neutral) / "Save role" (accent). Company-level actions live behind the top-bar ⋯. |
+| Verdict cards | `.verdict-card`, `.verdict-chip` | Qualitative fit first: "Excellent / Solid / Borderline on <dimension>" + one-sentence rationale, issues sorted first. Numbers stay one tap away in the score modal — numeric pills don't appear in lists. |
+| Collapsed JD | `.jd-collapse` | Raw scraped posting text is never the reading surface; it collapses behind "Original posting text". Summaries and match bullets lead. |
+| Page ⋯ menu | `.page-menu` | Operational controls (refresh sources, quality-floor toggle, expiry info) live behind one ⋯ in the page header — machinery stays out of the reading flow. Sourcing config (watched companies) lives on /ladder/vision/. |
+| Chat launcher | `.chat-fab` | Fixed 44px bubble top-right on every page (neutral surface, chat glyph). Never a floating bottom FAB over list content. |
 
 ## Cache busting
 
