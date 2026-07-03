@@ -11,7 +11,7 @@
 // POST /functions/v1/gcal-sync   (Authorization: Bearer <user JWT>)
 // Body: { action: 'connect-url' | 'exchange' | 'status' | 'settings' | 'sync' | 'disconnect', ... }
 
-const VERSION = '1.0.0'
+const VERSION = '1.0.1'
 console.log(`[gcal-sync] v${VERSION} — ctrl.events Google Calendar sync (bookmarked + agape)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -40,11 +40,13 @@ function getSupabase() {
   return createClient(url, key)
 }
 
+// Reuses the OAuth client already configured for the /calendar app
+// (same Google Cloud project; ctrl.rodeo/events/ must be an authorized redirect URI)
 function googleClientId(): string {
-  return Deno.env.get('GOOGLE_CLIENT_ID') || ''
+  return Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID') || ''
 }
 function googleClientSecret(): string {
-  return Deno.env.get('GOOGLE_CLIENT_SECRET') || ''
+  return Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET') || ''
 }
 
 // --- Auth: resolve the calling user from their JWT ---
