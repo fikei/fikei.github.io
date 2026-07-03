@@ -189,7 +189,7 @@ Explicitly **not** filters: ticket platform (attribute → outbound link icon), 
 - [x] Demotion machinery: `demoted` flag + corroboration visibility upgrades (both directions) in `cache-events` — dormant until demoted feeds are registered
 - [ ] Demoted-platform parsers (Eventbrite location search, Bandsintown) — needs new parser types
 - [x] Venue calendar Wave 2/3 backlog registered in `event_sources` (14 rows, disabled pending feed verification; enable = verify feed → set type → flip `enabled`, no deploy)
-- [ ] Wave 2 feed verification & enablement (per-venue stories)
+- [x] Wave 2/3 feed verification complete (migration 096): **enabled** Bottom of the Hill (dedicated RSS parser), Frontier Tower (Luma iCal), ATA (dedicated calendar parser, migration 095). **11 venues are JS-only** (Gray Area, The Lab, SF Symphony, Exploratorium, SFMOMA, The Chapel, Lost Church, ODC, Brick & Mortar, Rickshaw Stop; Noisebridge unstructured) — they need a headless-browser scrape path, tracked as a future epic
 - [x] Coverage metric: `agape_coverage` view (corroboration % of Agape events vs public feeds)
 - [x] Event-platform domains (Partiful, Luma, Tixr, etc.) added to `enrich-event` allowlist per §4.1
 
