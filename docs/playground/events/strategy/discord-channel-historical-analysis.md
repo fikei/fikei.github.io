@@ -156,4 +156,56 @@ grayarea.org, sfneofuturists.org, sf.funcheap.com, westcoastcraft.com, thelab.or
 
 ---
 
+## Appendix B — Breakdown by Venue & Organizer
+
+### Venues
+
+291 of 568 events name an identifiable venue; 277 are vague or venue-less ("SF", "Mission", online, or house parties with no address in the post). Variants merged (e.g. "Agape" / "Agape house").
+
+**Top venues (3+ events)**
+
+| Venue | Events | | Venue | Events |
+|---|---|---|---|---|
+| **Agape (house)** | 50 | | 1015 Folsom | 4 |
+| Public Works | 20 | | Noisebridge | 4 |
+| The Midway | 11 | | Internet Archive | 4 |
+| The Loom (Oakland) | 9 | | Dolores Park | 3 |
+| Gray Area | 6 | | Studio Collective | 3 |
+| The Great Northern | 5 | | Cow Palace | 3 |
+| F8 \| 1192 Folsom | 5 | | Stage Werx / 447 Minna | 3 |
+| Frontier Tower | 5 | | | |
+
+**2 events each:** Corona Heights, Hibernia Bank, Greek Theatre Berkeley, The Lab, SF Symphony, Exploratorium, Brick & Mortar Music Hall, Manny's, Golden Gate Park, The Foundry, The Lost Church, The Chapel, ODC, Moomin, Stanford, New Theory, Garfield Park, Studio Aurora, Fort Mason, Envelop SF, Adobe Books, Dolo, River.
+
+**1 event each (~20):** Berkeley Rep, Chapel of the Chimes, Audio SF, El Rio, UndergroundSF, Danzhaus, Monument SF, SF Conservatory of Music, Church of 8 Wheels, Bottom of the Hill, Alamo Drafthouse, Bombay Beach, Rickshaw Stop, and other one-offs.
+
+**Venue tiers for dedup:**
+- **Nightlife venues on 19hz/RA** (Public Works, The Midway, Great Northern, F8, 1015 Folsom, Audio, UndergroundSF, The Great Northern — ~50 events): high collision probability → match-and-flag, don't insert.
+- **Community/DIY spaces** (Agape, The Loom, Noisebridge, Frontier Tower, Studio Collective, Adobe Books — ~75 events): near-zero collision → insert as new.
+- **Institutional venues** (SF Symphony, Exploratorium, Gray Area, Internet Archive, theaters): occasional Luma/Eventbrite/Funcheap presence — URL match is sufficient.
+
+### Organizers
+
+The classifier resolved organizers into three buckets: **Agape house/members (273, 48%)**, **external unnamed (270, 48%)** — promoter identifiable only from flyer/link, not message text — and **named external orgs (25, 4%)**: Hoodslam (3), Public Works (3), The Loom, Moomin, ODC Dance, Internet Archive (2 each), SF Symphony, New Parish, Robot Heart, The Chapel, Endzeit, Langton Labs, Rickshaw Stop, SF Philharmonic, Enzyme SF, Four Star Theater (1 each).
+
+Because posts rarely name the promoter, the **posting member is the best organizer proxy** for house events (author ≈ host) and the curation signal for external ones:
+
+| Member | House events posted | External events shared |
+|---|---|---|
+| thatmre | 36 | 29 |
+| subfeels | 34 | 29 |
+| marrryna | 22 | 14 |
+| prime_lemur_26983 | 21 | 3 |
+| toshbeats | 20 | 17 |
+| parmigianna | 17 | — |
+| micha.online | 10 | 17 |
+| carlicita | 12 | 6 |
+| jamesjulius. | 6 | 15 |
+| yoyoyc | — | 15 |
+| kstoreyf | 7 | 14 |
+
+~15 members account for the large majority of all event posts. For the integration, storing `posted_by` per event enables both organizer attribution for house events and a per-member taste signal ("recommended by") later.
+
+---
+
 *Raw data: full export + per-message classifications live in session scratchpad (`all_messages.json`, `events_classified_all.json`); regenerate anytime via the `export` action.*
