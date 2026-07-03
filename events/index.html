@@ -353,6 +353,27 @@ body {
 .data-table .col-promoter { display: none; }
 .data-table .col-source { width: 90px; }
 .data-table .col-source .token--source + .token--source { margin-left: 3px; }
+.data-table .col-bm { width: 28px; padding-left: var(--space-2); padding-right: 0; }
+
+/* Bookmark ("interested") toggle */
+.bm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+  transition: color var(--duration-fast) ease;
+}
+.bm-btn:hover { color: var(--fg); }
+.bm-btn svg { fill: none; stroke: currentColor; }
+.bm-btn--on { color: var(--fg); }
+.bm-btn--on svg { fill: currentColor; }
 
 /* Source token — color-coded, clickable */
 .token--source {
@@ -1261,12 +1282,13 @@ body {
   .data-table tbody tr {
     grid-template-columns: auto 1fr auto auto;
     grid-template-areas:
-      "date date date date"
+      "date date date bm"
       "time time ages price"
       "name name name name"
       "venue venue venue venue"
       "genre genre genre source";
   }
+  .data-table .col-bm { grid-area: bm; width: auto; padding: 0; text-align: right; }
   .data-table .col-date { grid-area: date; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); }
   .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg); }
   .col-time .mobile-date-range { display: inline; }
@@ -1464,6 +1486,10 @@ body {
       <div class="sources-bar__chips" id="sourceChips"></div>
       <button class="btn btn--sm btn--ghost" id="forceRefreshBtn" title="Force refresh all sources (Shift+R)" style="padding:4px 6px;font-size:14px;line-height:1;opacity:0.5;min-width:0;" onclick="window.__forceRefreshSources && window.__forceRefreshSources()">⟳</button>
       <button class="btn btn--sm btn--dashed" id="addSourceBtn">Manage Sources</button>
+      <button class="btn btn--sm btn--ghost" id="calSyncBtn" title="Sync interested + Agape events to Google Calendar">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Calendar
+      </button>
       <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
         Filter
@@ -1482,6 +1508,7 @@ body {
       <input type="date" class="input input--date" id="filterDateFrom" title="From date">
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
       <button class="btn btn--sm btn--ghost" id="filterAgape" title="Only events recommended in the Agape #events channel">★ Agape</button>
+      <button class="btn btn--sm btn--ghost" id="filterInterested" title="Only events you bookmarked as interested">🔖 Interested</button>
       <button class="btn btn--sm btn--ghost" id="filterPast" title="Include past events (last 60 days)">Past events</button>
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
     </div>
@@ -1524,6 +1551,7 @@ body {
       <table class="data-table" id="eventsTable">
         <thead>
           <tr>
+            <th class="col-bm" title="Interested"></th>
             <th class="col-date" data-sort="date">Date <span class="data-table__sort">&#9650;</span></th>
             <th class="col-time" data-sort="time">Time <span class="data-table__sort">&#9650;</span></th>
             <th class="col-name" data-sort="name">Event <span class="data-table__sort">&#9650;</span></th>
@@ -1747,6 +1775,22 @@ body {
     </div>
   </div>
 
+  <!-- Google Calendar Sync modal -->
+  <div class="modal" id="calSyncModal">
+    <div class="modal__content">
+      <h2 class="modal__title">Google Calendar Sync</h2>
+      <p style="font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-4);">
+        Mirror events into a dedicated <strong>ctrl.events</strong> Google calendar.
+        <span style="color: hsl(200, 60%, 55%);">■</span> Interested (bookmarked) &nbsp;
+        <span style="color: hsl(270, 45%, 60%);">■</span> Agape recommended
+      </p>
+      <div id="calSyncBody"></div>
+      <div class="modal__actions">
+        <button class="btn" id="calSyncClose">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase JS + Shared Auth Module -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="/auth/ctrl-auth.js"></script>
@@ -1759,8 +1803,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.15.0';
-  console.log(`[events] v${VERSION} - Agape recommended + past-events filters; Agape curation source; eventbrite-org stock sources`);
+  const VERSION = '1.16.0';
+  console.log(`[events] v${VERSION} - Interested bookmarks + Google Calendar sync (ctrl.events, bookmarked/agape color-coded)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1882,6 +1926,8 @@ body {
     updateDebugLogVisibility();
     if (wasLoggedOut) {
       log('Logged in as ' + (currentUser.email || 'user'));
+      loadBookmarks();
+      loadCalendarSyncState();
       const cloudLoaded = await loadSourcesCloud();
       if (cloudLoaded) {
         log('Cloud sync: restored sources after login');
@@ -1899,6 +1945,9 @@ body {
   document.addEventListener('ctrl:auth:signedout', () => {
     currentUser = null;
     updateDebugLogVisibility();
+    state.bookmarks = new Map();
+    resetCalendarSyncState();
+    render();
     log('Logged out');
   });
 
@@ -1914,8 +1963,9 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, showPast: false },
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false },
     sort: { key: 'date', dir: 'asc' },
+    bookmarks: new Map(),  // eventKey -> { id, gcal_event_id } (user_event_bookmarks rows)
     view: 'table',
     calMonth: new Date().getMonth(),
     calYear: new Date().getFullYear(),
@@ -2086,6 +2136,243 @@ body {
       log(`Cloud sync: loaded ${cloudSources.length} sources for ${currentUser.email}`);
       return true;
     } catch (e) { log('Cloud sync load failed: ' + e.message); return false; }
+  }
+
+  // --- Bookmarks ("interested" flag, Supabase user_event_bookmarks) ---
+  function eventKeyFor(ev) {
+    return ev.key || (ev.source + '|' + ev.url);
+  }
+
+  function isAgapeEvent(ev) {
+    return (ev.recommendedBy && ev.recommendedBy.includes('agape')) ||
+           (ev.sources && ev.sources.includes('discord-agape-events')) ||
+           ev.source === 'discord-agape-events';
+  }
+
+  async function loadBookmarks() {
+    if (!supabaseClient || !currentUser) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_event_bookmarks')
+        .select('id, event_key')
+        .eq('user_id', currentUser.id);
+      if (error) { log('Bookmarks load error: ' + error.message); return; }
+      state.bookmarks = new Map((data || []).map(r => [r.event_key, r]));
+      log(`Bookmarks loaded: ${state.bookmarks.size}`);
+      render();
+    } catch (e) { log('Bookmarks load failed: ' + e.message); }
+  }
+
+  async function toggleBookmark(key) {
+    if (!currentUser) {
+      // Bookmarking is an authenticated feature — route to sign-in
+      CtrlAuth.openLoginModal();
+      return;
+    }
+    const existing = state.bookmarks.get(key);
+    if (existing) {
+      state.bookmarks.delete(key);
+      render();
+      const { error } = await supabaseClient
+        .from('user_event_bookmarks')
+        .delete()
+        .eq('id', existing.id);
+      if (error) { log('Bookmark remove error: ' + error.message); state.bookmarks.set(key, existing); render(); }
+      else { log('Bookmark removed: ' + key); scheduleCalendarSync(); }
+    } else {
+      const ev = state.events.find(e => eventKeyFor(e) === key);
+      if (!ev) return;
+      // Optimistic UI; reconcile with the returned row id
+      state.bookmarks.set(key, { id: null });
+      render();
+      const snapshot = {
+        name: ev.name, date: ev.date, endDate: ev.endDate || null, time: ev.time || '',
+        venue: ev.venue || '', address: ev.address || '', city: ev.city || '',
+        url: ev.url || '', source: ev.source, contentType: ev.contentType || '',
+        description: ev.description || '', agape: isAgapeEvent(ev),
+      };
+      const { data, error } = await supabaseClient
+        .from('user_event_bookmarks')
+        .upsert({ user_id: currentUser.id, event_key: key, event: snapshot }, { onConflict: 'user_id,event_key' })
+        .select('id, event_key')
+        .single();
+      if (error || !data) { log('Bookmark save error: ' + (error?.message || 'no row')); state.bookmarks.delete(key); render(); }
+      else { state.bookmarks.set(key, data); log('Bookmark saved: ' + key); scheduleCalendarSync(); }
+    }
+  }
+
+  // --- Google Calendar Sync (ctrl.events calendar via gcal-sync edge function) ---
+  const GCAL_STATE_KEY = 'ctrl-rodeo-gcal-oauth-state';
+  const calSync = { loaded: false, connected: false, syncEnabled: false, syncBookmarked: true, syncAgape: true, lastSyncedAt: null, busy: false, statusMsg: '' };
+
+  function regionTimezone() {
+    const region = localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area';
+    return { 'new-york': 'America/New_York' }[region] || 'America/Los_Angeles';
+  }
+
+  async function gcalSyncCall(action, payload = {}) {
+    const token = getAccessToken();
+    if (!token) throw new Error('Sign in first');
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/gcal-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `gcal-sync ${res.status}`);
+    return data;
+  }
+
+  function applyCalSyncStatus(data) {
+    calSync.loaded = true;
+    calSync.connected = !!data.connected;
+    calSync.syncEnabled = !!data.syncEnabled;
+    calSync.syncBookmarked = data.syncBookmarked !== false;
+    calSync.syncAgape = data.syncAgape !== false;
+    calSync.lastSyncedAt = data.lastSyncedAt || null;
+    if (data.result) {
+      const r = data.result;
+      calSync.statusMsg = `Synced: ${r.pushed} added, ${r.updated} updated, ${r.deleted} removed` + (r.errors ? `, ${r.errors} errors` : '');
+    }
+  }
+
+  async function loadCalendarSyncState() {
+    if (!currentUser) return;
+    try {
+      applyCalSyncStatus(await gcalSyncCall('status'));
+      renderCalSyncModal();
+    } catch (e) { log('Calendar sync status failed: ' + e.message); }
+  }
+
+  function resetCalendarSyncState() {
+    calSync.loaded = false; calSync.connected = false; calSync.syncEnabled = false;
+    calSync.lastSyncedAt = null; calSync.statusMsg = '';
+  }
+
+  // Debounced background sync after bookmark changes
+  let _calSyncDebounce = null;
+  function scheduleCalendarSync() {
+    if (!currentUser || !calSync.connected || !calSync.syncEnabled) return;
+    clearTimeout(_calSyncDebounce);
+    _calSyncDebounce = setTimeout(async () => {
+      try {
+        const data = await gcalSyncCall('sync');
+        applyCalSyncStatus(data);
+        log('Calendar sync: ' + (calSync.statusMsg || 'ok'));
+        renderCalSyncModal();
+      } catch (e) { log('Calendar sync failed: ' + e.message); }
+    }, 3000);
+  }
+
+  async function startGoogleConnect() {
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(GCAL_STATE_KEY, nonce);
+    const redirectUri = window.location.origin + '/events/';
+    const { url } = await gcalSyncCall('connect-url', { redirectUri, state: nonce });
+    window.location.href = url;
+  }
+
+  // Handle the OAuth redirect back from Google (?code=...&state=...)
+  async function handleGoogleCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const stateParam = params.get('state');
+    if (!code || !stateParam) return;
+    const expected = localStorage.getItem(GCAL_STATE_KEY);
+    history.replaceState(null, '', window.location.pathname); // clean URL either way
+    if (!expected || stateParam !== expected) { log('Google callback: state mismatch, ignoring'); return; }
+    localStorage.removeItem(GCAL_STATE_KEY);
+    if (!currentUser) { log('Google callback: not signed in, ignoring'); return; }
+    openCalSyncModal();
+    setCalSyncBodyMsg('Connecting Google Calendar…');
+    try {
+      const data = await gcalSyncCall('exchange', { code, redirectUri: window.location.origin + '/events/', timezone: regionTimezone() });
+      applyCalSyncStatus(data);
+      if (!calSync.statusMsg) calSync.statusMsg = 'Connected.';
+      log('Google Calendar connected');
+    } catch (e) {
+      calSync.statusMsg = 'Connection failed: ' + e.message;
+      log('Google Calendar connect failed: ' + e.message);
+    }
+    renderCalSyncModal();
+  }
+
+  function openCalSyncModal() {
+    document.getElementById('calSyncModal').classList.add('modal--visible');
+    renderCalSyncModal();
+    if (currentUser && !calSync.loaded) loadCalendarSyncState();
+  }
+
+  function setCalSyncBodyMsg(msg) {
+    document.getElementById('calSyncBody').innerHTML =
+      `<p style="font-size: var(--text-xs); color: var(--fg-muted);">${escHtml(msg)}</p>`;
+  }
+
+  function renderCalSyncModal() {
+    const body = document.getElementById('calSyncBody');
+    if (!body) return;
+
+    if (!currentUser) {
+      body.innerHTML = `
+        <p style="font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-3);">Sign in to sync events to Google Calendar.</p>
+        <button class="btn btn--filled" onclick="document.getElementById('calSyncModal').classList.remove('modal--visible'); CtrlAuth.openLoginModal()">Sign in</button>`;
+      return;
+    }
+
+    if (!calSync.connected) {
+      body.innerHTML = `
+        <p style="font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-3);">Connect your Google account to create the ctrl.events calendar.</p>
+        <button class="btn btn--filled" id="calSyncConnect">Connect Google Calendar</button>
+        ${calSync.statusMsg ? `<p style="font-size: var(--text-2xs); color: var(--fg-subtle); margin-top: var(--space-2);">${escHtml(calSync.statusMsg)}</p>` : ''}`;
+      document.getElementById('calSyncConnect')?.addEventListener('click', async () => {
+        setCalSyncBodyMsg('Redirecting to Google…');
+        try { await startGoogleConnect(); }
+        catch (e) { calSync.statusMsg = 'Could not start connection: ' + e.message; renderCalSyncModal(); }
+      });
+      return;
+    }
+
+    const lastSynced = calSync.lastSyncedAt ? new Date(calSync.lastSyncedAt).toLocaleString() : 'never';
+    const cb = (id, checked, label, hint) => `
+      <label style="display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; margin-bottom: var(--space-2); font-size: var(--text-xs);">
+        <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} ${calSync.busy ? 'disabled' : ''} style="margin-top: 2px;">
+        <span>${label}<br><span style="color: var(--fg-subtle); font-size: var(--text-2xs);">${hint}</span></span>
+      </label>`;
+    body.innerHTML = `
+      ${cb('calSyncEnabled', calSync.syncEnabled, '<strong>Sync to Google Calendar</strong>', 'Keeps the ctrl.events calendar up to date')}
+      <div style="margin: var(--space-2) 0 var(--space-3) var(--space-5); ${calSync.syncEnabled ? '' : 'opacity: 0.45; pointer-events: none;'}">
+        ${cb('calSyncBookmarked', calSync.syncBookmarked, 'Interested events', 'Events you bookmark — blue')}
+        ${cb('calSyncAgape', calSync.syncAgape, 'Agape recommended', 'Community picks from the Agape #events channel — purple')}
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--space-3);">
+        <button class="btn btn--sm btn--ghost" id="calSyncNow" ${calSync.busy || !calSync.syncEnabled ? 'disabled' : ''}>Sync now</button>
+        <span style="font-size: var(--text-2xs); color: var(--fg-subtle);">Last synced: ${escHtml(lastSynced)}</span>
+      </div>
+      ${calSync.statusMsg ? `<p style="font-size: var(--text-2xs); color: var(--fg-subtle); margin-top: var(--space-2);">${escHtml(calSync.statusMsg)}</p>` : ''}
+      <p style="margin-top: var(--space-4);"><a href="#" id="calSyncDisconnect" style="font-size: var(--text-2xs); color: var(--fg-subtle);">Disconnect Google Calendar</a></p>`;
+
+    const applySettings = async (payload) => {
+      calSync.busy = true; renderCalSyncModal();
+      try { applyCalSyncStatus(await gcalSyncCall('settings', payload)); }
+      catch (e) { calSync.statusMsg = 'Error: ' + e.message; }
+      calSync.busy = false; renderCalSyncModal();
+    };
+    document.getElementById('calSyncEnabled')?.addEventListener('change', (e) => applySettings({ syncEnabled: e.target.checked }));
+    document.getElementById('calSyncBookmarked')?.addEventListener('change', (e) => applySettings({ syncBookmarked: e.target.checked }));
+    document.getElementById('calSyncAgape')?.addEventListener('change', (e) => applySettings({ syncAgape: e.target.checked }));
+    document.getElementById('calSyncNow')?.addEventListener('click', async () => {
+      calSync.busy = true; calSync.statusMsg = 'Syncing…'; renderCalSyncModal();
+      try { applyCalSyncStatus(await gcalSyncCall('sync')); }
+      catch (e) { calSync.statusMsg = 'Sync failed: ' + e.message; }
+      calSync.busy = false; renderCalSyncModal();
+    });
+    document.getElementById('calSyncDisconnect')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (!confirm('Disconnect Google Calendar? The ctrl.events calendar stays in Google, but syncing stops.')) return;
+      try { applyCalSyncStatus(await gcalSyncCall('disconnect')); calSync.statusMsg = 'Disconnected.'; }
+      catch (err) { calSync.statusMsg = 'Error: ' + err.message; }
+      renderCalSyncModal();
+    });
   }
 
   // Get category for a source
@@ -2281,6 +2568,7 @@ body {
       for (const row of data) {
         const key = row.canonical_key || row.event_key || (row.source_id + '|' + row.url);
         const ev = {
+          key,
           date: row.date, time: row.time || '', name: row.name, venue: row.venue,
           address: row.address || '', city: row.city || '', genre: row.genre || '',
           price: row.price || '', ages: row.ages || '', promoter: row.promoter || '',
@@ -2666,7 +2954,13 @@ body {
       const priceData = formatPriceDisplay(ev.price);
       const priceTitle = priceData.full ? ` title="${escHtml(priceData.full)}"` : '';
       const thumbHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="event-thumb" alt="" loading="lazy">` : '';
+      const bmKey = eventKeyFor(ev);
+      const isBm = state.bookmarks.has(bmKey);
+      const bmCell = `<td class="col-bm"><button class="bm-btn${isBm ? ' bm-btn--on' : ''}" data-bm-key="${encodeURIComponent(bmKey)}" aria-pressed="${isBm}" title="${isBm ? 'Interested — click to remove' : 'Mark as interested'}">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button></td>`;
       return `<tr>
+        ${bmCell}
         <td class="col-date">${dateDisplay}</td>
         <td class="col-time"${timeTip}>${timeDisplay}${mobileRangeHtml}</td>
         <td class="col-name">${thumbHtml}${nameCell}</td>
@@ -2692,7 +2986,7 @@ body {
         lastDate = ev.date;
         const d = new Date(ev.date + 'T00:00:00');
         const label = isNaN(d) ? ev.date : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        html += `<tr class="date-group"><td colspan="10" class="date-group__label">${escHtml(label)}</td></tr>`;
+        html += `<tr class="date-group"><td colspan="11" class="date-group__label">${escHtml(label)}</td></tr>`;
       }
       html += rowHtml(ev);
     }
@@ -3141,7 +3435,13 @@ body {
   // --- Filtering ---
   function updateFilterChips() {
     const agapeBtn = document.getElementById('filterAgape');
+    const interestedBtn = document.getElementById('filterInterested');
     const pastBtn = document.getElementById('filterPast');
+    if (interestedBtn) {
+      interestedBtn.style.background = state.filters.interested ? 'var(--fg)' : '';
+      interestedBtn.style.color = state.filters.interested ? 'var(--bg)' : '';
+      interestedBtn.setAttribute('aria-pressed', String(!!state.filters.interested));
+    }
     if (agapeBtn) {
       agapeBtn.style.background = state.filters.agape ? 'var(--fg)' : '';
       agapeBtn.style.color = state.filters.agape ? 'var(--bg)' : '';
@@ -3156,8 +3456,9 @@ body {
 
   function getFilteredEvents() {
     return state.events.filter(ev => {
-      const { search, city, source, dateFrom, dateTo, category, contentType, agape } = state.filters;
+      const { search, city, source, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
       if (agape && !((ev.recommendedBy && ev.recommendedBy.includes('agape')) || (ev.sources && ev.sources.includes('discord-agape-events')))) return false;
+      if (interested && !state.bookmarks.has(eventKeyFor(ev))) return false;
       if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
       if (city && ev.city !== city) return false;
       if (source && ev.source !== source && !(ev.sources && ev.sources.includes(source))) return false;
@@ -3173,7 +3474,7 @@ body {
 
   function clearAllFilters() {
     const hadPast = state.filters.showPast;
-    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, showPast: false };
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false };
     updateFilterChips();
     if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
@@ -3527,6 +3828,12 @@ body {
       updateFilterChips();
       render();
     });
+    document.getElementById('filterInterested').addEventListener('click', () => {
+      if (!currentUser && !state.filters.interested) { CtrlAuth.openLoginModal(); return; }
+      state.filters.interested = !state.filters.interested;
+      updateFilterChips();
+      render();
+    });
     document.getElementById('filterPast').addEventListener('click', () => {
       state.filters.showPast = !state.filters.showPast;
       updateFilterChips();
@@ -3538,6 +3845,20 @@ body {
       filterToggleBtn.classList.remove('active');
     });
     document.getElementById('emptyClear').addEventListener('click', clearAllFilters);
+
+    // Bookmark ("interested") toggle
+    document.getElementById('eventsBody').addEventListener('click', (e) => {
+      const btn = e.target.closest('.bm-btn');
+      if (!btn) return;
+      e.preventDefault();
+      toggleBookmark(decodeURIComponent(btn.dataset.bmKey));
+    });
+
+    // Calendar sync modal
+    document.getElementById('calSyncBtn').addEventListener('click', openCalSyncModal);
+    document.getElementById('calSyncClose').addEventListener('click', () => {
+      document.getElementById('calSyncModal').classList.remove('modal--visible');
+    });
 
     // Mobile cards: the whole card is the tap target, not just the title link
     document.getElementById('eventsBody').addEventListener('click', (e) => {
@@ -4156,7 +4477,7 @@ body {
           '<div class="rec-signin-prompt">' +
             '<p class="rec-signin-prompt__text">Sign in to get personalized event recommendations based on your Boards.</p>' +
             '<p class="rec-signin-prompt__how">Recommendations analyze your saved links — artists, genres, categories, and keywords — then use AI to match upcoming events to your taste profile.</p>' +
-            '<button class="rec-signin-prompt__btn" onclick="document.getElementById(\'authLoginBtn\').click()">Sign in</button>' +
+            '<button class="rec-signin-prompt__btn" onclick="CtrlAuth.openLoginModal()">Sign in</button>' +
           '</div>';
         section.style.display = '';
         return;
@@ -4290,7 +4611,12 @@ body {
     if (currentUser && supabaseClient) {
       const cloudLoaded = await loadSourcesCloud();
       if (cloudLoaded) log('Init: using cloud sources');
+      loadBookmarks();
+      loadCalendarSyncState();
     }
+
+    // Returning from Google OAuth consent (?code=&state=)
+    handleGoogleCallback().catch(e => log('Google callback error: ' + e.message));
 
     if (!state.onboarded && state.sources.length === 0) {
       showOnboarding();
