@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.14.2";
-console.log(`[ladder] v${VERSION} - For You rail badge counts the floored view`);
+const VERSION = "2.15.0";
+console.log(`[ladder] v${VERSION} - For You inbox + review flow; qualitative verdicts; machinery moved to Search plan`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -38,12 +38,14 @@ if (location.pathname.startsWith('/ladder/jobs/drill')) {
   }
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
-  import('./components/ladder-watched-companies.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
   import('./components/ladder-pipeline.js' + V);
 }
 if (location.pathname.startsWith('/ladder/vision')) {
   import('./components/ladder-vision.js' + V);
+  // Watched companies — sourcing config lives with the rest of the search
+  // plan, not in the For You reading flow.
+  import('./components/ladder-watched-companies.js' + V);
 }
 if (location.pathname.startsWith('/ladder/onboarding')) {
   import('./components/ladder-onboarding.js' + V);

@@ -8,7 +8,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderFitCardBody, renderCandidateCardBody, scoreClass, weakestFitDims }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal, weakestFitDims }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -31,6 +31,7 @@ export class LadderRecDetail extends LitElement {
     rec:    { state: true },
     saving: { state: true },
     dismissed: { state: true },
+    scoreOpen: { state: true },
   };
 
   constructor() {
@@ -40,6 +41,7 @@ export class LadderRecDetail extends LitElement {
     this.rec = null;
     this.saving = false;
     this.dismissed = false;
+    this.scoreOpen = null;
     const params = new URLSearchParams(location.search);
     this.recId = params.get('rec') || '';
     this.slug = (params.get('slug') || '').toLowerCase();
@@ -136,7 +138,7 @@ export class LadderRecDetail extends LitElement {
     const weak = weakestFitDims(rec);
     return html`
       <aside class="rec-detail__wildcard">
-        <strong>🃏 Wildcard</strong> — you'd likely be a standout candidate
+        <strong>Wildcard</strong> — you'd likely be a standout candidate
         (strength ${rec.candidateScore}), but it scores low on your stated
         criteria (fit ${rec.fitScore}).
         <ul>
@@ -180,10 +182,6 @@ export class LadderRecDetail extends LitElement {
               ${rec.enrichmentStatus === 'unresolved' ? html` · <span class="enrichment-badge">verifying source</span>` : nothing}
             </p>
           </div>
-          <div class="rec-detail__scores">
-            <span class=${scoreClass(rec.fitScore)} title="Fit score">${rec.fitScore ?? '—'}</span>
-            <span class=${scoreClass(rec.candidateScore)} title="Candidate strength">${rec.candidateScore ?? '—'}</span>
-          </div>
         </header>
 
         <div class="rec-detail__actions">
@@ -210,23 +208,25 @@ export class LadderRecDetail extends LitElement {
           </article>
         ` : nothing}
 
-        <div class="rec-detail__cards">
-          <article class="role-card role-card--fit fit-modal">
-            <header class="role-card__head"><h3>Fit</h3></header>
-            ${renderFitCardBody(rec, { summary: rec.fitSummary || null })}
-          </article>
-          <article class="role-card role-card--fit fit-modal">
-            <header class="role-card__head"><h3>Candidate strength</h3></header>
-            ${renderCandidateCardBody(rec, { summary: rec.candidateSummary || null })}
-          </article>
-        </div>
+        <article class="role-card">
+          <header class="role-card__head"><h3>How it stacks up</h3></header>
+          ${rec.fitSummary ? html`<p class="rec-detail__summary">${rec.fitSummary}</p>` : nothing}
+          ${renderVerdicts(rec)}
+          <p class="review__numbers muted">
+            <button class="link-subtle" @click=${() => { this.scoreOpen = 'fit'; }}>Fit ${rec.fitScore ?? '—'}</button>
+            ·
+            <button class="link-subtle" @click=${() => { this.scoreOpen = 'candidate'; }}>Strength ${rec.candidateScore ?? '—'}</button>
+            — tap for the full breakdown
+          </p>
+        </article>
 
         ${rec.description ? html`
-          <article class="role-card">
-            <header class="role-card__head"><h3>Job description</h3></header>
-            <div class="kb-doc rec-detail__jd">${unsafeHTML(renderMarkdown(rec.description))}</div>
-          </article>
+          <details class="jd-collapse">
+            <summary>Original posting text</summary>
+            <div class="kb-doc jd-collapse__body">${unsafeHTML(renderMarkdown(rec.description))}</div>
+          </details>
         ` : nothing}
+        ${this.scoreOpen ? renderScoreModal({ ...rec, score: rec.fitScore }, () => { this.scoreOpen = null; }, this.scoreOpen) : nothing}
       </div>
     `;
   }

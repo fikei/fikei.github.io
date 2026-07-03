@@ -79,7 +79,7 @@ export class JobHome extends LitElement {
           <span class="home-rec__title">${rec.title || 'Untitled role'}</span>
           <span class="home-rec__sub">${rec.company || ''}${rec.location ? ` · ${rec.location}` : ''}</span>
         </div>
-        <span class="home-rec__fit">${Number.isFinite(rec.fit) ? rec.fit : ''}</span>
+        <span class="home-rec__arrow" aria-hidden="true">→</span>
       </a>
     `;
   }
