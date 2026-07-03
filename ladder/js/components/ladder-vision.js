@@ -93,6 +93,8 @@ export class JobVision extends LitElement {
     if (id) url.searchParams.set('section', id);
     else url.searchParams.delete('section');
     history.replaceState(null, '', url.pathname + url.search);
+    // Keep the rail's Search-plan sub-nav in sync with in-page tab clicks.
+    document.dispatchEvent(new CustomEvent('job:vision:section', { detail: { section: id } }));
   }
 
   connectedCallback() {

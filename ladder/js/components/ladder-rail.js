@@ -57,7 +57,21 @@ const ROUTES = [
     ],
   },
   { href: '/ladder/history/',  label: 'Profile',     icon: 'profile',  match: /^\/ladder\/history\/?/ },
-  { href: '/ladder/vision/',   label: 'Search plan', icon: 'plan',     match: /^\/ladder\/vision\/?/ },
+  {
+    href: '/ladder/vision/',
+    label: 'Search plan',
+    icon: 'plan',
+    match: /^\/ladder\/vision\/?/,
+    // ?section= sub-pages (see TABS in ladder-vision.js). `section: null`
+    // is the summary landing.
+    sub: [
+      { href: '/ladder/vision/',                 label: 'Overview', section: null },
+      { href: '/ladder/vision/?section=targets', label: 'Targets',  section: 'targets' },
+      { href: '/ladder/vision/?section=signals', label: 'Signals',  section: 'signals' },
+      { href: '/ladder/vision/?section=rules',   label: 'Rules',    section: 'rules' },
+      { href: '/ladder/vision/?section=sources', label: 'Sources',  section: 'sources' },
+    ],
+  },
   { href: '/ladder/settings/', label: 'Settings',    icon: 'settings', match: /^\/ladder\/settings\/?/ }
 ];
 
@@ -75,9 +89,11 @@ export class JobRail extends LitElement {
     super();
     this.path = location.pathname;
     this.bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
+    this.sectionParam = new URLSearchParams(location.search).get('section') || null;
     this.counts = null;
     this.email = window.CtrlAuth?.getUser?.()?.email || '';
     this._onBucket = (e) => { this.bucket = e.detail.bucket; };
+    this._onSection = (e) => { this.sectionParam = e.detail.section; this.requestUpdate(); };
     this._onAuth = (e) => {
       this.email = e?.detail?.email || window.CtrlAuth?.getUser?.()?.email || this.email;
       this._loadCounts();
@@ -88,6 +104,7 @@ export class JobRail extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('job:jobs:bucket', this._onBucket);
+    document.addEventListener('job:vision:section', this._onSection);
     document.addEventListener('ctrl:auth:signedin', this._onAuth);
     document.addEventListener('job:auth:ready', this._onAuth);
     // Other components emit this after they add/dismiss a role; refresh
@@ -97,6 +114,7 @@ export class JobRail extends LitElement {
   }
   disconnectedCallback() {
     document.removeEventListener('job:jobs:bucket', this._onBucket);
+    document.removeEventListener('job:vision:section', this._onSection);
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('job:pipeline:refresh', this._onRefresh);
@@ -174,7 +192,10 @@ export class JobRail extends LitElement {
                   ${active && r.sub ? html`
                     <ul class="nav-sublist">
                       ${r.sub.map(s => {
-                        const subActive = this.bucket === s.bucket;
+                        // bucket-based (Jobs) or section-based (Search plan)
+                        const subActive = 'section' in s
+                          ? this.sectionParam === s.section
+                          : this.bucket === s.bucket;
                         return html`
                           <li>
                             <a href=${s.href} aria-current=${subActive ? 'page' : 'false'}>
