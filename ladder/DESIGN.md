@@ -9,26 +9,40 @@ These are the Wise rules we follow strictly. Don't break them when adding compon
 1. **Sentence case only.** Never `text-transform: uppercase`. No tracked all-caps labels. Headings, button labels, navigation, table headers — all sentence case.
 2. **Inter for body, Inter SemiBold for display.** Wise Sans is Wise's display face but it's not freely distributable; we substitute Inter SemiBold and tighten letter-spacing on titles. If we ever ship Wise Sans we drop it into `--font-display`.
 3. **4px base spacing scale.** Use `var(--space-N)` only — 1=4, 2=8, 3=12, 4=16, 5=24, 6=32, 7=48, 8=64. No magic numbers.
-4. **Generous radius.** Wise's smallest desktop radius is 16px. Cards 30px, buttons pill (`--radius-pill: 999px`). Don't use `border-radius: 4px` anywhere — looks wrong.
+4. **Generous radius, two button shapes.** Smallest radius 16px; cards 20px (`--radius-lg`). Decision CTAs (`.btn--primary`, `.btn--accent`, review footer) are pills; every other button is a 16px rounded-rect. Circular (`--radius-pill`) is otherwise reserved for `.icon-btn` and chips. Don't use `border-radius: 4px` anywhere — looks wrong.
 5. **Forest Green and Bright Green own the brand — but only for actions.** Light theme: Forest Green (`#163300`) is `--accent` (interactive primary); Bright Green (`#9FE870`) is `--accent-strong`. Green is reserved for **the primary action on each screen** (accent CTAs, active fit pills in score modals). Active nav, tabs, and selected states are **neutral** (`--bg-overlay` + semibold), never green fills — one accented moment per screen. Red appears only on destructive/error surfaces, never in browse lists. Dark theme inverts: Forest is the base, Bright is the accent.
 6. **Token contract.** Every component reads `var(--bg)`, `var(--fg)`, `var(--accent)`, etc. Never hardcode hex values. The CTRL alternate must expose the same custom-property names.
-7. **No emoji or decorative icons unless the user adds them.**
+7. **No emoji or decorative icons unless the user adds them — with one scoped exception:** inline SVG line icons are permitted in **primary navigation only** (rail + mobile drawer; see `NAV_ICONS` in `ladder-rail.js`). Never in content, cards, lists, or buttons.
 
 ## Type scale (px)
 
 | Token | Size | Use |
 |-|-|-|
 | `--font-size-display` | 56 | landing headlines (none in /ladder yet) |
-| `--font-size-title-1` | 36 | page H1 |
-| `--font-size-title-2` | 28 | section H2, card titles |
+| `--font-size-title-1` | 28 | page H1 (bold, -0.02em) |
+| `--font-size-title-2` | 22 | section H2, card titles |
 | `--font-size-title-3` | 22 | sub-section H3 |
 | `--font-size-title-4` | 18 | small heading / strong label |
 | `--font-size-body-lg` | 18 | KB document body, lede |
 | `--font-size-body` | 16 | default body |
-| `--font-size-small` | 14 | meta, table cells |
+| `--font-size-small` | 15 | meta, table cells |
 | `--font-size-caption` | 12 | chips, captions |
 
 Line heights: `--lh-display: 1.1`, `--lh-title: 1.25`, `--lh-body: 1.55`, `--lh-tight: 1.35`.
+Weights: `--fw-medium: 500`, `--fw-semibold: 600`, `--fw-bold: 700` (page H1s + inbox group headers are bold).
+Light surfaces are warm-neutral: `--bg #FAFAF9`, `--bg-surface #F4F4F2` — no green tint; color comes from content and the single accent.
+
+## Naming (v2.17)
+
+Nav labels are one-word nouns in sentence case; URLs and DB status values never change when labels do.
+
+| Surface | Name | Notes |
+|-|-|-|
+| /ladder/jobs/recommended/ | **Inbox** | Top-level nav item (the daily loop), not under Jobs. Formerly "For You". |
+| /ladder/jobs/ buckets | **Saved · In progress · Archive** | Display labels; DB status values stay `Saved/Active/Archive` (`STATUS_LABELS` in ladder-pipeline.js). |
+| /ladder/history/ | **Profile** | Formerly "Your career". |
+| /ladder/vision/ | **Search plan** | Subpages: Targets · Signals · Rules · Sources. |
+| Page titles | `<Page> — Ladder` | No slash-prefix branding anywhere ("Ask Ladder", gate says "Ladder"). |
 
 ## Core patterns (v2.15)
 

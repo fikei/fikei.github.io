@@ -1,4 +1,4 @@
-// ladder-recommendations-table — the For You inbox at /ladder/jobs/recommended/.
+// ladder-recommendations-table — the Inbox at /ladder/jobs/recommended/.
 // New roles arrive in small date-stamped batches (Today / Yesterday / Jun 12),
 // one "Review" affordance per row, and every decision happens inside the
 // full-screen <ladder-review-overlay> — no inline accept/reject, no numeric
@@ -338,7 +338,7 @@ export class JobRecommendationsTable extends LitElement {
     try {
       await watchCompany({ company });
       document.dispatchEvent(new CustomEvent('job:watch:added', { detail: { company } }));
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds For You now` } }));
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds your Inbox now` } }));
     } catch (e) {
       document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: e.message || `Couldn't watch ${company}` } }));
       console.warn('[recs-table] watchCompany failed', e);
@@ -549,7 +549,7 @@ export class JobRecommendationsTable extends LitElement {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
         <header class="recs-page__head">
-          <h1>For You</h1>
+          <h1>Inbox</h1>
         </header>
         <section class="inbox-group" aria-hidden="true">
           <header class="inbox-group__head">
@@ -578,7 +578,7 @@ export class JobRecommendationsTable extends LitElement {
     const rows = this._sorted();
     return html`
       <header class="recs-page__head">
-        <h1>For You</h1>
+        <h1>Inbox</h1>
         <span class="muted">${this._total > rows.length
           ? `${rows.length} of ${this._total} roles`
           : `${rows.length} ${rows.length === 1 ? 'role' : 'roles'}`}</span>

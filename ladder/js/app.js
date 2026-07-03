@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.16.0";
-console.log(`[ladder] v${VERSION} - header score pills + company description on review/detail; inbox max-width`);
+const VERSION = "2.17.0";
+console.log(`[ladder] v${VERSION} - J&J visual system: Inbox/Profile/In progress naming, nav icons + drawer, warm surfaces, bold titles, 20px cards`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -132,9 +132,9 @@ function injectFooter() {
 }
 
 // Inject a mobile top app bar at the start of <body>. CSS hides it on
-// >720px screens. The leading button is a back caret on every page except
-// the home dashboard at /ladder/, where it's omitted. Title comes from the
-// page's .page-header h1.
+// >720px screens. J&J-style: a circular hamburger opens the nav drawer on
+// every page (the drawer is the only mobile nav — no back caret). Title
+// comes from the page's .page-header h1.
 function injectMobileBar() {
   if (document.querySelector('.mobile-bar')) return;
   const app = document.querySelector('.app');
@@ -151,15 +151,92 @@ function injectMobileBar() {
   bar.className = 'mobile-bar';
   bar.dataset.home = isHome ? 'true' : 'false';
   bar.innerHTML = `
-    ${isHome
-      ? `<span class="mobile-bar__spacer" aria-hidden="true"></span>`
-      : `<a class="mobile-bar__back" href="/ladder/" aria-label="Back to home">‹</a>`}
+    <button class="icon-btn mobile-bar__menu-btn" aria-label="Open navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
     <span class="mobile-bar__title">${title}</span>
     <span class="mobile-bar__action-slot"></span>
   `;
   // Sit OUTSIDE .app__main so the bar can be edge-to-edge while main keeps
   // its own horizontal padding.
   document.body.insertBefore(bar, app);
+  bar.querySelector('.mobile-bar__menu-btn').addEventListener('click', () => toggleNavDrawer(true));
+  injectNavDrawer();
+}
+
+// Left-side nav drawer (mobile). Same taxonomy as the rail — keep the two
+// in sync by hand (see ROUTES in components/ladder-rail.js). Icons mirror
+// NAV_ICONS there; primary navigation is the only surface icons are
+// allowed on (DESIGN.md rule 7).
+const DRAWER_ITEMS = [
+  { href: '/ladder/jobs/recommended/', label: 'Inbox',       countKey: 'recommended', match: /^\/ladder\/jobs\/recommended\/?/,
+    icon: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
+  { href: '/ladder/jobs/',             label: 'Jobs',        countKey: 'leads',       match: /^\/ladder\/jobs(?!\/recommended)\/?/,
+    icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
+  { href: '/ladder/history/',          label: 'Profile',     match: /^\/ladder\/history\/?/,
+    icon: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+  { href: '/ladder/vision/',           label: 'Search plan', match: /^\/ladder\/vision\/?/,
+    icon: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>' },
+  { href: '/ladder/settings/',         label: 'Settings',    match: /^\/ladder\/settings\/?/,
+    icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
+];
+
+function injectNavDrawer() {
+  if (document.querySelector('.nav-drawer')) return;
+  const here = location.pathname;
+  const drawer = document.createElement('div');
+  drawer.innerHTML = `
+    <div class="nav-drawer__scrim" hidden></div>
+    <nav class="nav-drawer" aria-label="Navigation" hidden>
+      <a class="brand nav-drawer__brand" href="/ladder/">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6.5" y1="2.5" x2="6.5" y2="21.5"/><line x1="17.5" y1="2.5" x2="17.5" y2="21.5"/><line x1="6.5" y1="7" x2="17.5" y2="7"/><line x1="6.5" y1="12" x2="17.5" y2="12"/><line x1="6.5" y1="17" x2="17.5" y2="17"/></svg>
+        </span>
+        <span class="brand__text">Ladder</span>
+      </a>
+      <ul class="nav-drawer__list">
+        ${DRAWER_ITEMS.map(i => `
+          <li>
+            <a class="nav-drawer__item" href="${i.href}" aria-current="${i.match.test(here) ? 'page' : 'false'}">
+              <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${i.icon}</svg></span>
+              <span class="nav-label">${i.label}</span>
+              ${i.countKey ? `<span class="nav-count" data-count="${i.countKey}" hidden></span>` : ''}
+            </a>
+          </li>`).join('')}
+      </ul>
+      <div class="nav-drawer__user">
+        <span class="rail-user__dot" aria-hidden="true"></span>
+        <span class="rail-user__email"></span>
+      </div>
+    </nav>
+  `;
+  while (drawer.firstChild) document.body.appendChild(drawer.firstChild);
+  document.querySelector('.nav-drawer__scrim').addEventListener('click', () => toggleNavDrawer(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleNavDrawer(false); });
+  const email = window.CtrlAuth?.getUser?.()?.email || '';
+  const emailEl = document.querySelector('.nav-drawer__user .rail-user__email');
+  if (email) emailEl.textContent = email;
+  else document.querySelector('.nav-drawer__user').hidden = true;
+  // Counts arrive from the rail's broadcast.
+  document.addEventListener('job:rail:counts', (e) => {
+    for (const el of document.querySelectorAll('.nav-drawer [data-count]')) {
+      const n = e.detail?.[el.getAttribute('data-count')];
+      if (n == null) { el.hidden = true; continue; }
+      el.hidden = false;
+      el.textContent = String(n);
+    }
+  });
+}
+
+function toggleNavDrawer(open) {
+  const drawer = document.querySelector('.nav-drawer');
+  const scrim = document.querySelector('.nav-drawer__scrim');
+  const btn = document.querySelector('.mobile-bar__menu-btn');
+  if (!drawer || !scrim) return;
+  drawer.hidden = !open;
+  scrim.hidden = !open;
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  document.body.style.overflow = open ? 'hidden' : '';
 }
 
 // Inject the mobile segmented sub-nav (sticky under mobile-bar). Only
@@ -184,26 +261,24 @@ function injectSubnavBar() {
 
   const row = bar.querySelector('.subnav-bar__row');
   const here = location.pathname;
-  const isJobs = /^\/ladder\/jobs\/?/.test(here);
+  // Pipeline buckets only — the Inbox is its own top-level page now, so
+  // /ladder/jobs/recommended/ gets no segmented sub-nav.
+  const isJobs = /^\/ladder\/jobs(?!\/recommended)\/?/.test(here) && !/^\/ladder\/jobs\/drill/.test(here);
 
   if (!isJobs) {
     bar.dataset.hasItems = 'false';
     return;
   }
 
-  // Keep in sync with ROUTES[0].sub in components/ladder-rail.js.
+  // Keep in sync with the Jobs sub-items in components/ladder-rail.js.
   const ITEMS = [
-    { href: '/ladder/jobs/recommended/',    label: 'For You', path: '/ladder/jobs/recommended/', countKey: 'recommended' },
-    { href: '/ladder/jobs/?bucket=leads',   label: 'Saved',   bucket: 'leads',                countKey: 'leads' },
-    { href: '/ladder/jobs/?bucket=active',  label: 'Active',  bucket: 'active',               countKey: 'active' },
-    { href: '/ladder/jobs/?bucket=archive', label: 'Archive', bucket: 'archive' },
+    { href: '/ladder/jobs/?bucket=leads',   label: 'Saved',       bucket: 'leads',  countKey: 'leads' },
+    { href: '/ladder/jobs/?bucket=active',  label: 'In progress', bucket: 'active', countKey: 'active' },
+    { href: '/ladder/jobs/?bucket=archive', label: 'Archive',     bucket: 'archive' },
   ];
   const bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
-  const onSubPath = ITEMS.some(i => i.path && here.startsWith(i.path));
   row.innerHTML = ITEMS.map(i => {
-    const active = i.path
-      ? here.startsWith(i.path)
-      : (!onSubPath && bucket === i.bucket);
+    const active = bucket === i.bucket;
     return `<a class="subnav-bar__item" href="${i.href}" aria-current="${active ? 'page' : 'false'}"
               data-count-key="${i.countKey || ''}">
               <span class="subnav-bar__label">${i.label}</span>

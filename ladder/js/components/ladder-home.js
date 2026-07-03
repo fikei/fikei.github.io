@@ -88,8 +88,8 @@ export class JobHome extends LitElement {
     const c = this.counts || { leads: '—', active: '—', recommended: '—' };
     return html`
       <section class="home">
-        <h1 class="home__title">/ job</h1>
-        <p class="home__sub">Ian's career knowledge base.</p>
+        <h1 class="home__title">Ladder</h1>
+        <p class="home__sub">Your career, one place.</p>
 
         <a class="home-card home-card--jobs" href="/ladder/jobs/">
           <div class="home-card__head">
@@ -97,9 +97,9 @@ export class JobHome extends LitElement {
             <span class="home-card__arrow" aria-hidden="true">→</span>
           </div>
           <div class="home-card__metrics">
-            <span><strong>${c.recommended}</strong> for you</span>
+            <span><strong>${c.recommended}</strong> inbox</span>
             <span><strong>${c.leads}</strong> saved</span>
-            <span><strong>${c.active}</strong> active</span>
+            <span><strong>${c.active}</strong> in progress</span>
           </div>
           ${this.topRecs && this.topRecs.length ? html`
             <div class="home-card__list">
@@ -110,7 +110,7 @@ export class JobHome extends LitElement {
 
         <a class="home-card" href="/ladder/history/">
           <div class="home-card__head">
-            <h2>Your career</h2>
+            <h2>Profile</h2>
             <span class="home-card__arrow" aria-hidden="true">→</span>
           </div>
           <p class="home-card__hint">Companies, roles, and the narratives that go in your résumé.</p>
