@@ -92,6 +92,28 @@ Merge mechanics:
 - **Conservative policy:** prefer occasional duplicate cards over falsely-merged (lost) events; house/DIY-venue events never fuzzy-match
 - **Dedup runs server-side** in the cache pipeline, not per-client
 
+### 4.1 Design considerations carried over from the historical analysis
+
+Concrete implementation constraints observed in the real data (568 events, 3,328 messages):
+
+**Extraction & data quality**
+- **Parse platform URLs before AI.** For class-3/demoted-class-2 links (Partiful, Luma, RA, Eventbrite, Dice), fetch the page or API (Luma has iCal/API) for canonical title/date/venue. The Discord message text becomes *recommendation context*, not the source of truth — free-text extraction is the fallback, not the default.
+- **Image-only flyers are 15–20% of events** (258 messages carry images, many with no extractable text). OCR/vision extraction is worth more than the original Discord PRD assumed; until it ships, these events are silently missed — track them as a known coverage gap.
+- **Relative dates are common** in text-only posts ("this Friday", "tonight") — extraction must resolve against the message timestamp, and assume the message's year, not the current year.
+- **Categorization prior:** this channel skews social/community (21% social). Default uncertain events toward `social`, not `other`.
+
+**Dedup specifics**
+- **Same-link reposts are the top intra-channel duplicate pattern** — the same Partiful/RA URL posted by multiple members. URL canonicalization (strip query params) must dedupe within the Discord feed itself, not just across feeds.
+- **Venue whitelist boosts dedup recall:** an event at Public Works, Great Northern, The Midway, 1015 Folsom, F8, or Gray Area is very likely already on 19hz/RA → prefer match-and-flag over insert.
+- **House-venue events never dedup:** anything at Agape or a member's home always inserts as new — fuzzy matching there only creates false merges.
+- **Expected collision rate ~23%**, concentrated in music/nightlife. Use this as the baseline when validating the dedup ladder: materially higher merge rates suggest over-merging; near-zero suggests the fuzzy tier isn't firing.
+
+**Ingestion & signals**
+- **Steady-state volume is ~2.5–3 events/week** (~20–30 messages/week) — the existing 7-day lookback and 4-hour cache refresh are sufficient. Historical backfill must use the `export` action (shipped in `scrape-discord-events` v1.2.0, service-role-gated), not the standard scrape path.
+- **Store `posted_by` per event.** ~15 members generate the large majority of posts; author ≈ organizer for house events and is the curation signal for external ones. This field powers organizer attribution now and per-member "recommended by" taste signals later.
+- **Replies carry signal (993 messages, 30% of channel):** RSVPs, corrections ("moved to 9pm"), cancellations. V1 ignores them for extraction, but they are the future "heat"/update signal — don't discard them at ingest.
+- **Recognize the recurring series** as first-class curated collections: Agape Underground, CATS open mic, Wordsy Wednesday, D&B Society, Endzeit at The Loom, monthly movie nights, SF Neo-Futurists. Stable names, high community value, and easy to match across recurrences.
+
 ---
 
 ## 5. Venue / Community Calendar Backlog
