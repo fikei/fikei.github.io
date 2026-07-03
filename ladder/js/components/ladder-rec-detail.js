@@ -8,7 +8,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderFitCardBody, renderCandidateCardBody, scoreClass, weakestFitDims }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal, scoreClass, weakestFitDims }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -31,6 +31,7 @@ export class LadderRecDetail extends LitElement {
     rec:    { state: true },
     saving: { state: true },
     dismissed: { state: true },
+    scoreOpen: { state: true },
   };
 
   constructor() {
@@ -40,6 +41,7 @@ export class LadderRecDetail extends LitElement {
     this.rec = null;
     this.saving = false;
     this.dismissed = false;
+    this.scoreOpen = null;
     const params = new URLSearchParams(location.search);
     this.recId = params.get('rec') || '';
     this.slug = (params.get('slug') || '').toLowerCase();
@@ -124,7 +126,7 @@ export class LadderRecDetail extends LitElement {
     }
     if (this.dismissed) {
       return html`<div class="rec-detail__banner">
-        Dismissed. <a href="/ladder/jobs/recommended/">Back to For You →</a>
+        Dismissed. <a href="/ladder/jobs/recommended/">Back to Inbox →</a>
       </div>`;
     }
     return nothing;
@@ -136,7 +138,7 @@ export class LadderRecDetail extends LitElement {
     const weak = weakestFitDims(rec);
     return html`
       <aside class="rec-detail__wildcard">
-        <strong>🃏 Wildcard</strong> — you'd likely be a standout candidate
+        <strong>Wildcard</strong> — you'd likely be a standout candidate
         (strength ${rec.candidateScore}), but it scores low on your stated
         criteria (fit ${rec.fitScore}).
         <ul>
@@ -155,7 +157,7 @@ export class LadderRecDetail extends LitElement {
     if (this.state === 'error' || !this.rec) {
       return html`<div class="rec-detail">
         <p class="muted">Couldn't load this recommendation. ${this.error}</p>
-        <a href="/ladder/jobs/recommended/">Back to For You →</a>
+        <a href="/ladder/jobs/recommended/">Back to Inbox →</a>
       </div>`;
     }
     const rec = this.rec;
@@ -174,15 +176,24 @@ export class LadderRecDetail extends LitElement {
           <div class="rec-detail__title-block">
             <h1>${rec.title || '(untitled)'}</h1>
             ${meta ? html`<p class="rec-detail__meta">${meta}</p>` : nothing}
+            <div class="review__scores">
+              <button class=${scoreClass(rec.fitScore) + ' fit-pill--button review__score'}
+                      title="Fit score — tap for the full breakdown"
+                      @click=${() => { this.scoreOpen = 'fit'; }}>
+                ${rec.fitScore ?? '—'}<span class="review__score-label">fit</span>
+              </button>
+              <button class=${scoreClass(rec.candidateScore) + ' fit-pill--button review__score'}
+                      title="Candidate strength — tap for the full breakdown"
+                      @click=${() => { this.scoreOpen = 'candidate'; }}>
+                ${rec.candidateScore ?? '—'}<span class="review__score-label">strength</span>
+              </button>
+            </div>
+            ${rec.companyDescription ? html`<p class="review__company-desc">${rec.companyDescription}</p>` : nothing}
             <p class="rec-detail__source muted">
               ${rec.sourceLabel ? html`via ${rec.sourceLabel}` : nothing}
               ${rec.sourceEmailUrl ? html` · <a href=${rec.sourceEmailUrl} target="_blank" rel="noopener">📧 source email</a>` : nothing}
               ${rec.enrichmentStatus === 'unresolved' ? html` · <span class="enrichment-badge">verifying source</span>` : nothing}
             </p>
-          </div>
-          <div class="rec-detail__scores">
-            <span class=${scoreClass(rec.fitScore)} title="Fit score">${rec.fitScore ?? '—'}</span>
-            <span class=${scoreClass(rec.candidateScore)} title="Candidate strength">${rec.candidateScore ?? '—'}</span>
           </div>
         </header>
 
@@ -210,23 +221,19 @@ export class LadderRecDetail extends LitElement {
           </article>
         ` : nothing}
 
-        <div class="rec-detail__cards">
-          <article class="role-card role-card--fit fit-modal">
-            <header class="role-card__head"><h3>Fit</h3></header>
-            ${renderFitCardBody(rec, { summary: rec.fitSummary || null })}
-          </article>
-          <article class="role-card role-card--fit fit-modal">
-            <header class="role-card__head"><h3>Candidate strength</h3></header>
-            ${renderCandidateCardBody(rec, { summary: rec.candidateSummary || null })}
-          </article>
-        </div>
+        <article class="role-card">
+          <header class="role-card__head"><h3>How it stacks up</h3></header>
+          ${rec.fitSummary ? html`<p class="rec-detail__summary">${rec.fitSummary}</p>` : nothing}
+          ${renderVerdicts(rec)}
+        </article>
 
         ${rec.description ? html`
-          <article class="role-card">
-            <header class="role-card__head"><h3>Job description</h3></header>
-            <div class="kb-doc rec-detail__jd">${unsafeHTML(renderMarkdown(rec.description))}</div>
-          </article>
+          <details class="jd-collapse">
+            <summary>Original posting text</summary>
+            <div class="kb-doc jd-collapse__body">${unsafeHTML(renderMarkdown(rec.description))}</div>
+          </details>
         ` : nothing}
+        ${this.scoreOpen ? renderScoreModal({ ...rec, score: rec.fitScore }, () => { this.scoreOpen = null; }, this.scoreOpen) : nothing}
       </div>
     `;
   }

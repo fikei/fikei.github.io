@@ -13,20 +13,36 @@
 }
 
 .nav-list a {
-  display: block;
-  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--fg);
   font-weight: var(--fw-medium);
   font-size: var(--font-size-body);
 }
+.nav-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: inherit;
+}
+.nav-label { flex: 1; min-width: 0; }
+.nav-list a .nav-count { margin-left: auto; }
 .nav-list a:hover {
   background: var(--bg-elevated);
   text-decoration: none;
 }
+/* Active nav is neutral — a filled surface, not a brand-green splash.
+   Bright Green is reserved for the primary action on each screen. */
 .nav-list a[aria-current="page"] {
-  background: var(--accent-strong);
-  color: var(--accent-strong-fg);
+  background: var(--bg-overlay);
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
 }
 
 /* --- Theme toggle --- */
@@ -49,15 +65,17 @@
   outline: none;
 }
 
-/* --- Buttons --- */
+/* --- Buttons ---
+   Two shapes only (J&J): decision CTAs (accent/primary) are pills; every
+   other button is a 16px rounded-rect. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  height: 48px;
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
@@ -72,6 +90,7 @@
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
+  border-radius: var(--radius-pill);
 }
 .btn--primary:hover { background: var(--accent); filter: brightness(1.06); }
 
@@ -79,6 +98,7 @@
   background: var(--accent-strong);
   color: var(--accent-strong-fg);
   border-color: var(--accent-strong);
+  border-radius: var(--radius-pill);
 }
 .btn--accent:hover { filter: brightness(0.97); }
 
@@ -89,11 +109,9 @@
 .page-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
-  /* Scales from 24px on phones to 36px on desktop. The static token
-     --font-size-title-1 is 36px; the clamp keeps that as the ceiling so
-     desktop is unchanged. */
-  font-size: clamp(24px, 5.5vw, var(--font-size-title-1));
+  font-weight: var(--fw-bold, 700);
+  /* Scales from 20px on phones to the title-1 token (24px) on desktop. */
+  font-size: clamp(20px, 5vw, var(--font-size-title-1));
   line-height: var(--lh-title);
   letter-spacing: -0.02em;
 }
@@ -439,6 +457,15 @@
 
 .link-subtle { color: var(--fg-muted); }
 .link-subtle:hover { color: var(--fg); text-decoration: underline; }
+/* Used on <button> as well as <a> — strip native button chrome. */
+button.link-subtle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
 
 /* --- Sortable column headers --- */
 .th-sort {
@@ -3363,8 +3390,9 @@
 }
 .nav-sublist a:hover { background: var(--bg-elevated); color: var(--fg); text-decoration: none; }
 .nav-sublist a[aria-current="page"] {
-  background: var(--accent-muted);
-  color: var(--accent);
+  background: var(--bg-overlay);
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
 }
 .nav-sublist .nav-sub__label { min-width: 0; }
 
@@ -3404,8 +3432,8 @@
   font-variant-numeric: tabular-nums;
 }
 .nav-sublist a[aria-current="page"] .nav-count {
-  background: var(--accent);
-  color: var(--accent-fg, #fff);
+  background: var(--bg-elevated);
+  color: var(--fg);
 }
 
 /* --- Bucket tabs (in-page Leads / Active / Archive) --- */
@@ -3732,10 +3760,10 @@
   }
   .pipeline-table tr {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) 44px;
     grid-template-areas:
-      "fit role menu"
-      "fit meta menu";
+      "role menu"
+      "meta menu";
     column-gap: var(--space-4);
     row-gap: var(--space-2);
     align-items: center;
@@ -3753,33 +3781,11 @@
     padding: 0;
     min-width: 0;
   }
-  .pipeline-table .col-fit {
-    grid-area: fit;
-    width: 48px;
-    align-self: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: visible;
-  }
-  /* Score-pair on desktop shows both fit + candidate-strength side-by-side
-     in 93px. On phones that overflows a 48px column and bleeds into the
-     role title. Drop the secondary score on mobile — fit is the primary
-     signal; the breakdown lives one tap away in the role detail. */
-  .pipeline-table .col-fit .score-pair {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .pipeline-table .col-fit .score-pair__cand { display: none; }
-  .pipeline-table .col-fit .fit-pill {
-    font-size: var(--font-size-small);
-    font-weight: var(--fw-semibold);
-    padding: 6px 0;
-    min-width: 48px;
-    text-align: center;
-    line-height: 1.2;
-  }
+  /* Numeric scores stay out of mobile lists entirely — the qualitative
+     verdicts + breakdown live one tap away in the role detail. Hiding the
+     cell (not just the pill) keeps the grid to [role | menu]. */
+  .pipeline-table .col-fit,
+  .pipeline-table .col-strength { display: none; }
   .pipeline-table .col-role {
     grid-area: role;
     max-width: none;
@@ -4066,16 +4072,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.home-rec__fit {
-  font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
-  font-size: var(--font-size-small);
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-strong);
-  color: var(--accent-strong-fg);
-  min-width: 36px;
-  text-align: center;
+.home-rec__arrow {
+  color: var(--fg-subtle);
+  font-size: var(--font-size-body);
+  flex-shrink: 0;
 }
 
 /* --- Mobile segmented sub-nav ---
@@ -4118,8 +4118,9 @@
 }
 .subnav-bar__item:hover { text-decoration: none; color: var(--fg); }
 .subnav-bar__item[aria-current="page"] {
-  background: var(--accent-strong);
-  color: var(--accent-strong-fg);
+  background: var(--bg-overlay);
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
 }
 .subnav-bar__item .nav-count {
   font-size: var(--font-size-caption);
@@ -5196,28 +5197,49 @@ job-onboarding { display: contents; }
    See <ladder-chat> component for state.
    ───────────────────────────────────────────────────────────── */
 
+/* Circular icon button — J&J's signature chrome. Hamburger, chat, close,
+   overflow all share this shape. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  transition: box-shadow 80ms ease, transform 80ms ease;
+}
+.icon-btn:hover { box-shadow: var(--shadow-md); }
+.icon-btn:active { transform: translateY(1px); }
+
+/* Chat launcher — a fixed bubble in the top-right corner (J&J-style),
+   never floating over list content. Neutral surface; the drawer it opens
+   is the accented moment, not the button. */
 .chat-fab {
   position: fixed;
   right: var(--space-4);
-  bottom: var(--space-4);
-  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  top: max(var(--space-3), env(safe-area-inset-top));
   z-index: 55;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-pill);
-  border: 0;
-  background: var(--accent-strong);
-  color: var(--accent-strong-fg);
-  font-size: 22px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 20px;
   cursor: pointer;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   display: inline-grid;
   place-items: center;
   transition: transform 80ms ease, box-shadow 80ms ease;
 }
-.chat-fab:hover { box-shadow: var(--shadow-lg); }
+.chat-fab:hover { box-shadow: var(--shadow-md); }
 .chat-fab:active { transform: translateY(1px); }
-.chat-fab__icon { line-height: 1; }
+.chat-fab__icon { line-height: 1; display: inline-grid; place-items: center; }
 
 /* Scrim sits between page and drawer. Mobile only — on desktop the drawer
    is a floating panel that doesn't need a backdrop. */
@@ -5256,11 +5278,12 @@ job-onboarding { display: contents; }
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
-/* Desktop: floating panel anchored bottom-right above the FAB. */
+/* Desktop: floating panel anchored top-right below the launcher. */
 @media (min-width: 721px) {
   .chat-drawer {
     right: var(--space-4);
-    bottom: calc(56px + var(--space-4) + var(--space-3));
+    top: calc(44px + var(--space-3) + var(--space-3));
+    bottom: auto;
     width: min(420px, 90vw);
     height: min(640px, 80vh);
     border-radius: var(--radius-lg);
@@ -6072,3 +6095,685 @@ body[data-auth-state="out"] job-chat { display: none; }
   font-size: var(--font-size-caption);
   margin: var(--space-2) 0 0;
 }
+
+/* ==========================================================================
+   Inbox (For You) — date-batched groups, one Review affordance per row.
+   Replaces the sortable table: a single elevated card per day with hairline
+   dividers between rows. No scores, no inline accept/reject.
+   ========================================================================== */
+/* Cap the reading column — J&J-style centered inbox, not a full-bleed table. */
+.inbox { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; }
+
+.inbox-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.inbox-group__label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold, 700);
+  font-size: var(--font-size-title-3);
+  letter-spacing: -0.02em;
+}
+.inbox-group__count { font-size: var(--font-size-small); }
+
+.inbox-card {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.inbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  position: relative;
+}
+/* Inset divider — starts after the logo column (J&J/iOS list pattern):
+   28px logo + 12px gap. */
+.inbox-row::after {
+  content: '';
+  position: absolute;
+  left: 40px;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.inbox-row:last-child::after { display: none; }
+.inbox-row__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.inbox-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-row__title {
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-body);
+  color: var(--fg);
+  /* Full titles, wrapped — never truncated to "Senior Produ…". */
+  overflow-wrap: anywhere;
+}
+.inbox-row__sub {
+  font-size: var(--font-size-small);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-row__review {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 var(--space-3);
+  background: var(--bg-surface);
+  border: 0;
+}
+.inbox-row__review:hover { background: var(--bg-overlay); }
+.inbox-row--skeleton { gap: var(--space-3); }
+.inbox-row--skeleton .inbox-row__text { flex: 1; gap: 6px; }
+
+/* Header ⋯ menu holding the operational controls (refresh, floors). */
+.page-menu { margin-left: auto; align-self: center; }
+.page-menu .row-menu__trigger {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  display: inline-grid;
+  place-items: center;
+}
+.page-menu .row-menu__trigger:hover { background: var(--bg-overlay); }
+.row-menu__info {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-caption);
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+}
+.recs-page__head .page-menu ~ * { margin-right: 0; }
+
+/* ==========================================================================
+   Review overlay — full-screen, one role at a time. Progress dots up top,
+   summarized card in the middle, exactly two decisions pinned at the bottom.
+   ========================================================================== */
+.review {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.review__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-top: max(var(--space-3), env(safe-area-inset-top));
+  flex-shrink: 0;
+}
+.review__bar-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+.review__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.review__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-overlay);
+  flex-shrink: 0;
+  transition: width 160ms ease, background 160ms ease;
+}
+.review__dot.is-current { width: 24px; background: var(--fg); }
+.review__counter { font-size: var(--font-size-small); color: var(--fg-muted); }
+.review__close,
+.review__more {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+}
+.review__scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--space-4) var(--space-6);
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.review__card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.review__head { display: flex; gap: var(--space-4); align-items: flex-start; }
+.review__logo {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+.review__logo--placeholder {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  color: var(--fg-muted);
+}
+.review__head-text { min-width: 0; }
+.review__title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-3);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.review__meta { margin: 0; color: var(--fg-muted); font-size: var(--font-size-body); }
+/* Scores sit directly under role + company — the most critical data after
+   the name. Clickable pills; the modal holds the full breakdown. */
+.review__scores {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+.review__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: var(--font-size-small);
+  padding: 5px var(--space-3);
+}
+.review__score-label {
+  font-size: var(--font-size-caption);
+  font-weight: var(--fw-medium);
+  opacity: 0.75;
+}
+.review__company-desc {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+.review__salary { margin: var(--space-3) 0 0; font-weight: var(--fw-medium); font-size: var(--font-size-body); }
+.review__sub { margin: var(--space-2) 0 0; font-size: var(--font-size-small); }
+.review__section { margin-bottom: var(--space-5); }
+.review__section-title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-title-4);
+}
+.review__bullets {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+.review__bullets li > *, .review__bullets p { display: inline; margin: 0; }
+.review__summary { margin: 0; font-size: var(--font-size-body); line-height: var(--lh-body); }
+.review__numbers { margin: var(--space-3) 0 0; font-size: var(--font-size-caption); }
+.review__numbers .link-subtle { font-size: inherit; }
+.review__done { text-align: center; padding: var(--space-8) var(--space-4); }
+.review__foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+.review__foot .review__btn { width: 100%; height: 48px; }
+.review__btn--dismiss { background: var(--bg-surface); border: 0; }
+.review__btn--dismiss:hover { background: var(--bg-overlay); }
+@media (min-width: 721px) {
+  .review__foot { justify-content: center; }
+  .review__foot .review__btn { max-width: 344px; justify-self: end; }
+  .review__foot .review__btn + .review__btn { justify-self: start; }
+}
+
+/* ==========================================================================
+   Verdict cards — qualitative fit dimensions ("Excellent on job-ready
+   skills", "Borderline on compensation"). The numeric bars stay in the
+   score modal; these are the first read.
+   ========================================================================== */
+.verdict-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.verdict-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px var(--space-4);
+}
+.verdict-card__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body);
+}
+.verdict-card__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.verdict-card--strong .verdict-card__dot { background: var(--accent-strong); }
+.verdict-card--ok     .verdict-card__dot { background: color-mix(in srgb, var(--accent-strong) 45%, var(--bg-surface)); }
+.verdict-card--weak   .verdict-card__dot { background: var(--warning); }
+.verdict-card--fail   { border-color: color-mix(in srgb, var(--error) 40%, var(--border)); }
+.verdict-card--fail .verdict-card__title { color: var(--error); }
+.verdict-card__body {
+  margin: var(--space-1) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+/* Compact chip row variant for tight surfaces. */
+.verdict-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  font-weight: var(--fw-medium);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+}
+.verdict-chip--strong { background: var(--accent-muted); color: var(--fg); }
+.verdict-chip--weak   { background: color-mix(in srgb, var(--warning) 18%, transparent); }
+.verdict-chip--fail   { background: color-mix(in srgb, var(--error) 10%, transparent); color: var(--error); }
+
+/* Raw scraped posting text stays available but collapsed — the AI summary
+   and verdicts are the reading surface, not aggregator boilerplate. */
+.jd-collapse {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  margin: var(--space-4) 0;
+}
+.jd-collapse > summary {
+  cursor: pointer;
+  padding: var(--space-4);
+  font-weight: var(--fw-medium);
+  color: var(--fg-muted);
+  list-style: none;
+}
+.jd-collapse > summary::-webkit-details-marker { display: none; }
+.jd-collapse > summary::after { content: ' +'; color: var(--fg-subtle); }
+.jd-collapse[open] > summary::after { content: ' –'; }
+.jd-collapse__body {
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--fg-muted);
+  font-size: var(--font-size-small);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.rec-detail__summary {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+
+/* ==========================================================================
+   Mobile nav drawer — J&J-style left sheet opened by the .mobile-bar
+   hamburger. Same taxonomy as the desktop rail (see ladder-rail.js).
+   ========================================================================== */
+.nav-drawer__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 15, 12, 0.45);
+  z-index: 70;
+}
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(320px, 85vw);
+  z-index: 71;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-4);
+  padding-top: max(var(--space-5), env(safe-area-inset-top));
+  padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.nav-drawer[hidden], .nav-drawer__scrim[hidden] { display: none; }
+.nav-drawer__brand { margin-bottom: var(--space-6); }
+.nav-drawer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+.nav-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-body);
+  text-decoration: none;
+}
+.nav-drawer__item:hover { background: var(--bg-surface); text-decoration: none; }
+.nav-drawer__item[aria-current="page"] {
+  background: var(--bg-overlay);
+  font-weight: var(--fw-semibold);
+}
+.nav-drawer__item .nav-count { margin-left: auto; }
+.nav-drawer__user,
+.rail-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-3) 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+.rail-user { margin-top: auto; }
+.rail-user__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  flex-shrink: 0;
+}
+.rail-user__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Drawer is mobile chrome; never show it on desktop. */
+@media (min-width: 721px) {
+  .nav-drawer, .nav-drawer__scrim { display: none !important; }
+}
+
+/* ==========================================================================
+   Search plan (v2.18) — summary landing + Targets/Signals/Rules/Sources
+   tabs switched by ?section= (same pattern as Jobs ?bucket=).
+   ========================================================================== */
+.vf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+.vf-tabs .subnav-bar__item {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-medium);
+}
+.vf-tabs .subnav-bar__item[aria-current="page"] {
+  background: var(--bg-overlay);
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
+}
+.vf-summary { max-width: 760px; }
+.vf-summary__strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-5);
+}
+.vf-summary__label { font-size: var(--font-size-body); }
+.vf-summary__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-overlay);
+  overflow: hidden;
+}
+.vf-summary__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-strong);
+}
+.vf-summary__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.vf-summary__list li { position: relative; }
+.vf-summary__list li::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.vf-summary__list li:last-child::after { display: none; }
+.vf-summary__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+}
+.vf-summary__row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.vf-summary__row-label {
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body);
+}
+.vf-summary__row-digest {
+  color: var(--fg-subtle);
+  font-size: var(--font-size-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vf-summary__row-arrow { color: var(--fg-subtle); flex-shrink: 0; }
+.vf-section__hint { margin: 0 0 var(--space-4); font-size: var(--font-size-small); }
+.vf-advanced { margin-top: var(--space-5); }
+.vf-story-note { margin-top: var(--space-5); font-size: var(--font-size-small); }
+
+/* ==========================================================================
+   Search plan subsections (v2.20) — chip collapse, merged comp card,
+   structured rules, blocked companies, source health.
+   ========================================================================== */
+.vf-section__grid--cols {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+.vf-chip--more,
+.vf-chip--ghost {
+  cursor: pointer;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--font-size-caption);
+}
+.vf-chip--more:hover,
+.vf-chip--ghost:hover { background: var(--bg-surface); color: var(--fg); }
+.vf-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.vf-chip-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.vf-chip-filter {
+  flex: 1;
+  max-width: 260px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+/* Anti-mission terms repel — warn tint so attract vs repel reads at a glance. */
+.vf-card[data-name="anti_mission_terms"] .vf-chip {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+.vf-toggle--inline { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-small); }
+.vf-comp-grid {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.vf-comp-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.vf-comp-label { font-size: var(--font-size-caption); color: var(--fg-muted); font-weight: var(--fw-medium); }
+.vf-comp-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+.vf-comp-input .vf-input { width: 130px; }
+/* Structured deal-breakers */
+.vf-rules { display: flex; flex-direction: column; gap: var(--space-4); }
+.vf-rules__heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+}
+.vf-rules__note { margin: 0 0 var(--space-2); font-size: var(--font-size-caption); }
+.vf-rules__list { list-style: none; margin: 0; padding: 0; }
+.vf-rules__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-small);
+}
+.vf-rules__item:last-child { border-bottom: 0; }
+.vf-rules__text { flex: 1; min-width: 0; }
+.vf-rules__add {
+  margin-top: var(--space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+/* Blocked companies + source health rows */
+.vf-blocked, .vf-sources { list-style: none; margin: 0; padding: 0; }
+.vf-blocked__row, .vf-sources__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-small);
+}
+.vf-blocked__row:last-child, .vf-sources__row:last-child { border-bottom: 0; }
+.vf-blocked__name { flex: 1; min-width: 0; text-transform: capitalize; }
+.vf-sources__dot {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: var(--accent-strong); flex-shrink: 0;
+}
+.vf-sources__dot--bad { background: var(--error); }
+.vf-sources__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.vf-sources__name { font-weight: var(--fw-medium); }
+.vf-sources__meta { font-size: var(--font-size-caption); }
+.vf-sources__expired { margin: var(--space-3) 0 0; font-size: var(--font-size-caption); }
+.vf-summary__row-meta {
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-caption);
+  margin-left: var(--space-2);
+}
+/* Watched companies read as list rows here, not floating chips. */
+.watched-strip__row { display: flex; flex-direction: column; gap: var(--space-2); }
+.watched-chip { width: 100%; }

@@ -1,48 +1,26 @@
-// job-recommendations-table — full sortable list for /ladder/jobs/recommended/.
-// Mirrors the pipeline-table look (col-fit / role-cell / company-logo /
-// th-sort) so this page reads as a peer of the pipeline view, not a
-// separate widget.
+// ladder-recommendations-table — the Inbox at /ladder/jobs/recommended/.
+// New roles arrive in small date-stamped batches (Today / Yesterday / Jun 12),
+// one "Review" affordance per row, and every decision happens inside the
+// full-screen <ladder-review-overlay> — no inline accept/reject, no numeric
+// score chips, no sort machinery in the reading flow. Pipeline plumbing
+// (quality-floor toggle, source refresh) lives behind a single ⋯ menu;
+// watched-company config moved to /ladder/vision/ (Search plan).
 //
 // Pulls the ?view=all variant so it includes recs below the carousel's
-// fit-score floor. Records persist in the DB regardless of what shows
-// here; this view is the full audit trail.
+// fit-score floor. Records persist in the DB regardless of what shows here.
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchRecommendations, dismissRecommendation, blockCompany, watchCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { renderLocation, renderSource }, { roleSlug }] = await Promise.all([
+const [{ fetchRecommendations, dismissRecommendation, blockCompany, watchCompany, addRole, refreshSources }, { logoSrc, logoInitial }, { renderScoreModal, renderScorePair, weakestFitDims }, { roleSlug }] = await Promise.all([
   import('../pipeline.js' + V),
   import('../logo.js' + V),
   import('./ladder-fit-modal.js' + V),
-  import('../format.js' + V),
   import('../slug.js' + V),
 ]);
-
-// Column shape mirrors job-pipeline's COLUMNS: id drives the col class,
-// sortKey gates sortability, label is what the header shows.
-// Location is nested under Role (no standalone column) — sort still offered.
-const COLUMNS = [
-  { id: 'fit',      label: 'Fit',      sortKey: 'fitScore',       numeric: true },
-  { id: 'strength', label: 'Strength', sortKey: 'candidateScore', numeric: true },
-  { id: 'role',     label: 'Role',     sortKey: 'title' },
-  { id: 'source',   label: 'Source',   sortKey: 'source' },
-  { id: 'added',    label: 'Added',    sortKey: 'suggestedAt', date: true },
-  { id: 'menu',     label: '',         sortKey: null },
-];
+import('./ladder-review-overlay.js' + V);
 
 // Page size for the infinite-scroll fetch. Server caps at 200; 100 keeps
 // each round-trip light while filling a tall viewport in one or two pages.
 const PAGE_SIZE = 100;
-
-function relTime(iso) {
-  if (!iso) return '';
-  const ms = Date.now() - Date.parse(iso);
-  const s = Math.max(1, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24); if (d < 7)  return `${d}d ago`;
-  const w = Math.floor(d / 7);  if (w < 5)  return `${w}w ago`;
-  const mo = Math.floor(d / 30); return mo < 12 ? `${mo}mo ago` : `${Math.floor(mo / 12)}y ago`;
-}
 
 function fitClass(s) {
   if (s == null) return 'fit-pill fit-pill--poor';
@@ -52,6 +30,20 @@ function fitClass(s) {
   return 'fit-pill fit-pill--poor';
 }
 
+// Group label for an ISO timestamp: Today / Yesterday / "Jun 12" (+ year
+// when it isn't the current one). Grouping is by local calendar day.
+function dayLabel(iso) {
+  if (!iso) return 'Earlier';
+  const d = new Date(iso);
+  const now = new Date();
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  const opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('en-US', opts);
+}
 
 export class JobRecommendationsTable extends LitElement {
   createRenderRoot() { return this; }
@@ -60,8 +52,7 @@ export class JobRecommendationsTable extends LitElement {
     state:    { state: true },
     items:    { state: true },
     error:    { state: true },
-    _sortLayers: { state: true },
-    _menuOpenId: { state: true },
+    _menuOpen:  { state: true },
     addingId: { state: true },
     selectedRec:         { state: true },
     selectedScoreWhich:  { state: true },
@@ -75,6 +66,7 @@ export class JobRecommendationsTable extends LitElement {
     _recentlyExpired:    { state: true },
     _wildcards:          { state: true },
     _floorOn:            { state: true },
+    _reviewIndex:        { state: true },
   };
 
   constructor() {
@@ -82,12 +74,7 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'idle';
     this.items = [];
     this.error = '';
-    // Multi-level sort stack (Google-Sheets style): most-significant layer
-    // first. Empty → the server's "best overall match" blended ranking.
-    // Clicking a header pushes/toggles that column to the front; earlier
-    // layers become tiebreakers.
-    this._sortLayers = [];
-    this._menuOpenId = null;
+    this._menuOpen = false;
     this.addingId = null;
     this.selectedRec = null;
     this._refreshing = false;
@@ -101,14 +88,16 @@ export class JobRecommendationsTable extends LitElement {
     this._recentlyExpired = 0;
     this._wildcards = [];
     // Quality floors (fit >= 50, strength >= 50, no hard fails) apply by
-    // default; the header toggle flips to the unfiltered audit view.
+    // default; the ⋯ menu toggle flips to the unfiltered audit view.
     this._floorOn = true;
+    // Index into items while the review overlay is open; null = closed.
+    this._reviewIndex = null;
   }
 
   // ----- Source health banner ------------------------------------------
   // The recommendations GET returns sourceHealth rows. Anything with
   // needsReauth (dead Gmail token) or a lastError gets surfaced above the
-  // table — "no new recs" and "a source is blind" must look different.
+  // list — "no new recs" and "a source is blind" must look different.
 
   _healthIssues() {
     if (!Array.isArray(this._health)) return [];
@@ -225,8 +214,8 @@ export class JobRecommendationsTable extends LitElement {
     };
     window.addEventListener('scroll', this._onScroll, { passive: true });
     window.addEventListener('resize', this._onScroll, { passive: true });
-    // Close any open row menu on an outside click.
-    this._onDocClick = () => { if (this._menuOpenId) this._menuOpenId = null; };
+    // Close the header ⋯ menu on an outside click.
+    this._onDocClick = () => { if (this._menuOpen) this._menuOpen = false; };
     document.addEventListener('click', this._onDocClick);
   }
   disconnectedCallback() {
@@ -255,7 +244,7 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'loading';
     await this._fetchPage({ reset: true });
     if (this.state === 'loading') this.state = 'loaded';
-    // Wildcards strip loads after the table — never block or fail the
+    // Wildcards strip loads after the list — never block or fail the
     // page over it.
     try {
       const wc = await fetchRecommendations({ view: 'wildcard' });
@@ -263,22 +252,19 @@ export class JobRecommendationsTable extends LitElement {
     } catch { this._wildcards = []; }
   }
 
-  // Fetch one page from the server (server-side sorted). reset=true starts
-  // a fresh list at offset 0 (initial load, sort change, refresh); otherwise
-  // appends the next page for infinite scroll.
+  // Fetch one page from the server. Inbox order: newest batch first —
+  // the server's date sort keeps groups contiguous. reset=true starts a
+  // fresh list at offset 0; otherwise appends for infinite scroll.
   async _fetchPage({ reset = false } = {}) {
     if (reset) { this._offset = 0; this._hasMore = false; }
     try {
-      const layers = this._sortLayers;
       const data = await fetchRecommendations({
         view:   'all',
         floor:  this._floorOn,
         limit:  PAGE_SIZE,
         offset: this._offset,
-        // Multi-level: comma-joined keys + dirs, most-significant first.
-        // Empty stack → 'best' blended default on the server.
-        sort:   layers.length ? layers.map(l => l.key).join(',') : 'best',
-        dir:    layers.length ? layers.map(l => l.dir).join(',') : 'desc',
+        sort:   'suggestedAt',
+        dir:    'desc',
       });
       const page = Array.isArray(data?.recommendations) ? data.recommendations : [];
       this.items   = reset ? page : [...this.items, ...page];
@@ -309,47 +295,6 @@ export class JobRecommendationsTable extends LitElement {
     finally { this._loadingMore = false; this.requestUpdate(); }
   }
 
-  // Max sort layers kept. 3 is plenty (primary + two tiebreakers) and keeps
-  // the header indicators readable.
-  static SORT_DEPTH = 3;
-
-  _layerIndex(key) {
-    return this._sortLayers.findIndex(l => l.key === key);
-  }
-
-  _onSortClick(c) {
-    if (!c.sortKey) return;
-    const key = c.sortKey;
-    const defaultDir = (c.numeric || c.date) ? 'desc' : 'asc';
-    const layers = [...this._sortLayers];
-    const idx = layers.findIndex(l => l.key === key);
-    if (idx === 0) {
-      // Re-clicking the current primary toggles its direction.
-      layers[0] = { key, dir: layers[0].dir === 'asc' ? 'desc' : 'asc' };
-    } else {
-      // Promote this column to primary; previous layers slide down as
-      // tiebreakers. Pull it from its old position first if present.
-      if (idx > 0) layers.splice(idx, 1);
-      layers.unshift({ key, dir: defaultDir });
-    }
-    this._sortLayers = layers.slice(0, JobRecommendationsTable.SORT_DEPTH);
-    // Server-side sort — re-fetch from offset 0 in the new (layered) order.
-    this._fetchPage({ reset: true });
-  }
-
-  // Shift-click (or the header's reset affordance) clears the stack back to
-  // the default "best" ranking.
-  _clearSort() {
-    this._sortLayers = [];
-    this._fetchPage({ reset: true });
-  }
-
-  // Rows are returned already sorted by the server; this is just an
-  // array guard so a transient bad state can't crash render.
-  _sorted() {
-    return Array.isArray(this.items) ? this.items : [];
-  }
-
   async _onDismiss(rec) {
     this.items = this.items.filter(r => r.id !== rec.id);
     this._wildcards = this._wildcards.filter(r => r.id !== rec.id);
@@ -359,6 +304,10 @@ export class JobRecommendationsTable extends LitElement {
   async _onAdd(rec) {
     if (this.addingId) return;
     this.addingId = rec.id;
+    // Optimistic removal — the review flow advances instantly; the server
+    // save completes in the background (failures are logged and toasted).
+    this.items = this.items.filter(x => x.id !== rec.id);
+    this._wildcards = this._wildcards.filter(x => x.id !== rec.id);
     try {
       const r = await addRole({
         url: rec.url,
@@ -368,17 +317,91 @@ export class JobRecommendationsTable extends LitElement {
         source: 'Network',
         fromRecommendationId: rec.id,
       });
-      this.items = this.items.filter(x => x.id !== rec.id);
-      this._wildcards = this._wildcards.filter(x => x.id !== rec.id);
       document.dispatchEvent(new CustomEvent('job:pipeline:refresh', { detail: { slug: r.slug } }));
       document.dispatchEvent(new CustomEvent('job:pipeline:added', {
         detail: { role: { slug: r.slug, company: r.company || rec.company, title: r.title || rec.title } },
       }));
     } catch (e) {
       console.warn('[recs-table] add failed', e);
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Couldn't save ${rec.title || 'role'} — try again from Show all` } }));
     } finally {
       this.addingId = null;
     }
+  }
+
+  // "Watch <company>" — green-light the company as a direct source. The
+  // server resolves the careers backend (major-tech registry or an ATS
+  // board probe); unsupported companies surface the server's message.
+  async _onWatchCompany(r) {
+    const company = r.company;
+    if (!company) return;
+    try {
+      await watchCompany({ company });
+      document.dispatchEvent(new CustomEvent('job:watch:added', { detail: { company } }));
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds your Inbox now` } }));
+    } catch (e) {
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: e.message || `Couldn't watch ${company}` } }));
+      console.warn('[recs-table] watchCompany failed', e);
+    }
+  }
+
+  async _onBlockCompany(r) {
+    const company = r.company;
+    if (!company) return;
+    // Optimistic: drop every loaded row from this company immediately.
+    const norm = company.toLowerCase().trim();
+    this.items = this.items.filter(x => (x.company || '').toLowerCase().trim() !== norm);
+    this.requestUpdate();
+    try {
+      await blockCompany(company);
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Won't recommend ${company} anymore` } }));
+    } catch (e) {
+      console.warn('[recs-table] blockCompany failed', e);
+    }
+  }
+
+  // ----- Review overlay --------------------------------------------------
+
+  _openReview(index) { this._reviewIndex = index; }
+  _closeReview()     { this._reviewIndex = null; }
+
+  _renderReview() {
+    if (this._reviewIndex == null) return nothing;
+    const rows = this._sorted();
+    // Items removed out from under the overlay (save/dismiss/block) shift
+    // the queue; clamp, and close when it's drained.
+    if (!rows.length) { return nothing; }
+    const index = Math.min(this._reviewIndex, rows.length - 1);
+    return html`
+      <ladder-review-overlay
+        .items=${rows}
+        .index=${index}
+        @review-close=${() => this._closeReview()}
+        @review-save=${(e) => this._onAdd(e.detail.rec)}
+        @review-dismiss=${(e) => this._onDismiss(e.detail.rec)}
+        @review-watch=${(e) => this._onWatchCompany(e.detail.rec)}
+        @review-block=${(e) => this._onBlockCompany(e.detail.rec)}
+      ></ladder-review-overlay>
+    `;
+  }
+
+  // ----- Inbox list --------------------------------------------------------
+
+  _sorted() {
+    return Array.isArray(this.items) ? this.items : [];
+  }
+
+  _groups() {
+    const rows = this._sorted();
+    const groups = [];
+    const byLabel = new Map();
+    rows.forEach((r, i) => {
+      const label = dayLabel(r.suggestedAt);
+      let g = byLabel.get(label);
+      if (!g) { g = { label, rows: [] }; byLabel.set(label, g); groups.push(g); }
+      g.rows.push({ rec: r, index: i });
+    });
+    return groups;
   }
 
   _renderLogo(r) {
@@ -400,154 +423,64 @@ export class JobRecommendationsTable extends LitElement {
     `;
   }
 
-  _renderHeader() {
-    const multi = this._sortLayers.length > 1;
+  _renderInboxRow({ rec, index }) {
+    const sub = [rec.company, rec.location].filter(Boolean).join(' · ');
     return html`
-      <tr>
-        ${COLUMNS.map(c => {
-          const cls = `col col-${c.id}`;
-          if (!c.sortKey) return html`<th class=${cls}>${c.label}</th>`;
-          const idx = this._layerIndex(c.sortKey);
-          const layer = idx >= 0 ? this._sortLayers[idx] : null;
-          const arrow = layer ? (layer.dir === 'asc' ? '↑' : '↓') : '↕';
-          return html`
-            <th class=${cls}>
-              <button class=${'th-sort' + (layer ? ' is-active' : '')}
-                      title=${layer ? `Sort layer ${idx + 1} — click to toggle / re-prioritize` : 'Click to sort; click another column to layer'}
-                      @click=${() => this._onSortClick(c)}>
-                <span>${c.label}</span>
-                <span class="th-sort__arrow">${arrow}</span>
-                ${layer && multi ? html`<span class="th-sort__rank">${idx + 1}</span>` : nothing}
-              </button>
-            </th>
-          `;
-        })}
-      </tr>
+      <li class="inbox-row" role="listitem">
+        <button class="inbox-row__main" @click=${() => this._openReview(index)}>
+          ${this._renderLogo(rec)}
+          <span class="inbox-row__text">
+            <span class="inbox-row__title">${rec.title || '(untitled)'}</span>
+            ${sub ? html`<span class="inbox-row__sub">${sub}</span>` : nothing}
+          </span>
+        </button>
+        <button class="btn btn--sm inbox-row__review" @click=${() => this._openReview(index)}>
+          Review <span aria-hidden="true">→</span>
+        </button>
+      </li>
     `;
   }
 
-  _onRowClick(r, e) {
-    if (e.target.closest('button, a, .row-menu, .fit-pill--button')) return;
-    // Row click → pre-save detail page, in a NEW tab so browsing the list
-    // is never hijacked. The external posting link lives on that page.
-    const detail = `/ladder/jobs/${roleSlug(r.company, r.title)}/?rec=${r.id}`;
-    window.open(detail, '_blank', 'noopener');
+  _renderGroups() {
+    const groups = this._groups();
+    return html`
+      ${groups.map(g => html`
+        <section class="inbox-group">
+          <header class="inbox-group__head">
+            <h2 class="inbox-group__label">${g.label}</h2>
+            <span class="inbox-group__count muted">${g.rows.length} ${g.rows.length === 1 ? 'role' : 'roles'}</span>
+          </header>
+          <ul class="inbox-card" role="list">
+            ${g.rows.map(row => this._renderInboxRow(row))}
+          </ul>
+        </section>
+      `)}
+    `;
   }
 
-  _renderRow(r) {
+  // Header ⋯ menu: the operational controls (refresh, floor toggle,
+  // expiry info) that used to crowd the page header.
+  _renderHeaderMenu() {
     return html`
-      <tr class="pipeline-row" @click=${(e) => this._onRowClick(r, e)}>
-        <td class="col col-fit" data-label="Fit">
-          ${this._scorePill(r.fitScore, () => this._openFitModal(r), 'Fit score — tap for breakdown')}
-        </td>
-        <td class="col col-strength" data-label="Strength">
-          ${this._scorePill(r.candidateScore, () => this._openCandidateModal(r), 'Candidate strength — tap for breakdown')}
-        </td>
-        <td class="col col-role role-cell" data-label="Role">
-          <div class="role-cell__inner">
-            ${this._renderLogo(r)}
-            <div class="role-cell__text">
-              <div class="role-cell__title">${r.title || '(untitled)'}</div>
-              <div class="role-cell__company">${r.company || ''}</div>
-              ${renderLocation(r.location)}
-            </div>
-          </div>
-        </td>
-        <td class="col col-source" data-label="Source">
-          ${renderSource(r)}
-          ${r.enrichmentStatus === 'unresolved' ? html`
-            <span class="enrichment-badge" title="Still resolving the canonical posting. Aggregator URL in the meantime.">verifying</span>
-          ` : nothing}
-          ${r.sourceEmailUrl ? html`
-            <a class="rec-source-email" href=${r.sourceEmailUrl} target="_blank" rel="noopener"
-               title="Open the originating email in Gmail" @click=${(e) => e.stopPropagation()}>📧</a>
-          ` : nothing}
-        </td>
-        <td class="col col-added" data-label="Added">
-          <span class="muted">${r.suggestedAt ? relTime(r.suggestedAt) : ''}</span>
-        </td>
-        <td class="col col-menu">
-          <div class="rec-actions">
-            <button class="btn btn--sm btn--accent"
-                    aria-label=${this.addingId === r.id ? 'Saving' : 'Save role'}
-                    title=${this.addingId === r.id ? 'Saving…' : 'Save role'}
-                    ?disabled=${this.addingId === r.id}
-                    @click=${() => this._onAdd(r)}>
-              <span class="btn-icon" aria-hidden="true">${this.addingId === r.id ? '…' : '✓'}</span>
-              <span class="btn-label">${this.addingId === r.id ? 'Saving…' : 'Save'}</span>
+      <div class="row-menu page-menu">
+        <button class="row-menu__trigger" aria-label="List options" title="List options"
+                @click=${(e) => { e.stopPropagation(); this._menuOpen = !this._menuOpen; }}>⋯</button>
+        ${this._menuOpen ? html`
+          <div class="row-menu__pop" @click=${(e) => e.stopPropagation()}>
+            <button class="row-menu__item" ?disabled=${this._refreshing}
+                    @click=${() => { this._menuOpen = false; this._onRefresh(); }}>
+              ${this._refreshing ? 'Scanning…' : 'Refresh sources'}
             </button>
-            <button class="btn-dismiss" aria-label="Dismiss recommendation"
-                    title="Dismiss"
-                    @click=${() => this._onDismiss(r)}>×</button>
-            <div class="row-menu">
-              <button class="row-menu__trigger" aria-label="More actions" title="More"
-                      @click=${(e) => this._toggleMenu(r.id, e)}>⋯</button>
-              ${this._menuOpenId === r.id ? html`
-                <div class="row-menu__pop" @click=${(e) => e.stopPropagation()}>
-                  <button class="row-menu__item" @click=${() => this._onWatchCompany(r)}>
-                    Watch ${r.company || 'this company'}
-                  </button>
-                  <button class="row-menu__item" @click=${() => this._onBlockCompany(r)}>
-                    Don't recommend ${r.company || 'this company'}
-                  </button>
-                  <button class="row-menu__item" @click=${() => { this._onDismiss(r); this._menuOpenId = null; }}>
-                    Dismiss this role
-                  </button>
-                </div>
-              ` : nothing}
-            </div>
+            <button class="row-menu__item" @click=${() => { this._menuOpen = false; this._toggleFloor(); }}>
+              ${this._floorOn ? 'Show below-floor roles' : 'Re-apply quality floors'}
+            </button>
+            ${this._recentlyExpired > 0 ? html`
+              <div class="row-menu__info muted">${this._recentlyExpired} expired removed this week</div>
+            ` : nothing}
           </div>
-        </td>
-      </tr>
+        ` : nothing}
+      </div>
     `;
-  }
-
-  // Single score pill (Fit or Strength). null score renders an em dash.
-  _scorePill(score, onClick, title) {
-    const cls = fitClass(score) + ' fit-pill--button';
-    return html`
-      <button class=${cls} title=${title}
-              @click=${(e) => { e.stopPropagation(); onClick(); }}>
-        ${score == null ? '—' : Math.round(score)}
-      </button>`;
-  }
-
-  _toggleMenu(id, e) {
-    e.stopPropagation();
-    this._menuOpenId = this._menuOpenId === id ? null : id;
-  }
-
-  // "Watch <company>" — green-light the company as a direct source. The
-  // server resolves the careers backend (major-tech registry or an ATS
-  // board probe); unsupported companies surface the server's message.
-  async _onWatchCompany(r) {
-    const company = r.company;
-    this._menuOpenId = null;
-    if (!company) return;
-    try {
-      await watchCompany({ company });
-      document.dispatchEvent(new CustomEvent('job:watch:added', { detail: { company } }));
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — its careers page feeds For You now` } }));
-    } catch (e) {
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: e.message || `Couldn't watch ${company}` } }));
-      console.warn('[recs-table] watchCompany failed', e);
-    }
-  }
-
-  async _onBlockCompany(r) {
-    const company = r.company;
-    this._menuOpenId = null;
-    if (!company) return;
-    // Optimistic: drop every loaded row from this company immediately.
-    const norm = company.toLowerCase().trim();
-    this.items = this.items.filter(x => (x.company || '').toLowerCase().trim() !== norm);
-    this.requestUpdate();
-    try {
-      await blockCompany(company);
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Won't recommend ${company} anymore` } }));
-    } catch (e) {
-      console.warn('[recs-table] blockCompany failed', e);
-    }
   }
 
   // --- Wildcards strip -------------------------------------------------
@@ -602,7 +535,7 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <section class="rec-wildcards" aria-label="Wildcards">
         <header class="rec-shell__head rec-wildcards__head">
-          <h2>🃏 Wildcards</h2>
+          <h2>Wildcards</h2>
           <span class="muted">Roles where you'd likely be a standout candidate — but that flunk your stated criteria. A litmus test for the litmus.</span>
         </header>
         <div class="rec-row rec-row--wildcards" role="list">
@@ -616,20 +549,24 @@ export class JobRecommendationsTable extends LitElement {
     if (this.state === 'idle' || this.state === 'loading') {
       return html`
         <header class="recs-page__head">
-          <h1>For You</h1>
+          <h1>Inbox</h1>
         </header>
-        <div class="pipeline-table-wrap">
-          <table class="pipeline-table pipeline-table--recs">
-            <thead>${this._renderHeader()}</thead>
-            <tbody>
-              ${Array.from({ length: 6 }).map(() => html`
-                <tr class="skeleton-row">
-                  ${COLUMNS.map(c => html`<td class=${`col col-${c.id}`}><span class="skeleton" style="width:80%;height:14px;display:inline-block;"></span></td>`)}
-                </tr>
-              `)}
-            </tbody>
-          </table>
-        </div>
+        <section class="inbox-group" aria-hidden="true">
+          <header class="inbox-group__head">
+            <span class="skeleton" style="width:96px;height:20px;display:inline-block;"></span>
+          </header>
+          <ul class="inbox-card" role="list">
+            ${Array.from({ length: 5 }).map(() => html`
+              <li class="inbox-row inbox-row--skeleton">
+                <span class="skeleton" style="width:44px;height:44px;border-radius:12px;"></span>
+                <span class="inbox-row__text">
+                  <span class="skeleton" style="width:60%;height:16px;display:inline-block;"></span>
+                  <span class="skeleton" style="width:40%;height:12px;display:inline-block;"></span>
+                </span>
+              </li>
+            `)}
+          </ul>
+        </section>
       `;
     }
     if (this.state === 'error') {
@@ -641,55 +578,35 @@ export class JobRecommendationsTable extends LitElement {
     const rows = this._sorted();
     return html`
       <header class="recs-page__head">
-        <h1>For You</h1>
+        <h1>Inbox</h1>
         <span class="muted">${this._total > rows.length
           ? `${rows.length} of ${this._total} roles`
           : `${rows.length} ${rows.length === 1 ? 'role' : 'roles'}`}</span>
-        ${this._recentlyExpired > 0 ? html`
-          <span class="muted recs-page__pruned"
-                title="Postings the liveness checks found expired and removed in the last 7 days">
-            · ${this._recentlyExpired} expired removed
-          </span>
-        ` : nothing}
-        <button class="link-subtle recs-page__floor-toggle"
-                title=${this._floorOn
-                  ? 'Quality floors on: fit ≥ 50, strength ≥ 50, no hard fails, graded only. Click to see everything.'
-                  : 'Showing everything, including below-floor and ungraded roles. Click to re-apply the quality floors.'}
-                @click=${() => this._toggleFloor()}>
-          ${this._floorOn ? 'Below-floor hidden · show all' : 'Showing all · apply floors'}
-        </button>
-        <button class="btn btn--sm recs-page__refresh" ?disabled=${this._refreshing}
-                title="Scan Gmail for new role alerts and application updates"
-                @click=${() => this._onRefresh()}>
-          ${this._refreshing ? 'Scanning…' : '↻ Refresh'}
-        </button>
-        ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
-        ${this._sortLayers.length ? html`
-          <button class="btn btn--sm recs-page__clearsort" title="Back to best-match order"
-                  @click=${() => this._clearSort()}>
-            Sorted by ${this._sortLayers.map(l => l.key === 'candidateScore' ? 'Strength' : l.key === 'fitScore' ? 'Fit' : l.key === 'suggestedAt' ? 'Date' : l.key).join(' › ')} · reset
+        ${!this._floorOn ? html`
+          <button class="link-subtle recs-page__floor-toggle" @click=${() => this._toggleFloor()}>
+            Showing all · apply floors
           </button>
         ` : nothing}
+        ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
+        ${this._renderHeaderMenu()}
       </header>
       ${this._renderHealthBanner()}
-      ${this._renderWildcards()}
       ${rows.length === 0 ? html`
         <div class="placeholder">
-          <h2>No recommendations yet</h2>
-          <p>New ones land here as soon as the workers pull fresh roles.</p>
+          <h2>All caught up</h2>
+          <p>New roles land here as soon as the workers pull them.</p>
         </div>
       ` : html`
-        <div class="pipeline-table-wrap">
-          <table class="pipeline-table pipeline-table--recs">
-            <thead>${this._renderHeader()}</thead>
-            <tbody>${rows.map(r => this._renderRow(r))}</tbody>
-          </table>
+        <div class="inbox">
+          ${this._renderGroups()}
           ${this._hasMore ? html`
             <div class="recs-sentinel" aria-hidden="true"></div>
             <div class="recs-loadmore muted">${this._loadingMore ? 'Loading more…' : ''}</div>
           ` : nothing}
         </div>
       `}
+      ${this._renderWildcards()}
+      ${this._renderReview()}
       ${renderScoreModal(this.selectedRec, () => this._closeFitModal(), this.selectedScoreWhich || 'fit')}
     `;
   }

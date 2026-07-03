@@ -6,6 +6,34 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-07-02] - For You Quality Floors, Wildcards Strip & Pre-Save Detail Page
+
+### Added
+- **For You quality floors** — recommendations fn: strength (candidate_score) floor raised 30→50; ungraded rows = "pending" (hidden until graded); floors now apply to the For You table by default via `view=all&floor=1` with a header toggle "Below-floor hidden · show all"; `view=all` without floor is the unfiltered audit surface.
+- **Wildcards strip** — new `view=wildcard` (candidate_score ≥ 65, fit < 50, hard-fails allowed) rendered as a compact dashed-card strip on `/ladder/jobs/recommended/`; each card leads with the weakest fit dimensions ("why low fit"). Purpose: pressure-test user's search criteria.
+- **Pre-save rec detail page** — new `ladder-rec-detail` component at `/ladder/jobs/<slug>/?rec=<id>` (404-rewrite into jobs/drill, app.js swaps the mount when `?rec` present): fit + strength breakdowns, summaries, match bullets, JD, Save/Dismiss/Open-posting. For You clicks (table rows, card titles) open it in a new tab; recommendations fn gained `?id=<uuid>` single-rec lookup.
+
+### Changed
+- Removed the unmounted For You carousel (`ladder-recommendations.js`) — dead code; the table page is the For You surface.
+- **Wellfound Gmail source fixed** — sender is `team@hi.wellfound.com`; the `@wellfound.com` allowlist entry never matched under `includes()`; changed to domain-suffix `wellfound.com` + "more matches" digest hint.
+- **Counter truthfulness** — rail/subnav For You badge now counts the floored view (was unfiltered).
+- **Dismissed roles stay dismissed** — ingest dedup in `pull-recommendations` now checks ALL recs incl. dismissed (was only active), so weekly digests can't resurrect dismissed roles; 24 retroactively re-dismissed.
+
+### Versions Bumped
+- `ladder` v2.13.0 → v2.14.2 (floor toggle + wildcards + detail page + Wellfound fix + badge truthfulness)
+- `recommendations` v0.14.0 → v0.15.0-merged (floor apply + wildcards view + single-rec lookup)
+- `pull-recommendations` v0.23.1 → v0.25.1 (Wellfound source fix + dismissed dedup)
+
+### Infrastructure
+- Functions deployed: `recommendations`, `pull-recommendations`.
+- Historical: 56 Wellfound roles processed (5 pass floors, 51 below floor); 24 previously-dismissed roles retroactively re-dismissed to prevent digest resurrection.
+
+### Notes
+- Ops: gmail drain hits ~150s edge wall clock when processing many digests; temporary mitigation = set `maxMessagesPerRun=2` and loop; cursor = `job.gmail_scan_state` (history_id + last_scan_at).
+- Floors apply at read time (GET /recommendations); impact: ~90% of For You roles now hidden by default (candidate_score < 50); hidden roles remain in DB for analysis.
+
+---
+
 ## [2026-06-19] - Product rename: /job → /ladder (frontend + branding)
 
 ### Changed

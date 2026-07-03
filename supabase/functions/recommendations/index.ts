@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.15.0';
-console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the quality-floor + wildcard gates`);
+const VERSION = '0.17.0';
+console.log(`[recommendations] v${VERSION} - ?view=blocked lists the caller's don't-recommend companies`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -34,6 +34,17 @@ serve(async (req) => {
       //                  (drives the carousel).
       const url = new URL(req.url);
 
+      // ?view=blocked → the caller's "don't recommend" company list, for
+      // the Search plan → Rules card. Unblock goes through the existing
+      // POST { unblockCompany } action.
+      if (url.searchParams.get('view') === 'blocked') {
+        const rows = await sql<{ company_norm: string; created_at: string }[]>`
+          select company_norm, created_at from job.blocked_companies
+           where user_email = ${email}
+           order by created_at desc`;
+        return jsonResp({ blocked: rows.map(r => ({ company: r.company_norm, blockedAt: r.created_at })) });
+      }
+
       // ?id=<uuid> → single-rec lookup for the pre-save detail page.
       // Returns the row regardless of score/dismissed/closed state (the
       // page renders those states itself), scoped to the caller's rows.
@@ -49,6 +60,7 @@ serve(async (req) => {
                  r.candidate_rationales as "candidateRationales", r.candidate_summary as "candidateSummary",
                  r.comp_acceptable as "compAcceptable",
                  r.hard_fails as "hardFails", r.sector,
+                 r.company_description as "companyDescription",
                  r.enrichment_status as "enrichmentStatus",
                  r.canonical_url as "canonicalUrl",
                  r.dismissed_at as "dismissedAt", r.closed_at as "closedAt",
@@ -225,6 +237,7 @@ serve(async (req) => {
                r.candidate_rationales as "candidateRationales", r.candidate_summary as "candidateSummary",
                r.comp_acceptable as "compAcceptable",
                r.hard_fails as "hardFails", r.sector,
+               r.company_description as "companyDescription",
                r.enrichment_status as "enrichmentStatus",
                r.enrichment_retry_at as "enrichmentRetryAt",
                r.canonical_url as "canonicalUrl",
