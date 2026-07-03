@@ -14,8 +14,8 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.2.0'
-console.log(`[scrape-discord-events] v${VERSION} - inspect + raw export actions`)
+const VERSION = '1.3.0'
+console.log(`[scrape-discord-events] v${VERSION} - canonical store forwarding (posted_by, recommended_by, per-message attribution)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -240,6 +240,8 @@ interface ExtractedEvent {
   ages: string
   promoter: string
   url: string
+  msg?: number       // 1-based index of the source message within the batch
+  postedBy?: string  // Discord author of the source message
 }
 
 function buildExtractionPrompt(messages: Array<{ content: string; timestamp: string; authorIsBot: boolean }>, today: string): string {
@@ -262,6 +264,7 @@ Rules:
 
 Output ONLY a JSON array (no markdown, no explanation):
 [{
+  "msg": <number of the source message the event came from, e.g. 1>,
   "date": "YYYY-MM-DD",
   "time": "HH:MM" or "HH:MM-HH:MM" or "",
   "name": "event title",
@@ -308,7 +311,7 @@ async function extractEventsWithAI(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -329,9 +332,17 @@ async function extractEventsWithAI(
 
       if (Array.isArray(parsed)) {
         for (const event of parsed) {
-          if (!event.url && batch[0]) {
-            event.url = messagePermalink(guildId, channelId, batch[0].id)
+          // Map the event back to its source message (1-based "msg" index)
+          // for author attribution and a permalink URL fallback.
+          const idx = typeof event.msg === 'number' ? event.msg - 1 : 0
+          const srcMsg = batch[idx] || batch[0]
+          if (srcMsg) {
+            event.postedBy = srcMsg.author?.username || ''
+            if (!event.url) {
+              event.url = messagePermalink(guildId, channelId, srcMsg.id)
+            }
           }
+          delete event.msg
           allEvents.push(event)
         }
       }
@@ -414,7 +425,68 @@ async function scrapeAndCache(
   const lastMessageId = messages.length > 0 ? messages[0].id : undefined
   await writeCache(guildId, channelId, events, meta, lastMessageId)
 
+  // Forward into the canonical event store (PRD event-source-architecture).
+  // cache-events computes visibility from the source's class ('curation' →
+  // private), runs the dedup ladder, and triggers enrichment.
+  try {
+    const forwarded = await forwardToCanonicalStore(events)
+    meta.canonicalStore = forwarded
+  } catch (err) {
+    console.error('Canonical store forward failed:', (err as Error).message)
+    meta.canonicalStore = { error: (err as Error).message }
+  }
+
   return { events, meta }
+}
+
+const AGAPE_SOURCE_ID = 'discord-agape-events'
+
+async function forwardToCanonicalStore(events: ExtractedEvent[]): Promise<Record<string, unknown>> {
+  if (events.length === 0) return { cached: 0, updated: 0 }
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+  const payload = events.map(ev => ({
+    source: AGAPE_SOURCE_ID,
+    date: ev.date,
+    time: ev.time || '',
+    name: ev.name,
+    venue: ev.venue || 'TBA',
+    address: ev.address || '',
+    city: ev.city || 'San Francisco',
+    genre: ev.genre || '',
+    price: ev.price || '',
+    ages: ev.ages || '',
+    promoter: ev.promoter || '',
+    url: ev.url,
+    postedBy: ev.postedBy || '',
+    recommendedBy: ['agape'],
+  }))
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/cache-events`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({
+      events: payload,
+      sourceOutcomes: [{
+        sourceId: AGAPE_SOURCE_ID,
+        sourceName: 'Agape #events',
+        sourceUrl: 'discord://agape/#events',
+        sourceType: 'discord',
+        eventCount: events.length,
+        ok: true,
+      }],
+    }),
+  })
+  if (!resp.ok) {
+    throw new Error(`cache-events ${resp.status}: ${(await resp.text()).slice(0, 200)}`)
+  }
+  const result = await resp.json()
+  console.log(`Canonical store: cached=${result.cached} updated=${result.updated}`)
+  return { cached: result.cached, updated: result.updated, enrichQueued: result.enrichQueued }
 }
 
 // --- Main handler ---

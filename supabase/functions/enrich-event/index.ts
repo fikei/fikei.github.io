@@ -6,8 +6,8 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
-const VERSION = '1.1.0'
-console.log(`[enrich-event] v${VERSION} - event enrichment with stuck-state recovery`)
+const VERSION = '1.1.1'
+console.log(`[enrich-event] v${VERSION} - retired Haiku model replaced (claude-3-haiku -> haiku-4-5)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -48,6 +48,19 @@ const ALLOWED_DOMAINS = [
   'citylights.com',
   'sfpl.org',
   'commonwealthclub.org',
+  // Event platforms from the Agape curation feed (PRD source-architecture §4.1:
+  // platform pages are the canonical fact source for Discord-announced events)
+  'partiful.com',
+  'lu.ma',
+  'luma.com',
+  'shotgun.live',
+  'tixr.com',
+  'seetickets.us',
+  'meetup.com',
+  'grayarea.org',
+  'thelab.org',
+  'bottomofthehill.com',
+  'thechapelsf.com',
 ]
 
 function isDomainAllowed(url: string): boolean {
@@ -222,7 +235,7 @@ Respond with JSON only: {"genre": "...", "content_type": "..."}`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
         messages: [{ role: 'user', content: prompt }],
       }),

@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.5.1'
-console.log(`[cache-events] v${VERSION} - chunked existence check + duplicate-proof inserts (unchunked .in() silently failed, killing batches)`)
+const VERSION = '1.6.0'
+console.log(`[cache-events] v${VERSION} - source classes, visibility, URL-first dedup ladder + tiered fuzzy match (PRD source-architecture)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -72,6 +72,227 @@ interface ScrapedEvent {
   promoter?: string
   url: string
   contentType?: string
+  description?: string
+  postedBy?: string
+  recommendedBy?: string[]
+}
+
+// --- Source classes & visibility (PRD event-source-architecture §2–3) ---
+
+interface SourceMeta { source_class: string; demoted: boolean }
+
+async function loadSourceClasses(supabase: ReturnType<typeof createClient>): Promise<Map<string, SourceMeta>> {
+  const map = new Map<string, SourceMeta>()
+  const { data } = await supabase.from('event_sources').select('id, source_class, demoted')
+  for (const row of data || []) {
+    map.set(row.id as string, { source_class: (row.source_class as string) || 'discovery', demoted: !!row.demoted })
+  }
+  return map
+}
+
+// Visibility by source class: curation (Agape) and private-ticketing rows are
+// always private; demoted discovery feeds are private until corroborated by
+// the Agape channel (upgrade handled in resolveCanonicalKeys); everything
+// else is public.
+function visibilityFor(sourceId: string, classes: Map<string, SourceMeta>): 'public' | 'private' {
+  const meta = classes.get(sourceId)
+  if (!meta) return 'public'
+  if (meta.source_class === 'curation' || meta.source_class === 'private-ticketing') return 'private'
+  if (meta.demoted) return 'private'
+  return 'public'
+}
+
+// --- Canonical URL (dedup ladder rung 1) ---
+// Only per-event pages on known platforms qualify — a canonical URL must
+// uniquely identify one event, so venue homepages and generic listings are
+// excluded to avoid welding unrelated events together.
+
+const EVENT_URL_PATTERNS: RegExp[] = [
+  /^https?:\/\/partiful\.com\/e\/[\w-]+$/,
+  /^https?:\/\/(?:[a-z]{2}\.)?ra\.co\/events\/\d+$/,
+  /^https?:\/\/lu\.ma\/[\w.-]+$/,
+  /^https?:\/\/eventbrite\.com\/e\/[\w-]+$/,
+  /^https?:\/\/dice\.fm\/(?:event|partner)\/[\w/-]+$/,
+  /^https?:\/\/shotgun\.live\/(?:[a-z]{2}\/)?events\/[\w-]+$/,
+  /^https?:\/\/tixr\.com\/groups\/[\w-]+\/events\/[\w-]+$/,
+  /^https?:\/\/[\w-]+\.secretparty\.io\/[\w-]+$/,
+  /^https?:\/\/(?:wl\.)?seetickets\.us\/event\/[\w/-]+$/,
+  /^https?:\/\/meetup\.com\/[\w-]+\/events\/\d+$/,
+]
+
+function canonicalizeEventUrl(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  try {
+    const u = new URL(raw)
+    u.hash = ''
+    u.search = ''
+    let s = u.toString().toLowerCase().replace(/\/+$/, '')
+    s = s.replace('://www.', '://').replace('://luma.com/', '://lu.ma/')
+    return EVENT_URL_PATTERNS.some(p => p.test(s)) ? s : null
+  } catch {
+    return null
+  }
+}
+
+// --- Fuzzy venue+date+name match (dedup ladder rung 2) ---
+// Only runs for curation-class rows at known nightlife venues, where the
+// collision probability with 19hz/RA is high (PRD §4 conservative policy:
+// prefer duplicate cards over false merges everywhere else).
+
+const NIGHTLIFE_VENUES = [
+  'public works', 'the midway', 'midway', 'great northern', '1015 folsom',
+  'f8', '1192 folsom', 'audio', 'undergroundsf', 'underground sf', 'gray area',
+  'monarch', 'halcyon', 'dna lounge', 'the endup', 'temple', 'the foundry',
+  'el rio', 'rickshaw stop', 'brick and mortar', 'bottom of the hill',
+  'the chapel', 'the independent', 'bimbos 365', 'new parish', 'fox oakland',
+  'the knockout', 'make out room', 'public sf', 'phoenix hotel',
+]
+
+function isNightlifeVenue(venue: string): boolean {
+  const nv = normalizeForKey(venue).replace(/^the /, '')
+  if (!nv) return false
+  return NIGHTLIFE_VENUES.some(w => {
+    const wv = w.replace(/^the /, '')
+    if (nv === wv) return true
+    if (wv.length > 4 && (nv.includes(wv) || wv.includes(nv))) return true
+    return false
+  })
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  const m = a.length, n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  let prev = Array.from({ length: n + 1 }, (_, i) => i)
+  for (let i = 1; i <= m; i++) {
+    const cur = [i]
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    }
+    prev = cur
+  }
+  return prev[n]
+}
+
+function fuzzyNameMatch(a: string, b: string): boolean {
+  const na = normalizeForKey(a).replace(/[^a-z0-9 ]/g, '')
+  const nb = normalizeForKey(b).replace(/[^a-z0-9 ]/g, '')
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.length >= 6 && nb.length >= 6 && (na.includes(nb) || nb.includes(na))) return true
+  return levenshtein(na, nb) <= 3
+}
+
+function fuzzyVenueMatch(a: string, b: string): boolean {
+  const na = normalizeForKey(a).replace(/^the /, '').replace(/[^a-z0-9 ]/g, '')
+  const nb = normalizeForKey(b).replace(/^the /, '').replace(/[^a-z0-9 ]/g, '')
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.length >= 5 && nb.length >= 5 && (na.includes(nb) || nb.includes(na))) return true
+  return levenshtein(na, nb) <= 2
+}
+
+// --- Dedup ladder (PRD §4): mutate rows in place to adopt canonical identity ---
+// Rung 1: canonical URL match against existing rows (any direction — a public
+//         listing arriving after a Discord post adopts the Discord row's key,
+//         and vice versa, so merges are stable regardless of timing).
+// Rung 2: curation rows at nightlife venues fuzzy-match venue+date+name.
+// Rung 3: corroboration upgrades — demoted-feed rows sharing identity with an
+//         Agape row become public (PRD §2.1); direction-agnostic.
+async function resolveCanonicalKeys(
+  supabase: ReturnType<typeof createClient>,
+  rows: Record<string, unknown>[],
+  classes: Map<string, SourceMeta>,
+): Promise<{ urlAdopted: number; fuzzyAdopted: number; upgraded: number }> {
+  let urlAdopted = 0, fuzzyAdopted = 0, upgraded = 0
+
+  // Rung 1: URL adoption
+  const urls = [...new Set(rows.map(r => r.canonical_url as string | null).filter(Boolean))] as string[]
+  const urlToKey = new Map<string, string>()
+  for (let i = 0; i < urls.length; i += 100) {
+    const chunk = urls.slice(i, i + 100)
+    const { data } = await supabase
+      .from('events')
+      .select('canonical_url, canonical_key')
+      .in('canonical_url', chunk)
+    for (const row of data || []) {
+      if (row.canonical_url && row.canonical_key) urlToKey.set(row.canonical_url as string, row.canonical_key as string)
+    }
+  }
+  for (const r of rows) {
+    const cu = r.canonical_url as string | null
+    if (cu && urlToKey.has(cu) && r.canonical_key !== urlToKey.get(cu)) {
+      r.canonical_key = urlToKey.get(cu)
+      urlAdopted++
+    }
+  }
+
+  // Rung 2: tiered fuzzy match for curation rows at nightlife venues
+  const fuzzyRows = rows.filter(r =>
+    classes.get(r.source_id as string)?.source_class === 'curation' &&
+    isNightlifeVenue((r.venue as string) || '')
+  )
+  if (fuzzyRows.length > 0) {
+    const dates = [...new Set(fuzzyRows.map(r => r.date as string))]
+    const { data: candidates } = await supabase
+      .from('events')
+      .select('date, name, venue, canonical_key, source_id')
+      .in('date', dates.slice(0, 50))
+      .neq('source_id', fuzzyRows[0].source_id as string)
+    for (const r of fuzzyRows) {
+      const match = (candidates || []).find(c =>
+        c.date === r.date &&
+        fuzzyVenueMatch(c.venue as string, r.venue as string) &&
+        fuzzyNameMatch(c.name as string, r.name as string)
+      )
+      if (match && match.canonical_key && r.canonical_key !== match.canonical_key) {
+        r.canonical_key = match.canonical_key
+        fuzzyAdopted++
+      }
+    }
+  }
+
+  // Rung 3: corroboration upgrades for demoted feeds
+  const demotedIds = [...classes.entries()].filter(([, m]) => m.demoted).map(([id]) => id)
+  if (demotedIds.length > 0) {
+    // 3a. Incoming demoted rows already corroborated by a stored Agape row → public
+    const demotedRows = rows.filter(r => demotedIds.includes(r.source_id as string))
+    if (demotedRows.length > 0) {
+      const keys = [...new Set(demotedRows.map(r => r.canonical_key as string))]
+      const corroborated = new Set<string>()
+      for (let i = 0; i < keys.length; i += 100) {
+        const { data } = await supabase
+          .from('events')
+          .select('canonical_key')
+          .in('canonical_key', keys.slice(i, i + 100))
+          .eq('source_id', 'discord-agape-events')
+        for (const row of data || []) corroborated.add(row.canonical_key as string)
+      }
+      for (const r of demotedRows) {
+        if (corroborated.has(r.canonical_key as string) && r.visibility !== 'public') {
+          r.visibility = 'public'
+          upgraded++
+        }
+      }
+    }
+    // 3b. Incoming Agape rows corroborate stored demoted rows → flip them public
+    const agapeKeys = [...new Set(rows
+      .filter(r => classes.get(r.source_id as string)?.source_class === 'curation')
+      .map(r => r.canonical_key as string))]
+    for (let i = 0; i < agapeKeys.length; i += 100) {
+      const { data } = await supabase
+        .from('events')
+        .update({ visibility: 'public' })
+        .in('canonical_key', agapeKeys.slice(i, i + 100))
+        .in('source_id', demotedIds)
+        .eq('visibility', 'private')
+        .select('id')
+      upgraded += data?.length || 0
+    }
+  }
+
+  return { urlAdopted, fuzzyAdopted, upgraded }
 }
 
 interface SourceOutcome {
@@ -253,6 +474,9 @@ serve(async (req: Request) => {
     const newEventIds: string[] = []
     const errors: string[] = []
 
+    // Source taxonomy: class + demoted flag drive visibility and the dedup ladder
+    const sourceClasses = await loadSourceClasses(supabase)
+
     // Build rows with event keys
     const rows = await Promise.all(events.map(async (ev) => {
       if (!ev.source || !ev.date || !ev.name || !ev.venue || !ev.url) return null
@@ -261,6 +485,8 @@ serve(async (req: Request) => {
       return {
         event_key: eventKey,
         canonical_key: canonicalKey,
+        canonical_url: canonicalizeEventUrl(ev.url),
+        visibility: visibilityFor(ev.source, sourceClasses),
         source_id: ev.source,
         date: ev.date,
         time: ev.time || null,
@@ -275,6 +501,8 @@ serve(async (req: Request) => {
         url: ev.url,
         content_type: ev.contentType || null,
         description: ev.description || null,
+        posted_by: ev.postedBy || null,
+        recommended_by: ev.recommendedBy && ev.recommendedBy.length > 0 ? ev.recommendedBy : null,
         scraped_at: new Date().toISOString(),
       }
     }))
@@ -283,6 +511,20 @@ serve(async (req: Request) => {
 
     if (validRows.length === 0) {
       return jsonResponse({ cached: 0, updated: 0, enrichQueued: 0, healthUpdated, errors: ['No valid events'] })
+    }
+
+    // Dedup ladder: adopt canonical identity from existing rows (URL first,
+    // then tiered fuzzy) and apply corroboration visibility upgrades.
+    let ladder = { urlAdopted: 0, fuzzyAdopted: 0, upgraded: 0 }
+    try {
+      ladder = await resolveCanonicalKeys(supabase, validRows, sourceClasses)
+      if (ladder.urlAdopted || ladder.fuzzyAdopted || ladder.upgraded) {
+        console.log(`[cache-events] Dedup ladder: urlAdopted=${ladder.urlAdopted} fuzzyAdopted=${ladder.fuzzyAdopted} upgraded=${ladder.upgraded}`)
+      }
+    } catch (err) {
+      // Non-fatal: rows keep their name/venue-derived canonical_key
+      console.error('[cache-events] Dedup ladder failed:', (err as Error).message)
+      errors.push(`Dedup ladder: ${(err as Error).message}`)
     }
 
     // Check which event_keys already exist. Chunked: .in() with 400 64-char
@@ -358,6 +600,8 @@ serve(async (req: Request) => {
       const patchRows = toUpdate.map(row => ({
         event_key: row.event_key,
         canonical_key: row.canonical_key,
+        canonical_url: row.canonical_url,
+        visibility: row.visibility,
         source_id: row.source_id,
         date: row.date,
         time: row.time,
@@ -369,6 +613,8 @@ serve(async (req: Request) => {
         ages: row.ages,
         promoter: row.promoter,
         url: row.url,
+        posted_by: row.posted_by,
+        recommended_by: row.recommended_by,
         scraped_at: row.scraped_at,
       }))
       const { data: upserted, error: upsertErr } = await supabase
