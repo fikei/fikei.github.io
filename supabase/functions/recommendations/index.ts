@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.16.0';
-console.log(`[recommendations] v${VERSION} - expose company_description on list + detail responses`);
+const VERSION = '0.17.0';
+console.log(`[recommendations] v${VERSION} - ?view=blocked lists the caller's don't-recommend companies`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -33,6 +33,17 @@ serve(async (req) => {
       // (default)      → fit floor 50 + strength floor 50, max 60 rows
       //                  (drives the carousel).
       const url = new URL(req.url);
+
+      // ?view=blocked → the caller's "don't recommend" company list, for
+      // the Search plan → Rules card. Unblock goes through the existing
+      // POST { unblockCompany } action.
+      if (url.searchParams.get('view') === 'blocked') {
+        const rows = await sql<{ company_norm: string; created_at: string }[]>`
+          select company_norm, created_at from job.blocked_companies
+           where user_email = ${email}
+           order by created_at desc`;
+        return jsonResp({ blocked: rows.map(r => ({ company: r.company_norm, blockedAt: r.created_at })) });
+      }
 
       // ?id=<uuid> → single-rec lookup for the pre-save detail page.
       // Returns the row regardless of score/dismissed/closed state (the

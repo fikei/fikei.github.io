@@ -207,6 +207,26 @@ export async function blockCompany(company) {
   return res.json();
 }
 
+// The caller's "don't recommend" list — [{ company, blockedAt }].
+export async function fetchBlockedCompanies() {
+  const headers = await authHeader();
+  const res = await fetch(`${REC_URL}?view=blocked`, { headers });
+  if (!res.ok) throw new Error(`blocked-companies ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  return Array.isArray(j.blocked) ? j.blocked : [];
+}
+
+export async function unblockCompany(company) {
+  const headers = await authHeader();
+  const res = await fetch(REC_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ unblockCompany: company }),
+  });
+  if (!res.ok) throw new Error(`unblock-company ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 // ----- Watched companies (job.watched_companies) ---------------------------
 // Green-lit companies pulled straight from their careers backends. Each has
 // a filter_mode gating how its roles surface in For You.
