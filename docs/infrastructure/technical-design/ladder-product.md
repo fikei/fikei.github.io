@@ -66,11 +66,13 @@
 /ladder/history/skills/{skill}/      → skill detail
 /ladder/history/wins/{win}/          → win detail
 /ladder/vision/             → goals + intents view
-/ladder/jobs/               → pipeline table
-/ladder/jobs/{role-slug}/   → per-role detail (fit-score breakdown + linked KB)
+/ladder/jobs/               → pipeline table (Saved roles)
+/ladder/jobs/recommended/   → For You table + Wildcards strip
+/ladder/jobs/<slug>/        → per-role detail (Saved role: fit-score breakdown + linked KB + activity + process tracker)
+/ladder/jobs/<slug>/?rec=<id> → pre-save rec detail (For You: fit + strength breakdowns, match bullets, JD, Save/Dismiss/Open-posting)
 ```
 
-Each route is a Jekyll layout that fetches data on load via Edge Function calls.
+Each route is a Jekyll layout that fetches data on load via Edge Function calls. The pre-save rec detail page uses a 404-rewrite to `jobs/drill` with app.js swapping the component mount when `?rec` parameter is present.
 
 ---
 
@@ -102,11 +104,66 @@ Writes a markdown file back to `fikei/job` via GitHub Contents API. Uses `baseSh
 **Commit:** authored as Ian via the PAT user. Commit message defaults to `chore: edit {path} via /ladder product`.
 **Cache invalidation:** clears the `kb-read` cache for that path on success.
 
+### `recommendations`
+
+`GET /functions/v1/recommendations?view=all|wildcard&floor=0|1&id=<uuid>&limit=100&offset=0`
+
+Returns For You recommendations with optional quality floor filtering.
+
+**Auth:** allowlisted user (JWT).
+
+**Parameters:**
+- `view` — `'all'` (default) for the standard For You table; `'wildcard'` for the pressure-test strip (candidate_score ≥ 65, fit < 50, hard-fails allowed)
+- `floor` — `1` (default) applies the quality floors (fit ≥ 50, candidate_score ≥ 50, no hard fails; ungraded rows are hidden as "pending" until graded); `0` returns all active recs regardless of score
+- `id` — optional UUID; if set, returns single rec (for pre-save detail page)
+- `limit`, `offset` — pagination (default 100/0)
+
+**Process:**
+1. Query `recommended_roles` where `closed_at is null` and `dismissed_at is null`
+2. Apply floor filter if requested (candidate_score ≥ 50 OR candidate_score IS NULL with enrichment_status='pending')
+3. Apply view filter: wildcard view adds candidate_score ≥ 65, fit < 50 constraints
+4. Order by blended score (candidate_score ≥ 50 recs ranked by `0.6*candidate_score + 0.4*fit_score`; ungraded recs by fit_score; below-floor recs if floor=0)
+5. Paginate and return
+
+**Response includes:**
+- Standard rec fields + fit breakdown
+- `candidate_score`, `candidate_summary` (Haiku-graded responsibilities match)
+- `recentlyExpired` — count of recs closed in last 7 days (displayed in header as "· N expired removed")
+- Ungraded recs marked `enrichment_status='pending'` in UI
+
+**Caching:** 2-minute response cache per (view, floor, id).
+
+### `pull-recommendations`
+
+`POST /functions/v1/pull-recommendations?rescore=1&ungraded=1&limit=N`
+
+Pulls new recs from tracked ATS sources, grades ungraded recs, updates liveness signals.
+
+**Auth:** cron task (x-cron-secret) or manual POST from app.
+
+**Parameters:**
+- `rescore` — if `1`, re-score all recs (recompute fit + candidate)
+- `ungraded` — if `1`, prioritize ungraded recs for Haiku grading
+- `limit` — max recs to process in one call
+
+**Process:**
+1. For each tracked ATS board (Greenhouse, Lever, Ashby, Workday, LinkedIn, Wellfound, aggregators): fetch live open-roles
+2. Compare against active `recommended_roles` by source_id; diff to find delisted / new
+3. On delisted: set `closed_at`, `closure_reason='delisted'`, `last_seen_at=now()`
+4. On new: enrich (resolve canonical URL) → score (fit + candidate) → insert
+5. If `rescore=1`: recompute fit + candidate for existing recs (on vision change)
+6. If `ungraded=1`: prioritize ungraded recs, fetch JD, call Haiku classifier, store candidate_score + summary
+7. Dedup against dismissed recs on insert (prevents digest resurrection)
+8. Wellfound source: use domain-suffix `wellfound.com` for sender matching; extract roles from body text
+9. Run application-scan side-effect (Gmail progress signals)
+
+**Cron:** `pull-recommendations-15min` every 15 minutes; `grade-ungraded-10min` every 10 minutes (ungraded only).
+
 ### `jobs-pipe`
 
 `GET /functions/v1/jobs-pipe`
 
-Returns the full pipeline view. In v1: reads from the Google Sheet via service account; computes fit scores; returns JSON.
+Returns the Saved pipeline view (pipeline_roles). In v1: reads from the Google Sheet via service account; computes fit scores; returns JSON.
 
 **Auth:** allowlisted user.
 **Secrets:**
@@ -186,6 +243,25 @@ function computeFitScore(role: Role, vision: Vision): {
 **Network scoring** (max 5):
 - Investor in Ian's VCs tab → +3
 - Direct connection at the company (Network tab match) → +5
+
+---
+
+## For You Quality Floors (v2026-07-02)
+
+The For You view applies a **candidate_score quality floor** to surface only roles where Haiku has graded the responsibilities match:
+
+**Candidate score floor:** 50 (raised from 30)
+- Roles with `candidate_score < 50` are hidden by default
+- Ungraded rows (candidate_score is NULL, marked "pending") are hidden until graded
+- Floors apply at read time (GET /recommendations with `view=all&floor=1`, the default)
+
+**Views:**
+- `view=all&floor=1` (default): floored For You table (fit ≥ 50, candidate_score ≥ 50, no hard fails; ungraded hidden as "pending")
+  - Header toggle: "Below-floor hidden · [show all]" link
+- `view=all` (no floor): unfiltered audit surface (all active recs)
+- `view=wildcard`: pressure-test view (candidate_score ≥ 65, fit < 50, hard-fails allowed); rendered as compact dashed-card strip on `/ladder/jobs/recommended/` with "why low fit" dimension labels
+
+**Impact:** ~90% of For You roles now hidden by default; floor prevents low-responsibility-match roles from dominating the view even when company/domain fit is high.
 
 ---
 

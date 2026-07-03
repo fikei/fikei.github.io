@@ -39,6 +39,11 @@
 
 ## Recent Milestones
 
+### Ladder — For You Quality Floors & Wildcards
+**Shipped: 2026-07-02** — PRs #984, #986, #989, #991, #993, #994. Candidate-score floor raised 30→50; floored view (fit ≥ 50, candidate ≥ 50, no hard fails; ungraded hidden as pending) is default with "show all" toggle. Wildcards strip (candidate≥65, fit<50) pressure-tests search criteria. Pre-save rec detail page (single rec lookup, fit/strength breakdowns, Save/Dismiss). Wellfound sender fix (domain-suffix match). Badge truthfulness + dismissed roles dedup.
+- Versions: ladder v2.13.0→v2.14.2, recommendations v0.14.0→v0.15.0-merged, pull-recommendations v0.23.1→v0.25.1
+- Flooring impact: ~90% of For You roles now hidden by default (candidate<50)
+
 ### Gmail → Jobs Pipe — Phase 1 Shipped
 **Updated: 2026-05-10** — Phase 1 narrowed to recs-only after schema collision with existing `job.companies` (career history). Canonical-URL enrichment carved out into Phase 1.5.
 
