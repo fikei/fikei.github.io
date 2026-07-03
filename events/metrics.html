@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events Metrics — ctrl.rodeo</title>
+  <link rel="stylesheet" href="/auth/ctrl-auth.css">
+  <style>
+    :root {
+      --bg: #0a0a0a; --bg-surface: #141414; --bg-subtle: #1c1c1c;
+      --fg: #e8e8e8; --fg-muted: #9a9a9a; --fg-subtle: #6a6a6a;
+      --border: #2a2a2a; --good: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg); font: 14px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; padding: 24px; }
+    h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .sub { color: var(--fg-subtle); font-size: 12px; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .card .label { color: var(--fg-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .card .value { font-size: 26px; font-weight: 600; }
+    .card .hint { color: var(--fg-subtle); font-size: 11px; margin-top: 4px; }
+    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); margin: 24px 0 8px; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    th, td { text-align: left; padding: 7px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--fg-subtle); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .status-healthy { color: var(--good); } .status-degraded { color: var(--warn); }
+    .status-broken { color: var(--bad); } .status-unknown { color: var(--fg-subtle); }
+    .pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 10px; border: 1px solid var(--border); color: var(--fg-muted); }
+    .auth-note { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--fg-muted); margin-bottom: 16px; }
+    a { color: var(--fg-muted); }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .table-scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Events — Metrics</h1>
+  <div class="sub">Canonical store, source health, and Agape coverage · <a href="/events/">back to events</a> · <span id="asOf"></span></div>
+  <div class="auth-note" id="authNote" style="display:none">Signed out — private-event metrics (Agape events, coverage) are hidden. Sign in on the <a href="/events/">events page</a> and reload.</div>
+
+  <div class="grid" id="cards"></div>
+
+  <h2>Agape Coverage</h2>
+  <div class="table-scroll"><table id="coverageTable"><thead><tr><th>Agape events (60d window)</th><th class="num">Corroborated by public feed</th><th class="num">Coverage %</th></tr></thead><tbody></tbody></table></div>
+
+  <h2>Sources</h2>
+  <div class="table-scroll"><table id="sourcesTable"><thead><tr>
+    <th>Source</th><th>Class</th><th>Status</th><th class="num">Events</th><th class="num">Success rate</th><th>Last success</th>
+  </tr></thead><tbody></tbody></table></div>
+
+  <h2>Recent Scrape Runs</h2>
+  <div class="table-scroll"><table id="runsTable"><thead><tr>
+    <th>Started</th><th>By</th><th class="num">Sources ok/failed</th><th class="num">Events total</th><th class="num">New</th><th class="num">Updated</th>
+  </tr></thead><tbody></tbody></table></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/auth/ctrl-auth.js"></script>
+<script>
+(async function () {
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  document.getElementById('asOf').textContent = new Date().toLocaleString();
+
+  CtrlAuth.init({
+    supabaseUrl: 'https://yfhudwakpgzswiylhfbh.supabase.co',
+    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI',
+    redirectTo: window.location.origin + '/events/metrics.html',
+    adminEmails: ['fike101@gmail.com'],
+  });
+  const sb = CtrlAuth.getSupabaseClient();
+  if (!sb) { document.body.innerHTML += '<p>Supabase client unavailable.</p>'; return; }
+  const { data: sessionData } = await sb.auth.getSession();
+  const session = sessionData && sessionData.session;
+  if (!session) document.getElementById('authNote').style.display = 'block';
+
+  // Paged event fetch — PostgREST caps responses at 1000 rows, and the
+  // store holds several thousand; aggregate over ALL rows, not a sample.
+  async function fetchAllEvents() {
+    const all = [];
+    for (let page = 0; page < 10; page++) {
+      const { data, error } = await sb.from('events')
+        .select('source_id, visibility, date, enrichment_status, recommended_by')
+        .range(page * 1000, page * 1000 + 999);
+      if (error || !data) break;
+      all.push(...data);
+      if (data.length < 1000) break;
+    }
+    return { data: all };
+  }
+
+  // Parallel fetches
+  const [evRes, srcRes, healthRes, runsRes, covRes] = await Promise.all([
+    fetchAllEvents(),
+    sb.from('event_sources').select('id, name, source_class, enabled, demoted'),
+    sb.from('source_health').select('source_id, status, success_rate, last_success_at, last_success_event_count'),
+    sb.from('scrape_runs').select('started_at, triggered_by, sources_succeeded, sources_failed, events_total, events_new, events_updated').order('started_at', { ascending: false }).limit(8),
+    sb.from('agape_coverage').select('*'),
+  ]);
+
+  const events = evRes.data || [];
+  const sources = srcRes.data || [];
+  const health = new Map((healthRes.data || []).map(h => [h.source_id, h]));
+  const today = new Date().toISOString().split('T')[0];
+
+  // --- Summary cards ---
+  const upcoming = events.filter(e => e.date >= today);
+  const privateRows = events.filter(e => e.visibility === 'private');
+  const agapeRows = events.filter(e => (e.recommended_by || []).includes('agape'));
+  const pendingEnrich = events.filter(e => e.enrichment_status === 'pending' || e.enrichment_status === 'processing');
+  const failedEnrich = events.filter(e => e.enrichment_status === 'failed');
+  const enabledSources = sources.filter(s => s.enabled);
+  const broken = enabledSources.filter(s => (health.get(s.id) || {}).status === 'broken');
+
+  const cards = [
+    { label: 'Upcoming events', value: upcoming.length, hint: `${events.length} total in store` },
+    { label: 'Agape recommended', value: agapeRows.length, hint: session ? `${privateRows.length} private rows` : 'sign in to see' },
+    { label: 'Enabled sources', value: enabledSources.length, hint: `${sources.length} registered, ${broken.length} broken` },
+    { label: 'Enrichment queue', value: pendingEnrich.length, hint: `${failedEnrich.length} failed` },
+  ];
+  document.getElementById('cards').innerHTML = cards.map(c =>
+    `<div class="card"><div class="label">${esc(c.label)}</div><div class="value">${esc(c.value)}</div><div class="hint">${esc(c.hint)}</div></div>`
+  ).join('');
+
+  // --- Agape coverage ---
+  const cov = (covRes.data && covRes.data[0]) || { agape_events: session ? 0 : '—', corroborated: '—', corroboration_pct: '—' };
+  document.querySelector('#coverageTable tbody').innerHTML =
+    `<tr><td>${esc(cov.agape_events)}</td><td class="num">${esc(cov.corroborated)}</td><td class="num">${esc(cov.corroboration_pct ?? '—')}${cov.corroboration_pct != null ? '%' : ''}</td></tr>`;
+
+  // --- Sources table ---
+  const counts = {};
+  for (const e of events) counts[e.source_id] = (counts[e.source_id] || 0) + 1;
+  const rows = sources
+    .filter(s => s.enabled)
+    .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0))
+    .map(s => {
+      const h = health.get(s.id) || {};
+      const status = h.status || 'unknown';
+      const cls = s.source_class + (s.demoted ? ' · demoted' : '');
+      return `<tr>
+        <td>${esc(s.name)}</td>
+        <td><span class="pill">${esc(cls)}</span></td>
+        <td class="status-${esc(status)}">${esc(status)}</td>
+        <td class="num">${counts[s.id] || 0}</td>
+        <td class="num">${h.success_rate != null ? Math.round(h.success_rate * 100) + '%' : '—'}</td>
+        <td>${h.last_success_at ? new Date(h.last_success_at).toLocaleString() : '—'}</td>
+      </tr>`;
+    }).join('');
+  document.querySelector('#sourcesTable tbody').innerHTML = rows || '<tr><td colspan="6">No sources</td></tr>';
+
+  // --- Runs table ---
+  document.querySelector('#runsTable tbody').innerHTML = (runsRes.data || []).map(r => `<tr>
+    <td>${new Date(r.started_at).toLocaleString()}</td>
+    <td>${esc(r.triggered_by)}</td>
+    <td class="num">${r.sources_succeeded ?? 0}/${r.sources_failed ?? 0}</td>
+    <td class="num">${r.events_total ?? 0}</td>
+    <td class="num">${r.events_new ?? 0}</td>
+    <td class="num">${r.events_updated ?? 0}</td>
+  </tr>`).join('') || '<tr><td colspan="6">No runs recorded</td></tr>';
+})();
+</script>
+</body>
+</html>

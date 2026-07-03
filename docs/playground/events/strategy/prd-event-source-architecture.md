@@ -191,10 +191,13 @@ Explicitly **not** filters: ticket platform (attribute → outbound link icon), 
 - [x] Coverage metric: `agape_coverage` view (corroboration % of Agape events vs public feeds)
 - [x] Event-platform domains (Partiful, Luma, Tixr, etc.) added to `enrich-event` allowlist per §4.1
 
-### Phase 3 — Curation surface
-- [ ] Authenticated view with "Recommended by Agape" filter + badges + `posted_by`
-- [ ] Private-event view (class-4 events) for members
-- [ ] Venue Waves 1 & 3 gap-fill
+### Phase 3 — Curation surface (partial)
+- [x] "★ Agape" filter + "Past events" toggle in the events app (v1.15.0); private rows visible to authenticated users (migration 091 — §8.1 resolved: any Supabase-authenticated user)
+- [x] Metrics dashboard at `/events/metrics.html` (agape_coverage, source health, scrape runs, enrichment queue)
+- [x] Greenlit Eventbrite orgs with Agape signal via `eventbrite-org` parser (§8.4 resolved: class per-source) — Public Works, Manny's, Hoodslam, The Center SF, Envelop, Flux Vertical Theatre (migration 090)
+- [ ] Agape badge + `posted_by` display on event cards
+- [ ] Private-event view polish (class-4 events) for members
+- [ ] Venue Waves 1 & 3 gap-fill; Internet Archive org id lookup
 
 ---
 
