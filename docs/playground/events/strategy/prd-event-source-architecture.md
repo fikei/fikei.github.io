@@ -177,16 +177,19 @@ Explicitly **not** filters: ticket platform (attribute → outbound link icon), 
 
 ## 7. Scope & Phasing
 
-### Phase 1 — Foundation
-- [ ] Canonical event store with `sources[]`, `visibility`, `recommended_by`, `posted_by`, normalized `venue`
-- [ ] Visibility engine per §3 matrix + RLS fix
-- [ ] Dedup ladder (URL match + tiered fuzzy match) server-side in cache pipeline
-- [ ] Agape Discord feed → canonical store (replacing standalone `discord_event_cache` read path)
+### Phase 1 — Foundation ✅ Shipped (migration 089, cache-events v1.6.0, scrape-discord-events v1.3.0, scrape-events v1.4.0)
+- [x] Canonical event store extensions: `visibility`, `canonical_url`, `recommended_by`, `posted_by` on `events`; `source_class` + `demoted` on `event_sources`
+- [x] Visibility engine per §3 matrix + RLS fix (public read restricted to `visibility='public'`; anon write policies removed)
+- [x] Dedup ladder (URL-first canonical adoption + nightlife-tier fuzzy match) server-side in `cache-events`
+- [x] Agape Discord feed → canonical store: `scrape-discord-events` forwards extracted events (with per-message `posted_by` attribution and `recommended_by=['agape']`) into `cache-events`; kicked every 2h by `scrape-events`
 
-### Phase 2 — Coverage
-- [ ] Demoted-platform ingestion (Eventbrite/Bandsintown as enrichers, hidden by default)
-- [ ] Venue calendar Wave 2 (arts & institutional)
-- [ ] Coverage metric: % of externally-hosted Agape events corroborated by a public feed
+### Phase 2 — Coverage (partial)
+- [x] Demotion machinery: `demoted` flag + corroboration visibility upgrades (both directions) in `cache-events` — dormant until demoted feeds are registered
+- [ ] Demoted-platform parsers (Eventbrite location search, Bandsintown) — needs new parser types
+- [x] Venue calendar Wave 2/3 backlog registered in `event_sources` (14 rows, disabled pending feed verification; enable = verify feed → set type → flip `enabled`, no deploy)
+- [ ] Wave 2 feed verification & enablement (per-venue stories)
+- [x] Coverage metric: `agape_coverage` view (corroboration % of Agape events vs public feeds)
+- [x] Event-platform domains (Partiful, Luma, Tixr, etc.) added to `enrich-event` allowlist per §4.1
 
 ### Phase 3 — Curation surface
 - [ ] Authenticated view with "Recommended by Agape" filter + badges + `posted_by`

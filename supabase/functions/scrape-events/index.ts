@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.3.1'
-console.log(`[scrape-events] v${VERSION} - record cache-events batch failures in scrape_runs error_log`)
+const VERSION = '1.4.0'
+console.log(`[scrape-events] v${VERSION} - registry-driven sources exclude discord type (handled by scrape-discord-events kick)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -71,6 +71,11 @@ async function loadSources(supabase: ReturnType<typeof createClient>): Promise<E
       .from('event_sources')
       .select('id, name, category, type, url, region, description')
       .eq('enabled', true)
+      // Curation feeds (type=discord) are scraped by scrape-discord-events,
+      // kicked at the end of this run — not by this dispatcher. Including
+      // them here would log a zero-result outcome every run and drive their
+      // source_health to 'broken'.
+      .neq('type', 'discord')
 
     if (error || !data || data.length === 0) {
       console.log(`[scrape-events] Registry unavailable (${error?.message || 'empty'}), falling back to STOCK_SOURCES`)
