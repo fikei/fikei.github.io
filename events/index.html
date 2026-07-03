@@ -1481,6 +1481,8 @@ body {
       </select>
       <input type="date" class="input input--date" id="filterDateFrom" title="From date">
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
+      <button class="btn btn--sm btn--ghost" id="filterAgape" title="Only events recommended in the Agape #events channel">★ Agape</button>
+      <button class="btn btn--sm btn--ghost" id="filterPast" title="Include past events (last 60 days)">Past events</button>
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
     </div>
 
@@ -1757,8 +1759,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.14.0';
-  console.log(`[events] v${VERSION} - mobile card hierarchy: time anchor, plain-text meta, ages, multi-day ranges, whole-card tap`);
+  const VERSION = '1.15.0';
+  console.log(`[events] v${VERSION} - Agape recommended + past-events filters; Agape curation source; eventbrite-org stock sources`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1792,6 +1794,15 @@ body {
     { id: 'garysguide-sf', name: "Gary's Guide SF", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=sf', region: 'bay-area', description: 'Tech & startup events' },
     // Bay Area — Social (Luma discover feed)
     { id: 'luma-sf', name: 'Luma SF', category: 'social', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=discover&id=discplace-BDj7GNbGlsF7Cka', region: 'bay-area', description: "What's happening in San Francisco" },
+    // Bay Area — Agape curation feed (private rows: visible only when signed in)
+    { id: 'discord-agape-events', name: 'Agape #events', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
+    // Bay Area — Eventbrite orgs with Agape signal (scraped server-side)
+    { id: 'eb-publicworks', name: 'Public Works', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/public-works-17405142071', region: 'bay-area', description: 'Public Works SF' },
+    { id: 'eb-mannys', name: "Manny's", category: 'social', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/mannys-15114280512', region: 'bay-area', description: "Manny's civic events" },
+    { id: 'eb-hoodslam', name: 'Hoodslam', category: 'theater', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/hoodslam-15110219281', region: 'bay-area', description: 'Hoodslam' },
+    { id: 'eb-thecentersf', name: 'The Center SF', category: 'wellness', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/the-center-sf-3493443113', region: 'bay-area', description: 'Community & wellness' },
+    { id: 'eb-envelop', name: 'Envelop SF', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/envelop-17478025710', region: 'bay-area', description: 'Spatial audio venue' },
+    { id: 'eb-fluxvertical', name: 'Flux Vertical Theatre', category: 'theater', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/16887986144', region: 'bay-area', description: 'Vertical theater & circus' },
     // New York — Tech & Networking
     { id: 'garysguide-nyc', name: "Gary's Guide NYC", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=nyc', region: 'new-york', description: 'Tech & startup events' },
   ];
@@ -1903,7 +1914,7 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '' },
+    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, showPast: false },
     sort: { key: 'date', dir: 'asc' },
     view: 'table',
     calMonth: new Date().getMonth(),
@@ -1969,6 +1980,16 @@ body {
     if (state.sources.length === 0) {
       const def = STOCK_SOURCES.find(s => s.id === '19hz-bayarea');
       state.sources = [{ ...def, enabled: true }];
+    }
+
+    // One-time migration: existing users get the Agape curation feed
+    // (harmless when signed out — RLS returns no private rows for anon)
+    if (!localStorage.getItem('ctrl-rodeo-agape-source-added')) {
+      if (!state.sources.some(s => s.id === 'discord-agape-events')) {
+        const agape = STOCK_SOURCES.find(s => s.id === 'discord-agape-events');
+        if (agape) state.sources.push({ ...agape, enabled: true });
+      }
+      localStorage.setItem('ctrl-rodeo-agape-source-added', '1');
     }
 
     saveSources();
@@ -2206,6 +2227,7 @@ body {
       const age = Date.now() - (cache.timestamp || 0);
       // Check if cache is fresh and source IDs match
       const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id).sort().join(',');
+      if (!!cache.showPast !== !!state.filters.showPast) { log('Cache skip: past-events window changed'); return null; }
       if (age < CACHE_MAX_AGE && cache.sourceIds === enabledIds && Array.isArray(cache.events)) {
         log(`Cache hit: ${cache.events.length} events, ${Math.round(age / 1000)}s old`);
         return cache.events;
@@ -2218,7 +2240,7 @@ body {
   function saveEventCache() {
     try {
       const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id).sort().join(',');
-      const cache = { events: state.events, sourceIds: enabledIds, timestamp: Date.now() };
+      const cache = { events: state.events, sourceIds: enabledIds, showPast: !!state.filters.showPast, timestamp: Date.now() };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
       log(`Cache saved: ${state.events.length} events`);
     } catch (e) { log('Cache save failed: ' + e.message); }
@@ -2231,13 +2253,20 @@ body {
       const enabledIds = state.sources.filter(s => s.enabled).map(s => s.id);
       if (enabledIds.length === 0) return null;
       const today = new Date().toISOString().split('T')[0];
-      log(`L2 cache: querying ${enabledIds.length} source(s)`);
+      // "Past events" widens the window to the 60-day retention horizon
+      let fromDate = today;
+      if (state.filters.showPast) {
+        const past = new Date();
+        past.setDate(past.getDate() - 60);
+        fromDate = past.toISOString().split('T')[0];
+      }
+      log(`L2 cache: querying ${enabledIds.length} source(s) from ${fromDate}`);
       // 12s ceiling so a hung request can't leave the spinner up forever
       const query = supabaseClient
         .from('events')
         .select('*')
         .in('source_id', enabledIds)
-        .gte('date', today)
+        .gte('date', fromDate)
         .order('date', { ascending: true });
       const timeout = new Promise(resolve =>
         setTimeout(() => resolve({ data: null, error: { message: 'timed out after 12s' } }), 12000));
@@ -2259,6 +2288,7 @@ body {
           contentType: row.content_type || getSourceCategory(row.source_id),
           description: row.description || '', imageUrl: row.image_url || '',
           enrichedTags: row.tags || [],
+          recommendedBy: row.recommended_by || [], postedBy: row.posted_by || '',
         };
         const existing = byCanonical.get(key);
         if (!existing) {
@@ -2267,6 +2297,10 @@ body {
         } else {
           mergedCount++;
           if (!existing.sources.includes(ev.source)) existing.sources.push(ev.source);
+          for (const r of ev.recommendedBy) {
+            if (!existing.recommendedBy.includes(r)) existing.recommendedBy.push(r);
+          }
+          if (!existing.postedBy && ev.postedBy) existing.postedBy = ev.postedBy;
           if (!existing.time && ev.time) existing.time = ev.time;
           if (!existing.genre && ev.genre) existing.genre = ev.genre;
           if (!existing.price && ev.price) existing.price = ev.price;
@@ -3105,9 +3139,25 @@ body {
   }
 
   // --- Filtering ---
+  function updateFilterChips() {
+    const agapeBtn = document.getElementById('filterAgape');
+    const pastBtn = document.getElementById('filterPast');
+    if (agapeBtn) {
+      agapeBtn.style.background = state.filters.agape ? 'var(--fg)' : '';
+      agapeBtn.style.color = state.filters.agape ? 'var(--bg)' : '';
+      agapeBtn.setAttribute('aria-pressed', String(!!state.filters.agape));
+    }
+    if (pastBtn) {
+      pastBtn.style.background = state.filters.showPast ? 'var(--fg)' : '';
+      pastBtn.style.color = state.filters.showPast ? 'var(--bg)' : '';
+      pastBtn.setAttribute('aria-pressed', String(!!state.filters.showPast));
+    }
+  }
+
   function getFilteredEvents() {
     return state.events.filter(ev => {
-      const { search, city, source, dateFrom, dateTo, category, contentType } = state.filters;
+      const { search, city, source, dateFrom, dateTo, category, contentType, agape } = state.filters;
+      if (agape && !((ev.recommendedBy && ev.recommendedBy.includes('agape')) || (ev.sources && ev.sources.includes('discord-agape-events')))) return false;
       if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
       if (city && ev.city !== city) return false;
       if (source && ev.source !== source && !(ev.sources && ev.sources.includes(source))) return false;
@@ -3122,7 +3172,10 @@ body {
   }
 
   function clearAllFilters() {
-    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '' };
+    const hadPast = state.filters.showPast;
+    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, showPast: false };
+    updateFilterChips();
+    if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
     document.getElementById('filterCity').value = '';
     const fs = document.getElementById('filterSource'); if (fs) fs.value = '';
@@ -3469,6 +3522,16 @@ body {
     document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
     document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
     document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
+    document.getElementById('filterAgape').addEventListener('click', () => {
+      state.filters.agape = !state.filters.agape;
+      updateFilterChips();
+      render();
+    });
+    document.getElementById('filterPast').addEventListener('click', () => {
+      state.filters.showPast = !state.filters.showPast;
+      updateFilterChips();
+      fetchAllSources(true); // window change requires a fresh L2 query
+    });
     document.getElementById('filterClear').addEventListener('click', () => {
       clearAllFilters();
       filterBar.style.display = 'none';
