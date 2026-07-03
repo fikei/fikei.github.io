@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.5.0'
-console.log(`[scrape-events] v${VERSION} - eventbrite-org parser (greenlit orgs with Agape signal)`)
+const VERSION = '1.6.0'
+console.log(`[scrape-events] v${VERSION} - ata parser (Artists' Television Access calendar)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -27,6 +27,7 @@ import { scrapeBonobo } from './parsers/bonobo.ts'
 import { scrapeSFMOMA } from './parsers/sfmoma.ts'
 import { scrapeIcal } from './parsers/ical.ts'
 import { scrapeEventbriteOrg } from './parsers/eventbrite-org.ts'
+import { scrapeAta } from './parsers/ata.ts'
 import { scrapeJson } from './parsers/json.ts'
 import { scrapeRss } from './parsers/rss.ts'
 import { scrapeFamsf } from './parsers/famsf.ts'
@@ -101,6 +102,7 @@ async function scrapeSource(source: EventSource): Promise<ScrapedEvent[]> {
     case 'sfmoma': return scrapeSFMOMA(source)
     case 'ical': return scrapeIcal(source)
     case 'eventbrite-org': return scrapeEventbriteOrg(source)
+    case 'ata': return scrapeAta(source)
     case 'json': return scrapeJson(source)
     case 'rss': return scrapeRss(source)
     case 'famsf': return scrapeFamsf(source)

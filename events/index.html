@@ -65,6 +65,11 @@ body {
   flex: 1;
 }
 
+.token--agape {
+  border: var(--border-thin) solid #e8c547;
+  color: #e8c547;
+}
+
 .source-chip__count {
   margin-left: var(--space-1);
   opacity: 0.6;
@@ -1813,8 +1818,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.17.0';
-  console.log(`[events] v${VERSION} - one-off event submission by link (add-event); Interested bookmarks + Google Calendar sync`);
+  const VERSION = '1.17.1';
+  console.log(`[events] v${VERSION} - Agape badge + posted_by on event rows; ATA stock source`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1852,6 +1857,7 @@ body {
     { id: 'discord-agape-events', name: 'Agape #events', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
     // One-off events added by users via the add-event function
     { id: 'user-submitted', name: 'Community adds', category: 'social', type: 'manual', url: null, region: 'bay-area', description: 'One-off events added by link' },
+    { id: 'ata-sf', name: 'ATA', category: 'film', type: 'ata', url: 'https://www.atasite.org/calendar', region: 'bay-area', description: 'Underground film & experimental art' },
     // Bay Area — Eventbrite orgs with Agape signal (scraped server-side)
     { id: 'eb-publicworks', name: 'Public Works', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/public-works-17405142071', region: 'bay-area', description: 'Public Works SF' },
     { id: 'eb-mannys', name: "Manny's", category: 'social', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/mannys-15114280512', region: 'bay-area', description: "Manny's civic events" },
@@ -2937,11 +2943,15 @@ body {
     const tbody = document.getElementById('eventsBody');
     const rowHtml = ev => {
       const sourceIds = ev.sources || [ev.source];
-      const sourceTagsHtml = sourceIds.map(sid => {
+      let sourceTagsHtml = sourceIds.map(sid => {
         const sName = state.sources.find(s => s.id === sid)?.name || sid;
         const sColor = getSourceColor(sid);
         return `<span class="token token--source" data-source-id="${escHtml(sid)}" style="border-color: ${sColor}; color: ${sColor};">${escHtml(sName)}</span>`;
       }).join(' ');
+      if (ev.agape || isAgapeEvent(ev)) {
+        const byAttr = ev.postedBy ? ` title="Recommended by ${escHtml(ev.postedBy)} in Agape #events"` : ' title="Recommended in Agape #events"';
+        sourceTagsHtml = `<span class="token token--agape"${byAttr}>★ Agape${ev.postedBy ? ' · ' + escHtml(ev.postedBy) : ''}</span> ` + sourceTagsHtml;
+      }
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const displayName = stripVenueFromTitle(ev.name, ev.venue);
       const nameCell = ev.url && ev.url !== '#'
