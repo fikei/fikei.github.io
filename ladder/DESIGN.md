@@ -56,6 +56,7 @@ The For You surface follows a **triage, don't browse** model (inbox → review �
 | Collapsed JD | `.jd-collapse` | Raw scraped posting text is never the reading surface; it collapses behind "Original posting text". Summaries and match bullets lead. |
 | Page ⋯ menu | `.page-menu` | Operational controls (refresh sources, quality-floor toggle, expiry info) live behind one ⋯ in the page header — machinery stays out of the reading flow. Sourcing config (watched companies) lives on /ladder/vision/. |
 | Chat launcher | `.chat-fab` | Fixed 44px bubble top-right on every page (neutral surface, chat glyph). Never a floating bottom FAB over list content. |
+| Search plan | `.vf-tabs`, `.vf-summary` | Landing = summary view: plan-strength bar + one tappable digest row per section. Sections (Targets · Signals · Rules · Sources) switch via `?section=`. Advanced (score weights, raw plan, unknown fields) folds at the bottom of Signals; Story lives on Profile → Narratives. |
 
 ## Cache busting
 
