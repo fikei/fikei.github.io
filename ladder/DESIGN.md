@@ -61,4 +61,4 @@ The For You surface follows a **triage, don't browse** model (inbox → review �
 
 ## Cache busting
 
-Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js`. The string is appended to `<link>`/`<script>` URLs and to dynamic `import(...)` calls so GH Pages' 10-minute `max-age` doesn't shadow new deploys.
+Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js`, the `?v=` on every HTML `<link>`/`<script>`, **and the `@import url("./components.css?v=…")` inside `base.css`** — that import is the easy one to forget and it silently pins component styles to the 10-minute edge cache.
