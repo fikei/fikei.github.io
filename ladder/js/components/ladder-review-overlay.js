@@ -10,7 +10,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal, scoreClass }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -140,6 +140,7 @@ export class LadderReviewOverlay extends LitElement {
     const description = full?.description || '';
     const fit = rec.fitScore ?? null;
     const cand = rec.candidateScore ?? null;
+    const companyDescription = full?.companyDescription || rec.companyDescription || '';
     const scoreRow = { ...rec, ...(full || {}), score: fit };
     return html`
       <div class="review" role="dialog" aria-modal="true" aria-label="Review role">
@@ -171,7 +172,20 @@ export class LadderReviewOverlay extends LitElement {
               <div class="review__head-text">
                 <h2 class="review__title">${rec.title || '(untitled)'}</h2>
                 ${meta ? html`<p class="review__meta">${meta}</p>` : nothing}
+                <div class="review__scores">
+                  <button class=${scoreClass(fit) + ' fit-pill--button review__score'}
+                          title="Fit score — tap for the full breakdown"
+                          @click=${() => { this._scoreOpen = 'fit'; }}>
+                    ${fit ?? '—'}<span class="review__score-label">fit</span>
+                  </button>
+                  <button class=${scoreClass(cand) + ' fit-pill--button review__score'}
+                          title="Candidate strength — tap for the full breakdown"
+                          @click=${() => { this._scoreOpen = 'candidate'; }}>
+                    ${cand ?? '—'}<span class="review__score-label">strength</span>
+                  </button>
+                </div>
                 ${salary ? html`<p class="review__salary">${salary}</p>` : nothing}
+                ${companyDescription ? html`<p class="review__company-desc">${companyDescription}</p>` : nothing}
                 <p class="review__sub muted">
                   ${rec.suggestedAt ? `Surfaced ${relTime(rec.suggestedAt)}` : ''}
                   ${full?.sourceLabel ? ` • via ${full.sourceLabel}` : ''}
@@ -197,14 +211,6 @@ export class LadderReviewOverlay extends LitElement {
 
           <section class="review__section">
             ${renderVerdicts(rec)}
-            ${fit != null || cand != null ? html`
-              <p class="review__numbers muted">
-                <button class="link-subtle" @click=${() => { this._scoreOpen = 'fit'; }}>Fit ${fit ?? '—'}</button>
-                ·
-                <button class="link-subtle" @click=${() => { this._scoreOpen = 'candidate'; }}>Strength ${cand ?? '—'}</button>
-                — tap for the full breakdown
-              </p>
-            ` : nothing}
           </section>
 
           ${description ? html`
