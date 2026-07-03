@@ -106,4 +106,54 @@ Estimated overlap with current stock sources (would the event *also* appear ther
 
 ---
 
+## Appendix A — Complete Link-Destination List
+
+Every domain that confirmed event messages link to (counts = events referencing that domain; one event can reference several). Domains canonicalized (`luma.com`→`lu.ma`, `youtu.be`→`youtube.com`, Eventbrite subdomains merged); Discord CDN / GIF domains excluded.
+
+### Event platforms & ticketing
+
+| Domain | Events | | Domain | Events |
+|---|---|---|---|---|
+| partiful.com | 104 | | dice.fm (+link.dice.fm) | 3 |
+| eventbrite.com | 60 | | shotgun.live | 2 |
+| ra.co (+links, de.ra.co) | 48 | | momence.com | 2 |
+| lu.ma (+o.lu.ma) | 37 | | bandsintown.com | 2 |
+| secretparty.io | 23 | | earthling.fyi | 2 |
+| tixr.com | 16 | | ticketfairy.com | 1 |
+| seetickets.us | 7 | | ticketweb.com | 1 |
+| meetup.com | 4 | | songkick.com | 1 |
+| mobilize.us | 3 | | app.gopassage.com | 1 |
+| | | | cityboxoffice.com | 1 |
+| | | | sweatpals.com | 1 |
+| | | | app.sola.day | 1 |
+| | | | par.tf | 1 |
+
+### Social & content platforms (weak structured data)
+
+| Domain | Events |
+|---|---|
+| instagram.com | 28 |
+| facebook.com | 22 |
+| youtube.com | 6 |
+| open.spotify.com | 4 |
+| soundcloud.com | 3 |
+| bandcamp / laylo / lnk.to / ffm.to (artist pages) | 5 |
+| twitter.com, vimeo.com | 2 |
+
+### DIY / self-serve (forms, docs, calendars)
+
+| Domain | Events |
+|---|---|
+| docs.google.com | 8 |
+| forms.gle | 3 |
+| doodle.com, calendar.app.google, mailchi.mp | 3 |
+
+### Venue & organization websites (long tail, 1–4 each)
+
+grayarea.org, sfneofuturists.org, sf.funcheap.com, westcoastcraft.com, thelab.org, sfsymphony.org, sfcm.edu, sfmoma.org, thelostchurch (salesforce-sites), odcsf (salesforce-sites) / odc.dance, thechapelsf.com, bottomofthehill.com, brickandmortarmusic.com, bimbos365club.com, thenewparish.com, thefoxoakland.com, rickshawstop (via other), berkeleyrep.org, broadwaysf.com, roxie.com, 4-star-movies.com, frameline.org, exploratorium.edu, commonwealthclub.org, themoth.org, oddsalon.com, sf.nerdnite.com, portolamusicfestival.com, sterngrove.org, lapena.org, citydancesf.com, envelop.us, sfsound.org, saintjosephsartssociety.com, zinnbookfair.org, churchofclown.org, sunsetmercantilesf.com, blackbirdsf.com, dothebay.com, iwannahotbox.com, bumbumtrain.com, onetable.org, plus ~15 personal-artist / misc one-offs (airbnb.com, yelp.com, maps.app.goo.gl, news links).
+
+**Takeaways:** 9 platforms/ticketers cover the overwhelming majority of linked events — **Partiful, Eventbrite, RA, Luma, secretparty.io, Tixr, SeeTickets, Dice, Meetup** (302 of ~390 platform-linked events). The venue-site long tail (~50 domains at 1–4 events each) is not worth per-site parsers; those events should flow through AI extraction of the message text, with the link kept as the event URL.
+
+---
+
 *Raw data: full export + per-message classifications live in session scratchpad (`all_messages.json`, `events_classified_all.json`); regenerate anytime via the `export` action.*
