@@ -226,7 +226,7 @@ export class LadderReviewOverlay extends LitElement {
             Not for me
           </button>
           <button class="btn btn--accent review__btn" @click=${() => this._emit('review-save')}>
-            Save role
+            Save
           </button>
         </footer>
 

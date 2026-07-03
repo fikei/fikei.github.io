@@ -3,8 +3,8 @@
    Wise Foundations color, spacing, and radius pages. */
 [data-theme="generic-light"] {
   /* Backgrounds */
-  --bg: #FFFFFF;                                   /* Background Screen */
-  --bg-surface: #F5F7F4;                           /* tinted neutral lift */
+  --bg: #FAFAF9;                                   /* warm off-white canvas (J&J) */
+  --bg-surface: #F4F4F2;                           /* neutral lift — no green tint */
   --bg-elevated: #FFFFFF;                          /* Background Elevated */
   --bg-overlay: rgba(22, 51, 0, 0.08);             /* Background Overlay */
 
@@ -36,13 +36,13 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --font-size-display: 56px;
-  --font-size-title-1: 36px;
-  --font-size-title-2: 28px;
+  --font-size-title-1: 28px;
+  --font-size-title-2: 22px;
   --font-size-title-3: 22px;
   --font-size-title-4: 18px;
   --font-size-body-lg: 18px;
   --font-size-body: 16px;
-  --font-size-small: 14px;
+  --font-size-small: 15px;
   --font-size-caption: 12px;
 
   --lh-display: 1.1;
@@ -52,11 +52,12 @@
 
   --fw-medium: 500;
   --fw-semibold: 600;
+  --fw-bold: 700;
 
   /* Radius — Wise desktop scale (rounded-by-default look) */
   --radius-sm: 16px;
   --radius-md: 20px;
-  --radius-lg: 30px;
+  --radius-lg: 20px;
   --radius-xl: 40px;
   --radius-2xl: 60px;
   --radius-pill: 999px;

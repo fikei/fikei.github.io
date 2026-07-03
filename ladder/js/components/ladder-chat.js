@@ -221,7 +221,7 @@ export class JobChat extends LitElement {
         <div class="chat-scrim" @click=${() => this._toggle()} aria-hidden="true"></div>
         <aside class="chat-drawer" role="dialog" aria-label="Job chat">
           <header class="chat-drawer__head">
-            <span class="chat-drawer__title">Ask /ladder</span>
+            <span class="chat-drawer__title">Ask Ladder</span>
             <button class="chat-drawer__close" aria-label="Close" @click=${() => this._toggle()}>×</button>
           </header>
 

@@ -13,13 +13,26 @@
 }
 
 .nav-list a {
-  display: block;
-  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-sm);
   color: var(--fg);
   font-weight: var(--fw-medium);
   font-size: var(--font-size-body);
 }
+.nav-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: inherit;
+}
+.nav-label { flex: 1; min-width: 0; }
+.nav-list a .nav-count { margin-left: auto; }
 .nav-list a:hover {
   background: var(--bg-elevated);
   text-decoration: none;
@@ -52,7 +65,9 @@
   outline: none;
 }
 
-/* --- Buttons --- */
+/* --- Buttons ---
+   Two shapes only (J&J): decision CTAs (accent/primary) are pills; every
+   other button is a 16px rounded-rect. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -60,7 +75,7 @@
   gap: var(--space-2);
   height: 48px;
   padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--fg);
@@ -75,6 +90,7 @@
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
+  border-radius: var(--radius-pill);
 }
 .btn--primary:hover { background: var(--accent); filter: brightness(1.06); }
 
@@ -82,6 +98,7 @@
   background: var(--accent-strong);
   color: var(--accent-strong-fg);
   border-color: var(--accent-strong);
+  border-radius: var(--radius-pill);
 }
 .btn--accent:hover { filter: brightness(0.97); }
 
@@ -92,10 +109,8 @@
 .page-header h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
-  /* Scales from 24px on phones to 36px on desktop. The static token
-     --font-size-title-1 is 36px; the clamp keeps that as the ceiling so
-     desktop is unchanged. */
+  font-weight: var(--fw-bold, 700);
+  /* Scales from 24px on phones to the title-1 token (28px) on desktop. */
   font-size: clamp(24px, 5.5vw, var(--font-size-title-1));
   line-height: var(--lh-title);
   letter-spacing: -0.02em;
@@ -5182,6 +5197,25 @@ job-onboarding { display: contents; }
    See <ladder-chat> component for state.
    ───────────────────────────────────────────────────────────── */
 
+/* Circular icon button — J&J's signature chrome. Hamburger, chat, close,
+   overflow all share this shape. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  transition: box-shadow 80ms ease, transform 80ms ease;
+}
+.icon-btn:hover { box-shadow: var(--shadow-md); }
+.icon-btn:active { transform: translateY(1px); }
+
 /* Chat launcher — a fixed bubble in the top-right corner (J&J-style),
    never floating over list content. Neutral surface; the drawer it opens
    is the accented moment, not the button. */
@@ -6068,7 +6102,7 @@ body[data-auth-state="out"] job-chat { display: none; }
    dividers between rows. No scores, no inline accept/reject.
    ========================================================================== */
 /* Cap the reading column — J&J-style centered inbox, not a full-bleed table. */
-.inbox { display: flex; flex-direction: column; gap: var(--space-5); max-width: 760px; }
+.inbox { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; }
 
 .inbox-group__head {
   display: flex;
@@ -6079,9 +6113,9 @@ body[data-auth-state="out"] job-chat { display: none; }
 .inbox-group__label {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: var(--fw-semibold);
+  font-weight: var(--fw-bold, 700);
   font-size: var(--font-size-title-3);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 .inbox-group__count { font-size: var(--font-size-small); }
 
@@ -6099,9 +6133,19 @@ body[data-auth-state="out"] job-chat { display: none; }
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
+  position: relative;
+}
+/* Inset divider — starts after the logo column (J&J/iOS list pattern):
+   28px logo + 12px gap. */
+.inbox-row::after {
+  content: '';
+  position: absolute;
+  left: 40px;
+  right: 0;
+  bottom: 0;
   border-bottom: 1px solid var(--border);
 }
-.inbox-row:last-child { border-bottom: 0; }
+.inbox-row:last-child::after { display: none; }
 .inbox-row__main {
   display: flex;
   align-items: center;
@@ -6419,4 +6463,90 @@ body[data-auth-state="out"] job-chat { display: none; }
   margin: 0 0 var(--space-4);
   font-size: var(--font-size-body);
   line-height: var(--lh-body);
+}
+
+/* ==========================================================================
+   Mobile nav drawer — J&J-style left sheet opened by the .mobile-bar
+   hamburger. Same taxonomy as the desktop rail (see ladder-rail.js).
+   ========================================================================== */
+.nav-drawer__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 15, 12, 0.45);
+  z-index: 70;
+}
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(320px, 85vw);
+  z-index: 71;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-4);
+  padding-top: max(var(--space-5), env(safe-area-inset-top));
+  padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+.nav-drawer[hidden], .nav-drawer__scrim[hidden] { display: none; }
+.nav-drawer__brand { margin-bottom: var(--space-6); }
+.nav-drawer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+.nav-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-body);
+  text-decoration: none;
+}
+.nav-drawer__item:hover { background: var(--bg-surface); text-decoration: none; }
+.nav-drawer__item[aria-current="page"] {
+  background: var(--bg-overlay);
+  font-weight: var(--fw-semibold);
+}
+.nav-drawer__item .nav-count { margin-left: auto; }
+.nav-drawer__user,
+.rail-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-3) 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-caption);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+.rail-user { margin-top: auto; }
+.rail-user__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  flex-shrink: 0;
+}
+.rail-user__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Drawer is mobile chrome; never show it on desktop. */
+@media (min-width: 721px) {
+  .nav-drawer, .nav-drawer__scrim { display: none !important; }
 }

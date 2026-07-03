@@ -13,6 +13,9 @@ const { renderLocation } = await import('../format.js' + V);
 //   active → 'Active'  (with sub-stage: drafting/applied/interviewing/offer)
 //   archive→ 'Archive' (with exit_reason)
 const STATUS_OPTIONS = ['Saved', 'Active', 'Archive'];
+// Display labels for status values — the DB keeps 'Active'; the UI says
+// 'In progress' (clearer state pair with Saved/Archive).
+const STATUS_LABELS = { Saved: 'Saved', Active: 'In progress', Archive: 'Archive' };
 
 const STAGES = [
   { id: 'drafting',     label: 'Drafting' },
@@ -646,12 +649,12 @@ export class JobPipeline extends LitElement {
                       class=${'row-menu__item row-menu__item--status' + (cur === s ? ' is-current' : '')}
                       @click=${() => this._changeStatusFromMenu(r, s)}>
                 <span class="row-menu__check" aria-hidden="true">${cur === s ? '✓' : ''}</span>
-                <span>${s}</span>
+                <span>${STATUS_LABELS[s] || s}</span>
               </button>
             `)}
             ${cur === 'Active' ? html`
               <div class="row-menu__divider" role="separator"></div>
-              <div class="row-menu__group-label">Active stage</div>
+              <div class="row-menu__group-label">Stage</div>
               ${STAGES.map(s => html`
                 <button role="menuitem"
                         class=${'row-menu__item row-menu__item--stage' + (curStage === s.id ? ' is-current' : '')}
@@ -1216,7 +1219,7 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._sorted();
-    const bucketLabel = { leads: 'Saved', active: 'Active', archive: 'Archive' }[this.bucket];
+    const bucketLabel = { leads: 'Saved', active: 'In progress', archive: 'Archive' }[this.bucket];
     const added = this.addedBanner?.roles || [];
     const showAddedBanner = added.length > 0 && !this.addedBanner.dismissed;
 

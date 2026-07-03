@@ -12,7 +12,7 @@ const [{ fetchWatchedCompanies, watchCompany, updateWatchedCompany, unwatchCompa
 const FILTER_MODES = [
   { value: 'all',         label: 'Any role',        hint: 'Every role the watch pulls, regardless of score' },
   { value: 'role_level',  label: 'My role & level', hint: 'Roles that match your role and seniority — no fit-score floor' },
-  { value: 'good_fits',   label: 'Good fits',       hint: 'Standard For You gates (fit ≥50, strength ≥30)' },
+  { value: 'good_fits',   label: 'Good fits',       hint: 'Standard Inbox gates (fit ≥50, strength ≥30)' },
   { value: 'exceptional', label: 'Exceptional only', hint: 'Only roles graded 60+ candidate strength' },
 ];
 

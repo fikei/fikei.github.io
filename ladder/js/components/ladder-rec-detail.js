@@ -126,7 +126,7 @@ export class LadderRecDetail extends LitElement {
     }
     if (this.dismissed) {
       return html`<div class="rec-detail__banner">
-        Dismissed. <a href="/ladder/jobs/recommended/">Back to For You →</a>
+        Dismissed. <a href="/ladder/jobs/recommended/">Back to Inbox →</a>
       </div>`;
     }
     return nothing;
@@ -157,7 +157,7 @@ export class LadderRecDetail extends LitElement {
     if (this.state === 'error' || !this.rec) {
       return html`<div class="rec-detail">
         <p class="muted">Couldn't load this recommendation. ${this.error}</p>
-        <a href="/ladder/jobs/recommended/">Back to For You →</a>
+        <a href="/ladder/jobs/recommended/">Back to Inbox →</a>
       </div>`;
     }
     const rec = this.rec;
