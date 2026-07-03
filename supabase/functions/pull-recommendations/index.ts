@@ -24,7 +24,7 @@ import { extractCompensation } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.26.0';
+const VERSION = '0.26.1';
 console.log(`[pull-recommendations] v${VERSION} - Haiku grader also emits company_description (factual 1-2 sentence blurb) persisted on recs`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
@@ -158,6 +158,10 @@ serve(async (req) => {
     // function wall-clock and the backlog drains across repeated calls
     // instead of one giant pass that times out before reaching anything.
     const ungradedOnly = qp.get('ungraded') === '1';
+    // ?missing_desc=1 — company-description backfill drain. Restricts to
+    // gradeable rows that don't have one yet, so repeated ?force=1&limit=N
+    // calls make progress instead of re-grading the same newest N forever.
+    const missingDescOnly = qp.get('missing_desc') === '1';
     const limitN = Math.max(0, Math.min(100, parseInt(qp.get('limit') || '0', 10) || 0));
     const rows = await sql<Array<{ id: string; title: string | null; company: string | null; description: string | null; sector: string | null; investors: string[] | null; salary: string | null; source: string | null; role_match_score: number | null; role_match_rationale: string | null; role_match_seniority: string | null; role_match_scope: string | null; fit_summary: string | null; candidate_score: number | null; watched_company_id: string | null }>>`
       select id, title, company, description, sector, investors, salary, source, watched_company_id,
@@ -165,6 +169,7 @@ serve(async (req) => {
         from job.recommended_roles
        where dismissed_at is null and added_to_pipeline_slug is null
          ${ungradedOnly ? sql`and candidate_score is null and length(coalesce(description,'')) > 200` : sql``}
+         ${missingDescOnly ? sql`and company_description is null and length(coalesce(description,'')) > 200` : sql``}
        order by suggested_at desc
        ${limitN ? sql`limit ${limitN}` : sql``}
     `;
