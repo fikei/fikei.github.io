@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.4.0'
-console.log(`[cache-events] v${VERSION} - canonical_key cross-source dedup + decaying peak for count-drop detection`)
+const VERSION = '1.5.0'
+console.log(`[cache-events] v${VERSION} - bulk upsert for existing events (per-row update loop was timing out batches)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -335,22 +335,39 @@ serve(async (req: Request) => {
       }
     }
 
-    // Batch update existing events (refresh scraped_at + backfill description
-    // if newly available — parsers that didn't used to emit it may now).
+    // Refresh existing events with ONE bulk upsert per batch. The previous
+    // per-row update loop (up to 400 sequential round-trips) blew the edge
+    // function's time budget, so every batch after the first 504'd and its
+    // events were silently lost — sources late in the run never refreshed.
+    // Only scraper-owned columns are included; enrichment-owned columns
+    // (description, image_url, tags, genre, content_type, enrichment_*) are
+    // omitted so the upsert can't clobber AI-enriched values.
     if (toUpdate.length > 0) {
-      for (const row of toUpdate) {
-        const patch: Record<string, unknown> = { scraped_at: row.scraped_at, canonical_key: row.canonical_key }
-        if (row.description) patch.description = row.description
-        const { error: updateErr } = await supabase
-          .from('events')
-          .update(patch)
-          .eq('event_key', row.event_key)
+      const patchRows = toUpdate.map(row => ({
+        event_key: row.event_key,
+        canonical_key: row.canonical_key,
+        source_id: row.source_id,
+        date: row.date,
+        time: row.time,
+        name: row.name,
+        venue: row.venue,
+        address: row.address,
+        city: row.city,
+        price: row.price,
+        ages: row.ages,
+        promoter: row.promoter,
+        url: row.url,
+        scraped_at: row.scraped_at,
+      }))
+      const { data: upserted, error: upsertErr } = await supabase
+        .from('events')
+        .upsert(patchRows, { onConflict: 'event_key' })
+        .select('id')
 
-        if (updateErr) {
-          errors.push(`Update ${row.event_key}: ${updateErr.message}`)
-        } else {
-          updated++
-        }
+      if (upsertErr) {
+        errors.push(`Bulk update: ${upsertErr.message}`)
+      } else {
+        updated = upserted?.length || patchRows.length
       }
     }
 

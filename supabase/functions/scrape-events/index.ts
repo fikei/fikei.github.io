@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.3.0'
-console.log(`[scrape-events] v${VERSION} - DB source registry, maintenance RPC, discord trigger`)
+const VERSION = '1.3.1'
+console.log(`[scrape-events] v${VERSION} - record cache-events batch failures in scrape_runs error_log`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -136,7 +136,7 @@ async function pushToCache(
   sourceOutcomes: SourceOutcome[],
   supabaseUrl: string,
   _serviceKey: string,
-): Promise<{ cached: number; updated: number; enrichQueued: number }> {
+): Promise<{ cached: number; updated: number; enrichQueued: number; batchErrors: string[] }> {
   const serviceKey = internalJwt()
   void _serviceKey
   // Format events to match ScrapedEvent interface expected by cache-events
@@ -163,6 +163,7 @@ async function pushToCache(
   // run's health tracking.
   let totalCached = 0, totalUpdated = 0, totalEnrichQueued = 0
   let outcomesDelivered = false
+  const batchErrors: string[] = []
 
   for (let i = 0; i < formatted.length; i += 400) {
     const batch = formatted.slice(i, i + 400)
@@ -190,9 +191,11 @@ async function pushToCache(
       } else {
         const errText = await resp.text()
         console.error(`[scrape-events] cache-events batch failed: ${resp.status} ${errText}`)
+        batchErrors.push(`batch ${i / 400 + 1} (${batch.length} events): HTTP ${resp.status} ${errText.slice(0, 200)}`)
       }
     } catch (e) {
       console.error(`[scrape-events] cache-events call failed: ${(e as Error).message}`)
+      batchErrors.push(`batch ${i / 400 + 1} (${batch.length} events): ${(e as Error).message}`)
     }
   }
 
@@ -212,7 +215,7 @@ async function pushToCache(
     }
   }
 
-  return { cached: totalCached, updated: totalUpdated, enrichQueued: totalEnrichQueued }
+  return { cached: totalCached, updated: totalUpdated, enrichQueued: totalEnrichQueued, batchErrors }
 }
 
 // --- Scrape run tracking ---
@@ -347,6 +350,10 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   // Push all events to cache-events
   const cacheResult = await pushToCache(allEvents, sourceOutcomes, supabaseUrl, serviceKey)
   console.log(`[scrape-events] Cache: ${cacheResult.cached} new, ${cacheResult.updated} updated, ${cacheResult.enrichQueued} enrich queued`)
+  // Batch failures mean scraped events were dropped — record them in the run
+  for (const be of cacheResult.batchErrors) {
+    errorLog.push({ sourceId: '_cache-batch', error: be })
+  }
 
   // Complete run tracking
   if (runId) {
