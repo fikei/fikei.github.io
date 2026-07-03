@@ -40,6 +40,8 @@ Every source belongs to exactly one class. Class determines default visibility, 
 | **3. Public Event Ticketing** | Ticketing platforms with public, discoverable event pages | RA, Luma, Dice, Shotgun, Tixr, SeeTickets | **Public** |
 | **4. Private Ticketing / Invites** | Invite-native platforms with no discovery surface | Partiful, secretparty.io, Google Forms, Discord text-only announcements | **Hidden (for now)** |
 
+**User-submitted one-off events** (`user-submitted` source, `add-event` function) follow the same per-URL rules: any signed-in user can paste an event link; public ticketing/venue pages become public rows, private-invite platforms (Partiful, secretparty, forms) stay private. The URL-first dedup ladder merges submissions that already exist in the store.
+
 **The Agape Discord channel is not a class-member — it is the curation layer.** It contributes the `recommended_by: agape` signal and `posted_by` attribution to events in any class. It is also the *only* ingestion path for class-4 events.
 
 ### 2.1 Demotion rule (long-tail discovery platforms)
@@ -195,6 +197,7 @@ Explicitly **not** filters: ticket platform (attribute → outbound link icon), 
 - [x] "★ Agape" filter + "Past events" toggle in the events app (v1.15.0); private rows visible to authenticated users (migration 091 — §8.1 resolved: any Supabase-authenticated user)
 - [x] Metrics dashboard at `/events/metrics.html` (agape_coverage, source health, scrape runs, enrichment queue)
 - [x] Greenlit Eventbrite orgs with Agape signal via `eventbrite-org` parser (§8.4 resolved: class per-source) — Public Works, Manny's, Hoodslam, The Center SF, Envelop, Flux Vertical Theatre (migration 090)
+- [x] One-off event submission by link (`add-event` v1.0.0 + client v1.16.0): JSON-LD → OG → Haiku extraction, per-URL visibility, auth-gated
 - [ ] Agape badge + `posted_by` display on event cards
 - [ ] Private-event view polish (class-4 events) for members
 - [ ] Venue Waves 1 & 3 gap-fill; Internet Archive org id lookup

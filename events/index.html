@@ -1639,6 +1639,16 @@ body {
         <div id="activeSourcesList" style="border: var(--border-thin) solid var(--border-subtle); max-height: 200px; overflow-y: auto;"></div>
       </div>
 
+      <!-- One-off event by link (add-event edge function) -->
+      <div class="form-group" id="oneOffGroup">
+        <label class="form-label">Add a one-off event by link</label>
+        <div style="display:flex; gap: var(--space-2);">
+          <input type="text" class="input" id="oneOffUrl" placeholder="Paste an event page URL (Partiful, Luma, Eventbrite, venue…)" style="flex:1;">
+          <button class="btn btn--sm" id="oneOffAddBtn">Add</button>
+        </div>
+        <span class="form-hint" id="oneOffStatus"></span>
+      </div>
+
       <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: var(--space-3) 0;">add more</div>
 
       <!-- Pin-based suggestions (logged-in users) -->
@@ -1759,8 +1769,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.15.0';
-  console.log(`[events] v${VERSION} - Agape recommended + past-events filters; Agape curation source; eventbrite-org stock sources`);
+  const VERSION = '1.16.0';
+  console.log(`[events] v${VERSION} - one-off event submission by link (add-event); Community adds source`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1796,6 +1806,8 @@ body {
     { id: 'luma-sf', name: 'Luma SF', category: 'social', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=discover&id=discplace-BDj7GNbGlsF7Cka', region: 'bay-area', description: "What's happening in San Francisco" },
     // Bay Area — Agape curation feed (private rows: visible only when signed in)
     { id: 'discord-agape-events', name: 'Agape #events', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
+    // One-off events added by users via the add-event function
+    { id: 'user-submitted', name: 'Community adds', category: 'social', type: 'manual', url: null, region: 'bay-area', description: 'One-off events added by link' },
     // Bay Area — Eventbrite orgs with Agape signal (scraped server-side)
     { id: 'eb-publicworks', name: 'Public Works', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/public-works-17405142071', region: 'bay-area', description: 'Public Works SF' },
     { id: 'eb-mannys', name: "Manny's", category: 'social', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/mannys-15114280512', region: 'bay-area', description: "Manny's civic events" },
@@ -1990,6 +2002,14 @@ body {
         if (agape) state.sources.push({ ...agape, enabled: true });
       }
       localStorage.setItem('ctrl-rodeo-agape-source-added', '1');
+    }
+    // One-time migration: community-added one-off events source
+    if (!localStorage.getItem('ctrl-rodeo-user-submitted-added')) {
+      if (!state.sources.some(s => s.id === 'user-submitted')) {
+        const us = STOCK_SOURCES.find(s => s.id === 'user-submitted');
+        if (us) state.sources.push({ ...us, enabled: true });
+      }
+      localStorage.setItem('ctrl-rodeo-user-submitted-added', '1');
     }
 
     saveSources();
@@ -3526,6 +3546,34 @@ body {
       state.filters.agape = !state.filters.agape;
       updateFilterChips();
       render();
+    });
+    document.getElementById('oneOffAddBtn').addEventListener('click', async () => {
+      const input = document.getElementById('oneOffUrl');
+      const status = document.getElementById('oneOffStatus');
+      const btn = document.getElementById('oneOffAddBtn');
+      const url = input.value.trim();
+      if (!url) { status.textContent = 'Paste an event page URL first'; return; }
+      const token = getAccessToken();
+      if (!token) { status.textContent = 'Sign in to add events'; return; }
+      btn.disabled = true;
+      status.textContent = 'Extracting event…';
+      try {
+        const resp = await fetch(SUPABASE_URL + '/functions/v1/add-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ url }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { status.textContent = data.error || 'Failed to add event'; return; }
+        const vis = data.visibility === 'private' ? ' (private — visible to signed-in users)' : '';
+        status.textContent = 'Added: ' + data.event.name + ' on ' + data.event.date + vis;
+        input.value = '';
+        fetchAllSources(true);
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
     });
     document.getElementById('filterPast').addEventListener('click', () => {
       state.filters.showPast = !state.filters.showPast;
