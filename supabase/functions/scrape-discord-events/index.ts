@@ -10,11 +10,12 @@
 //   POST { guildId, channelId }                     -> read cache (or scrape if stale/missing)
 //   POST { action: "refresh", guildId, channelId }  -> force scrape + cache (for cron)
 //   POST { action: "refresh-all" }                  -> refresh all cached channels (for cron)
+//   POST { action: "export", channelId, after?, maxMessages? } -> raw message export (paginated, service-role only)
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.1.0'
-console.log(`[scrape-discord-events] v${VERSION} - rate-limit retry cap`)
+const VERSION = '1.2.0'
+console.log(`[scrape-discord-events] v${VERSION} - inspect + raw export actions`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -129,7 +130,8 @@ interface DiscordMessage {
   timestamp: string
   type: number
   message_reference?: { message_id?: string }
-  embeds?: Array<{ title?: string; description?: string }>
+  embeds?: Array<{ title?: string; description?: string; url?: string; provider?: { name?: string } }>
+  attachments?: Array<{ filename?: string; url?: string; content_type?: string }>
 }
 
 async function fetchDiscordMessages(
@@ -461,6 +463,91 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ refreshed: results.length, results }),
+        { headers: jsonHeaders }
+      )
+    }
+
+    // --- export: raw message dump for analysis (service-role only) ---
+    if (action === 'export') {
+      // Gateway (verify_jwt) has already validated the JWT signature;
+      // here we only require that the caller's role is service_role.
+      const authHeader = req.headers.get('Authorization') || ''
+      let role = ''
+      try {
+        const token = authHeader.replace(/^Bearer\s+/i, '')
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        role = payload.role || ''
+      } catch { /* not a JWT */ }
+      if (role !== 'service_role') {
+        return new Response(
+          JSON.stringify({ error: 'export requires service role key' }),
+          { status: 403, headers: jsonHeaders }
+        )
+      }
+
+      const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
+      if (!botToken) throw new Error('DISCORD_BOT_TOKEN not configured')
+
+      const exportChannelId = body.channelId as string
+      if (!exportChannelId) {
+        return new Response(
+          JSON.stringify({ error: 'channelId is required' }),
+          { status: 400, headers: jsonHeaders }
+        )
+      }
+
+      const maxMessages = Math.min(Math.max((body.maxMessages as number) || 500, 1), 1000)
+      let after = (body.after as string) || '0'
+      const raw: DiscordMessage[] = []
+
+      try {
+        while (raw.length < maxMessages) {
+          const batch = await fetchDiscordMessages(exportChannelId, botToken, after)
+          if (batch.length === 0) break
+          // Discord returns newest-first within a page when using `after`; sort ascending
+          batch.sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+          raw.push(...batch)
+          after = batch[batch.length - 1].id
+          if (batch.length < 100) break
+        }
+      } catch (err) {
+        // Surface the raw Discord error so callers can distinguish
+        // bad-token (401) from not-invited/missing-access (403)
+        const msg = err instanceof Error ? err.message : String(err)
+        return new Response(
+          JSON.stringify({ error: `Discord fetch failed: ${msg}` }),
+          { status: 502, headers: jsonHeaders }
+        )
+      }
+
+      const messages = raw.slice(0, maxMessages).map(m => ({
+        id: m.id,
+        timestamp: m.timestamp,
+        author: m.author?.username || '',
+        bot: !!m.author?.bot,
+        content: m.content,
+        embeds: (m.embeds || []).map(e => ({
+          title: e.title || '',
+          description: (e.description || '').slice(0, 500),
+          url: e.url || '',
+          provider: e.provider?.name || '',
+        })),
+        attachments: (m.attachments || []).map(a => ({
+          filename: a.filename || '',
+          content_type: a.content_type || '',
+          url: a.url || '',
+        })),
+        reply: !!m.message_reference,
+      }))
+
+      const done = messages.length < maxMessages
+      return new Response(
+        JSON.stringify({
+          count: messages.length,
+          done,
+          nextAfter: messages.length > 0 ? messages[messages.length - 1].id : after,
+          messages,
+        }),
         { headers: jsonHeaders }
       )
     }
