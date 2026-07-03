@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.5.0'
-console.log(`[cache-events] v${VERSION} - bulk upsert for existing events (per-row update loop was timing out batches)`)
+const VERSION = '1.5.1'
+console.log(`[cache-events] v${VERSION} - chunked existence check + duplicate-proof inserts (unchunked .in() silently failed, killing batches)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -285,16 +285,26 @@ serve(async (req: Request) => {
       return jsonResponse({ cached: 0, updated: 0, enrichQueued: 0, healthUpdated, errors: ['No valid events'] })
     }
 
-    // Check which event_keys already exist
+    // Check which event_keys already exist. Chunked: .in() with 400 64-char
+    // keys builds a ~26KB URL that the gateway rejects — and that failure was
+    // silently swallowed, routing every row to insert, where the whole batch
+    // died on the unique constraint. Months of scrapes were lost this way.
     const keys = validRows.map(r => r.event_key as string)
-    const { data: existing } = await supabase
-      .from('events')
-      .select('event_key, id, enrichment_status')
-      .in('event_key', keys)
-
     const existingMap = new Map<string, { id: string; enrichment_status: string }>()
-    if (existing) {
-      for (const row of existing) {
+    for (let i = 0; i < keys.length; i += 100) {
+      const chunk = keys.slice(i, i + 100)
+      const { data: existing, error: existErr } = await supabase
+        .from('events')
+        .select('event_key, id, enrichment_status')
+        .in('event_key', chunk)
+      if (existErr) {
+        // Not fatal: unmatched rows fall through to the insert path, which
+        // ignores duplicates — worst case their scraped_at doesn't refresh.
+        console.error(`[cache-events] Existence check chunk failed: ${existErr.message}`)
+        errors.push(`Existence check: ${existErr.message}`)
+        continue
+      }
+      for (const row of existing || []) {
         existingMap.set(row.event_key, { id: row.id, enrichment_status: row.enrichment_status })
       }
     }
@@ -313,11 +323,13 @@ serve(async (req: Request) => {
       toInsert.push(r)
     }
 
-    // Batch insert new events
+    // Batch insert new events. ignoreDuplicates makes this immune to a stale
+    // existence check — conflicting rows are skipped, never a batch-killing
+    // constraint violation.
     if (toInsert.length > 0) {
       const { data: inserted, error: insertErr } = await supabase
         .from('events')
-        .insert(toInsert)
+        .upsert(toInsert, { onConflict: 'event_key', ignoreDuplicates: true })
         .select('id, url, enrichment_status')
 
       if (insertErr) {
