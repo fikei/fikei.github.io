@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.6.0'
-console.log(`[cache-events] v${VERSION} - source classes, visibility, URL-first dedup ladder + tiered fuzzy match (PRD source-architecture)`)
+const VERSION = '1.6.1'
+console.log(`[cache-events] v${VERSION} - per-event visibility override for user-submitted events`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -75,6 +75,9 @@ interface ScrapedEvent {
   description?: string
   postedBy?: string
   recommendedBy?: string[]
+  // Per-event visibility override (used by add-event, where visibility
+  // depends on the submitted URL's platform, not the source's class)
+  visibility?: 'public' | 'private'
 }
 
 // --- Source classes & visibility (PRD event-source-architecture §2–3) ---
@@ -486,7 +489,9 @@ serve(async (req: Request) => {
         event_key: eventKey,
         canonical_key: canonicalKey,
         canonical_url: canonicalizeEventUrl(ev.url),
-        visibility: visibilityFor(ev.source, sourceClasses),
+        visibility: (ev.visibility === 'public' || ev.visibility === 'private')
+          ? ev.visibility
+          : visibilityFor(ev.source, sourceClasses),
         source_id: ev.source,
         date: ev.date,
         time: ev.time || null,
