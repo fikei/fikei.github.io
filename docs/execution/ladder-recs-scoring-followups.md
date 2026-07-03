@@ -1,6 +1,15 @@
-# Job Recs — Scoring & Enrichment Follow-ups
+# Ladder Recommendations — Scoring & Enrichment Follow-ups
 
-Status: items 1-3 addressed 2026-06-16 (score-based ranking + candidate floor). Item 9 shipped 2026-06-19 (role-closure detection). Items 4-5, 6-8 open. Use `/plan` to schedule the open ones.
+Status: items 1-3, 9 shipped. Item 2 shipped 2026-07-02 (For You floors + wildcards strip). Items 4-5, 6-8 open. Use `/plan` to schedule the open ones.
+
+**Shipped 2026-07-02 (recommendations v0.15.0-merged + ladder v2.14.2) — addresses items 1, 2, 3 (final iteration):**
+- **#2 candidate floor (final):** raised 30→50. Graded rows with `candidate_score < 50` are hidden by default (applied at read time via `view=all&floor=1`); ungraded rows stay hidden until graded. Floors apply by default; toggle in header: "Below-floor hidden · show all" links to `view=all` (unfiltered audit surface).
+- **#3 ranking (final):** blended score `0.6*candidate_score + 0.4*fit_score` for graded rows ≥50; ungraded rows ranked by fit_score; below-floor rows only visible when floor=0. Graded high-candidate + high-fit roles surface first.
+- **Wildcards strip (new):** `view=wildcard` shows candidate_score ≥65, fit<50 roles as compact dashed cards with "why low fit" dimension labels — pressure-test surface to question search criteria. Lives on `/ladder/jobs/recommended/` as a separate strip.
+- **Pre-save detail page (new):** `/ladder/jobs/<slug>/?rec=<id>` for For You roles — fit + strength breakdowns, match bullets, JD, Save/Dismiss/Open-posting. Clicking For You table rows/card titles opens it in new tab. Single-rec lookup via `?id=<uuid>` parameter.
+- **#1 leakage:** addressed *via* #2/#3 — The Nava-PBC ops/proposals roles (high company-fit, low responsibilities-match) now sink or disappear once graded (candidate_score<50), rather than dominating the view. The substring title gate was intentionally removed by the earlier "surface all recs" change; we are NOT re-adding it — ranking + flooring on the candidate (responsibilities) grade is the durable fix. Revisit only if un-graded leakage proves persistent.
+
+---
 
 **Shipped 2026-06-16 (recommendations v0.9.0 + /ladder v2.3.6) — addresses items 1, 2, 3:**
 - **#3 ranking:** For You now defaults to a "best overall match" sort — `candidate_score*0.6 + fit_score*0.4` for graded rows, `fit_score*0.8` for un-graded — so strong responsibilities-matches surface first and un-graded high-fit roles can't dominate the top. Clicking a column header still switches to that explicit sort.
