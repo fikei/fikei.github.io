@@ -6550,3 +6550,108 @@ body[data-auth-state="out"] job-chat { display: none; }
 @media (min-width: 721px) {
   .nav-drawer, .nav-drawer__scrim { display: none !important; }
 }
+
+/* ==========================================================================
+   Search plan (v2.18) — summary landing + Targets/Signals/Rules/Sources
+   tabs switched by ?section= (same pattern as Jobs ?bucket=).
+   ========================================================================== */
+.vf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+.vf-tabs .subnav-bar__item {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-medium);
+}
+.vf-tabs .subnav-bar__item[aria-current="page"] {
+  background: var(--bg-overlay);
+  color: var(--fg);
+  font-weight: var(--fw-semibold);
+}
+.vf-summary { max-width: 760px; }
+.vf-summary__strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-5);
+}
+.vf-summary__label { font-size: var(--font-size-body); }
+.vf-summary__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-overlay);
+  overflow: hidden;
+}
+.vf-summary__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-strong);
+}
+.vf-summary__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.vf-summary__list li { position: relative; }
+.vf-summary__list li::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.vf-summary__list li:last-child::after { display: none; }
+.vf-summary__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+}
+.vf-summary__row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.vf-summary__row-label {
+  font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body);
+}
+.vf-summary__row-digest {
+  color: var(--fg-subtle);
+  font-size: var(--font-size-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vf-summary__row-arrow { color: var(--fg-subtle); flex-shrink: 0; }
+.vf-section__hint { margin: 0 0 var(--space-4); font-size: var(--font-size-small); }
+.vf-advanced { margin-top: var(--space-5); }
+.vf-story-note { margin-top: var(--space-5); font-size: var(--font-size-small); }

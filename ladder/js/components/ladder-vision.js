@@ -15,22 +15,33 @@ import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const FN_URL = `${SUPABASE_URL}/functions/v1/vision-field`;
 
-// Field grouping. Each section lists the canonical field names that
-// belong to it. Anything not listed below falls into 'Other'.
-const SECTIONS = [
-  { id: 'narrative', label: 'Narrative + voice',
-    names: ['narrative_arc', 'voice_rules_md'] },
+// Search-plan taxonomy (v2.18): four subpages switched by ?section=,
+// reusing the Jobs ?bucket= pattern. Landing (no param) is a summary view
+// with a plan-strength chip and one tappable digest row per section.
+//   Targets — what a good role looks like (facts)
+//   Signals — what the grader rewards (taste)
+//   Rules   — hard gates that auto-drop a role
+//   Sources — where roles come from (watched companies + Gmail)
+// Story fields (narrative_arc, voice_rules_md) live on Profile → Narratives,
+// not here; Advanced (score_weights, raw_md) collapses at the bottom of
+// Signals. Unknown fields fall into that same Advanced fold.
+const TABS = [
   { id: 'targets', label: 'Targets',
-    names: ['target_titles', 'target_stages', 'target_sectors', 'target_geographies'] },
-  { id: 'mission', label: 'Mission + culture',
+    hint: 'What a good role looks like — titles, stage, sector, geography, comp.',
+    names: ['target_titles', 'target_stages', 'target_sectors', 'target_geographies', 'comp_floor_base', 'comp_floor_total'] },
+  { id: 'signals', label: 'Signals',
+    hint: 'What the recommendation grader rewards — mission, culture, interests.',
     names: ['mission_keywords', 'mission_required', 'anti_mission_terms', 'culture_keywords', 'interest_tags', 'impact_themes'] },
-  { id: 'comp', label: 'Compensation',
-    names: ['comp_floor_base', 'comp_floor_total'] },
-  { id: 'filters', label: 'Filters',
+  { id: 'rules', label: 'Rules',
+    hint: 'Hard gates — anything here auto-drops a role.',
     names: ['deal_breakers', 'blocked_titles', 'must_have_keywords'] },
-  { id: 'advanced', label: 'Advanced',
-    names: ['score_weights', 'raw_md'] },
+  { id: 'sources', label: 'Sources',
+    hint: 'Where roles come from — watched companies and Gmail scanning.',
+    names: [] },
 ];
+const ADVANCED_FIELDS = ['score_weights', 'raw_md'];
+// Story lives on Profile — never render these here.
+const STORY_FIELDS = ['narrative_arc', 'voice_rules_md'];
 
 function relTime(iso) {
   if (!iso) return '';
@@ -61,6 +72,7 @@ export class JobVision extends LitElement {
     drafts:  { state: true },     // { [name]: draft value } — edit-in-progress
     saving:  { state: true },     // Set<name>
     flash:   { state: true },     // { [name]: 'saved' | 'error' }
+    section: { state: true },     // active tab id or null (summary landing)
   };
 
   constructor() {
@@ -71,6 +83,16 @@ export class JobVision extends LitElement {
     this.drafts = {};
     this.saving = new Set();
     this.flash = {};
+    const s = new URLSearchParams(location.search).get('section');
+    this.section = TABS.some(t => t.id === s) ? s : null;
+  }
+
+  _setSection(id) {
+    this.section = id;
+    const url = new URL(location.href);
+    if (id) url.searchParams.set('section', id);
+    else url.searchParams.delete('section');
+    history.replaceState(null, '', url.pathname + url.search);
   }
 
   connectedCallback() {
@@ -304,30 +326,139 @@ export class JobVision extends LitElement {
     `;
   }
 
-  _renderSection(section) {
-    const present = section.names.filter((n) => this.fields[n]);
-    if (!present.length) return nothing;
+  // ── Summary landing + tabs ───────────────────────────────────────────
+
+  _isFilled(name) {
+    const v = this.fields[name]?.value;
+    if (v == null) return false;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === 'string') return v.trim().length > 0;
+    if (typeof v === 'boolean') return true;
+    return true;
+  }
+
+  // Plan strength = completeness across the core (non-Sources) fields.
+  _strength() {
+    const core = TABS.flatMap(t => t.names).filter(n => this.fields[n] && this.fields[n].kind !== 'bool');
+    if (!core.length) return { label: 'Getting started', pct: 0 };
+    const filled = core.filter(n => this._isFilled(n)).length;
+    const pct = filled / core.length;
+    const label = pct >= 0.8 ? 'Strong' : pct >= 0.5 ? 'Good' : 'Getting started';
+    return { label, pct };
+  }
+
+  _arr(name) {
+    const v = this.fields[name]?.value;
+    return Array.isArray(v) ? v : [];
+  }
+
+  _digest(tab) {
+    if (tab.id === 'targets') {
+      const bits = [];
+      const titles = this._arr('target_titles');
+      if (titles.length) bits.push(titles.slice(0, 3).join(', ') + (titles.length > 3 ? ` +${titles.length - 3}` : ''));
+      const stages = this._arr('target_stages');
+      if (stages.length) bits.push(stages.slice(0, 3).join(' / '));
+      const floor = this.fields.comp_floor_base?.value;
+      if (floor) bits.push(`$${Math.round(floor / 1000)}k+ base`);
+      return bits.join(' · ') || tab.hint;
+    }
+    if (tab.id === 'signals') {
+      const bits = [];
+      const m = this._arr('mission_keywords').length;   if (m) bits.push(`${m} mission`);
+      const c = this._arr('culture_keywords').length;   if (c) bits.push(`${c} culture`);
+      const i = this._arr('interest_tags').length;      if (i) bits.push(`${i} interests`);
+      return bits.length ? bits.join(' · ') + ' keywords' : tab.hint;
+    }
+    if (tab.id === 'rules') {
+      const bits = [];
+      if (this._isFilled('deal_breakers')) bits.push('Deal-breakers set');
+      const b = this._arr('blocked_titles').length;     if (b) bits.push(`${b} blocked titles`);
+      const mh = this._arr('must_have_keywords').length; if (mh) bits.push(`${mh} must-haves`);
+      return bits.join(' · ') || tab.hint;
+    }
+    return tab.hint;
+  }
+
+  _renderSummary() {
+    const s = this._strength();
+    return html`
+      <div class="vf-summary">
+        <div class="vf-summary__strength">
+          <span class="vf-summary__label">Plan strength: <strong>${s.label}</strong></span>
+          <span class="vf-summary__bar"><span style=${`width:${Math.round(s.pct * 100)}%`}></span></span>
+        </div>
+        <ul class="vf-summary__list" role="list">
+          ${TABS.map(t => html`
+            <li>
+              <button class="vf-summary__row" @click=${() => this._setSection(t.id)}>
+                <span class="vf-summary__row-text">
+                  <span class="vf-summary__row-label">${t.label}</span>
+                  <span class="vf-summary__row-digest">${this._digest(t)}</span>
+                </span>
+                <span class="vf-summary__row-arrow" aria-hidden="true">→</span>
+              </button>
+            </li>
+          `)}
+        </ul>
+      </div>
+    `;
+  }
+
+  _renderTabs() {
+    return html`
+      <div class="vf-tabs" role="tablist" aria-label="Search plan sections">
+        <button class="subnav-bar__item" aria-current=${this.section == null ? 'page' : 'false'}
+                @click=${() => this._setSection(null)}>Overview</button>
+        ${TABS.map(t => html`
+          <button class="subnav-bar__item" aria-current=${this.section === t.id ? 'page' : 'false'}
+                  @click=${() => this._setSection(t.id)}>${t.label}</button>
+        `)}
+      </div>
+    `;
+  }
+
+  // Advanced fold — score weights, raw markdown, plus any field the
+  // taxonomy doesn't know about (so nothing silently disappears).
+  _advancedNames() {
+    const known = new Set([...TABS.flatMap((t) => t.names), ...STORY_FIELDS]);
+    const others = Object.keys(this.fields).filter((n) => !known.has(n) && !ADVANCED_FIELDS.includes(n)).sort();
+    return [...ADVANCED_FIELDS.filter((n) => this.fields[n]), ...others];
+  }
+
+  _renderTab(tab) {
+    if (tab.id === 'sources') {
+      return html`
+        <section class="vf-section">
+          <p class="vf-section__hint muted">${tab.hint}</p>
+          <ladder-watched-companies></ladder-watched-companies>
+        </section>
+      `;
+    }
+    const present = tab.names.filter((n) => this.fields[n]);
     return html`
       <section class="vf-section">
-        <h2 class="vf-section__title">${section.label}</h2>
+        <p class="vf-section__hint muted">${tab.hint}</p>
         <div class="vf-section__grid">
           ${present.map((n) => this._renderFieldCard(n))}
         </div>
+        ${tab.id === 'signals' ? this._renderAdvanced() : nothing}
       </section>
     `;
   }
 
-  _renderOtherSection() {
-    const known = new Set(SECTIONS.flatMap((s) => s.names));
-    const others = Object.keys(this.fields).filter((n) => !known.has(n)).sort();
-    if (!others.length) return nothing;
+  _renderAdvanced() {
+    const names = this._advancedNames();
+    if (!names.length) return nothing;
     return html`
-      <section class="vf-section">
-        <h2 class="vf-section__title">Other</h2>
-        <div class="vf-section__grid">
-          ${others.map((n) => this._renderFieldCard(n))}
+      <details class="jd-collapse vf-advanced">
+        <summary>Advanced — score weights & raw plan</summary>
+        <div class="jd-collapse__body">
+          <div class="vf-section__grid">
+            ${names.map((n) => this._renderFieldCard(n))}
+          </div>
         </div>
-      </section>
+      </details>
     `;
   }
 
@@ -338,10 +469,17 @@ export class JobVision extends LitElement {
     if (this.state === 'error') {
       return html`<div class="placeholder"><h2>Couldn't load</h2><p>${this.error}</p></div>`;
     }
+    const tab = TABS.find(t => t.id === this.section) || null;
     return html`
       <div class="vf">
-        ${SECTIONS.map((s) => this._renderSection(s))}
-        ${this._renderOtherSection()}
+        ${this._renderTabs()}
+        ${tab ? this._renderTab(tab) : this._renderSummary()}
+        ${!tab ? html`
+          <p class="vf-story-note muted">
+            Your story — narrative arc and voice rules — lives on
+            <a href="/ladder/history/?tab=narratives">Profile → Narratives</a>.
+          </p>
+        ` : nothing}
       </div>
     `;
   }
