@@ -6655,3 +6655,125 @@ body[data-auth-state="out"] job-chat { display: none; }
 .vf-section__hint { margin: 0 0 var(--space-4); font-size: var(--font-size-small); }
 .vf-advanced { margin-top: var(--space-5); }
 .vf-story-note { margin-top: var(--space-5); font-size: var(--font-size-small); }
+
+/* ==========================================================================
+   Search plan subsections (v2.20) — chip collapse, merged comp card,
+   structured rules, blocked companies, source health.
+   ========================================================================== */
+.vf-section__grid--cols {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+.vf-chip--more,
+.vf-chip--ghost {
+  cursor: pointer;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--font-size-caption);
+}
+.vf-chip--more:hover,
+.vf-chip--ghost:hover { background: var(--bg-surface); color: var(--fg); }
+.vf-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.vf-chip-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.vf-chip-filter {
+  flex: 1;
+  max-width: 260px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+/* Anti-mission terms repel — warn tint so attract vs repel reads at a glance. */
+.vf-card[data-name="anti_mission_terms"] .vf-chip {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+.vf-toggle--inline { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-small); }
+.vf-comp-grid {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.vf-comp-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.vf-comp-label { font-size: var(--font-size-caption); color: var(--fg-muted); font-weight: var(--fw-medium); }
+.vf-comp-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+}
+.vf-comp-input .vf-input { width: 130px; }
+/* Structured deal-breakers */
+.vf-rules { display: flex; flex-direction: column; gap: var(--space-4); }
+.vf-rules__heading {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-semibold);
+}
+.vf-rules__note { margin: 0 0 var(--space-2); font-size: var(--font-size-caption); }
+.vf-rules__list { list-style: none; margin: 0; padding: 0; }
+.vf-rules__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-small);
+}
+.vf-rules__item:last-child { border-bottom: 0; }
+.vf-rules__text { flex: 1; min-width: 0; }
+.vf-rules__add {
+  margin-top: var(--space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+/* Blocked companies + source health rows */
+.vf-blocked, .vf-sources { list-style: none; margin: 0; padding: 0; }
+.vf-blocked__row, .vf-sources__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-small);
+}
+.vf-blocked__row:last-child, .vf-sources__row:last-child { border-bottom: 0; }
+.vf-blocked__name { flex: 1; min-width: 0; text-transform: capitalize; }
+.vf-sources__dot {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: var(--accent-strong); flex-shrink: 0;
+}
+.vf-sources__dot--bad { background: var(--error); }
+.vf-sources__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.vf-sources__name { font-weight: var(--fw-medium); }
+.vf-sources__meta { font-size: var(--font-size-caption); }
+.vf-sources__expired { margin: var(--space-3) 0 0; font-size: var(--font-size-caption); }
+.vf-summary__row-meta {
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-caption);
+  margin-left: var(--space-2);
+}
+/* Watched companies read as list rows here, not floating chips. */
+.watched-strip__row { display: flex; flex-direction: column; gap: var(--space-2); }
+.watched-chip { width: 100%; }

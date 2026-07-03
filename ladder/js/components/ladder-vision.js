@@ -11,9 +11,57 @@
 // distinguishable in the metadata footer of each field.
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
+const V = (new URL(import.meta.url)).search;
+const [{ fetchRecommendations, fetchBlockedCompanies, unblockCompany, refreshSources }] = await Promise.all([
+  import('../pipeline.js' + V),
+]);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const FN_URL = `${SUPABASE_URL}/functions/v1/vision-field`;
+
+// Chip walls collapse past this many entries (62 mission keywords should
+// not dominate the page). Expanded lists get a filter box.
+const CHIP_COLLAPSE_AT = 12;
+const CHIP_SHOW = 10;
+
+// Quick-add suggestions for funding stages — free text still works.
+const STAGE_SUGGESTIONS = ['Pre-seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D+', 'Public'];
+
+// Human labels for source-health rows (recommendations GET → sourceHealth).
+const SOURCE_LABELS = {
+  'gmail-jobs': 'Gmail job alerts',
+  'company-watch': 'Watched companies',
+  'tracked-ats': 'Tracked ATS boards',
+};
+
+// ── Deal-breakers structured editing ─────────────────────────────────────
+// The doc is markdown: optional preamble, '## ' section headings, '- ' rule
+// items, free-text notes. Parse into groups so rules render as rows with
+// add/delete; serialize back losslessly enough for this shape. Anything the
+// parser can't confidently rebuild still has the "Edit as text" escape hatch.
+function parseRuleDoc(md) {
+  const lines = String(md || '').split('\n');
+  const doc = { preamble: [], sections: [] };
+  let cur = null;
+  for (const line of lines) {
+    const h = line.match(/^##\s+(.*)/);
+    if (h) { cur = { heading: h[1].trim(), notes: [], items: [] }; doc.sections.push(cur); continue; }
+    if (!cur) { if (line.trim()) doc.preamble.push(line.trim()); continue; }
+    const it = line.match(/^\s*[-*]\s+(.*)/);
+    if (it) cur.items.push(it[1]);
+    else if (line.trim()) cur.notes.push(line.trim());
+  }
+  return doc;
+}
+function serializeRuleDoc(doc) {
+  const out = [...doc.preamble];
+  for (const s of doc.sections) {
+    out.push('', `## ${s.heading}`);
+    if (s.notes.length) out.push(...s.notes);
+    out.push(...s.items.map(i => `- ${i}`));
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
 
 // Search-plan taxonomy (v2.18): four subpages switched by ?section=,
 // reusing the Jobs ?bucket= pattern. Landing (no param) is a summary view
@@ -73,6 +121,13 @@ export class JobVision extends LitElement {
     saving:  { state: true },     // Set<name>
     flash:   { state: true },     // { [name]: 'saved' | 'error' }
     section: { state: true },     // active tab id or null (summary landing)
+    _expanded:    { state: true },  // Set<name> — chip lists shown in full
+    _chipFilters: { state: true },  // { [name]: filter text }
+    _blocked:     { state: true },  // [{company, blockedAt}] | null (loading)
+    _health:      { state: true },  // sourceHealth rows | null
+    _recentlyExpired: { state: true },
+    _refreshing:  { state: true },
+    _textMode:    { state: true },  // Set<name> — structured fields being edited raw
   };
 
   constructor() {
@@ -85,6 +140,32 @@ export class JobVision extends LitElement {
     this.flash = {};
     const s = new URLSearchParams(location.search).get('section');
     this.section = TABS.some(t => t.id === s) ? s : null;
+    this._expanded = new Set();
+    this._chipFilters = {};
+    this._blocked = null;
+    this._health = null;
+    this._recentlyExpired = 0;
+    this._refreshing = false;
+    this._textMode = new Set();
+  }
+
+  // Lazy per-tab data: blocked companies (Rules) and source health
+  // (Sources) load the first time their tab is visible.
+  willUpdate() {
+    if (document.body.dataset.authState !== 'in') return;
+    if (this.section === 'rules' && this._blocked === null && !this._blockedLoading) {
+      this._blockedLoading = true;
+      fetchBlockedCompanies().then(b => { this._blocked = b; }).catch(() => { this._blocked = []; });
+    }
+    if (this.section === 'sources' && this._health === null && !this._healthLoading) {
+      this._healthLoading = true;
+      fetchRecommendations({ view: 'all', floor: true, limit: 1 })
+        .then(d => {
+          this._health = Array.isArray(d?.sourceHealth) ? d.sourceHealth : [];
+          this._recentlyExpired = Number.isFinite(d?.recentlyExpired) ? d.recentlyExpired : 0;
+        })
+        .catch(() => { this._health = []; });
+    }
   }
 
   _setSection(id) {
@@ -204,15 +285,38 @@ export class JobVision extends LitElement {
 
   _renderStringArray(name) {
     const value = this._draftFor(name) || [];
+    const expanded = this._expanded.has(name);
+    const filter = (this._chipFilters[name] || '').toLowerCase();
+    const collapsible = value.length > CHIP_COLLAPSE_AT;
+    let shown = value;
+    if (filter) shown = value.filter(v => v.toLowerCase().includes(filter));
+    else if (collapsible && !expanded) shown = value.slice(0, CHIP_SHOW);
     return html`
+      ${collapsible && expanded ? html`
+        <div class="vf-chip-tools">
+          <input type="text" class="vf-chip-filter" placeholder=${`Filter ${value.length} terms…`}
+                 .value=${this._chipFilters[name] || ''}
+                 @input=${(e) => { this._chipFilters = { ...this._chipFilters, [name]: e.target.value }; }}>
+          <button class="link-subtle" @click=${() => {
+            const s = new Set(this._expanded); s.delete(name); this._expanded = s;
+            this._chipFilters = { ...this._chipFilters, [name]: '' };
+          }}>Collapse</button>
+        </div>
+      ` : nothing}
       <div class="vf-chips">
-        ${value.map((v, i) => html`
+        ${shown.map((v) => html`
           <span class="vf-chip">
             ${v}
             <button class="vf-chip__x" aria-label="Remove"
-                    @click=${() => this._setDraft(name, value.filter((_, idx) => idx !== i))}>×</button>
+                    @click=${() => this._setDraft(name, value.filter((x) => x !== v))}>×</button>
           </span>
         `)}
+        ${collapsible && !expanded && !filter ? html`
+          <button class="vf-chip vf-chip--more"
+                  @click=${() => { this._expanded = new Set([...this._expanded, name]); }}>
+            +${value.length - CHIP_SHOW} more
+          </button>
+        ` : nothing}
         <input type="text" class="vf-chip-input" placeholder="Add term + Enter"
                @keydown=${(e) => {
                  if (e.key === 'Enter') {
@@ -226,6 +330,22 @@ export class JobVision extends LitElement {
                    this._setDraft(name, value.slice(0, -1));
                  }
                }}>
+      </div>
+      ${name === 'target_stages' ? this._renderStageSuggestions(value) : nothing}
+    `;
+  }
+
+  // Quick-add ghosts for common funding stages not yet selected.
+  _renderStageSuggestions(value) {
+    const missing = STAGE_SUGGESTIONS.filter(s => !value.some(v => v.toLowerCase() === s.toLowerCase()));
+    if (!missing.length) return nothing;
+    return html`
+      <div class="vf-suggestions">
+        ${missing.map(s => html`
+          <button class="vf-chip vf-chip--ghost" @click=${() => this._setDraft('target_stages', [...value, s])}>
+            + ${s}
+          </button>
+        `)}
       </div>
     `;
   }
@@ -285,7 +405,7 @@ export class JobVision extends LitElement {
     }
   }
 
-  _renderFieldCard(name) {
+  _renderFieldCard(name, { headerExtra = null, editor = null } = {}) {
     const f = this.fields[name];
     if (!f) return nothing;
     const dirty = this._hasChanges(name);
@@ -293,20 +413,21 @@ export class JobVision extends LitElement {
     const flash = this.flash[name];
     const updatedBy = SOURCE_LABEL[f.source] || f.source;
     return html`
-      <article class="vf-card" data-kind=${f.kind}>
+      <article class="vf-card" data-kind=${f.kind} data-name=${name}>
         <header class="vf-card__head">
           <div class="vf-card__title-wrap">
             <h3 class="vf-card__title">${f.display_name || name}</h3>
             <span class="vf-card__name">${name}</span>
           </div>
           <div class="vf-card__meta">
+            ${headerExtra || nothing}
             <span class="vf-card__updated" title=${new Date(f.updated_at).toLocaleString()}>
               Updated ${relTime(f.updated_at)} by ${updatedBy}
             </span>
           </div>
         </header>
         ${f.description ? html`<p class="vf-card__desc">${f.description}</p>` : nothing}
-        <div class="vf-card__editor">${this._renderEditor(name)}</div>
+        <div class="vf-card__editor">${editor || this._renderEditor(name)}</div>
         ${dirty || flash ? html`
           <footer class="vf-card__foot">
             ${flash === 'saved'
@@ -391,17 +512,27 @@ export class JobVision extends LitElement {
           <span class="vf-summary__bar"><span style=${`width:${Math.round(s.pct * 100)}%`}></span></span>
         </div>
         <ul class="vf-summary__list" role="list">
-          ${TABS.map(t => html`
+          ${TABS.map(t => {
+            const names = t.names.filter((n) => this.fields[n] && this.fields[n].kind !== 'bool');
+            const missing = names.filter((n) => !this._isFilled(n)).length;
+            const latest = t.names.map((n) => this.fields[n]?.updated_at).filter(Boolean).sort().pop();
+            const meta = [
+              missing ? `${missing} ${missing === 1 ? 'field' : 'fields'} empty` : '',
+              latest ? `updated ${relTime(latest)}` : '',
+            ].filter(Boolean).join(' · ');
+            return html`
             <li>
               <button class="vf-summary__row" @click=${() => this._setSection(t.id)}>
                 <span class="vf-summary__row-text">
-                  <span class="vf-summary__row-label">${t.label}</span>
+                  <span class="vf-summary__row-label">${t.label}
+                    ${meta ? html`<span class="vf-summary__row-meta muted">${meta}</span>` : nothing}
+                  </span>
                   <span class="vf-summary__row-digest">${this._digest(t)}</span>
                 </span>
                 <span class="vf-summary__row-arrow" aria-hidden="true">→</span>
               </button>
             </li>
-          `)}
+          `;})}
         </ul>
       </div>
     `;
@@ -429,14 +560,10 @@ export class JobVision extends LitElement {
   }
 
   _renderTab(tab) {
-    if (tab.id === 'sources') {
-      return html`
-        <section class="vf-section">
-          <p class="vf-section__hint muted">${tab.hint}</p>
-          <ladder-watched-companies></ladder-watched-companies>
-        </section>
-      `;
-    }
+    if (tab.id === 'sources') return this._renderSourcesTab(tab);
+    if (tab.id === 'rules')   return this._renderRulesTab(tab);
+    if (tab.id === 'targets') return this._renderTargetsTab(tab);
+    if (tab.id === 'signals') return this._renderSignalsTab(tab);
     const present = tab.names.filter((n) => this.fields[n]);
     return html`
       <section class="vf-section">
@@ -444,7 +571,276 @@ export class JobVision extends LitElement {
         <div class="vf-section__grid">
           ${present.map((n) => this._renderFieldCard(n))}
         </div>
-        ${tab.id === 'signals' ? this._renderAdvanced() : nothing}
+      </section>
+    `;
+  }
+
+  // ── Targets: two-column grid, comp floors merged into one card ────────
+  _renderTargetsTab(tab) {
+    const gridNames = tab.names.filter((n) => this.fields[n] && !n.startsWith('comp_floor'));
+    return html`
+      <section class="vf-section">
+        <p class="vf-section__hint muted">${tab.hint}</p>
+        <div class="vf-section__grid vf-section__grid--cols">
+          ${gridNames.map((n) => this._renderFieldCard(n))}
+          ${this._renderCompCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  _renderCompCard() {
+    const names = ['comp_floor_base', 'comp_floor_total'].filter((n) => this.fields[n]);
+    if (!names.length) return nothing;
+    const dirty = names.some((n) => this._hasChanges(n));
+    const saving = names.some((n) => this.saving.has(n));
+    const flash = names.map((n) => this.flash[n]).find(Boolean);
+    const latest = names.map((n) => this.fields[n].updated_at).sort().pop();
+    return html`
+      <article class="vf-card" data-name="compensation">
+        <header class="vf-card__head">
+          <div class="vf-card__title-wrap">
+            <h3 class="vf-card__title">Compensation floor</h3>
+            <span class="vf-card__name">comp_floor</span>
+          </div>
+          <div class="vf-card__meta">
+            <span class="vf-card__updated">Updated ${relTime(latest)}</span>
+          </div>
+        </header>
+        <p class="vf-card__desc">Roles below the base floor hard-fail for non-founding positions.</p>
+        <div class="vf-comp-grid">
+          ${names.map((n) => {
+            const v = this._draftFor(n);
+            return html`
+              <label class="vf-comp-field">
+                <span class="vf-comp-label">${n === 'comp_floor_base' ? 'Base' : 'Total'}</span>
+                <span class="vf-comp-input">
+                  <span aria-hidden="true">$</span>
+                  <input type="number" class="vf-input" step="5000" min="0"
+                         .value=${v == null ? '' : String(v)}
+                         @input=${(e) => this._setDraft(n, e.target.value === '' ? null : Number(e.target.value))}>
+                </span>
+              </label>
+            `;
+          })}
+        </div>
+        ${dirty || flash ? html`
+          <footer class="vf-card__foot">
+            ${flash === 'saved' ? html`<span class="vf-saved">✓ Saved</span>`
+              : flash ? html`<span class="vf-error">${flash}</span>` : nothing}
+            ${dirty ? html`
+              <button class="btn btn--sm" ?disabled=${saving}
+                      @click=${() => names.forEach((n) => this._cancel(n))}>Cancel</button>
+              <button class="btn btn--sm btn--primary" ?disabled=${saving}
+                      @click=${async () => { for (const n of names) if (this._hasChanges(n)) await this._save(n); }}>
+                ${saving ? 'Saving…' : 'Save'}
+              </button>
+            ` : nothing}
+          </footer>
+        ` : nothing}
+      </article>
+    `;
+  }
+
+  // ── Signals: mission-required toggle inline in the Mission card ───────
+  _renderSignalsTab(tab) {
+    const gridNames = tab.names.filter((n) => this.fields[n] && n !== 'mission_required' && n !== 'mission_keywords');
+    const missionToggle = this.fields.mission_required ? html`
+      <label class="vf-toggle vf-toggle--inline" title="When on, roles with no mission signal hard-fail.">
+        <input type="checkbox" .checked=${!!this._currentValue('mission_required')}
+               ?disabled=${this.saving.has('mission_required')}
+               @change=${(e) => { this._setDraft('mission_required', e.target.checked); this._save('mission_required'); }}>
+        <span>Required</span>
+      </label>
+    ` : null;
+    return html`
+      <section class="vf-section">
+        <p class="vf-section__hint muted">${tab.hint}</p>
+        <div class="vf-section__grid">
+          ${this.fields.mission_keywords ? this._renderFieldCard('mission_keywords', { headerExtra: missionToggle }) : nothing}
+          ${gridNames.map((n) => this._renderFieldCard(n))}
+        </div>
+        ${this._renderAdvanced()}
+      </section>
+    `;
+  }
+
+  // ── Rules: structured deal-breakers + blocked companies ───────────────
+  _renderRulesTab(tab) {
+    const rest = tab.names.filter((n) => this.fields[n] && n !== 'deal_breakers');
+    return html`
+      <section class="vf-section">
+        <p class="vf-section__hint muted">${tab.hint}</p>
+        <div class="vf-section__grid">
+          ${this.fields.deal_breakers ? this._renderFieldCard('deal_breakers', {
+            headerExtra: html`
+              <button class="link-subtle" @click=${() => {
+                const s = new Set(this._textMode);
+                s.has('deal_breakers') ? s.delete('deal_breakers') : s.add('deal_breakers');
+                this._textMode = s;
+              }}>${this._textMode.has('deal_breakers') ? 'Structured view' : 'Edit as text'}</button>`,
+            editor: this._textMode.has('deal_breakers') ? null : this._renderRuleDocEditor('deal_breakers'),
+          }) : nothing}
+          ${rest.map((n) => this._renderFieldCard(n))}
+          ${this._renderBlockedCard()}
+        </div>
+      </section>
+    `;
+  }
+
+  _renderRuleDocEditor(name) {
+    const doc = parseRuleDoc(this._draftFor(name) || '');
+    const commit = () => this._setDraft(name, serializeRuleDoc(doc));
+    if (!doc.sections.length) return this._renderTextMd(name);
+    return html`
+      <div class="vf-rules">
+        ${doc.sections.map((sec) => html`
+          <div class="vf-rules__group">
+            <h4 class="vf-rules__heading">${sec.heading}</h4>
+            ${sec.notes.length ? html`<p class="vf-rules__note muted">${sec.notes.join(' ')}</p>` : nothing}
+            <ul class="vf-rules__list" role="list">
+              ${sec.items.map((item, i) => html`
+                <li class="vf-rules__item">
+                  <span class="vf-rules__text">${item}</span>
+                  <button class="vf-chip__x" aria-label="Remove rule"
+                          @click=${() => { sec.items.splice(i, 1); commit(); }}>×</button>
+                </li>
+              `)}
+            </ul>
+            <input type="text" class="vf-rules__add" placeholder="Add rule + Enter"
+                   @keydown=${(e) => {
+                     if (e.key !== 'Enter') return;
+                     e.preventDefault();
+                     const t = e.target.value.trim();
+                     if (!t) return;
+                     sec.items.push(t);
+                     e.target.value = '';
+                     commit();
+                   }}>
+          </div>
+        `)}
+      </div>
+    `;
+  }
+
+  async _unblock(company) {
+    this._blocked = (this._blocked || []).filter((b) => b.company !== company);
+    try {
+      await unblockCompany(company);
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `${company} can be recommended again` } }));
+    } catch (e) {
+      console.warn('[vision] unblock failed', e);
+      this._blocked = null; this._blockedLoading = false; // reload on next render
+    }
+  }
+
+  _renderBlockedCard() {
+    return html`
+      <article class="vf-card" data-name="blocked_companies">
+        <header class="vf-card__head">
+          <div class="vf-card__title-wrap">
+            <h3 class="vf-card__title">Blocked companies</h3>
+            <span class="vf-card__name">blocked_companies</span>
+          </div>
+        </header>
+        <p class="vf-card__desc">"Don't recommend" — roles from these companies never enter the Inbox.</p>
+        ${this._blocked == null ? html`<p class="muted">Loading…</p>`
+          : this._blocked.length === 0 ? html`<p class="vf-empty">No companies blocked.</p>`
+          : html`
+            <ul class="vf-blocked" role="list">
+              ${this._blocked.map((b) => html`
+                <li class="vf-blocked__row">
+                  <span class="vf-blocked__name">${b.company}</span>
+                  <span class="vf-blocked__meta muted">${relTime(b.blockedAt)}</span>
+                  <button class="link-subtle" @click=${() => this._unblock(b.company)}>Unblock</button>
+                </li>
+              `)}
+            </ul>
+          `}
+      </article>
+    `;
+  }
+
+  // ── Sources: pipeline health + watched companies ───────────────────────
+  async _onRefreshSources() {
+    if (this._refreshing) return;
+    this._refreshing = true;
+    try {
+      const r = await refreshSources();
+      document.dispatchEvent(new CustomEvent('job:toast', {
+        detail: { msg: r.throttled ? 'Recently refreshed — try again in a few minutes.' : 'Scanning sources for new roles…' },
+      }));
+    } catch (e) {
+      console.warn('[vision] refresh failed', e);
+    } finally {
+      this._refreshing = false;
+    }
+  }
+
+  async _onReconnectGmail() {
+    try {
+      const sb = this._supabase();
+      const token = (await sb?.auth.getSession?.())?.data?.session?.access_token;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/gmail-auth`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auth-url' }),
+      });
+      const j = await r.json();
+      if (j.url) window.location.assign(j.url);
+    } catch (e) {
+      console.warn('[vision] gmail reconnect failed', e);
+    }
+  }
+
+  _renderSourcesTab(tab) {
+    const health = this._health;
+    return html`
+      <section class="vf-section">
+        <p class="vf-section__hint muted">${tab.hint}</p>
+        <article class="vf-card" data-name="source_health">
+          <header class="vf-card__head">
+            <div class="vf-card__title-wrap">
+              <h3 class="vf-card__title">Pipeline health</h3>
+              <span class="vf-card__name">sources</span>
+            </div>
+            <div class="vf-card__meta">
+              <button class="btn btn--sm" ?disabled=${this._refreshing} @click=${() => this._onRefreshSources()}>
+                ${this._refreshing ? 'Scanning…' : 'Refresh sources'}
+              </button>
+            </div>
+          </header>
+          ${health == null ? html`<p class="muted">Loading…</p>`
+            : health.length === 0 ? html`<p class="vf-empty">No sources configured.</p>`
+            : html`
+              <ul class="vf-sources" role="list">
+                ${health.map((s) => {
+                  const bad = s.enabled !== false && (s.needsReauth || s.lastError);
+                  return html`
+                    <li class="vf-sources__row">
+                      <span class=${'vf-sources__dot' + (bad ? ' vf-sources__dot--bad' : '')} aria-hidden="true"></span>
+                      <span class="vf-sources__text">
+                        <span class="vf-sources__name">${SOURCE_LABELS[s.type] || s.type}</span>
+                        <span class="vf-sources__meta muted">
+                          ${s.enabled === false ? 'Disabled'
+                            : s.needsReauth ? 'Disconnected — needs re-auth'
+                            : s.lastError ? s.lastError
+                            : 'Healthy'}
+                        </span>
+                      </span>
+                      ${s.type === 'gmail-jobs' && s.needsReauth ? html`
+                        <button class="btn btn--sm btn--accent" @click=${() => this._onReconnectGmail()}>Reconnect</button>
+                      ` : nothing}
+                    </li>
+                  `;
+                })}
+              </ul>
+            `}
+          ${this._recentlyExpired > 0 ? html`
+            <p class="vf-sources__expired muted">${this._recentlyExpired} expired postings removed in the last 7 days.</p>
+          ` : nothing}
+        </article>
+        <ladder-watched-companies></ladder-watched-companies>
       </section>
     `;
   }
