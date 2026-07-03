@@ -6067,7 +6067,8 @@ body[data-auth-state="out"] job-chat { display: none; }
    Replaces the sortable table: a single elevated card per day with hairline
    dividers between rows. No scores, no inline accept/reject.
    ========================================================================== */
-.inbox { display: flex; flex-direction: column; gap: var(--space-5); }
+/* Cap the reading column — J&J-style centered inbox, not a full-bleed table. */
+.inbox { display: flex; flex-direction: column; gap: var(--space-5); max-width: 760px; }
 
 .inbox-group__head {
   display: flex;
@@ -6262,7 +6263,32 @@ body[data-auth-state="out"] job-chat { display: none; }
   overflow-wrap: anywhere;
 }
 .review__meta { margin: 0; color: var(--fg-muted); font-size: var(--font-size-body); }
-.review__salary { margin: var(--space-1) 0 0; font-weight: var(--fw-medium); font-size: var(--font-size-body); }
+/* Scores sit directly under role + company — the most critical data after
+   the name. Clickable pills; the modal holds the full breakdown. */
+.review__scores {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+.review__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: var(--font-size-body);
+  padding: 6px var(--space-3);
+}
+.review__score-label {
+  font-size: var(--font-size-caption);
+  font-weight: var(--fw-medium);
+  opacity: 0.75;
+}
+.review__company-desc {
+  margin: var(--space-3) 0 0;
+  color: var(--fg-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--lh-body);
+}
+.review__salary { margin: var(--space-3) 0 0; font-weight: var(--fw-medium); font-size: var(--font-size-body); }
 .review__sub { margin: var(--space-2) 0 0; font-size: var(--font-size-small); }
 .review__section { margin-bottom: var(--space-5); }
 .review__section-title {

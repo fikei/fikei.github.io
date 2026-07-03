@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.15.0';
-console.log(`[recommendations] v${VERSION} - watched-company filter modes (all / role_level / good_fits / exceptional) layered onto the quality-floor + wildcard gates`);
+const VERSION = '0.16.0';
+console.log(`[recommendations] v${VERSION} - expose company_description on list + detail responses`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -49,6 +49,7 @@ serve(async (req) => {
                  r.candidate_rationales as "candidateRationales", r.candidate_summary as "candidateSummary",
                  r.comp_acceptable as "compAcceptable",
                  r.hard_fails as "hardFails", r.sector,
+                 r.company_description as "companyDescription",
                  r.enrichment_status as "enrichmentStatus",
                  r.canonical_url as "canonicalUrl",
                  r.dismissed_at as "dismissedAt", r.closed_at as "closedAt",
@@ -225,6 +226,7 @@ serve(async (req) => {
                r.candidate_rationales as "candidateRationales", r.candidate_summary as "candidateSummary",
                r.comp_acceptable as "compAcceptable",
                r.hard_fails as "hardFails", r.sector,
+               r.company_description as "companyDescription",
                r.enrichment_status as "enrichmentStatus",
                r.enrichment_retry_at as "enrichmentRetryAt",
                r.canonical_url as "canonicalUrl",

@@ -8,7 +8,7 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal, weakestFitDims }] = await Promise.all([
+const [{ renderMarkdown }, { fetchRecommendation, addRole, dismissRecommendation }, { logoSrc, logoInitial }, { renderVerdicts, renderScoreModal, scoreClass, weakestFitDims }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../logo.js' + V),
@@ -176,6 +176,19 @@ export class LadderRecDetail extends LitElement {
           <div class="rec-detail__title-block">
             <h1>${rec.title || '(untitled)'}</h1>
             ${meta ? html`<p class="rec-detail__meta">${meta}</p>` : nothing}
+            <div class="review__scores">
+              <button class=${scoreClass(rec.fitScore) + ' fit-pill--button review__score'}
+                      title="Fit score — tap for the full breakdown"
+                      @click=${() => { this.scoreOpen = 'fit'; }}>
+                ${rec.fitScore ?? '—'}<span class="review__score-label">fit</span>
+              </button>
+              <button class=${scoreClass(rec.candidateScore) + ' fit-pill--button review__score'}
+                      title="Candidate strength — tap for the full breakdown"
+                      @click=${() => { this.scoreOpen = 'candidate'; }}>
+                ${rec.candidateScore ?? '—'}<span class="review__score-label">strength</span>
+              </button>
+            </div>
+            ${rec.companyDescription ? html`<p class="review__company-desc">${rec.companyDescription}</p>` : nothing}
             <p class="rec-detail__source muted">
               ${rec.sourceLabel ? html`via ${rec.sourceLabel}` : nothing}
               ${rec.sourceEmailUrl ? html` · <a href=${rec.sourceEmailUrl} target="_blank" rel="noopener">📧 source email</a>` : nothing}
@@ -212,12 +225,6 @@ export class LadderRecDetail extends LitElement {
           <header class="role-card__head"><h3>How it stacks up</h3></header>
           ${rec.fitSummary ? html`<p class="rec-detail__summary">${rec.fitSummary}</p>` : nothing}
           ${renderVerdicts(rec)}
-          <p class="review__numbers muted">
-            <button class="link-subtle" @click=${() => { this.scoreOpen = 'fit'; }}>Fit ${rec.fitScore ?? '—'}</button>
-            ·
-            <button class="link-subtle" @click=${() => { this.scoreOpen = 'candidate'; }}>Strength ${rec.candidateScore ?? '—'}</button>
-            — tap for the full breakdown
-          </p>
         </article>
 
         ${rec.description ? html`
