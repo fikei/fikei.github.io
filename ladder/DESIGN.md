@@ -8,7 +8,7 @@ These are the Wise rules we follow strictly. Don't break them when adding compon
 
 1. **Sentence case only.** Never `text-transform: uppercase`. No tracked all-caps labels. Headings, button labels, navigation, table headers — all sentence case.
 2. **Inter for body, Inter SemiBold for display.** Wise Sans is Wise's display face but it's not freely distributable; we substitute Inter SemiBold and tighten letter-spacing on titles. If we ever ship Wise Sans we drop it into `--font-display`.
-3. **4px base spacing scale.** Use `var(--space-N)` only — 1=4, 2=8, 3=12, 4=16, 5=24, 6=32, 7=48, 8=64. No magic numbers.
+3. **4px base spacing scale.** Use `var(--space-N)` only — 1=4, 2=8, 3=12, 4=16, 5=20, 6=24, 7=32, 8=40, 9=48, 10=64. Usage: 16 dense card padding, 20 feature card, 24 section gap, 32 page gutter, 40+ hero/empty states only. No magic numbers.
 4. **Generous radius, two button shapes.** Smallest radius 16px; cards 20px (`--radius-lg`). Decision CTAs (`.btn--primary`, `.btn--accent`, review footer) are pills; every other button is a 16px rounded-rect. Circular (`--radius-pill`) is otherwise reserved for `.icon-btn` and chips. Don't use `border-radius: 4px` anywhere — looks wrong.
 5. **Forest Green and Bright Green own the brand — but only for actions.** Light theme: Forest Green (`#163300`) is `--accent` (interactive primary); Bright Green (`#9FE870`) is `--accent-strong`. Green is reserved for **the primary action on each screen** (accent CTAs, active fit pills in score modals). Active nav, tabs, and selected states are **neutral** (`--bg-overlay` + semibold), never green fills — one accented moment per screen. Red appears only on destructive/error surfaces, never in browse lists. Dark theme inverts: Forest is the base, Bright is the accent.
 6. **Token contract.** Every component reads `var(--bg)`, `var(--fg)`, `var(--accent)`, etc. Never hardcode hex values. The CTRL alternate must expose the same custom-property names.
@@ -19,16 +19,17 @@ These are the Wise rules we follow strictly. Don't break them when adding compon
 | Token | Size | Use |
 |-|-|-|
 | `--font-size-display` | 56 | landing headlines (none in /ladder yet) |
-| `--font-size-title-1` | 28 | page H1 (bold, -0.02em) |
-| `--font-size-title-2` | 22 | section H2, card titles |
-| `--font-size-title-3` | 22 | sub-section H3 |
-| `--font-size-title-4` | 18 | small heading / strong label |
-| `--font-size-body-lg` | 18 | KB document body, lede |
-| `--font-size-body` | 16 | default body |
-| `--font-size-small` | 15 | meta, table cells |
+| `--font-size-title-1` | 24 | page H1 (bold, -0.02em; clamps to 20 on phones) |
+| `--font-size-title-2` | 20 | section H2, card titles |
+| `--font-size-title-3` | 18 | sub-section H3, inbox group headers, review title |
+| `--font-size-title-4` | 16 | small heading / strong label, mobile-bar title |
+| `--font-size-body-lg` | 16 | KB document body, lede |
+| `--font-size-body` | 15 | default body, row titles, buttons |
+| `--font-size-small` | 13 | meta, table cells, digests |
 | `--font-size-caption` | 12 | chips, captions |
 
-Line heights: `--lh-display: 1.1`, `--lh-title: 1.25`, `--lh-body: 1.55`, `--lh-tight: 1.35`.
+Line heights: `--lh-display: 1.1`, `--lh-title: 1.25`, `--lh-body: 1.5`, `--lh-tight: 1.35`.
+Control heights: buttons 40 (`.btn--sm` 32); thumb-critical controls stay 48 (review decision footer, drawer rows); desktop rail rows 40.
 Weights: `--fw-medium: 500`, `--fw-semibold: 600`, `--fw-bold: 700` (page H1s + inbox group headers are bold).
 Light surfaces are warm-neutral: `--bg #FAFAF9`, `--bg-surface #F4F4F2` — no green tint; color comes from content and the single accent.
 
