@@ -6,10 +6,10 @@ import type { EventSource } from '../sources.ts'
 
 export async function scrapeIcal(source: EventSource): Promise<ScrapedEvent[]> {
   const text = await fetchUrl(source.url)
-  return parseIcal(text, source.id)
+  return parseIcal(text, source.id, source.category)
 }
 
-function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
+function parseIcal(text: string, sourceId: string, category?: string): ScrapedEvent[] {
   // RFC 5545 line-unfolding: CRLF + (SPACE|TAB) continues the previous line.
   const unfolded = text.replace(/\r?\n[ \t]/g, '')
 
@@ -51,6 +51,7 @@ function parseIcal(text: string, sourceId: string): ScrapedEvent[] {
       url: url || '',
       description,
       source: sourceId,
+      contentType: category,
     })
   }
 
