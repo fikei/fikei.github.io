@@ -1818,8 +1818,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.17.1';
-  console.log(`[events] v${VERSION} - Agape badge + posted_by on event rows; ATA stock source`);
+  const VERSION = '1.17.2';
+  console.log(`[events] v${VERSION} - tiat (art & technology Luma calendar) stock source`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1858,6 +1858,7 @@ body {
     // One-off events added by users via the add-event function
     { id: 'user-submitted', name: 'Community adds', category: 'social', type: 'manual', url: null, region: 'bay-area', description: 'One-off events added by link' },
     { id: 'ata-sf', name: 'ATA', category: 'film', type: 'ata', url: 'https://www.atasite.org/calendar', region: 'bay-area', description: 'Underground film & experimental art' },
+    { id: 'luma-tiat', name: 'tiat', category: 'art', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=calendar&id=cal-twiOosdGMMY66DI', region: 'bay-area', description: 'The intersection of art & technology' },
     // Bay Area — Eventbrite orgs with Agape signal (scraped server-side)
     { id: 'eb-publicworks', name: 'Public Works', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/public-works-17405142071', region: 'bay-area', description: 'Public Works SF' },
     { id: 'eb-mannys', name: "Manny's", category: 'social', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/mannys-15114280512', region: 'bay-area', description: "Manny's civic events" },
