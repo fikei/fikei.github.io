@@ -6,8 +6,8 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
-const VERSION = '1.1.1'
-console.log(`[enrich-event] v${VERSION} - retired Haiku model replaced (claude-3-haiku -> haiku-4-5)`)
+const VERSION = '1.2.0'
+console.log(`[enrich-event] v${VERSION} - authoritative source categories + full content-type taxonomy in AI prompt`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -215,7 +215,7 @@ async function classifyWithAI(event: {
 
 1. "genre" — the music/art genre (e.g. "Techno", "House", "Hip-Hop", "Jazz", "Rock", "Comedy", "Film", "Indie", "Drum & Bass"). Use the most specific genre that fits. If multiple genres apply, comma-separate up to 3. Return "" if truly unknown.
 
-2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, other
+2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, tech, social, art, design, literary, wellness, other
 
 Event name: ${event.name}
 Venue: ${event.venue}
@@ -276,6 +276,7 @@ async function enrichSingleEvent(
   eventVenue: string,
   eventGenre: string,
   eventContentType: string,
+  eventSourceId: string,
 ): Promise<EnrichResult> {
   await supabase
     .from('events')
@@ -324,6 +325,22 @@ async function enrichSingleEvent(
     return { eventId, success: true, description: null, imageUrl: null, tags: [] }
   }
 
+  // Venue/community sources have an authoritative category — a curated art
+  // calendar's events are art even when the AI reads them as "music" or
+  // "other". Curation feeds (Agape) span categories, so their rows keep AI
+  // classification; discovery/ticketing rows accept AI content_type too.
+  let authoritativeType: string | null = null
+  try {
+    const { data: src } = await supabase
+      .from('event_sources')
+      .select('category, source_class')
+      .eq('id', eventSourceId)
+      .single()
+    if (src && ['venue', 'community'].includes(src.source_class as string)) {
+      authoritativeType = (src.category as string) || null
+    }
+  } catch { /* registry lookup is best-effort */ }
+
   const { error } = await supabase
     .from('events')
     .update({
@@ -331,7 +348,9 @@ async function enrichSingleEvent(
       image_url: metadata.imageUrl,
       tags: metadata.tags.length > 0 ? metadata.tags : null,
       ...(aiResult?.genre ? { genre: aiResult.genre } : {}),
-      ...(aiResult?.content_type ? { content_type: aiResult.content_type } : {}),
+      ...(authoritativeType
+        ? { content_type: authoritativeType }
+        : (aiResult?.content_type ? { content_type: aiResult.content_type } : {})),
       enrichment_status: 'completed',
       enriched_at: new Date().toISOString(),
       enrichment_error: null,
@@ -393,7 +412,7 @@ serve(async (req: Request) => {
 
     const { data: events, error: fetchErr } = await supabase
       .from('events')
-      .select('id, url, name, venue, genre, content_type, enrichment_status')
+      .select('id, url, name, venue, genre, content_type, source_id, enrichment_status')
       .in('id', eventIds)
       .in('enrichment_status', ['pending', 'failed'])
 
@@ -417,6 +436,7 @@ serve(async (req: Request) => {
         supabase, event.id, event.url,
         event.name || '', event.venue || '',
         event.genre || '', event.content_type || '',
+        event.source_id || '',
       )
       results.push(result)
       if (result.success) succeeded++

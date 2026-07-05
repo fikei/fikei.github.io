@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.7.0'
-console.log(`[scrape-events] v${VERSION} - ata + bottomofthehill parsers (Wave 2 verification pass)`)
+const VERSION = '1.7.1'
+console.log(`[scrape-events] v${VERSION} - ical parser carries source category as content_type`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
