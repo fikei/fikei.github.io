@@ -14,8 +14,8 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.3.0'
-console.log(`[scrape-discord-events] v${VERSION} - canonical store forwarding (posted_by, recommended_by, per-message attribution)`)
+const VERSION = '1.4.0'
+console.log(`[scrape-discord-events] v${VERSION} - platform-link resolution (bare link posts resolved via page JSON-LD, PRD §4.1)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -183,6 +183,95 @@ async function fetchAllMessages(
   }
 
   return all.slice(0, maxMessages)
+}
+
+// --- Platform-link resolution (PRD source-architecture §4.1) ---
+// A large share of channel posts are bare platform links with no date text —
+// the AI can't extract a dated event from them, so resolve the linked page
+// itself (JSON-LD Event schema). Message text stays recommendation context.
+
+const PLATFORM_URL_RE = /https?:\/\/(?:www\.)?(?:partiful\.com\/e\/[\w-]+|lu\.ma\/[\w.-]+|luma\.com\/[\w.-]+|eventbrite\.com\/e\/[\w-]+|dice\.fm\/(?:event|partner)\/[\w/-]+|shotgun\.live\/(?:[a-z]{2}\/)?events\/[\w-]+|tixr\.com\/groups\/[\w-]+\/events\/[\w-]+|[\w-]+\.secretparty\.io\/[\w-]+|(?:wl\.)?seetickets\.us\/event\/[\w/-]+|meetup\.com\/[\w-]+\/events\/\d+)/gi
+
+// deno-lint-ignore no-explicit-any
+function findLdEventNode(node: any): any | null {
+  if (!node || typeof node !== 'object') return null
+  if (Array.isArray(node)) {
+    for (const n of node) { const f = findLdEventNode(n); if (f) return f }
+    return null
+  }
+  const type = node['@type']
+  const types = Array.isArray(type) ? type : [type]
+  if (types.some((t: unknown) => typeof t === 'string' && /Event$/i.test(t as string))) return node
+  if (node['@graph']) return findLdEventNode(node['@graph'])
+  return null
+}
+
+async function resolveLinkEvent(url: string): Promise<Partial<ExtractedEvent> | null> {
+  try {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resp.ok) return null
+    const html = (await resp.text()).slice(0, 800_000)
+    const scripts = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+    for (const m of scripts) {
+      try {
+        const ev = findLdEventNode(JSON.parse(m[1]))
+        if (!ev || !ev.name || !ev.startDate) continue
+        const start = String(ev.startDate)
+        const loc = ev.location && !Array.isArray(ev.location) ? ev.location : (ev.location?.[0] || {})
+        const addr = loc.address || {}
+        return {
+          date: start.split('T')[0],
+          time: (start.split('T')[1] || '').slice(0, 5),
+          name: String(ev.name).slice(0, 200),
+          venue: String(loc.name || '').slice(0, 120),
+          address: String(typeof addr === 'string' ? addr : addr.streetAddress || '').slice(0, 200),
+          city: String(typeof addr === 'object' ? addr.addressLocality || '' : '').slice(0, 80),
+          url,
+        }
+      } catch { /* malformed JSON-LD block */ }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const MAX_LINK_RESOLUTIONS = 15
+
+async function extractLinkEvents(messages: DiscordMessage[]): Promise<ExtractedEvent[]> {
+  // Collect platform links from ALL messages (bare link posts usually fail
+  // the heuristic pre-filter — that's the point of this path)
+  const seen = new Set<string>()
+  const jobs: Array<{ url: string; author: string }> = []
+  for (const msg of messages) {
+    const text = msg.content + ' ' + (msg.embeds || []).map(e => e.url || '').join(' ')
+    for (const raw of text.match(PLATFORM_URL_RE) || []) {
+      const clean = raw.replace(/[.,;)\]]+$/, '').split('?')[0]
+      if (seen.has(clean)) continue
+      seen.add(clean)
+      jobs.push({ url: clean, author: msg.author?.username || '' })
+      if (jobs.length >= MAX_LINK_RESOLUTIONS) break
+    }
+    if (jobs.length >= MAX_LINK_RESOLUTIONS) break
+  }
+
+  const results = await Promise.all(jobs.map(async j => {
+    const ev = await resolveLinkEvent(j.url)
+    if (!ev || !ev.date || !ev.name) return null
+    return {
+      genre: '', price: '', ages: '', promoter: '',
+      address: '', city: '', venue: '', time: '',
+      ...ev,
+      postedBy: j.author,
+    } as ExtractedEvent
+  }))
+  const events = results.filter(Boolean) as ExtractedEvent[]
+  if (jobs.length > 0) console.log(`Link resolution: ${events.length}/${jobs.length} platform links resolved via JSON-LD`)
+  return events
 }
 
 // --- Heuristic pre-filter ---
@@ -404,23 +493,30 @@ async function scrapeAndCache(
   const candidates = messages.filter(m => scoreMessage(m) >= CANDIDATE_THRESHOLD)
   console.log(`${candidates.length} candidates passed heuristic filter`)
 
+  // Platform links resolved from their pages (bare link posts bypass the
+  // heuristic and the AI can't date them from message text alone)
+  const linkEvents = await extractLinkEvents(messages)
+
   let events: ExtractedEvent[] = []
   const meta: Record<string, unknown> = {
     messagesScanned: messages.length,
     candidateMessages: candidates.length,
+    linkResolved: linkEvents.length,
     eventsExtracted: 0,
     lookbackDays,
     scrapedAt: new Date().toISOString(),
   }
 
+  let aiEvents: ExtractedEvent[] = []
   if (candidates.length > 0) {
     const rawEvents = await extractEventsWithAI(candidates, apiKey, guildId, channelId)
     console.log(`AI extracted ${rawEvents.length} raw events`)
-    const valid = rawEvents.filter(validateEvent)
-    events = deduplicateEvents(valid)
-    console.log(`After validation: ${valid.length}, after dedup: ${events.length}`)
-    meta.eventsExtracted = events.length
+    aiEvents = rawEvents.filter(validateEvent)
   }
+  // Link-resolved events first: page facts beat AI text extraction on dedup
+  events = deduplicateEvents([...linkEvents.filter(validateEvent), ...aiEvents])
+  console.log(`Link-resolved: ${linkEvents.length}, AI valid: ${aiEvents.length}, after dedup: ${events.length}`)
+  meta.eventsExtracted = events.length
 
   const lastMessageId = messages.length > 0 ? messages[0].id : undefined
   await writeCache(guildId, channelId, events, meta, lastMessageId)
