@@ -222,6 +222,12 @@ export class JobPipeline extends LitElement {
       const existing = new Map((this.addedBanner.roles || []).map(r => [r.slug, r]));
       for (const r of next) if (r?.slug) existing.set(r.slug, r);
       this.addedBanner = { roles: Array.from(existing.values()), dismissed: false };
+      // Confirmation info, not state — auto-dismiss; the roles are visible
+      // in the list itself. Timer resets while adds keep arriving.
+      clearTimeout(this._addedHideTimer);
+      this._addedHideTimer = setTimeout(() => {
+        this.addedBanner = { ...this.addedBanner, dismissed: true };
+      }, 12000);
     };
     document.addEventListener('job:pipeline:added', this._onAdded);
     this._onPopState = () => {
@@ -327,6 +333,13 @@ export class JobPipeline extends LitElement {
       if (closed.length) {
         this.livenessResult = { checked: res.checked || 0, closed };
         this.bannerDismissed = false;
+        // Auto-expire — the closed roles are already reflected in the list;
+        // the banner is a heads-up, not a permanent fixture.
+        clearTimeout(this._livenessHideTimer);
+        this._livenessHideTimer = setTimeout(() => {
+          this.livenessResultDismissed = true;
+          this.requestUpdate();
+        }, 20000);
       }
       try { localStorage.setItem('job:lastLivenessAt', String(Date.now())); } catch {}
     } catch (e) {
@@ -374,9 +387,22 @@ export class JobPipeline extends LitElement {
 
   _computeClosedSinceLastVisit() {
     const cutoff = this._lastVisitAt ? Date.parse(this._lastVisitAt) : 0;
+    // Dismissal watermark: closures the user has already acknowledged
+    // (closed-banner ×) never resurface, even when auto-liveness or a
+    // pipeline refresh recomputes this list mid-session or on reload.
+    let seenThrough = 0;
+    try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
     this.closedSinceLastVisit = this.roles.filter(r =>
-      r.closedDetectedAt && Date.parse(r.closedDetectedAt) > cutoff
+      r.closedDetectedAt
+      && Date.parse(r.closedDetectedAt) > cutoff
+      && Date.parse(r.closedDetectedAt) > seenThrough
     );
+  }
+
+  _dismissClosedBanner() {
+    this.bannerDismissed = true;
+    const latest = Math.max(0, ...this.closedSinceLastVisit.map(r => Date.parse(r.closedDetectedAt) || 0));
+    try { localStorage.setItem('job:jobs:closedSeenThrough', String(latest)); } catch { /* */ }
   }
 
   _onSortClick(col) {
@@ -1256,7 +1282,7 @@ export class JobPipeline extends LitElement {
             <span class="muted">${this.closedSinceLastVisit.slice(0, 4).map(r => r.company).join(', ')}${this.closedSinceLastVisit.length > 4 ? '…' : ''}</span>
           </div>
           <button class="row-menu__trigger" aria-label="Dismiss"
-                  @click=${() => { this.bannerDismissed = true; }}>×</button>
+                  @click=${() => this._dismissClosedBanner()}>×</button>
         </div>
       ` : nothing}
 
