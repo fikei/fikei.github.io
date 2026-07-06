@@ -67,6 +67,9 @@ export class JobRecommendationsTable extends LitElement {
     _wildcards:          { state: true },
     _floorOn:            { state: true },
     _reviewIndex:        { state: true },
+    _below:              { state: true },
+    _expandedDays:       { state: true },
+    _reviewBelowDay:     { state: true },
   };
 
   constructor() {
@@ -92,6 +95,14 @@ export class JobRecommendationsTable extends LitElement {
     this._floorOn = true;
     // Index into items while the review overlay is open; null = closed.
     this._reviewIndex = null;
+    // Below-your-bar drawer: graded roles that fail the quality floors,
+    // grouped per day behind a "See more" expander at the bottom of each
+    // daily card. Loaded lazily after the main list (never blocks it).
+    this._below = null;
+    this._expandedDays = new Set();
+    // When set (a day label), the review overlay walks that day's
+    // below-bar queue instead of the main inbox.
+    this._reviewBelowDay = null;
   }
 
   // ----- Source health banner ------------------------------------------
@@ -288,6 +299,12 @@ export class JobRecommendationsTable extends LitElement {
       const wc = await fetchRecommendations({ view: 'wildcard' });
       this._wildcards = Array.isArray(wc?.recommendations) ? wc.recommendations : [];
     } catch { this._wildcards = []; }
+    // Below-your-bar rows for the per-day drawers. 200 newest covers the
+    // visible date range; older groups simply don't show a drawer.
+    try {
+      const bl = await fetchRecommendations({ view: 'all', floor: 'below', limit: 200, sort: 'suggestedAt', dir: 'desc' });
+      this._below = Array.isArray(bl?.recommendations) ? bl.recommendations : [];
+    } catch { this._below = []; }
   }
 
   // Fetch one page from the server. Inbox order: newest batch first —
@@ -336,6 +353,7 @@ export class JobRecommendationsTable extends LitElement {
   async _onDismiss(rec) {
     this.items = this.items.filter(r => r.id !== rec.id);
     this._wildcards = this._wildcards.filter(r => r.id !== rec.id);
+    if (this._below) this._below = this._below.filter(r => r.id !== rec.id);
     try { await dismissRecommendation(rec.id); } catch {}
   }
 
@@ -346,6 +364,7 @@ export class JobRecommendationsTable extends LitElement {
     // save completes in the background (failures are logged and toasted).
     this.items = this.items.filter(x => x.id !== rec.id);
     this._wildcards = this._wildcards.filter(x => x.id !== rec.id);
+    if (this._below) this._below = this._below.filter(x => x.id !== rec.id);
     try {
       const r = await addRole({
         url: rec.url,
@@ -389,6 +408,7 @@ export class JobRecommendationsTable extends LitElement {
     // Optimistic: drop every loaded row from this company immediately.
     const norm = company.toLowerCase().trim();
     this.items = this.items.filter(x => (x.company || '').toLowerCase().trim() !== norm);
+    if (this._below) this._below = this._below.filter(x => (x.company || '').toLowerCase().trim() !== norm);
     this.requestUpdate();
     try {
       await blockCompany(company);
@@ -400,12 +420,16 @@ export class JobRecommendationsTable extends LitElement {
 
   // ----- Review overlay --------------------------------------------------
 
-  _openReview(index) { this._reviewIndex = index; }
-  _closeReview()     { this._reviewIndex = null; }
+  _openReview(index) { this._reviewBelowDay = null; this._reviewIndex = index; }
+  _openBelowReview(day, index) { this._reviewBelowDay = day; this._reviewIndex = index; }
+  _closeReview()     { this._reviewIndex = null; this._reviewBelowDay = null; }
 
   _renderReview() {
     if (this._reviewIndex == null) return nothing;
-    const rows = this._sorted();
+    // Below-bar reviews walk that day's drawer queue; otherwise the inbox.
+    const rows = this._reviewBelowDay != null
+      ? (this._belowByDay().get(this._reviewBelowDay) || [])
+      : this._sorted();
     // Items removed out from under the overlay (save/dismiss/block) shift
     // the queue; clamp, and close when it's drained.
     if (!rows.length) { return nothing; }
@@ -427,6 +451,23 @@ export class JobRecommendationsTable extends LitElement {
 
   _sorted() {
     return Array.isArray(this.items) ? this.items : [];
+  }
+
+  // Below-bar rows grouped by the same day labels as the inbox groups.
+  _belowByDay() {
+    const map = new Map();
+    for (const r of (this._below || [])) {
+      const label = dayLabel(r.suggestedAt);
+      if (!map.has(label)) map.set(label, []);
+      map.get(label).push(r);
+    }
+    return map;
+  }
+
+  _toggleDay(label) {
+    const s = new Set(this._expandedDays);
+    s.has(label) ? s.delete(label) : s.add(label);
+    this._expandedDays = s;
   }
 
   _groups() {
@@ -461,19 +502,41 @@ export class JobRecommendationsTable extends LitElement {
     `;
   }
 
-  _renderInboxRow({ rec, index }) {
+  _renderInboxRow({ rec, index }, { belowDay = null } = {}) {
     const sub = [rec.company, rec.location].filter(Boolean).join(' · ');
+    const open = () => belowDay != null ? this._openBelowReview(belowDay, index) : this._openReview(index);
     return html`
-      <li class="inbox-row" role="listitem">
-        <button class="inbox-row__main" @click=${() => this._openReview(index)}>
+      <li class=${'inbox-row' + (belowDay != null ? ' inbox-row--below' : '')} role="listitem">
+        <button class="inbox-row__main" @click=${open}>
           ${this._renderLogo(rec)}
           <span class="inbox-row__text">
             <span class="inbox-row__title">${rec.title || '(untitled)'}</span>
             ${sub ? html`<span class="inbox-row__sub">${sub}</span>` : nothing}
           </span>
         </button>
-        <button class="btn btn--sm inbox-row__review" @click=${() => this._openReview(index)}>
+        <button class="btn btn--sm inbox-row__review" @click=${open}>
           Review <span aria-hidden="true">→</span>
+        </button>
+      </li>
+    `;
+  }
+
+  // "See more"-style drawer at the bottom of a daily card: graded roles
+  // that didn't clear the quality floors ("below your bar" — same language
+  // as the verdict cards' hard-fail copy).
+  _renderBelowDrawer(label) {
+    const rows = this._belowByDay().get(label) || [];
+    if (!rows.length) return nothing;
+    const open = this._expandedDays.has(label);
+    return html`
+      ${open ? rows.map((rec, i) => this._renderInboxRow({ rec, index: i }, { belowDay: label })) : nothing}
+      <li class="inbox-more" role="listitem">
+        <button class="inbox-more__btn" aria-expanded=${open ? 'true' : 'false'}
+                @click=${() => this._toggleDay(label)}>
+          ${open
+            ? 'Show fewer'
+            : `Show ${rows.length} below your bar`}
+          <span class="inbox-more__chevron" aria-hidden="true">${open ? '▴' : '▾'}</span>
         </button>
       </li>
     `;
@@ -490,6 +553,7 @@ export class JobRecommendationsTable extends LitElement {
           </header>
           <ul class="inbox-card" role="list">
             ${g.rows.map(row => this._renderInboxRow(row))}
+            ${this._renderBelowDrawer(g.label)}
           </ul>
         </section>
       `)}

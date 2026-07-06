@@ -6827,3 +6827,26 @@ body[data-auth-state="out"] job-chat { display: none; }
   padding: var(--space-1) var(--space-2);
   flex-shrink: 0;
 }
+
+/* "Below your bar" drawer (v2.23) — graded roles that failed the quality
+   floors, tucked behind a See-more row at the bottom of each daily card. */
+.inbox-more { padding: 0; }
+.inbox-more::after { display: none; }
+.inbox-more__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 10px 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.inbox-more__btn:hover { color: var(--fg); }
+.inbox-more__chevron { font-size: 10px; }
+.inbox-row--below .inbox-row__title { color: var(--fg-muted); font-weight: var(--fw-medium); }

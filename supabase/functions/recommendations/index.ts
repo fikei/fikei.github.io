@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.17.0';
-console.log(`[recommendations] v${VERSION} - ?view=blocked lists the caller's don't-recommend companies`);
+const VERSION = '0.18.0';
+console.log(`[recommendations] v${VERSION} - ?floor=below complement view for the per-day below-your-bar drawer`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -84,8 +84,13 @@ serve(async (req) => {
       // while keeping pagination + sort. The For You table sends this by
       // default; turning it off is the explicit "show below-floor" toggle.
       const applyFloor = isAll && url.searchParams.get('floor') === '1';
+      // ?floor=below (view=all only) → the complement: graded roles that
+      // FAIL the quality gates. Ungraded rows are pending, not below-bar,
+      // so they're excluded here. Powers the per-day "below your bar"
+      // drawer in the Inbox.
+      const belowFloor = isAll && url.searchParams.get('floor') === 'below';
       // True when this view skips the quality floors entirely.
-      const unfloored = (isAll && !applyFloor) || isWildcard;
+      const unfloored = (isAll && !applyFloor && !belowFloor) || isWildcard;
 
       // Pagination (view=all only). The default carousel view stays a
       // single 60-row pull; wildcard is a short strip. limit caps at 200;
@@ -196,7 +201,7 @@ serve(async (req) => {
         where r.dismissed_at is null
           and r.closed_at is null
           and r.added_to_pipeline_slug is null
-          and (${unfloored} or
+          and (${unfloored} or ${belowFloor} or
             case coalesce(w.filter_mode, 'good_fits')
               when 'all' then true
               when 'role_level' then
@@ -208,6 +213,22 @@ serve(async (req) => {
                 and coalesce(array_length(r.hard_fails, 1), 0) = 0
                 and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
             end)
+          -- floor=below: graded AND failing the same gates (keep the case in
+          -- sync with the pass-gate above).
+          and (${!belowFloor} or (
+            r.candidate_score is not null
+            and not (
+              case coalesce(w.filter_mode, 'good_fits')
+                when 'all' then true
+                when 'role_level' then
+                  (r.role_match_seniority is null or r.role_match_seniority <> 'below')
+                  and coalesce(r.role_match_score, 13) >= 13
+                when 'exceptional' then coalesce(r.candidate_score, 0) >= ${WILDCARD_MIN_STRENGTH}
+                else
+                  (r.fit_score is null or r.fit_score >= 50)
+                  and coalesce(array_length(r.hard_fails, 1), 0) = 0
+                  and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
+              end)))
           and (${!isWildcard} or (r.candidate_score >= ${WILDCARD_MIN_STRENGTH}
                                   and coalesce(r.fit_score, 100) < ${WILDCARD_MAX_FIT}))
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
