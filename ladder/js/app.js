@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.21.1";
-console.log(`[ladder] v${VERSION} - radius as a system: xs 6 / sm 8 / md 12 / lg 16 / xl 20; cards remapped lg→md; pill = token or decision`);
+const VERSION = "2.22.0";
+console.log(`[ladder] v${VERSION} - banner lifecycles: global toast host (job:toast finally renders), health-banner snooze + auto-revalidate, persisted closed-banner dismissal, auto-expiring confirmations`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -310,6 +310,37 @@ function injectSubnavBar() {
 }
 
 // (Bottom tab bar removed — drawer is the only mobile nav now.)
+
+// Global toast host. Components all over the app dispatch
+// `job:toast { detail: { msg } }` — this is the single renderer (there
+// previously was none, so toasts silently vanished). Every toast
+// auto-expires and is click-dismissable; max 3 stack.
+function injectToastHost() {
+  if (document.querySelector('.toast-host')) return;
+  const host = document.createElement('div');
+  host.className = 'toast-host';
+  host.setAttribute('role', 'status');
+  host.setAttribute('aria-live', 'polite');
+  document.body.appendChild(host);
+  document.addEventListener('job:toast', (e) => {
+    const msg = e.detail?.msg;
+    if (!msg) return;
+    const el = document.createElement('button');
+    el.className = 'toast';
+    el.type = 'button';
+    el.textContent = msg;
+    el.title = 'Dismiss';
+    const remove = () => {
+      el.classList.add('toast--leaving');
+      setTimeout(() => el.remove(), 200);
+    };
+    el.addEventListener('click', remove);
+    host.appendChild(el);
+    while (host.children.length > 3) host.firstChild.remove();
+    setTimeout(remove, 4500);
+  });
+}
+injectToastHost();
 
 // Mount the global agent chat — FAB at bottom-right + bottom drawer.
 // Skipped on onboarding (the onboarding flow has its own chat surface).

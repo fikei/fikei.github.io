@@ -6777,3 +6777,53 @@ body[data-auth-state="out"] job-chat { display: none; }
 /* Watched companies read as list rows here, not floating chips. */
 .watched-strip__row { display: flex; flex-direction: column; gap: var(--space-2); }
 .watched-chip { width: 100%; }
+
+/* ==========================================================================
+   Toast host (v2.22) — the single renderer for job:toast events.
+   Auto-expires after 4.5s; click to dismiss; max 3 stacked.
+   ========================================================================== */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  width: min(480px, calc(100vw - 32px));
+}
+.toast {
+  pointer-events: auto;
+  max-width: 100%;
+  padding: 10px var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-size: var(--font-size-small);
+  line-height: var(--lh-tight);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  animation: toast-in 160ms ease;
+}
+.toast--leaving { opacity: 0; transition: opacity 200ms ease; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.recs-health-banner__close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  flex-shrink: 0;
+}

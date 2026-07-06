@@ -104,6 +104,30 @@ export class JobRecommendationsTable extends LitElement {
     return this._health.filter(s => s.enabled !== false && (s.needsReauth || s.lastError));
   }
 
+  // Banner lifecycle: dismiss snoozes THIS error signature for 6h (persisted).
+  // A new/different error resurfaces immediately; the same one comes back
+  // after the snooze if the server still reports it. The banner also clears
+  // naturally when a successful scan wipes last_error server-side.
+  static HEALTH_SNOOZE_MS = 6 * 60 * 60 * 1000;
+  _healthSignature(issues) {
+    return issues.map(s => `${s.type}:${s.needsReauth ? 'reauth' : (s.lastError || '').slice(0, 80)}`).sort().join('|');
+  }
+  _healthSnoozed(issues) {
+    try {
+      const raw = JSON.parse(localStorage.getItem('job:healthBannerSnooze') || 'null');
+      return raw && raw.sig === this._healthSignature(issues)
+        && (Date.now() - raw.at) < JobRecommendationsTable.HEALTH_SNOOZE_MS;
+    } catch { return false; }
+  }
+  _snoozeHealth() {
+    const issues = this._healthIssues();
+    try {
+      localStorage.setItem('job:healthBannerSnooze',
+        JSON.stringify({ sig: this._healthSignature(issues), at: Date.now() }));
+    } catch { /* */ }
+    this.requestUpdate();
+  }
+
   async _onReconnectGmail() {
     if (this._reconnecting) return;
     this._reconnecting = true;
@@ -129,6 +153,7 @@ export class JobRecommendationsTable extends LitElement {
   _renderHealthBanner() {
     const issues = this._healthIssues();
     if (!issues.length) return nothing;
+    if (this._healthSnoozed(issues)) return nothing;
     const gmailDead = issues.find(s => s.type === 'gmail-jobs' && s.needsReauth);
     return html`
       <div class="recs-health-banner" role="alert">
@@ -146,6 +171,9 @@ export class JobRecommendationsTable extends LitElement {
             ${issues.map(s => `${s.type}: ${s.lastError || 'needs attention'}`).join(' · ')}
           </span>
         `}
+        <button class="recs-health-banner__close" aria-label="Dismiss for now"
+                title="Dismiss — comes back if the issue is still present in 6 hours"
+                @click=${() => this._snoozeHealth()}>×</button>
       </div>
     `;
   }
@@ -204,6 +232,15 @@ export class JobRecommendationsTable extends LitElement {
       this.requestUpdate();
     };
     document.addEventListener('job:gmail:connected', this._onGmailConnected);
+    // While a health issue is showing, revalidate every 5 minutes so the
+    // banner clears itself once the source recovers — no reload needed.
+    this._healthTimer = setInterval(async () => {
+      if (!this._healthIssues().length) return;
+      try {
+        const d = await fetchRecommendations({ view: 'all', floor: true, limit: 1 });
+        if (Array.isArray(d?.sourceHealth)) this._health = d.sourceHealth;
+      } catch { /* keep the current banner */ }
+    }, 5 * 60 * 1000);
     // Infinite scroll: when the viewport nears the bottom of the document,
     // pull the next page. A plain scroll listener is more reliable across
     // layouts than an IntersectionObserver on a 1px sentinel.
@@ -222,6 +259,7 @@ export class JobRecommendationsTable extends LitElement {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('job:gmail:connected', this._onGmailConnected);
+    clearInterval(this._healthTimer);
     document.removeEventListener('click', this._onDocClick);
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onScroll);
