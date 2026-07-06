@@ -967,7 +967,7 @@ async function generateBullets(
   row: { id: string; company: string | null; title: string | null; url: string; fitScore: number; breakdown: Record<string, number>; payload: Record<string, unknown> | null },
   user: UserContext,
 ): Promise<void> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) return;       // no key → leave bullets null, widget falls back to description
   const system = `Write exactly 3 markdown bullets. HARD LIMIT: 12 words per bullet.
 Use **bold** for the single most important phrase in each bullet. No headers, no lead-ins.

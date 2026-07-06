@@ -48,7 +48,7 @@ Rules:
 - Lean toward the candidate's job-search target when prioritizing.`;
 
 async function callClaudeJson(system: string, user: string, maxTokens = 4096): Promise<any> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',

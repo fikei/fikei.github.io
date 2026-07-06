@@ -715,7 +715,7 @@ async function resolveCanonicalForTitle(
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 async function haikuPickPosting(target: string, titles: string[]): Promise<number> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  const key = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!key || !titles.length) return -1;
   const list = titles.slice(0, 60).map((t, i) => `${i + 1}. ${t}`).join('\n');
   const system = `You match a job title to a company's live job postings. The target title came from a job alert; the numbered list is that company's current openings. Titles may be phrased differently across systems (e.g. "Product Lead, Platform" vs "Senior Product Manager"). Return ONLY a number: the posting that is the SAME role — same function AND same seniority band — or 0 if none is clearly the same role. Be strict: a different function (e.g. engineering vs product), a different seniority (e.g. manager vs director/VP), or only vague overlap = 0.`;

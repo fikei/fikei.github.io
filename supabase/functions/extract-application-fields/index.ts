@@ -26,7 +26,7 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 
 async function callClaude(system: string, user: string, maxTokens = 4000): Promise<string> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -333,7 +333,7 @@ async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl: strin
 
 // ----- HTML fallback (Workday, one-off ATSes, paranoid extraction) ------
 async function extractHtmlFallback(sourceUrl: string, html: string, ats: string, hint?: { labelsHint?: string[]; requiredHint?: number }): Promise<Schema> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) {
     return {
       ats,

@@ -106,7 +106,7 @@ export async function fetchJdText(url: string): Promise<string> {
 }
 
 export async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<HaikuRoleMatch | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) return null;
   const system = `You grade a job posting against a candidate's profile and return four structured fields.
 

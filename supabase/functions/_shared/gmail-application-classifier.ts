@@ -114,7 +114,7 @@ export async function classifyApplicationMessage(args: {
   appliedAt?: string;
   currentStage?: string | null;
 }): Promise<ClassifiedApplicationEvent | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) {
     console.warn('[gmail-app-classifier] ANTHROPIC_API_KEY missing');
     return null;
