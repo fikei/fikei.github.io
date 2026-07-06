@@ -683,7 +683,7 @@ Rules:
 - NEVER invent fields. Empty string > guess.`;
 
 async function extractJob(args: { subject: string; sender: string; body: string }): Promise<ExtractedJob | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) {
     console.warn('[gmail-jobs] ANTHROPIC_API_KEY missing; skipping extraction');
     return null;
@@ -754,7 +754,7 @@ Rules:
 - Cap at 30 roles per message.`;
 
 async function extractJobsMulti(args: { subject: string; sender: string; body: string }): Promise<ExtractedJob[]> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) {
     console.warn('[gmail-jobs] ANTHROPIC_API_KEY missing; skipping multi-extraction');
     return [];

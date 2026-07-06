@@ -100,7 +100,7 @@ type ContentBlock = TextBlock | ToolUseBlock;
 interface ClaudeResp { content: ContentBlock[]; stop_reason: string; }
 
 async function callClaude(messages: Array<{ role: 'user' | 'assistant'; content: unknown }>): Promise<ClaudeResp> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  const key = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!key) throw new Error('ANTHROPIC_API_KEY missing');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
