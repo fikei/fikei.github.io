@@ -6848,5 +6848,5 @@ body[data-auth-state="out"] job-chat { display: none; }
   cursor: pointer;
 }
 .inbox-more__btn:hover { color: var(--fg); }
-.inbox-more__chevron { font-size: 10px; }
+.inbox-more__chevron { font-size: 12px; line-height: 1; }
 .inbox-row--below .inbox-row__title { color: var(--fg-muted); font-weight: var(--fw-medium); }
