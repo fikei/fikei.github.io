@@ -122,12 +122,14 @@ body {
   transition: height var(--duration-normal) var(--ease-default);
 }
 
-/* Each day is a button; segments stack bottom-up in category order */
+/* Each day is a full-width click target; the visible needle is a narrow
+   3px bar centered inside it, segments stacked bottom-up in category order */
 .pulse__day {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column-reverse;
+  align-items: center;
   background: none;
   border: none;
   padding: 0;
@@ -135,10 +137,40 @@ body {
   transition: opacity var(--duration-fast) var(--ease-default);
 }
 
-.pulse__day:hover .pulse__seg { filter: brightness(1.3); }
+.pulse__day:hover .pulse__seg,
+.pulse__day:hover .pulse__dot { filter: brightness(1.3); }
 
-.pulse__seg { width: 100%; flex: 0 0 auto; }
+.pulse__seg { width: 3px; flex: 0 0 auto; }
 .pulse__seg--empty { height: 2px; background: var(--border-subtle); }
+
+/* Dot-matrix mode: one dot per N events, stacked in category colors */
+.pulse--dots .pulse__day {
+  gap: 2px;
+  padding-bottom: 3px;
+  overflow: hidden;
+}
+.pulse__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* Mode toggle (bars | dots) */
+.pulse__mode { display: flex; gap: 2px; }
+.pulse__mode-btn {
+  background: none;
+  border: var(--border-thin) solid transparent;
+  color: var(--fg-subtle);
+  font-family: var(--font-primary);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  padding: 0 4px;
+  cursor: pointer;
+}
+.pulse__mode-btn:hover { color: var(--fg); }
+.pulse__mode-btn.active { color: var(--fg); border-color: var(--border-subtle); }
 
 /* A selected day keeps full strength; the rest recede */
 .pulse--has-selection .pulse__day:not(.pulse__day--selected) { opacity: 0.3; }
@@ -178,6 +210,7 @@ body {
   .pulse__track { height: 40px; }
   .pulse__track, .pulse__axis { gap: 2px; }
   .pulse__legend { display: none; }
+  .pulse__mode { margin-left: auto; }
 }
 
 /* Sources bar */
@@ -1641,6 +1674,10 @@ body {
         <span class="pulse__label">Next 30 days</span>
         <span class="pulse__total" id="pulseTotal"></span>
         <div class="pulse__legend" id="pulseLegend"></div>
+        <div class="pulse__mode">
+          <button class="pulse__mode-btn" data-mode="needles">Bars</button>
+          <button class="pulse__mode-btn" data-mode="dots">Dots</button>
+        </div>
       </div>
       <div class="pulse__track" id="pulseTrack"></div>
       <div class="pulse__axis" id="pulseAxis"></div>
@@ -1952,8 +1989,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.20.0';
-  console.log(`[events] v${VERSION} - Pulse strip: events-per-day density viz, category colors, collapses on scroll`);
+  const VERSION = '1.21.0';
+  console.log(`[events] v${VERSION} - Pulse strip: narrow needle bars + dot-matrix mode toggle`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2146,6 +2183,7 @@ body {
     calDate: localToday(), // anchor date for day/week views
     selectedDate: null,
     onboarded: false,
+    pulseMode: localStorage.getItem('ctrl-rodeo-pulse-mode') || 'needles', // 'needles' | 'dots'
   };
 
   // --- Debug Logging ---
@@ -3083,7 +3121,15 @@ body {
     const selected = (state.filters.dateFrom && state.filters.dateFrom === state.filters.dateTo) ? state.filters.dateFrom : null;
     strip.classList.toggle('pulse--has-selection', !!selected);
 
-    document.getElementById('pulseTotal').textContent = `${distinct.size} event${distinct.size !== 1 ? 's' : ''}`;
+    const dots = state.pulseMode === 'dots';
+    // Dot mode: one dot per N events so the tallest day fits the track
+    const dotUnit = Math.max(1, Math.ceil(max / 8));
+    strip.classList.toggle('pulse--dots', dots);
+    strip.querySelectorAll('.pulse__mode-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === state.pulseMode));
+
+    document.getElementById('pulseTotal').textContent =
+      `${distinct.size} event${distinct.size !== 1 ? 's' : ''}` + (dots && dotUnit > 1 ? ` · 1 dot ≈ ${dotUnit}` : '');
     document.getElementById('pulseLegend').innerHTML = CATEGORY_ORDER.filter(c => catsSeen.has(c)).map(c =>
       `<span class="pulse__legend-item"><span class="pulse__legend-dot" style="background:${CATEGORY_COLORS[c]}"></span>${CATEGORY_LABELS[c]}</span>`
     ).join('');
@@ -3100,11 +3146,26 @@ body {
       const breakdown = CATEGORY_ORDER.filter(c => byCat[c]).map(c => `${byCat[c]} ${CATEGORY_LABELS[c].toLowerCase()}`).join(', ');
       const tip = dayTotal > 0 ? `${tipDate} — ${dayTotal} event${dayTotal !== 1 ? 's' : ''} (${breakdown})` : `${tipDate} — no events`;
       let segs = '';
-      if (dayTotal === 0) segs = '<span class="pulse__seg pulse__seg--empty"></span>';
-      else CATEGORY_ORDER.forEach(c => {
-        if (!byCat[c]) return;
-        segs += `<span class="pulse__seg" style="height:${(byCat[c] / max * 100).toFixed(2)}%;background:${CATEGORY_COLORS[c]}"></span>`;
-      });
+      if (dayTotal === 0) {
+        segs = '<span class="pulse__seg pulse__seg--empty"></span>';
+      } else if (dots) {
+        CATEGORY_ORDER.forEach(c => {
+          for (let k = 0; k < Math.round((byCat[c] || 0) / dotUnit); k++) {
+            segs += `<span class="pulse__dot" style="background:${CATEGORY_COLORS[c]}"></span>`;
+          }
+        });
+        // Rounding can drop every category on a light day — show at least one
+        // dot in the dominant category so the day doesn't read as empty
+        if (!segs) {
+          const dom = CATEGORY_ORDER.reduce((a, c) => (byCat[c] || 0) > (byCat[a] || 0) ? c : a);
+          segs = `<span class="pulse__dot" style="background:${CATEGORY_COLORS[dom]}"></span>`;
+        }
+      } else {
+        CATEGORY_ORDER.forEach(c => {
+          if (!byCat[c]) return;
+          segs += `<span class="pulse__seg" style="height:${(byCat[c] / max * 100).toFixed(2)}%;background:${CATEGORY_COLORS[c]}"></span>`;
+        });
+      }
       trackHtml += `<button class="${cls.join(' ')}" data-date="${ds}" title="${escHtml(tip)}" aria-label="${escHtml(tip)}">${segs}</button>`;
       // Label Mondays and today on the axis; the rest stay quiet
       const label = (ds === today || d.getDay() === 1) ? String(d.getDate()) : '';
@@ -3130,6 +3191,15 @@ body {
       });
     }
   }
+
+  // Mode toggle (bars | dots), persisted per user
+  document.querySelectorAll('.pulse__mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.pulseMode = btn.dataset.mode;
+      localStorage.setItem('ctrl-rodeo-pulse-mode', state.pulseMode);
+      renderPulse();
+    });
+  });
 
   // Collapse the sticky strip to a slim ribbon once the page scrolls.
   // Threshold (120px) exceeds the collapse's own height change (~60px)
