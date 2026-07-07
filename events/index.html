@@ -1913,6 +1913,12 @@ body {
         <div id="categoryToggles" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1) var(--space-3);"></div>
       </div>
 
+      <!-- Music-type visibility -->
+      <div class="form-group" id="musicTypeTogglesGroup">
+        <label class="form-label">Music types <span style="font-weight: normal; color: var(--fg-subtle);">uncheck to hide everywhere</span></label>
+        <div id="musicTypeToggles" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1) var(--space-3);"></div>
+      </div>
+
       <!-- One-off event by link (add-event edge function) -->
       <div class="form-group" id="oneOffGroup">
         <label class="form-label">Add a one-off event by link</label>
@@ -2072,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.33.0';
-  console.log(`[events] v${VERSION} - GCal connect race fix (ticketed status) + calendar-sync nudge after 2+ bookmarks`);
+  const VERSION = '1.34.0';
+  console.log(`[events] v${VERSION} - music-type filters (sticky sub-nav chips + settings mutes); Ticketmaster venue stock sources`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2115,6 +2121,13 @@ body {
     { id: 'luma-tiat', name: 'tiat', category: 'art', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=calendar&id=cal-twiOosdGMMY66DI', region: 'bay-area', description: 'The intersection of art & technology' },
     { id: 'thechapel-sf', name: 'The Chapel', category: 'music', type: 'seetickets-wp', url: 'https://thechapelsf.com/music/', region: 'bay-area', description: 'Live music — indie, folk, rock' },
     { id: 'rickshawstop-sf', name: 'Rickshaw Stop', category: 'music', type: 'seetickets-wp', url: 'https://rickshawstop.com/', region: 'bay-area', description: 'Live music & dance parties' },
+    { id: 'tm-fillmore', name: 'The Fillmore', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Historic rock venue' },
+    { id: 'tm-warfield', name: 'The Warfield', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Downtown concert hall' },
+    { id: 'tm-masonic', name: 'The Masonic', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Nob Hill concert hall' },
+    { id: 'tm-independent', name: 'The Independent', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Indie & alternative club' },
+    { id: 'tm-castro', name: 'Castro Theatre', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Historic theatre — concerts & more' },
+    { id: 'tm-gamh', name: 'Great American Music Hall', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Ornate historic music hall' },
+    { id: 'tm-regency', name: 'The Regency Ballroom', category: 'music', type: 'ticketmaster', url: null, region: 'bay-area', description: 'Van Ness ballroom venue' },
     { id: 'bottomofthehill-sf', name: 'Bottom of the Hill', category: 'music', type: 'bottomofthehill', url: 'https://bottomofthehill.com/RSS.xml', region: 'bay-area', description: 'Punk, indie & rock institution' },
     { id: 'frontiertower-sf', name: 'Frontier Tower', category: 'tech', type: 'ical', url: null, region: 'bay-area', description: 'Frontier Tower community events' },
     // Bay Area — Eventbrite orgs with Agape signal (scraped server-side)
@@ -2145,6 +2158,28 @@ body {
     'exhibition': 'Exhibition',
     'other': 'Other',
   };
+
+  // Music-type buckets: genre strings (TM/SeeTickets/19hz/AI) mapped to a
+  // small stable set for the sticky sub-nav filter and the settings mutes
+  const MUSIC_TYPES = {
+    'electronic': { label: 'Electronic / DJ', kw: ['electronic','techno','house','dj','dance','edm','bass','dubstep','drum & bass','dnb','trance','rave','club','garage','breaks','glitch','hyphy'] },
+    'rock': { label: 'Rock / Indie', kw: ['rock','indie','alternative','punk','metal','grunge','shoegaze','emo','psychedelic','post-'] },
+    'pop': { label: 'Pop', kw: ['pop','synthpop','k-pop','electropop','hyperpop'] },
+    'hiphop': { label: 'Hip-Hop / R&B', kw: ['hip-hop','hip hop','rap','r&b','rnb','soul','funk','neo-soul'] },
+    'jazz': { label: 'Jazz / Blues', kw: ['jazz','blues','swing'] },
+    'folk': { label: 'Folk / Country', kw: ['folk','country','americana','bluegrass','singer-songwriter','singer/songwriter','acoustic','tribute'] },
+    'world': { label: 'World / Latin', kw: ['latin','reggae','reggaeton','afrobeat','world','cumbia','salsa','brazilian','perreo'] },
+    'other-music': { label: 'Other Music', kw: [] },
+  };
+
+  function musicTypeFor(ev) {
+    if (getEventCategory(ev.contentType) !== 'music') return null;
+    const hay = [ev.genre || '', (ev.enrichedTags || []).join(' '), ev.contentType === 'dj-set' ? 'dj' : ''].join(' ').toLowerCase();
+    for (const [key, def] of Object.entries(MUSIC_TYPES)) {
+      if (def.kw.some(k => hay.includes(k))) return key;
+    }
+    return 'other-music';
+  }
 
   // Map granular contentType → top-level category (for primary tab grouping)
   const CONTENT_TYPE_CATEGORY = {
@@ -2336,9 +2371,10 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false },
+    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', agape: false, interested: false, showPast: false },
     userLoc: null, // { lat, lng } from browser geolocation, session-cached
     hiddenCategories: new Set(), // categories hidden everywhere via Settings
+    mutedMusicTypes: new Set(), // music types hidden everywhere via Settings
     sort: { key: 'date', dir: 'asc' },
     bookmarks: new Map(),  // eventKey -> { id, gcal_event_id } (user_event_bookmarks rows)
     view: 'table',
@@ -2445,6 +2481,7 @@ body {
       showRecommended: !!state.showRecommended,
       showViewSwitcher: !!state.showViewSwitcher,
       hiddenCategories: [...state.hiddenCategories],
+      mutedMusicTypes: [...state.mutedMusicTypes],
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
@@ -2460,6 +2497,7 @@ body {
         state.showViewSwitcher = !!settings.showViewSwitcher; // beta, default off
         if (!state.showViewSwitcher) state.view = 'table'; // no switcher, no calendar
         state.hiddenCategories = new Set(Array.isArray(settings.hiddenCategories) ? settings.hiddenCategories : []);
+        state.mutedMusicTypes = new Set(Array.isArray(settings.mutedMusicTypes) ? settings.mutedMusicTypes : []);
       }
     } catch (e) { /* ignore */ }
     // Tech is hidden by default — applied once so re-enabling it in
@@ -2488,6 +2526,7 @@ body {
           settings: {
             view: state.view, sort: state.sort,
             hiddenCategories: [...state.hiddenCategories],
+            mutedMusicTypes: [...state.mutedMusicTypes],
             showRecommended: !!state.showRecommended,
             showViewSwitcher: !!state.showViewSwitcher,
           },
@@ -2534,6 +2573,7 @@ body {
       // Older cloud rows predate these keys — only adopt when present so a
       // stale row can't wipe local preferences
       if (Array.isArray(data.settings?.hiddenCategories)) state.hiddenCategories = new Set(data.settings.hiddenCategories);
+      if (Array.isArray(data.settings?.mutedMusicTypes)) state.mutedMusicTypes = new Set(data.settings.mutedMusicTypes);
       if (typeof data.settings?.showRecommended === 'boolean') state.showRecommended = data.settings.showRecommended;
       if (typeof data.settings?.showViewSwitcher === 'boolean') state.showViewSwitcher = data.settings.showViewSwitcher;
       if (data.region) localStorage.setItem('ctrl-rodeo-events-region', data.region);
@@ -3293,8 +3333,13 @@ body {
   }
 
   function visibleEvents() {
-    if (state.hiddenCategories.size === 0) return state.events;
-    return state.events.filter(ev => !state.hiddenCategories.has(getEventCategory(ev.contentType)));
+    if (state.hiddenCategories.size === 0 && state.mutedMusicTypes.size === 0) return state.events;
+    return state.events.filter(ev => {
+      if (state.hiddenCategories.has(getEventCategory(ev.contentType))) return false;
+      const mt = musicTypeFor(ev);
+      if (mt && state.mutedMusicTypes.has(mt)) return false;
+      return true;
+    });
   }
 
   // Settings → Categories: uncheck to hide a category everywhere
@@ -3319,6 +3364,31 @@ body {
         }
         saveSettings();
         saveSourcesCloud(); // keep the cloud copy current or it reverts this on next load
+        render();
+      });
+    });
+  }
+
+  function renderMusicTypeToggles() {
+    const el = document.getElementById('musicTypeToggles');
+    if (!el) return;
+    el.innerHTML = Object.entries(MUSIC_TYPES).map(([k, def]) => `
+      <label style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); cursor: pointer;">
+        <input type="checkbox" data-mt="${k}" ${state.mutedMusicTypes.has(k) ? '' : 'checked'}>
+        ${def.label}
+      </label>`).join('');
+    el.querySelectorAll('input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const k = cb.dataset.mt;
+        if (cb.checked) state.mutedMusicTypes.delete(k);
+        else state.mutedMusicTypes.add(k);
+        // A muted type can't stay the active chip filter
+        if (state.filters.musicType && state.mutedMusicTypes.has(state.filters.musicType)) {
+          state.filters.musicType = '';
+        }
+        updateContentTypeFilter();
+        saveSettings();
+        saveSourcesCloud();
         render();
       });
     });
@@ -4017,6 +4087,7 @@ body {
         // Toggle off if clicking active; clear contentType sub-filter on category switch
         state.filters.category = state.filters.category === cat ? '' : cat;
         state.filters.contentType = '';
+        state.filters.musicType = '';
         updateContentTypeFilter();
         render();
       });
@@ -4052,7 +4123,10 @@ body {
 
   function getFilteredEvents(opts = {}) {
     return state.events.filter(ev => {
-      const { search, city, source, distance, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
+      const { search, city, source, distance, dateFrom, dateTo, category, contentType, musicType, agape, interested } = state.filters;
+      const mt = musicTypeFor(ev);
+      if (mt && state.mutedMusicTypes.has(mt)) return false;
+      if (musicType && mt !== musicType) return false;
       if (state.hiddenCategories.has(getEventCategory(ev.contentType))) return false;
       // Distance: city-centroid haversine against the user's location.
       // Unknown cities are excluded while the filter is active; if location
@@ -4081,7 +4155,7 @@ body {
 
   function clearAllFilters() {
     const hadPast = state.filters.showPast;
-    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false };
+    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', agape: false, interested: false, showPast: false };
     updateFilterChips();
     if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
@@ -4102,6 +4176,31 @@ body {
     // Only show sub-nav when a category is selected
     if (!activeCategory) {
       container.style.display = 'none';
+      return;
+    }
+
+    // Music tab: filter by music type (genre buckets) instead of content type
+    if (activeCategory === 'music') {
+      const scoped = state.events.filter(e => getEventCategory(e.contentType) === 'music' && !state.mutedMusicTypes.has(musicTypeFor(e)));
+      const counts = {};
+      scoped.forEach(e => { const k = musicTypeFor(e); counts[k] = (counts[k] || 0) + 1; });
+      const present = Object.keys(MUSIC_TYPES).filter(k => counts[k]);
+      if (present.length <= 1) { container.style.display = 'none'; return; }
+      container.style.display = 'flex';
+      const allActive = !state.filters.musicType;
+      let html = `<button class="type-filter__chip ${allActive ? 'active' : ''}" data-musictype="">All</button>`;
+      present.forEach(k => {
+        const active = state.filters.musicType === k;
+        html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-musictype="${k}">${escHtml(MUSIC_TYPES[k].label)} <span style="opacity:0.6">${counts[k]}</span></button>`;
+      });
+      container.innerHTML = html;
+      container.querySelectorAll('.type-filter__chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          state.filters.musicType = chip.dataset.musictype || '';
+          updateContentTypeFilter();
+          render();
+        });
+      });
       return;
     }
 
@@ -4481,6 +4580,7 @@ body {
     }
     updateViewSwitcherVisibility();
     renderCategoryToggles();
+    renderMusicTypeToggles();
     document.getElementById('oneOffAddBtn').addEventListener('click', async () => {
       const input = document.getElementById('oneOffUrl');
       const status = document.getElementById('oneOffStatus');
