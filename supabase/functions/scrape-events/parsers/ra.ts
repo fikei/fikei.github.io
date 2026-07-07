@@ -13,9 +13,10 @@ export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
   // same-evening events from evening cron runs
   const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' })
   const today = fmt.format(new Date())
-  // 90-day window matches the pulse strip on /events/ — festivals and big
-  // bookings publish months out (a 14-day window silently dropped them)
-  const endDate = fmt.format(new Date(Date.now() + 90 * 86400000))
+  // 120-day window — festivals and big bookings publish months out.
+  // Politeness: paged 100/request with an inter-page delay; worst case is
+  // 8 requests per scrape x 12 cron runs/day = ~96 req/day against ra.co.
+  const endDate = fmt.format(new Date(Date.now() + 120 * 86400000))
 
   // Extract area slug from URL
   const urlParts = source.url.replace(/\/$/, '').split('/')
@@ -36,10 +37,12 @@ export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
     }
   }`
 
-  // Paginate: 90 days of a metro area overflows one page of 100
-  const MAX_PAGES = 5
+  // Paginate: 120 days of a metro area overflows several pages of 100
+  const MAX_PAGES = 8
   const listings: any[] = []
   for (let page = 1; page <= MAX_PAGES; page++) {
+    // Inter-page delay keeps us far from RA's rate limits / bot heuristics
+    if (page > 1) await new Promise(r => setTimeout(r, 800))
     const variables = {
       filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
       filterOptions: { eventType: true, genre: true },
@@ -63,9 +66,10 @@ export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
     }
     const batch = gqlData?.data?.eventListings?.data || []
     listings.push(...batch)
-    if (batch.length < 100) break
+    const total = gqlData?.data?.eventListings?.totalResults
+    if (batch.length < 100 || (typeof total === 'number' && listings.length >= total)) break
   }
-  console.log(`[scrape-events] RA ${areaSlug}: ${listings.length} listings over 90d window`)
+  console.log(`[scrape-events] RA ${areaSlug}: ${listings.length} listings over 120d window`)
   if (listings.length === 0) return []
 
   return listings.map((listing: any) => {

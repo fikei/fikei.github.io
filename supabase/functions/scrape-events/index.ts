@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.9.0'
-console.log(`[scrape-events] v${VERSION} - ticketmaster venue parser (Fillmore, Warfield, Independent, Castro, ...)`)
+const VERSION = '1.9.1'
+console.log(`[scrape-events] v${VERSION} - RA 120-day window, paged with inter-page delay + totalResults early-exit`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
