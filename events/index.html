@@ -595,7 +595,8 @@ body {
 .data-table .col-price { display: none; }
 .data-table .col-ages { display: none; }
 .data-table .col-promoter { display: none; }
-.data-table .col-source { width: 90px; }
+.data-table .col-source { width: 140px; }
+.data-table .col-source .token--source { white-space: nowrap; }
 .data-table .col-source .token--source + .token--source { margin-left: 3px; }
 .data-table .col-bm { width: 28px; padding-left: var(--space-2); padding-right: 0; }
 
@@ -2065,7 +2066,7 @@ body {
   'use strict';
 
   const VERSION = '1.27.1';
-  console.log(`[events] v${VERSION} - Agape rows show only the ★ Agape token (no duplicate source token)`);
+  console.log(`[events] v${VERSION} - Agape rows show only the ★ Agape token; wider source column (fewer wrapped tags)`);
 
   // ============================================
   // Stock Sources Catalog
