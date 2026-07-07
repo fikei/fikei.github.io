@@ -2067,8 +2067,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.28.0';
-  console.log(`[events] v${VERSION} - Category hide toggles in Settings; collapse snaps (no mid-scroll jiggle) with hysteresis`);
+  const VERSION = '1.28.1';
+  console.log(`[events] v${VERSION} - Tech category hidden by default (one-time; re-enable in Settings)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2430,6 +2430,15 @@ body {
         state.showViewSwitcher = !!settings.showViewSwitcher; // beta, default off
         if (!state.showViewSwitcher) state.view = 'table'; // no switcher, no calendar
         state.hiddenCategories = new Set(Array.isArray(settings.hiddenCategories) ? settings.hiddenCategories : []);
+      }
+    } catch (e) { /* ignore */ }
+    // Tech is hidden by default — applied once so re-enabling it in
+    // Settings → Categories sticks
+    try {
+      if (!localStorage.getItem('ctrl-rodeo-tech-hidden-applied')) {
+        state.hiddenCategories.add('tech');
+        localStorage.setItem('ctrl-rodeo-tech-hidden-applied', '1');
+        saveSettings(); // persist now or the next load reverts
       }
     } catch (e) { /* ignore */ }
   }
