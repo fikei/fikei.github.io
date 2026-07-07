@@ -1557,16 +1557,17 @@ body {
   /* Hierarchy: time anchors scanning within a date group, name is primary,
      venue·city one muted line, tags + source demoted to plain text
      ("show, don't decorate" — no boxes inside boxes). */
+  /* Date and price columns are hidden, so the bookmark shares the time
+     row instead of holding an empty header row on every card */
   .data-table tbody tr {
     grid-template-columns: auto 1fr auto auto;
     grid-template-areas:
-      "date date date bm"
-      "time time ages price"
+      "time time ages bm"
       "name name name name"
       "venue venue venue venue"
       "genre genre genre source";
   }
-  .data-table .col-bm { grid-area: bm; width: auto; padding: 0; text-align: right; }
+  .data-table .col-bm { grid-area: bm; width: auto; padding: 0; text-align: right; align-self: start; }
   .data-table .col-date { display: none; }
   .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg); }
   .col-time .mobile-date-range { display: inline; }
@@ -2074,8 +2075,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.30.1';
-  console.log(`[events] v${VERSION} - Refresh button removed (Shift+R shortcut remains)`);
+  const VERSION = '1.30.2';
+  console.log(`[events] v${VERSION} - Mobile audit fix: bookmark shares the time row (empty card header row removed)`);
 
   // ============================================
   // Stock Sources Catalog
