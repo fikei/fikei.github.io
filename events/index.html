@@ -227,9 +227,10 @@ body {
 .pulse__axis-cell--today { color: var(--fg); font-weight: 700; }
 .pulse__axis-cell--month { color: var(--fg-muted); font-weight: 700; letter-spacing: var(--tracking-wider); }
 
-/* The sources bar lives inside the sticky header; the strip's own
-   padding provides the rhythm */
+/* The sources bar and filter bar live inside the sticky header; the
+   strip's own padding provides the rhythm */
 .pulse .sources-bar { margin-bottom: 0; margin-top: var(--space-3); }
+.pulse .filter-bar { margin-bottom: 0; margin-top: var(--space-3); }
 
 /* Scrolled-to date — appears in the collapsed header next to the filters */
 .pulse__current {
@@ -1755,13 +1756,19 @@ body {
           Filter
         </button>
       </div>
-    </div>
 
-    <!-- Filters — DS: .filter-bar (collapsible) -->
-    <div class="filter-bar filter-bar--collapsible" id="filterBar" style="display:none">
+      <!-- Filters — DS: .filter-bar (collapsible), opens inside the sticky header -->
+      <div class="filter-bar filter-bar--collapsible" id="filterBar" style="display:none">
       <input type="text" class="input input--search" id="filterSearch" placeholder="Search events..." autocomplete="off">
       <select class="input select" id="filterCity">
         <option value="">All Cities</option>
+      </select>
+      <select class="input select" id="filterDistance" title="Distance from your location (city-level accuracy)">
+        <option value="">Any distance</option>
+        <option value="5">&lt; 5 mi</option>
+        <option value="10">&lt; 10 mi</option>
+        <option value="25">&lt; 25 mi</option>
+        <option value="50">&lt; 50 mi</option>
       </select>
       <select class="input select" id="filterSource">
         <option value="">All Sources</option>
@@ -1772,7 +1779,8 @@ body {
       <button class="btn btn--sm btn--ghost" id="filterInterested" title="Only events you bookmarked as interested">🔖 Interested</button>
       <button class="btn btn--sm btn--ghost" id="filterPast" title="Include past events (last 60 days)">Past events</button>
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
-    </div>
+      </div>
+    </div><!-- /pulse (sticky header) -->
 
     <!-- Content type filter (populated dynamically, hidden when only 1 type) -->
     <div class="type-filter" id="typeFilter" style="display:none"></div>
@@ -2056,8 +2064,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.25.0';
-  console.log(`[events] v${VERSION} - Agape rows: gold spine + wash + token; date column hidden (date groups carry it)`);
+  const VERSION = '1.26.0';
+  console.log(`[events] v${VERSION} - Distance filter (city-centroid + geolocation); filter bar docked in the sticky header`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2160,6 +2168,60 @@ body {
   };
   function getEventCategory(contentType) { return CONTENT_TYPE_CATEGORY[contentType] || 'other'; }
 
+  // City centroids for the distance filter — events carry city text only
+  // (no per-venue coordinates yet), so distance is city-level accuracy
+  const CITY_COORDS = {
+    'san francisco': [37.7749, -122.4194], 'sf': [37.7749, -122.4194],
+    'oakland': [37.8044, -122.2712], 'berkeley': [37.8715, -122.2730],
+    'emeryville': [37.8313, -122.2852], 'alameda': [37.7652, -122.2416],
+    'san leandro': [37.7249, -122.1561], 'hayward': [37.6688, -122.0808],
+    'fremont': [37.5485, -121.9886], 'san jose': [37.3382, -121.8863],
+    'santa clara': [37.3541, -121.9552], 'sunnyvale': [37.3688, -122.0363],
+    'mountain view': [37.3861, -122.0839], 'palo alto': [37.4419, -122.1430],
+    'stanford': [37.4275, -122.1697], 'redwood city': [37.4852, -122.2364],
+    'san mateo': [37.5630, -122.3255], 'daly city': [37.6879, -122.4702],
+    'mill valley': [37.9060, -122.5450], 'sausalito': [37.8591, -122.4853],
+    'san rafael': [37.9735, -122.5311], 'richmond': [37.9358, -122.3477],
+    'walnut creek': [37.9101, -122.0652], 'concord': [37.9780, -122.0311],
+    'orinda': [37.8771, -122.1802], 'petaluma': [38.2324, -122.6367],
+    'napa': [38.2975, -122.2869], 'santa cruz': [36.9741, -122.0308],
+    'sacramento': [38.5816, -121.4944], 'isleton': [38.1616, -121.6114],
+    'los angeles': [34.0522, -118.2437], 'new york': [40.7128, -74.0060],
+    'brooklyn': [40.6782, -73.9442], 'manhattan': [40.7831, -73.9712],
+    'queens': [40.7282, -73.7949], 'seattle': [47.6062, -122.3321],
+  };
+
+  function milesBetween(a, b) {
+    const R = 3959, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(b[0] - a[0]), dLng = toRad(b[1] - a[1]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  function requestUserLocation() {
+    try {
+      const cached = sessionStorage.getItem('ctrl-rodeo-user-loc');
+      if (cached) { state.userLoc = JSON.parse(cached); render(); return; }
+    } catch (e) { /* ignore */ }
+    if (!navigator.geolocation) { log('Distance filter: geolocation unavailable'); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        state.userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try { sessionStorage.setItem('ctrl-rodeo-user-loc', JSON.stringify(state.userLoc)); } catch (e) { /* ignore */ }
+        log('Distance filter: location acquired');
+        render();
+      },
+      (err) => {
+        log('Distance filter: location denied/failed — ' + err.message);
+        state.filters.distance = '';
+        const sel = document.getElementById('filterDistance');
+        if (sel) sel.value = '';
+        render();
+      },
+      { maximumAge: 600000, timeout: 10000 }
+    );
+  }
+
   // ============================================
   // Auth — powered by /auth/ctrl-auth.js
   // ============================================
@@ -2241,7 +2303,8 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false },
+    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false },
+    userLoc: null, // { lat, lng } from browser geolocation, session-cached
     sort: { key: 'date', dir: 'asc' },
     bookmarks: new Map(),  // eventKey -> { id, gcal_event_id } (user_event_bookmarks rows)
     view: 'table',
@@ -3145,7 +3208,7 @@ body {
 
     // Update filter button indicator (show dot when non-source filters are active)
     const filterBtn = document.getElementById('filterToggleBtn');
-    const hasNonSourceFilters = state.filters.search || state.filters.city || state.filters.dateFrom || state.filters.dateTo;
+    const hasNonSourceFilters = state.filters.search || state.filters.city || state.filters.distance || state.filters.dateFrom || state.filters.dateTo;
     const existingDot = filterBtn.querySelector('.filter-dot');
     if (hasNonSourceFilters && !existingDot) {
       const dot = document.createElement('span');
@@ -3792,7 +3855,15 @@ body {
 
   function getFilteredEvents(opts = {}) {
     return state.events.filter(ev => {
-      const { search, city, source, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
+      const { search, city, source, distance, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
+      // Distance: city-centroid haversine against the user's location.
+      // Unknown cities are excluded while the filter is active; if location
+      // hasn't arrived yet the filter passes everything (no flash of empty).
+      if (distance && state.userLoc) {
+        const c = CITY_COORDS[(ev.city || '').trim().toLowerCase()];
+        if (!c) return false;
+        if (milesBetween([state.userLoc.lat, state.userLoc.lng], c) > Number(distance)) return false;
+      }
       if (agape && !((ev.recommendedBy && ev.recommendedBy.includes('agape')) || (ev.sources && ev.sources.includes('discord-agape-events')))) return false;
       if (interested && !state.bookmarks.has(eventKeyFor(ev))) return false;
       if (search) { const q = search.toLowerCase(); if (![ev.name, ev.venue, ev.city, ev.genre, ev.promoter || '', ev.ages || ''].join(' ').toLowerCase().includes(q)) return false; }
@@ -3812,11 +3883,12 @@ body {
 
   function clearAllFilters() {
     const hadPast = state.filters.showPast;
-    state.filters = { search: '', city: '', source: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false };
+    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false };
     updateFilterChips();
     if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
     document.getElementById('filterCity').value = '';
+    const fd = document.getElementById('filterDistance'); if (fd) fd.value = '';
     const fs = document.getElementById('filterSource'); if (fs) fs.value = '';
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
@@ -4158,6 +4230,11 @@ body {
     let debounceTimer;
     filterSearch.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { state.filters.search = filterSearch.value; render(); }, 150); });
     document.getElementById('filterCity').addEventListener('change', (e) => { state.filters.city = e.target.value; render(); });
+    document.getElementById('filterDistance').addEventListener('change', (e) => {
+      state.filters.distance = e.target.value;
+      if (state.filters.distance && !state.userLoc) requestUserLocation();
+      render();
+    });
     document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
     document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
     document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
