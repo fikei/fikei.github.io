@@ -11,7 +11,7 @@
 // POST /functions/v1/gcal-sync   (Authorization: Bearer <user JWT>)
 // Body: { action: 'connect-url' | 'exchange' | 'status' | 'settings' | 'sync' | 'disconnect', ... }
 
-const VERSION = '1.1.0'
+const VERSION = '1.1.1'
 console.log(`[gcal-sync] v${VERSION} — ctrl.events Google Calendar sync (bookmarked + agape)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -32,7 +32,8 @@ const SCOPES = 'https://www.googleapis.com/auth/calendar'
 const CALENDAR_NAME = 'ctrl.events'
 const COLOR_BOOKMARKED = '7' // Peacock blue
 const COLOR_AGAPE = '3'      // Grape purple
-const DEFAULT_DURATION_MIN = 180
+// Fallback only — real durations come from scraped time ranges ("7:30PM - 2AM")
+const DEFAULT_DURATION_MIN = 120
 
 function getSupabase() {
   const url = Deno.env.get('SUPABASE_URL')!
@@ -228,22 +229,50 @@ async function getDesiredItems(row: SyncRow): Promise<DesiredItem[]> {
 
 // --- Event payload (per trainingplans buildGoogleEvent) ---
 
-// Parse a scraped time string ("8pm", "7:30PM - 2AM", "20:00") → { h, m } or null
-function parseStartTime(raw: string | null): { h: number; m: number } | null {
-  if (!raw) return null
-  const start = raw.split(/[-–]/)[0].trim()
-  const ampm = start.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i)
+// Parse one clock string ("8pm", "7:30PM", "20:00", or bare "8" with a meridiem
+// hint from the other end of a range like "8-11pm") → { h, m } or null
+function parseClock(raw: string, meridiemHint?: string): { h: number; m: number } | null {
+  const s = raw.trim()
+  const ampm = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i)
   if (ampm) {
     let h = parseInt(ampm[1], 10) % 12
     if (/pm/i.test(ampm[3])) h += 12
     return { h, m: ampm[2] ? parseInt(ampm[2], 10) : 0 }
   }
-  const h24 = start.match(/^(\d{1,2}):(\d{2})$/)
+  const h24 = s.match(/^(\d{1,2}):(\d{2})$/)
   if (h24) {
     const h = parseInt(h24[1], 10)
     if (h >= 0 && h <= 23) return { h, m: parseInt(h24[2], 10) }
   }
+  // Bare hour ("8" in "8-11pm"): borrow the meridiem from the range's other side
+  const bare = s.match(/^(\d{1,2})$/)
+  if (bare && meridiemHint) {
+    let h = parseInt(bare[1], 10) % 12
+    if (/pm/i.test(meridiemHint)) h += 12
+    return { h, m: 0 }
+  }
   return null
+}
+
+// Parse a scraped time string → start + duration in minutes.
+// Ranges ("7:30PM - 2AM", "10pm-4am", "8-11pm") yield the real duration,
+// wrapping past midnight when the end reads earlier than the start.
+function parseTimeRange(raw: string | null): { start: { h: number; m: number }; durationMin: number } | null {
+  if (!raw) return null
+  const cleaned = raw.split('(')[0]
+  const parts = cleaned.split(/[-–—]|\bto\b|\buntil\b|\btil\b/i)
+  const endPart = parts.length > 1 ? parts[parts.length - 1].trim() : ''
+  const endMeridiem = endPart.match(/am|pm/i)?.[0]
+  const start = parseClock(parts[0], endMeridiem)
+  if (!start) return null
+
+  const end = endPart ? parseClock(endPart) : null
+  if (end) {
+    let durationMin = (end.h * 60 + end.m) - (start.h * 60 + start.m)
+    if (durationMin <= 0) durationMin += 24 * 60 // past midnight ("10pm - 4am")
+    if (durationMin > 0 && durationMin <= 18 * 60) return { start, durationMin }
+  }
+  return { start, durationMin: DEFAULT_DURATION_MIN }
 }
 
 function pad(n: number): string { return String(n).padStart(2, '0') }
@@ -269,8 +298,8 @@ function buildGoogleEvent(item: DesiredItem, tz: string): Record<string, unknown
     extendedProperties: { private: { eventKey: item.eventKey, kind: item.kind, app: 'ctrl-events' } },
   }
 
-  const start = parseStartTime(item.time)
-  if (!start) {
+  const range = parseTimeRange(item.time)
+  if (!range) {
     // All-day (end date is exclusive)
     event.start = { date: item.date }
     event.end = { date: nextDay(item.endDate || item.date) }
@@ -278,8 +307,9 @@ function buildGoogleEvent(item: DesiredItem, tz: string): Record<string, unknown
   }
 
   // Timed event: local wall-clock in the user's timezone; Google resolves the offset
+  const { start, durationMin } = range
   const startLocal = `${item.date}T${pad(start.h)}:${pad(start.m)}:00`
-  const endMinutes = start.h * 60 + start.m + DEFAULT_DURATION_MIN
+  const endMinutes = start.h * 60 + start.m + durationMin
   const endH = Math.floor(endMinutes / 60), endM = endMinutes % 60
   const endDate = endH >= 24 ? nextDay(item.date) : item.date
   const endLocal = `${endDate}T${pad(endH % 24)}:${pad(endM)}:00`
@@ -301,7 +331,7 @@ async function runSync(row: SyncRow): Promise<Record<string, number>> {
   const desiredByKey = new Map(desired.map(d => [d.eventKey, d]))
 
   // Scan the calendar for events we own (extendedProperties.private.app = ctrl-events)
-  const existingByKey = new Map<string, { id: string; kind: string; summary: string; startRaw: string }>()
+  const existingByKey = new Map<string, { id: string; kind: string; summary: string; startRaw: string; endRaw: string }>()
   let pageToken: string | null = null
   do {
     const params = new URLSearchParams({
@@ -323,6 +353,7 @@ async function runSync(row: SyncRow): Promise<Record<string, number>> {
           kind: ev.extendedProperties.private.kind || '',
           summary: ev.summary || '',
           startRaw: JSON.stringify(ev.start || {}),
+          endRaw: JSON.stringify(ev.end || {}),
         })
       }
     }
@@ -345,9 +376,10 @@ async function runSync(row: SyncRow): Promise<Record<string, number>> {
         if (!res.ok) throw new Error(`insert ${res.status}`)
         pushed++
       } else {
-        // Cheap change check: kind (color), name, start
+        // Cheap change check: kind (color), name, start, end (duration)
         const startNow = JSON.stringify((payload as { start: unknown }).start)
-        if (existing.kind === item.kind && existing.summary === payload.summary && existing.startRaw === startNow) {
+        const endNow = JSON.stringify((payload as { end: unknown }).end)
+        if (existing.kind === item.kind && existing.summary === payload.summary && existing.startRaw === startNow && existing.endRaw === endNow) {
           unchanged++
         } else {
           const res = await fetch(`${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${existing.id}`, {
