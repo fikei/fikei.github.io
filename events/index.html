@@ -2069,8 +2069,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.31.2';
-  console.log(`[events] v${VERSION} - Mobile: Agape rows get horizontal padding (content off the spine)`);
+  const VERSION = '1.31.3';
+  console.log(`[events] v${VERSION} - hiddenCategories + beta flags survive cloud sync (Tech toggle no longer reverts on refresh)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2457,7 +2457,12 @@ body {
         const payload = {
           user_id: currentUser.id,
           sources: state.sources,
-          settings: { view: state.view, sort: state.sort },
+          settings: {
+            view: state.view, sort: state.sort,
+            hiddenCategories: [...state.hiddenCategories],
+            showRecommended: !!state.showRecommended,
+            showViewSwitcher: !!state.showViewSwitcher,
+          },
           region: localStorage.getItem('ctrl-rodeo-events-region') || 'bay-area',
           onboarded: state.onboarded,
         };
@@ -2498,12 +2503,23 @@ body {
       state.onboarded = data.onboarded ?? true;
       if (data.settings?.view) state.view = data.settings.view;
       if (data.settings?.sort) state.sort = data.settings.sort;
+      // Older cloud rows predate these keys — only adopt when present so a
+      // stale row can't wipe local preferences
+      if (Array.isArray(data.settings?.hiddenCategories)) state.hiddenCategories = new Set(data.settings.hiddenCategories);
+      if (typeof data.settings?.showRecommended === 'boolean') state.showRecommended = data.settings.showRecommended;
+      if (typeof data.settings?.showViewSwitcher === 'boolean') state.showViewSwitcher = data.settings.showViewSwitcher;
       if (data.region) localStorage.setItem('ctrl-rodeo-events-region', data.region);
 
-      // Persist to localStorage so L1 cache works
+      // Persist to localStorage so L1 cache works. saveSettings() writes the
+      // FULL settings shape — a hand-rolled subset here used to clobber
+      // hiddenCategories/beta flags on every signed-in load, which is why
+      // "hide Tech" un-stuck itself after a refresh.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sources));
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ sources: state.sources, view: state.view, sort: state.sort }));
+      saveSettings();
       if (state.onboarded) localStorage.setItem(ONBOARDED_KEY, '1');
+
+      // Write back so older-shape cloud rows pick up the full settings
+      saveSourcesCloud();
 
       log(`Cloud sync: loaded ${cloudSources.length} sources for ${currentUser.email}`);
       return true;
@@ -3217,6 +3233,7 @@ body {
           updateContentTypeFilter();
         }
         saveSettings();
+        saveSourcesCloud(); // keep the cloud copy current or it reverts this on next load
         render();
       });
     });
@@ -4346,6 +4363,7 @@ body {
       betaRec.addEventListener('change', (e) => {
         state.showRecommended = e.target.checked;
         saveSettings();
+        saveSourcesCloud();
         if (state.showRecommended) {
           loadRecommendedEvents();
         } else {
@@ -4360,6 +4378,7 @@ body {
         state.showViewSwitcher = e.target.checked;
         if (!state.showViewSwitcher && state.view !== 'table') state.view = 'table';
         saveSettings();
+        saveSourcesCloud();
         updateViewSwitcherVisibility();
         render();
       });
