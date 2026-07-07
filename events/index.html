@@ -1809,8 +1809,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.19.0';
-  console.log(`[events] v${VERSION} - Epic 1: local-date fix, List/Month views only, desktop date separators, month day-takeover, nav restructure`);
+  const VERSION = '1.19.1';
+  console.log(`[events] v${VERSION} - cache-key bump: purge stale pre-timezone-fix event caches`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2006,7 +2006,7 @@ body {
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
   const ONBOARDED_KEY = 'ctrl-rodeo-events-onboarded';
   const SETTINGS_KEY = 'ctrl-rodeo-events-settings';
-  const CACHE_KEY = 'ctrl-rodeo-events-cache';
+  const CACHE_KEY = 'ctrl-rodeo-events-cache-v2' // v2: invalidates caches predating the iCal timezone fix;
   const CACHE_MAX_AGE = 15 * 60 * 1000; // 15 minutes
 
   // --- Source Management ---
