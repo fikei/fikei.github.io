@@ -14,8 +14,8 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.4.0'
-console.log(`[scrape-discord-events] v${VERSION} - platform-link resolution (bare link posts resolved via page JSON-LD, PRD §4.1)`)
+const VERSION = '1.4.1'
+console.log(`[scrape-discord-events] v${VERSION} - PT-local date anchors (UTC 'today' mis-resolved relative dates after 5pm PT)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -221,11 +221,22 @@ async function resolveLinkEvent(url: string): Promise<Partial<ExtractedEvent> | 
         const ev = findLdEventNode(JSON.parse(m[1]))
         if (!ev || !ev.name || !ev.startDate) continue
         const start = String(ev.startDate)
+        // Z-normalized publishers (e.g. Meetup) need UTC->PT conversion;
+        // offset-formatted ones (Luma, Partiful, Eventbrite) are already local
+        let date = start.split('T')[0]
+        let time = (start.split('T')[1] || '').slice(0, 5)
+        if (/Z$/.test(start)) {
+          const local = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          }).format(new Date(start))
+          ;[date, time] = local.split(' ')
+        }
         const loc = ev.location && !Array.isArray(ev.location) ? ev.location : (ev.location?.[0] || {})
         const addr = loc.address || {}
         return {
-          date: start.split('T')[0],
-          time: (start.split('T')[1] || '').slice(0, 5),
+          date,
+          time,
           name: String(ev.name).slice(0, 200),
           venue: String(loc.name || '').slice(0, 120),
           address: String(typeof addr === 'string' ? addr : addr.streetAddress || '').slice(0, 200),
@@ -378,7 +389,7 @@ async function extractEventsWithAI(
   guildId: string,
   channelId: string
 ): Promise<ExtractedEvent[]> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' }).format(new Date())
   const BATCH_SIZE = 15
   const allEvents: ExtractedEvent[] = []
 

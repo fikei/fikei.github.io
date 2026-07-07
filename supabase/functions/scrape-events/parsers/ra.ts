@@ -9,8 +9,11 @@ const RA_AREAS: Record<string, number> = {
 }
 
 export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
-  const today = new Date().toISOString().split('T')[0]
-  const endDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+  // PT-local window: a UTC "today" is tomorrow after 5pm PT, which dropped
+  // same-evening events from evening cron runs
+  const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' })
+  const today = fmt.format(new Date())
+  const endDate = fmt.format(new Date(Date.now() + 14 * 86400000))
 
   // Extract area slug from URL
   const urlParts = source.url.replace(/\/$/, '').split('/')
