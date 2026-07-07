@@ -579,8 +579,8 @@ body {
 .data-table .col-city { min-width: 80px; white-space: nowrap; }
 .data-table .col-type { width: 70px; font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-wider); color: var(--fg-muted); }
 .data-table .col-genre { min-width: 100px; }
-.data-table .col-price { width: 70px; white-space: nowrap; font-size: var(--text-2xs); position: relative; }
-.data-table .col-price[title] { cursor: help; }
+/* Price column parked for now — data still renders, column hidden */
+.data-table .col-price { display: none; }
 .data-table .col-ages { display: none; }
 .data-table .col-promoter { display: none; }
 .data-table .col-source { width: 90px; }
@@ -1534,7 +1534,7 @@ body {
   .data-table .col-venue .venue-city { display: inline; }
   .data-table .col-venue .venue-city::before { content: '\00A0\00B7'; }
   .data-table .col-ages { grid-area: ages; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-subtle); text-align: right; }
-  .data-table .col-price { grid-area: price; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-subtle); text-align: right; }
+  .data-table .col-price { display: none; }
   .data-table .col-genre { grid-area: genre; display: block; min-width: 0; margin-top: var(--space-2); align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .data-table .col-genre .genre-tag {
     border: none; background: none; padding: 0; margin: 0;
@@ -1627,7 +1627,7 @@ body {
       <div class="page-header__actions">
         <!-- Pinned beside the fixed ctrl-auth bar -->
         <button class="btn btn--sm btn--dashed" id="addSourceBtn"
-          style="position: fixed; top: calc(var(--safe-top, 0px) + var(--space-4) + 4px); right: calc(var(--safe-right, 0px) + 118px); z-index: 100;">Manage Sources</button>
+          style="position: fixed; top: calc(var(--safe-top, 0px) + var(--space-4) + 4px); right: calc(var(--safe-right, 0px) + 118px); z-index: 100;">Settings</button>
         <div id="ctrl-auth-root"></div>
         <!-- Theme toggle moved to /account/ settings; Calendar sync moved to /account/ -->
       </div>
@@ -1757,7 +1757,7 @@ body {
       </select>
       <input type="date" class="input input--date" id="filterDateFrom" title="From date">
       <input type="date" class="input input--date" id="filterDateTo" title="To date">
-      <button class="btn btn--sm btn--ghost" id="filterAgape" title="Only events recommended in the Agape #events channel">★ Agape</button>
+      <button class="btn btn--sm btn--ghost" id="filterAgape" title="Only Agape Recommended events">★ Agape</button>
       <button class="btn btn--sm btn--ghost" id="filterInterested" title="Only events you bookmarked as interested">🔖 Interested</button>
       <button class="btn btn--sm btn--ghost" id="filterPast" title="Include past events (last 60 days)">Past events</button>
       <button class="btn btn--ghost btn--sm" id="filterClear">Clear</button>
@@ -1878,7 +1878,7 @@ body {
   <!-- Add Source Modal — DS: .modal + .form-group + .form-label + .form-hint -->
   <div class="modal" id="addSourceModal">
     <div class="modal__content">
-      <h2 class="modal__title">Manage Sources</h2>
+      <h2 class="modal__title">Settings</h2>
 
       <!-- Active sources with remove -->
       <div class="form-group" id="activeSourcesGroup">
@@ -1902,6 +1902,10 @@ body {
         <label style="display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; font-size: var(--text-xs);">
           <input type="checkbox" id="betaShowRecommended" style="margin-top: 2px;">
           <span>Show &ldquo;Recommended for you&rdquo;<br><span style="color: var(--fg-subtle); font-size: var(--text-2xs);">Personalized picks based on your Boards. Off by default.</span></span>
+        </label>
+        <label style="display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; font-size: var(--text-xs); margin-top: var(--space-2);">
+          <input type="checkbox" id="betaShowViewSwitcher" style="margin-top: 2px;">
+          <span>Month/List switcher<br><span style="color: var(--fg-subtle); font-size: var(--text-2xs);">Toggle between the list and month calendar views. Off by default.</span></span>
         </label>
       </div>
 
@@ -2041,8 +2045,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.23.1';
-  console.log(`[events] v${VERSION} - Pulse strip head shows the global event/source count; duplicate stats line removed`);
+  const VERSION = '1.24.0';
+  console.log(`[events] v${VERSION} - Settings rename, beta Month/List switcher (default off), Agape Recommended (no member), price column hidden`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2077,7 +2081,7 @@ body {
     // Bay Area — Social (Luma discover feed)
     { id: 'luma-sf', name: 'Luma SF', category: 'social', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=discover&id=discplace-BDj7GNbGlsF7Cka', region: 'bay-area', description: "What's happening in San Francisco" },
     // Bay Area — Agape curation feed (private rows: visible only when signed in)
-    { id: 'discord-agape-events', name: 'Agape #events', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
+    { id: 'discord-agape-events', name: 'Agape Recommended', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
     // One-off events added by users via the add-event function
     { id: 'user-submitted', name: 'Community adds', category: 'social', type: 'manual', url: null, region: 'bay-area', description: 'One-off events added by link' },
     { id: 'ata-sf', name: 'ATA', category: 'film', type: 'ata', url: 'https://www.atasite.org/calendar', region: 'bay-area', description: 'Underground film & experimental art' },
@@ -2331,6 +2335,7 @@ body {
       view: state.view,
       sort: state.sort,
       showRecommended: !!state.showRecommended,
+      showViewSwitcher: !!state.showViewSwitcher,
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
@@ -2343,6 +2348,8 @@ body {
         if (settings.view) state.view = (settings.view === 'day' || settings.view === 'week') ? 'table' : settings.view;
         if (settings.sort) state.sort = settings.sort;
         state.showRecommended = !!settings.showRecommended; // beta, default off
+        state.showViewSwitcher = !!settings.showViewSwitcher; // beta, default off
+        if (!state.showViewSwitcher) state.view = 'table'; // no switcher, no calendar
       }
     } catch (e) { /* ignore */ }
   }
@@ -2616,7 +2623,7 @@ body {
       ${cb('calSyncEnabled', calSync.syncEnabled, '<strong>Sync to Google Calendar</strong>', 'Keeps the ctrl.events calendar up to date')}
       <div style="margin: var(--space-2) 0 var(--space-3) var(--space-5); ${calSync.syncEnabled ? '' : 'opacity: 0.45; pointer-events: none;'}">
         ${cb('calSyncBookmarked', calSync.syncBookmarked, 'Interested events', 'Events you bookmark — blue')}
-        ${cb('calSyncAgape', calSync.syncAgape, 'Agape recommended', 'Community picks from the Agape #events channel — purple')}
+        ${cb('calSyncAgape', calSync.syncAgape, 'Agape Recommended', 'Community picks — purple')}
       </div>
       <div style="display: flex; align-items: center; gap: var(--space-3);">
         <button class="btn btn--sm btn--ghost" id="calSyncNow" ${calSync.busy || !calSync.syncEnabled ? 'disabled' : ''}>Sync now</button>
@@ -3061,8 +3068,16 @@ body {
     return div.innerHTML;
   }
 
+  // Month/List switcher is beta (default off) — without it the list is the
+  // only view, wherever the view state came from (cloud sync included)
+  function updateViewSwitcherVisibility() {
+    const toggle = document.querySelector('.view-toggle');
+    if (toggle) toggle.style.display = state.showViewSwitcher ? '' : 'none';
+  }
+
   // --- Render ---
   function render() {
+    if (!state.showViewSwitcher && state.view !== 'table') state.view = 'table';
     const filtered = getFilteredEvents();
     const sorted = getSortedEvents(filtered);
     const tableWrap = document.querySelector('.data-table-wrap');
@@ -3379,8 +3394,7 @@ body {
         return `<span class="token token--source" data-source-id="${escHtml(sid)}" style="border-color: ${sColor}; color: ${sColor};">${escHtml(sName)}</span>`;
       }).join(' ');
       if (ev.agape || isAgapeEvent(ev)) {
-        const byAttr = ev.postedBy ? ` title="Recommended by ${escHtml(ev.postedBy)} in Agape #events"` : ' title="Recommended in Agape #events"';
-        sourceTagsHtml = `<span class="token token--agape"${byAttr}>★ Agape${ev.postedBy ? ' · ' + escHtml(ev.postedBy) : ''}</span> ` + sourceTagsHtml;
+        sourceTagsHtml = `<span class="token token--agape" title="Agape Recommended">★ Agape</span> ` + sourceTagsHtml;
       }
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
       const displayName = stripVenueFromTitle(ev.name, ev.venue);
@@ -4151,6 +4165,18 @@ body {
         }
       });
     }
+    const betaSwitcher = document.getElementById('betaShowViewSwitcher');
+    if (betaSwitcher) {
+      betaSwitcher.checked = !!state.showViewSwitcher;
+      betaSwitcher.addEventListener('change', (e) => {
+        state.showViewSwitcher = e.target.checked;
+        if (!state.showViewSwitcher && state.view !== 'table') state.view = 'table';
+        saveSettings();
+        updateViewSwitcherVisibility();
+        render();
+      });
+    }
+    updateViewSwitcherVisibility();
     document.getElementById('oneOffAddBtn').addEventListener('click', async () => {
       const input = document.getElementById('oneOffUrl');
       const status = document.getElementById('oneOffStatus');
