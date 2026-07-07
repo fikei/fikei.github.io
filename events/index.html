@@ -328,8 +328,14 @@ body {
 .data-table tbody tr.agape-row:hover { background: color-mix(in srgb, #e8c547 9%, var(--bg-surface)); }
 .data-table tbody tr.agape-row td:first-child { box-shadow: inset 2px 0 0 #e8c547; }
 @media (max-width: 600px) {
-  /* Mobile rows are flat: spine on the row's left edge, wash over the row */
-  .data-table tbody tr.agape-row { box-shadow: inset 2px 0 0 #e8c547; background: color-mix(in srgb, #e8c547 5%, transparent); }
+  /* Mobile rows are flat: spine on the row's left edge, wash over the row.
+     Horizontal padding keeps content off the spine and the row edge. */
+  .data-table tbody tr.agape-row {
+    box-shadow: inset 2px 0 0 #e8c547;
+    background: color-mix(in srgb, #e8c547 5%, transparent);
+    padding-left: var(--space-3);
+    padding-right: var(--space-2);
+  }
   .data-table tbody tr.agape-row td:first-child { box-shadow: none; }
 }
 
@@ -2063,8 +2069,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.31.1';
-  console.log(`[events] v${VERSION} - Mobile: source column hidden; Filter rides top-right above Bars/Dots`);
+  const VERSION = '1.31.2';
+  console.log(`[events] v${VERSION} - Mobile: Agape rows get horizontal padding (content off the spine)`);
 
   // ============================================
   // Stock Sources Catalog
