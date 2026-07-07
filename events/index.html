@@ -2064,8 +2064,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.26.0';
-  console.log(`[events] v${VERSION} - Distance filter (city-centroid + geolocation); filter bar docked in the sticky header`);
+  const VERSION = '1.27.0';
+  console.log(`[events] v${VERSION} - Within-day time sort; start times normalized to military (24h)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2837,6 +2837,20 @@ body {
     return `${hours.toString().padStart(2, '0')}:${mins}`;
   }
 
+  // Display normalization: freeform scraper times ("9:30pm", "Mon: 3pm",
+  // "4pm-2am", "19:00") → military start time ("21:30"). Unparseable
+  // strings fall back to the raw start segment.
+  function formatTimeMilitary(timeStr) {
+    if (!timeStr) return '';
+    const start = timeStr.split(/[-–]/)[0].split('(')[0].trim();
+    if (!start) return '';
+    const parsed = parseTimeForSort(start);
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(parsed)) return parsed;
+    // Wordy times ("noon", "doors 8") pass through raw; numeric garbage
+    // from bad scrapes ("99:30") hides rather than lies
+    return /[a-z]/i.test(start) ? start : '';
+  }
+
   // --- Price Formatting ---
   function formatPriceDisplay(priceStr) {
     if (!priceStr || priceStr === '-') return { short: '', full: null };
@@ -3482,9 +3496,9 @@ body {
       const dateDisplay = ev.endDate ? formatDateRange(ev) : formatDate(ev.date);
       // Show only start time; full range in tooltip
       const timeRaw = ev.time || '';
-      const timeStart = timeRaw.split(/[-–]/)[0].split('(')[0].trim();
+      const timeStart = formatTimeMilitary(timeRaw);
       const timeDisplay = timeStart ? escHtml(timeStart) : '';
-      const timeTip = (timeRaw !== timeStart && timeRaw) ? ` title="${escHtml(timeRaw)}"` : '';
+      const timeTip = (timeRaw && timeRaw !== timeStart) ? ` title="${escHtml(timeRaw)}"` : '';
       // Mobile cards drop the date cell (the sticky date header carries it),
       // which would lose multi-day ranges — surface those in the time slot
       const mobileRangeHtml = (!timeStart && ev.endDate) ? `<span class="mobile-date-range">${escHtml(dateDisplay)}</span>` : '';
@@ -3669,7 +3683,7 @@ body {
         const tip = tipParts.join(' \u2014 ');
 
         // Time prefix if available
-        const timeHtml = ev.time ? `<span class="calendar__event-time">${escHtml(ev.time.split('-')[0].split('(')[0].trim().substring(0, 7))}</span> ` : '';
+        const timeHtml = ev.time ? `<span class="calendar__event-time">${escHtml(formatTimeMilitary(ev.time))}</span> ` : '';
 
         inner += `<span class="calendar__event" data-focus="${escHtml(ev.name)}" title="${escHtml(tip)}">${timeHtml}${escHtml(ev.name)}</span>`;
       });
@@ -3752,7 +3766,7 @@ body {
         const imgHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="day-detail__img" alt="" loading="lazy">` : '';
         return `<li class="day-detail__item" data-name="${escHtml(ev.name)}">
           ${imgHtml}
-          <div class="day-detail__time">${escHtml(ev.time || '\u2014')}</div>
+          <div class="day-detail__time"${ev.time && ev.time !== formatTimeMilitary(ev.time) ? ` title="${escHtml(ev.time)}"` : ''}>${escHtml(formatTimeMilitary(ev.time) || '\u2014')}</div>
           <div class="day-detail__info">
             <div class="day-detail__name">${nameHtml}</div>
             <div class="day-detail__meta">${metaParts.join('')}</div>
@@ -4204,7 +4218,11 @@ body {
     const { key, dir } = state.sort;
     return [...events].sort((a, b) => {
       let aVal = a[key] || '', bVal = b[key] || '';
-      if (key === 'date') { aVal = aVal || '9999-12-31'; bVal = bVal || '9999-12-31'; }
+      if (key === 'date') {
+        aVal = aVal || '9999-12-31'; bVal = bVal || '9999-12-31';
+        // Within a day, order by start time (timeless events sink to the end)
+        if (aVal === bVal) { aVal = parseTimeForSort(a.time); bVal = parseTimeForSort(b.time); }
+      }
       if (key === 'time') { aVal = parseTimeForSort(a.time); bVal = parseTimeForSort(b.time); }
       const cmp = aVal.localeCompare(bVal);
       return dir === 'asc' ? cmp : -cmp;
