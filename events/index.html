@@ -2067,8 +2067,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.28.1';
-  console.log(`[events] v${VERSION} - Tech category hidden by default (one-time; re-enable in Settings)`);
+  const VERSION = '1.28.2';
+  console.log(`[events] v${VERSION} - Classifier: music never leaves music via keywords; venue hints (tiat → art)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2777,6 +2777,17 @@ body {
 
   const UMBRELLA_CATEGORIES = new Set(['social', 'other', 'music']);
 
+  // Music-source events may refine into a music subtype but never leave
+  // music — artist names trip cross-domain keywords ("Healing Hottie" is
+  // not a wellness event)
+  const MUSIC_SUBTYPES = new Set(['music', 'dj-set', 'live-music', 'festival']);
+
+  // Venues whose programming defines the category better than keywords do
+  const VENUE_CATEGORY_HINTS = {
+    'tiat': 'art',
+    'gray area': 'art',
+  };
+
   function classifyEvent(ev) {
     const text = [(ev.name || ''), (ev.genre || ''), (ev.description || '')].join(' ').toLowerCase();
     let detectedType = null;
@@ -2792,10 +2803,15 @@ body {
 
   function detectEventType(ev) {
     const cat = ev.contentType;
-    const { type } = classifyEvent(ev);
     // Trust a specific (non-umbrella) contentType from the source; otherwise detect.
     if (cat && !UMBRELLA_CATEGORIES.has(cat)) return cat;
-    if (type) return type;
+    const venueHint = VENUE_CATEGORY_HINTS[(ev.venue || '').trim().toLowerCase()];
+    if (venueHint) return venueHint;
+    const { type } = classifyEvent(ev);
+    if (type) {
+      if (cat === 'music' && !MUSIC_SUBTYPES.has(type)) return 'music';
+      return type;
+    }
     return cat || getSourceCategory(ev.source) || 'other';
   }
 
