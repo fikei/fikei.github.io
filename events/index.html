@@ -2078,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.35.0';
-  console.log(`[events] v${VERSION} - music taxonomy: persisted music_type, sub-genre drill-down, bucket colors, junk-tag cleanup`);
+  const VERSION = '1.36.0';
+  console.log(`[events] v${VERSION} - new stock sources auto-enable for existing users (tombstoned removals stay removed)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2457,23 +2457,22 @@ body {
       state.sources = [{ ...def, enabled: true }];
     }
 
-    // One-time migration: existing users get the Agape curation feed
-    // (harmless when signed out — RLS returns no private rows for anon)
-    if (!localStorage.getItem('ctrl-rodeo-agape-source-added')) {
-      if (!state.sources.some(s => s.id === 'discord-agape-events')) {
-        const agape = STOCK_SOURCES.find(s => s.id === 'discord-agape-events');
-        if (agape) state.sources.push({ ...agape, enabled: true });
+    // Auto-add new Bay Area stock sources for existing users. New venues used
+    // to require a manual visit to Settings, so their events were invisible
+    // (bit us three times: Bottom of the Hill, Frontier Tower, Ticketmaster
+    // venues). Tombstoned sources — ones the user removed — stay removed.
+    try {
+      const removed = new Set(JSON.parse(localStorage.getItem('ctrl-rodeo-removed-sources') || '[]'));
+      const have = new Set(state.sources.map(s => s.id));
+      let autoAdded = 0;
+      for (const stock of STOCK_SOURCES) {
+        if (stock.region !== 'bay-area') continue;
+        if (have.has(stock.id) || removed.has(stock.id)) continue;
+        state.sources.push({ ...stock, enabled: true });
+        autoAdded++;
       }
-      localStorage.setItem('ctrl-rodeo-agape-source-added', '1');
-    }
-    // One-time migration: community-added one-off events source
-    if (!localStorage.getItem('ctrl-rodeo-user-submitted-added')) {
-      if (!state.sources.some(s => s.id === 'user-submitted')) {
-        const us = STOCK_SOURCES.find(s => s.id === 'user-submitted');
-        if (us) state.sources.push({ ...us, enabled: true });
-      }
-      localStorage.setItem('ctrl-rodeo-user-submitted-added', '1');
-    }
+      if (autoAdded > 0) log(`Auto-added ${autoAdded} new stock source(s)`);
+    } catch (e) { /* ignore */ }
 
     saveSources();
     log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
@@ -4355,6 +4354,12 @@ body {
 
   function removeSource(sourceId) {
     state.sources = state.sources.filter(s => s.id !== sourceId);
+    // Tombstone: auto-add must not resurrect a source the user removed
+    try {
+      const removed = new Set(JSON.parse(localStorage.getItem('ctrl-rodeo-removed-sources') || '[]'));
+      removed.add(sourceId);
+      localStorage.setItem('ctrl-rodeo-removed-sources', JSON.stringify([...removed]));
+    } catch (e) { /* ignore */ }
     saveSources();
     renderActiveSourcesList();
     renderStockSourcesList();
