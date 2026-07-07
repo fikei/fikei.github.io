@@ -63,6 +63,8 @@ body {
   margin-bottom: var(--space-4);
 }
 
+/* Collapse is a snap, not an animation: transitioning the sticky header's
+   in-flow height shifts the whole list every frame mid-scroll (jiggle) */
 .pulse__head {
   display: flex;
   align-items: baseline;
@@ -70,9 +72,6 @@ body {
   margin-bottom: var(--space-2);
   max-height: 16px;
   overflow: hidden;
-  transition: max-height var(--duration-normal) var(--ease-default),
-              opacity var(--duration-normal) var(--ease-default),
-              margin-bottom var(--duration-normal) var(--ease-default);
 }
 
 .pulse__label {
@@ -129,7 +128,6 @@ body {
   min-width: 100%;
   height: 56px;
   border-bottom: var(--border-thin) solid var(--border-subtle);
-  transition: height var(--duration-normal) var(--ease-default);
 }
 
 /* Fixed-pitch needles: an 11px day cell with a 3px bar centered inside —
@@ -206,8 +204,6 @@ body {
   min-width: 100%;
   max-height: 14px;
   overflow: hidden;
-  transition: max-height var(--duration-normal) var(--ease-default),
-              opacity var(--duration-normal) var(--ease-default);
 }
 
 /* Labels are wider than their 3px cell — center them over the needle
@@ -1906,6 +1902,12 @@ body {
         <div id="activeSourcesList" style="border: var(--border-thin) solid var(--border-subtle); max-height: 200px; overflow-y: auto;"></div>
       </div>
 
+      <!-- Category visibility -->
+      <div class="form-group" id="categoryTogglesGroup">
+        <label class="form-label">Categories <span style="font-weight: normal; color: var(--fg-subtle);">uncheck to hide everywhere</span></label>
+        <div id="categoryToggles" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-1) var(--space-3);"></div>
+      </div>
+
       <!-- One-off event by link (add-event edge function) -->
       <div class="form-group" id="oneOffGroup">
         <label class="form-label">Add a one-off event by link</label>
@@ -2065,8 +2067,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.27.1';
-  console.log(`[events] v${VERSION} - Agape rows show only the ★ Agape token; wider source column (fewer wrapped tags)`);
+  const VERSION = '1.28.0';
+  console.log(`[events] v${VERSION} - Category hide toggles in Settings; collapse snaps (no mid-scroll jiggle) with hysteresis`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2306,6 +2308,7 @@ body {
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
     filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', agape: false, interested: false, showPast: false },
     userLoc: null, // { lat, lng } from browser geolocation, session-cached
+    hiddenCategories: new Set(), // categories hidden everywhere via Settings
     sort: { key: 'date', dir: 'asc' },
     bookmarks: new Map(),  // eventKey -> { id, gcal_event_id } (user_event_bookmarks rows)
     view: 'table',
@@ -2411,6 +2414,7 @@ body {
       sort: state.sort,
       showRecommended: !!state.showRecommended,
       showViewSwitcher: !!state.showViewSwitcher,
+      hiddenCategories: [...state.hiddenCategories],
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
@@ -2425,6 +2429,7 @@ body {
         state.showRecommended = !!settings.showRecommended; // beta, default off
         state.showViewSwitcher = !!settings.showViewSwitcher; // beta, default off
         if (!state.showViewSwitcher) state.view = 'table'; // no switcher, no calendar
+        state.hiddenCategories = new Set(Array.isArray(settings.hiddenCategories) ? settings.hiddenCategories : []);
       }
     } catch (e) { /* ignore */ }
   }
@@ -3159,6 +3164,37 @@ body {
     return div.innerHTML;
   }
 
+  function visibleEvents() {
+    if (state.hiddenCategories.size === 0) return state.events;
+    return state.events.filter(ev => !state.hiddenCategories.has(getEventCategory(ev.contentType)));
+  }
+
+  // Settings → Categories: uncheck to hide a category everywhere
+  function renderCategoryToggles() {
+    const el = document.getElementById('categoryToggles');
+    if (!el) return;
+    el.innerHTML = CATEGORY_ORDER.map(c => `
+      <label style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); cursor: pointer;">
+        <input type="checkbox" data-cat="${c}" ${state.hiddenCategories.has(c) ? '' : 'checked'}>
+        ${CATEGORY_LABELS[c]}
+      </label>`).join('');
+    el.querySelectorAll('input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const c = cb.dataset.cat;
+        if (cb.checked) state.hiddenCategories.delete(c);
+        else state.hiddenCategories.add(c);
+        // A hidden category can't stay the active chip filter
+        if (state.filters.category && state.hiddenCategories.has(state.filters.category)) {
+          state.filters.category = '';
+          state.filters.contentType = '';
+          updateContentTypeFilter();
+        }
+        saveSettings();
+        render();
+      });
+    });
+  }
+
   // Month/List switcher is beta (default off) — without it the list is the
   // only view, wherever the view state came from (cloud sync included)
   function updateViewSwitcherVisibility() {
@@ -3214,10 +3250,11 @@ body {
     // Pulse strip (events-per-day density, above everything)
     renderPulse();
 
-    // Stats
+    // Stats — hidden categories are out of every count
+    const visible = visibleEvents();
     const enabledCount = state.sources.filter(s => s.enabled).length;
-    document.getElementById('statsText').textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
-    document.getElementById('statsFiltered').textContent = sorted.length !== state.events.length ? `Showing ${sorted.length}` : '';
+    document.getElementById('statsText').textContent = `${visible.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
+    document.getElementById('statsFiltered').textContent = sorted.length !== visible.length ? `Showing ${sorted.length}` : '';
 
     renderSourceChips();
 
@@ -3370,9 +3407,9 @@ body {
       window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - headerH - stripH - 4);
     };
     align();
-    // The strip collapses in response to the jump, and its height animates —
-    // re-align once the collapse transition has settled
-    setTimeout(align, 400);
+    // The jump collapses the strip (instantly), changing the sticky stack
+    // height — re-align once against the settled layout
+    requestAnimationFrame(align);
   }
 
   // Mode toggle (bars | dots), persisted per user
@@ -3386,12 +3423,14 @@ body {
 
   // Collapse the sticky strip to a slim ribbon once the page scrolls, and
   // scrollspy the list: while scrolled, only the needle for the date at the
-  // top of the viewport stays lit. Threshold (120px) exceeds the collapse's
-  // own height change so toggling can't oscillate at the boundary.
+  // top of the viewport stays lit. Hysteresis (collapse past 160, expand
+  // under 60) keeps the boundary from flapping — the gap exceeds the
+  // strip's own height change, which itself shifts scroll geometry.
   function updatePulseScroll() {
     const strip = document.getElementById('pulseStrip');
     if (!strip) return;
-    const collapsed = window.scrollY > 120;
+    const wasCollapsed = strip.classList.contains('pulse--collapsed');
+    const collapsed = wasCollapsed ? window.scrollY > 60 : window.scrollY > 160;
     strip.classList.toggle('pulse--collapsed', collapsed);
 
     // Scrollspy over the date-grouped list: which date is at the top of
@@ -3421,12 +3460,10 @@ body {
     if (currentBtn) currentBtn.classList.add('pulse__day--current');
   }
 
-  let _pulseScrollTick = false;
-  window.addEventListener('scroll', () => {
-    if (_pulseScrollTick) return;
-    _pulseScrollTick = true;
-    requestAnimationFrame(() => { _pulseScrollTick = false; updatePulseScroll(); });
-  }, { passive: true });
+  // Direct call, no rAF throttle: rAF never fires in a hidden tab, which
+  // jammed the throttle flag and froze the collapse/scrollspy permanently.
+  // The handler is cheap (class toggle + ≤90 rect reads when collapsed).
+  window.addEventListener('scroll', updatePulseScroll, { passive: true });
 
   function renderExhibitionsRail() {
     const rail = document.getElementById('exhibitionsRail');
@@ -3820,15 +3857,16 @@ body {
     const activeCategory = state.filters.category;
     const allActive = !activeCategory;
 
-    // Count events per category (only categories present in current events)
+    // Count events per category (only visible categories present in current events)
+    const chipEvents = visibleEvents();
     const counts = {};
-    state.events.forEach(e => {
+    chipEvents.forEach(e => {
       const c = getEventCategory(e.contentType);
       counts[c] = (counts[c] || 0) + 1;
     });
     const present = CATEGORY_ORDER.filter(c => counts[c] > 0);
 
-    let html = `<button class="token ${allActive ? 'token--active' : ''}" data-category="">All<span class="source-chip__count">${state.events.length}</span></button>`;
+    let html = `<button class="token ${allActive ? 'token--active' : ''}" data-category="">All<span class="source-chip__count">${chipEvents.length}</span></button>`;
     html += present.map(c => {
       const active = activeCategory === c;
       return `<button class="token ${active ? 'token--active' : ''}" data-category="${escHtml(c)}">${escHtml(CATEGORY_LABELS[c] || c)}<span class="source-chip__count">${counts[c]}</span></button>`;
@@ -3872,6 +3910,7 @@ body {
   function getFilteredEvents(opts = {}) {
     return state.events.filter(ev => {
       const { search, city, source, distance, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
+      if (state.hiddenCategories.has(getEventCategory(ev.contentType))) return false;
       // Distance: city-centroid haversine against the user's location.
       // Unknown cities are excluded while the filter is active; if location
       // hasn't arrived yet the filter passes everything (no flash of empty).
@@ -4288,6 +4327,7 @@ body {
       });
     }
     updateViewSwitcherVisibility();
+    renderCategoryToggles();
     document.getElementById('oneOffAddBtn').addEventListener('click', async () => {
       const input = document.getElementById('oneOffUrl');
       const status = document.getElementById('oneOffStatus');
