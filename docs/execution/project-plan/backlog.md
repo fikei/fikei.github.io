@@ -350,6 +350,19 @@ Connecting digital curation to real-world experiences. Supports brand principle 
 | **Event → pin linking** — Associate regular pins with events ("I found this at that show") | Pending |
 | **Past events archive** — Auto-move past events to archive, preserve as part of collection history | Pending |
 
+### Challenge-Protected Event Sources (Headless Fetch)
+
+Shotgun.live (shotgun.live/en/cities/san-francisco) sits behind a Vercel Security Checkpoint — a JS challenge that 429s every server-side fetch (city pages, event pages, sitemap). Same blocker class that removed sf-punchline, cobbs-sf, citylights-sf, and audium-sf from the registry. A headless-fetch worker unblocks all of them in one move. Dedup is already structurally handled: `shotgun.live/events/*` is in cache-events' canonical-URL patterns (rung 1 merges with the ~36 upcoming 19hz rows that link Shotgun ticket pages), and date+name+venue exact matches merge via canonical_key.
+
+> Personas: Sound & Scene Curator, DJ
+
+| Story | Status |
+|-------|--------|
+| **Headless-fetch worker** — Rendered-page fetch service (Browserless/Playwright) callable from scrape-events for challenge-protected sources; budget cold-start + per-page cost before committing | Pending |
+| **Shotgun SF source** — `shotgun` parser type: city page → event slugs → per-event JSON-LD (same schema path as Discord link resolution); blocked on headless worker | Pending |
+| **Re-enable removed sources** — sf-punchline, cobbs-sf, citylights-sf, audium-sf via the headless worker | Pending |
+| **Discord link-resolution fallback** — Agape-posted shotgun.live links currently 429 during JSON-LD resolution and fall back to text/flyer extraction; route through the headless worker | Pending |
+
 ---
 
 ## Mobile Capture Enhancements

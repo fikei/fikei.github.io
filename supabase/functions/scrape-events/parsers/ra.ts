@@ -13,7 +13,9 @@ export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
   // same-evening events from evening cron runs
   const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' })
   const today = fmt.format(new Date())
-  const endDate = fmt.format(new Date(Date.now() + 14 * 86400000))
+  // 90-day window matches the pulse strip on /events/ — festivals and big
+  // bookings publish months out (a 14-day window silently dropped them)
+  const endDate = fmt.format(new Date(Date.now() + 90 * 86400000))
 
   // Extract area slug from URL
   const urlParts = source.url.replace(/\/$/, '').split('/')
@@ -34,29 +36,36 @@ export async function scrapeRA(source: EventSource): Promise<ScrapedEvent[]> {
     }
   }`
 
-  const variables = {
-    filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
-    filterOptions: { eventType: true, genre: true },
-    page: 1, pageSize: 100,
+  // Paginate: 90 days of a metro area overflows one page of 100
+  const MAX_PAGES = 5
+  const listings: any[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const variables = {
+      filters: { areas: { eq: areaId }, listingDate: { gte: today, lte: endDate } },
+      filterOptions: { eventType: true, genre: true },
+      page, pageSize: 100,
+    }
+
+    const text = await fetchUrl('https://ra.co/graphql', {
+      method: 'POST',
+      body: JSON.stringify({ query, variables }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Referer': `https://ra.co/events/us/${areaSlug}`,
+        'Origin': 'https://ra.co',
+      },
+    })
+
+    const gqlData = JSON.parse(text)
+    if (gqlData.errors) {
+      console.log(`[scrape-events] RA GraphQL errors (page ${page}): ${JSON.stringify(gqlData.errors.map((e: any) => e.message))}`)
+      break
+    }
+    const batch = gqlData?.data?.eventListings?.data || []
+    listings.push(...batch)
+    if (batch.length < 100) break
   }
-
-  // GraphQL API call — direct fetch with RA headers
-  const text = await fetchUrl('https://ra.co/graphql', {
-    method: 'POST',
-    body: JSON.stringify({ query, variables }),
-    headers: {
-      'Content-Type': 'application/json',
-      'Referer': `https://ra.co/events/us/${areaSlug}`,
-      'Origin': 'https://ra.co',
-    },
-  })
-
-  const gqlData = JSON.parse(text)
-  if (gqlData.errors) {
-    console.log(`[scrape-events] RA GraphQL errors: ${JSON.stringify(gqlData.errors.map((e: any) => e.message))}`)
-  }
-
-  const listings = gqlData?.data?.eventListings?.data || []
+  console.log(`[scrape-events] RA ${areaSlug}: ${listings.length} listings over 90d window`)
   if (listings.length === 0) return []
 
   return listings.map((listing: any) => {

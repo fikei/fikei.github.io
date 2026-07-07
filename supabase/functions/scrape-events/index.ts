@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.7.2'
-console.log(`[scrape-events] v${VERSION} - ical UTC timestamps converted to region timezone (Luma evening events were dated tomorrow)`)
+const VERSION = '1.8.0'
+console.log(`[scrape-events] v${VERSION} - RA window 14d → 90d with pagination (long-lead bookings were silently dropped)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'

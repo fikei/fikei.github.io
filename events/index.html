@@ -258,6 +258,38 @@ body {
   .pulse__mode { margin-left: auto; }
 }
 
+/* First-load equalizer loader — same LED-tick language as the pulse strip */
+#pulseLoader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-16) 0;
+}
+.pulse-loader__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 56px;
+}
+.pulse-loader__bar {
+  width: 3px;
+  -webkit-mask-image: repeating-linear-gradient(to top, #000 0 3px, transparent 3px 4px);
+  mask-image: repeating-linear-gradient(to top, #000 0 3px, transparent 3px 4px);
+  animation: pulseEq 0.9s ease-in-out infinite alternate;
+}
+.pulse-loader__text {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulseEq {
+  from { height: 10%; }
+  to { height: 100%; }
+}
+
 /* Sources bar */
 .sources-bar {
   display: flex;
@@ -1646,7 +1678,7 @@ body {
   <div class="container">
     <p class="page-description">Aggregated events from multiple sources. Location data extracted into address and city columns for filtering.</p>
 
-    <!-- Onboarding (first visit) — 3-step flow -->
+    <!-- Onboarding (first visit) — 2-step flow -->
     <div id="onboarding" style="display:none">
       <div class="onboarding">
 
@@ -1667,59 +1699,30 @@ body {
           </div>
         </div>
 
-        <!-- Step 2: Interests -->
+        <!-- Step 2: Interests (final step — sources auto-default to all) -->
         <div id="onboardingStep2" style="display:none">
           <h2 class="onboarding__title">What are you into?</h2>
-          <p class="onboarding__desc">Pick your interests and we'll suggest the best sources for you.</p>
+          <p class="onboarding__desc">Pick your interests — press a number to toggle, Enter to finish.</p>
           <div class="onboarding__step">
             <div class="interest-grid" id="interestGrid"></div>
           </div>
           <div class="onboarding__step-nav">
             <button class="btn btn--ghost btn--sm" id="onboardingBackTo1">Back</button>
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
-              <button class="btn btn--ghost btn--sm" id="onboardingBrowseAll">Browse all sources</button>
-              <button class="btn btn--filled" id="onboardingToStep3" disabled>Continue <span class="onboarding__step-count" id="interestCount">(0)</span></button>
-            </div>
+            <button class="btn btn--filled" id="onboardingToStep3" disabled>Get Started <span class="onboarding__step-count" id="interestCount">(0)</span></button>
           </div>
         </div>
 
-        <!-- Step 3: Review Sources -->
-        <div id="onboardingStep3" style="display:none">
-          <h2 class="onboarding__title">Your Sources</h2>
-          <p class="onboarding__desc">We've picked sources based on your interests. Toggle to customize.</p>
-
-          <div class="onboarding__sources onboarding__sources--visible" id="onboardingSources">
-            <div class="onboarding__step-label">Recommended</div>
-            <div id="onboardingList"></div>
-          </div>
-
-          <details style="margin-top: var(--space-4);">
-            <summary style="cursor: pointer; color: var(--fg-muted); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-wider);">
-              All sources <span id="allSourcesCount"></span>
-            </summary>
-            <div id="onboardingAllList" style="margin-top: var(--space-2);"></div>
-          </details>
-
-          <div class="onboarding__or">or</div>
-
-          <div class="onboarding__step">
-            <div class="onboarding__step-label">Add your own</div>
-            <div style="display: flex; gap: var(--space-2);">
-              <input type="text" class="input" id="onboardingCustomUrl" placeholder="https://..." style="flex:1;">
-              <button class="btn btn--ghost btn--sm" id="onboardingCustomAdd">Add</button>
-            </div>
-          </div>
-
-          <div class="onboarding__step-nav">
-            <button class="btn btn--ghost btn--sm" id="onboardingBackTo2">Back</button>
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
-              <button class="btn btn--ghost" id="onboardingSkip">Skip</button>
-              <button class="btn btn--filled" id="onboardingStart">Get Started</button>
-            </div>
-          </div>
-        </div>
+        <!-- Sources step removed — onboarding auto-defaults to all sources
+             for the region; manage them later in Settings -->
 
       </div>
+    </div>
+
+    <!-- First-load equalizer: a play on the pulse strip, shown between
+         finishing onboarding and the first event render -->
+    <div id="pulseLoader" style="display:none">
+      <div class="pulse-loader__bars" id="pulseLoaderBars"></div>
+      <div class="pulse-loader__text">Tuning your feed</div>
     </div>
 
     <!-- Main events content (hidden during onboarding) -->
@@ -2067,8 +2070,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.28.2';
-  console.log(`[events] v${VERSION} - Classifier: music never leaves music via keywords; venue hints (tiat → art)`);
+  const VERSION = '1.29.0';
+  console.log(`[events] v${VERSION} - 2-step onboarding (all sources by default, numbered category interests, keyboard nav); category renames`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2150,8 +2153,8 @@ body {
     'wellness': 'wellness',
   };
   const CATEGORY_LABELS = {
-    'music': 'Music', 'film': 'Film', 'art': 'Art', 'comedy': 'Comedy',
-    'theater': 'Theater', 'tech': 'Tech', 'social': 'Social',
+    'music': 'Music', 'film': 'Film & Cinema', 'art': 'Art & Design', 'comedy': 'Comedy',
+    'theater': 'Theater', 'tech': 'Tech & Startups', 'social': 'Social',
     'literary': 'Literary', 'wellness': 'Wellness', 'other': 'Other',
   };
   const CATEGORY_ORDER = ['music', 'film', 'art', 'comedy', 'theater', 'tech', 'social', 'literary', 'wellness', 'other'];
@@ -4582,17 +4585,7 @@ body {
     // Day detail close
     document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
 
-    // Onboarding — 3-step flow
-    document.getElementById('onboardingStart').addEventListener('click', completeOnboarding);
-    document.getElementById('onboardingSkip').addEventListener('click', () => {
-      state.sources = [{ ...STOCK_SOURCES.find(s => s.id === '19hz-bayarea'), enabled: true }];
-      state.onboarded = true;
-      localStorage.setItem(ONBOARDED_KEY, '1');
-      saveSources();
-      document.getElementById('onboarding').style.display = 'none';
-      document.getElementById('eventsContent').style.display = '';
-      fetchAllSources();
-    });
+    // Onboarding — 2-step flow (region → interests; sources default to all)
     document.getElementById('onboardingToStep2').addEventListener('click', () => {
       document.getElementById('onboardingStep1').style.display = 'none';
       document.getElementById('onboardingStep2').style.display = '';
@@ -4602,24 +4595,25 @@ body {
       document.getElementById('onboardingStep2').style.display = 'none';
       document.getElementById('onboardingStep1').style.display = '';
     });
-    document.getElementById('onboardingToStep3').addEventListener('click', () => {
-      document.getElementById('onboardingStep2').style.display = 'none';
-      document.getElementById('onboardingStep3').style.display = '';
-      renderOnboardingSources();
-    });
-    document.getElementById('onboardingBackTo2').addEventListener('click', () => {
-      document.getElementById('onboardingStep3').style.display = 'none';
-      document.getElementById('onboardingStep2').style.display = '';
-    });
-    document.getElementById('onboardingBrowseAll').addEventListener('click', () => {
-      onboardingSelectedInterests = [];
-      document.getElementById('onboardingStep2').style.display = 'none';
-      document.getElementById('onboardingStep3').style.display = '';
-      renderOnboardingSources();
-    });
+    document.getElementById('onboardingToStep3').addEventListener('click', completeOnboarding);
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+      // Onboarding: number keys toggle interests, Enter advances the step
+      const ob = document.getElementById('onboarding');
+      if (ob && ob.style.display !== 'none' && document.activeElement.tagName !== 'INPUT') {
+        const step2Visible = document.getElementById('onboardingStep2').style.display !== 'none';
+        if (step2Visible && /^[1-9]$/.test(e.key)) {
+          const card = document.querySelectorAll('#interestGrid .interest-card')[Number(e.key) - 1];
+          if (card) { e.preventDefault(); card.click(); }
+          return;
+        }
+        if (e.key === 'Enter') {
+          const btn = document.getElementById(step2Visible ? 'onboardingToStep3' : 'onboardingToStep2');
+          if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+          return;
+        }
+      }
       if (e.key === 'Escape') {
         if (state.selectedDate) { closeDayDetail(); return; }
         authModal.classList.remove('auth-modal--visible');
@@ -4644,25 +4638,45 @@ body {
     };
   }
 
-  // --- Onboarding (3-step: region → interests → sources) ---
+  // --- Onboarding (2-step: region → interests; sources default to all) ---
   let onboardingSelectedRegion = '';
   let onboardingSelectedInterests = [];
-  let onboardingCustomSources = [];
 
-  // Interest categories — map user-facing interest to source categories
-  const INTEREST_OPTIONS = [
-    { id: 'music', label: 'Live Music', categories: ['music'] },
-    { id: 'film', label: 'Film & Cinema', categories: ['film'] },
-    { id: 'tech', label: 'Tech & Startups', categories: ['tech'] },
-    { id: 'art', label: 'Art & Design', categories: ['art', 'design'] },
-    { id: 'comedy', label: 'Comedy', categories: ['comedy'] },
-    { id: 'literary', label: 'Books & Writing', categories: ['literary'] },
-    { id: 'social', label: 'Social', categories: ['social'] },
-  ];
+  // Interests mirror the app's categories 1:1 (same order, same labels as
+  // the category chips) so onboarding choices map directly onto filtering
+  const INTEREST_OPTIONS = CATEGORY_ORDER
+    .filter(c => c !== 'other')
+    .map(c => ({ id: c, label: CATEGORY_LABELS[c], categories: c === 'art' ? ['art', 'design'] : [c] }));
+
+  // First-load equalizer — the pulse strip's LED needles as a loading state
+  let pulseLoaderShownAt = 0;
+
+  function showPulseLoader() {
+    pulseLoaderShownAt = Date.now();
+    const bars = document.getElementById('pulseLoaderBars');
+    const colors = CATEGORY_ORDER.filter(c => c !== 'other').map(c => CATEGORY_COLORS[c]);
+    bars.innerHTML = Array.from({ length: 24 }, (_, i) =>
+      `<span class="pulse-loader__bar" style="background:${colors[i % colors.length]};animation-delay:${(i * 67) % 900}ms;animation-duration:${700 + (i * 131) % 500}ms"></span>`
+    ).join('');
+    document.getElementById('pulseLoader').style.display = '';
+  }
+
+  function finishPulseLoader() {
+    // Let the equalizer play at least a beat — a flash reads as a glitch
+    const wait = Math.max(0, 1600 - (Date.now() - pulseLoaderShownAt));
+    setTimeout(() => {
+      document.getElementById('pulseLoader').style.display = 'none';
+      document.querySelector('.page-description').style.display = '';
+      document.getElementById('eventsContent').style.display = '';
+      pulseLoaderShownAt = 0;
+    }, wait);
+  }
 
   function showOnboarding() {
     const container = document.getElementById('onboarding');
     container.style.display = '';
+    // The description talks about the table — noise while onboarding
+    document.querySelector('.page-description').style.display = 'none';
 
     // Render region buttons — Bay Area active, others disabled
     const regionsEl = document.getElementById('onboardingRegions');
@@ -4691,11 +4705,6 @@ body {
       });
     });
 
-    // Custom URL add
-    document.getElementById('onboardingCustomAdd').addEventListener('click', addOnboardingCustom);
-    document.getElementById('onboardingCustomUrl').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addOnboardingCustom(); }
-    });
   }
 
   function renderInterestGrid() {
@@ -4706,12 +4715,12 @@ body {
 
     grid.innerHTML = INTEREST_OPTIONS
       .filter(opt => opt.categories.some(c => availableCats.has(c)))
-      .map(opt => {
-        const count = regionSources.filter(s => opt.categories.includes(s.category)).length;
+      .map((opt, i) => {
+        // Ordinal badge doubles as the keyboard shortcut (press 1-9 to toggle)
         const isActive = onboardingSelectedInterests.includes(opt.id);
         return `<button class="interest-card${isActive ? ' active' : ''}" data-interest="${escHtml(opt.id)}">
           ${escHtml(opt.label)}
-          <span style="font-size: var(--text-2xs); opacity: 0.5; margin-left: var(--space-1);">${count}</span>
+          <span style="font-size: var(--text-2xs); opacity: 0.5; margin-left: var(--space-1);">${i + 1}</span>
         </button>`;
       }).join('');
 
@@ -4736,87 +4745,11 @@ body {
     btn.disabled = n === 0;
   }
 
-  function getSourcesForInterests(interests, region) {
-    const relevantCats = new Set();
-    interests.forEach(interest => {
-      const opt = INTEREST_OPTIONS.find(o => o.id === interest);
-      if (opt) opt.categories.forEach(c => relevantCats.add(c));
-    });
-    return STOCK_SOURCES.filter(s => s.region === region && relevantCats.has(s.category));
-  }
-
-  function addOnboardingCustom() {
-    const input = document.getElementById('onboardingCustomUrl');
-    const url = input.value.trim();
-    if (!url) return;
-    let name;
-    try { name = new URL(url).hostname; } catch (e) { name = url.substring(0, 30); }
-    const id = 'custom-' + name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    onboardingCustomSources.push({ id, name, type: 'auto', url, category: 'other', region: 'custom', description: 'Custom source', enabled: true });
-    input.value = '';
-    renderOnboardingSources();
-  }
-
-  function renderOnboardingSources() {
-    const list = document.getElementById('onboardingList');
-    const allList = document.getElementById('onboardingAllList');
-    const allCount = document.getElementById('allSourcesCount');
-    const region = onboardingSelectedRegion || 'bay-area';
-    const regionSources = STOCK_SOURCES.filter(s => s.region === region);
-
-    // Recommended sources: based on interests (or all if no interests selected)
-    let recommended;
-    if (onboardingSelectedInterests.length > 0) {
-      recommended = getSourcesForInterests(onboardingSelectedInterests, region);
-    } else {
-      recommended = regionSources;
-    }
-
-    const recommendedIds = new Set(recommended.map(s => s.id));
-    const remaining = regionSources.filter(s => !recommendedIds.has(s.id));
-    const allSources = [...recommended, ...onboardingCustomSources];
-
-    // Render recommended list (pre-checked)
-    list.innerHTML = allSources.map(s => {
-      const catLabel = CONTENT_TYPES[s.category] || s.category || '';
-      const isCustom = s.region === 'custom';
-      return `<label class="onboarding__source">
-        <input type="checkbox" value="${escHtml(s.id)}" checked>
-        <div class="onboarding__source-info">
-          <span class="onboarding__source-name">${escHtml(s.name)}</span>
-          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
-          ${isCustom ? '<span class="onboarding__cat-tag">custom</span>' : ''}
-        </div>
-      </label>`;
-    }).join('');
-
-    // Render remaining sources (unchecked, in "all" expandable)
-    allCount.textContent = `(${remaining.length})`;
-    allList.innerHTML = remaining.map(s => {
-      const catLabel = CONTENT_TYPES[s.category] || s.category || '';
-      return `<label class="onboarding__source">
-        <input type="checkbox" value="${escHtml(s.id)}">
-        <div class="onboarding__source-info">
-          <span class="onboarding__source-name">${escHtml(s.name)}</span>
-          <span class="onboarding__cat-tag">${escHtml(catLabel)}</span>
-        </div>
-      </label>`;
-    }).join('');
-
-    // Bind checkbox selection UI
-    document.querySelectorAll('#onboardingList input[type="checkbox"], #onboardingAllList input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        cb.closest('.onboarding__source').classList.toggle('selected', cb.checked);
-      });
-    });
-  }
-
   function completeOnboarding() {
-    const checked = Array.from(document.querySelectorAll('#onboardingList input[type="checkbox"]:checked, #onboardingAllList input[type="checkbox"]:checked')).map(cb => cb.value);
-    const stockSelected = STOCK_SOURCES.filter(s => checked.includes(s.id));
-    const customSelected = onboardingCustomSources.filter(s => checked.includes(s.id));
-    const all = [...stockSelected, ...customSelected];
-
+    // Sources auto-default to everything in the region — interests are a
+    // taste signal, not a gate; sources are managed later in Settings
+    const region = onboardingSelectedRegion || 'bay-area';
+    const all = STOCK_SOURCES.filter(s => s.region === region);
     if (all.length === 0) {
       const def = STOCK_SOURCES.find(s => s.id === '19hz-bayarea');
       if (def) all.push(def);
@@ -4834,8 +4767,10 @@ body {
     }
     saveSources();
     document.getElementById('onboarding').style.display = 'none';
-    document.getElementById('eventsContent').style.display = '';
-    fetchAllSources();
+    // Equalizer plays while the first fetch runs; eventsContent reveals
+    // when both the data and the animation's minimum beat are done
+    showPulseLoader();
+    Promise.resolve(fetchAllSources()).finally(finishPulseLoader);
   }
 
   // Auth is handled by /auth/ctrl-auth.js — see event listeners at top of file
