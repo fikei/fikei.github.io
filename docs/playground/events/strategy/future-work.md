@@ -6,7 +6,7 @@
 
 ---
 
-## Epic 1 — UI/UX refinements (user-reported, 2026-07-05)
+## Epic 1 — UI/UX refinements (user-reported, 2026-07-05) ✅ Shipped (client v1.19.0, 2026-07-06)
 
 | # | Item | Notes / diagnosis | Size |
 |---|---|---|---|
