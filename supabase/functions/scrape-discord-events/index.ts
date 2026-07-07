@@ -14,8 +14,8 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.4.1'
-console.log(`[scrape-discord-events] v${VERSION} - PT-local date anchors (UTC 'today' mis-resolved relative dates after 5pm PT)`)
+const VERSION = '1.5.0'
+console.log(`[scrape-discord-events] v${VERSION} - flyer-image vision extraction, no invented times, message-permalink idempotency`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -321,6 +321,9 @@ function scoreMessage(msg: DiscordMessage): number {
   if (msg.author.bot) score += 1
   if (msg.message_reference) score -= 2
   if (text.length < 20) score -= 2
+  // Flyer posts often carry all their info in an attached image with barely
+  // any text — the image itself is a strong event signal
+  if ((msg.attachments || []).some(a => /^image\//.test(a.content_type || ''))) score += 3
   return score
 }
 
@@ -356,9 +359,10 @@ Rules:
 - Only extract actual events (shows, meetups, parties, screenings, concerts, etc.)
 - Skip messages that are just discussion, reactions, or questions about events
 - If a message contains multiple events, extract each separately
+- Some messages have attached flyer images (labeled "Flyer image for Message N" below). Read the flyer carefully — the flyer's event name, date, time, venue, and price are authoritative and override anything you would infer from the message text alone
 - If a date is relative ("this Friday", "tomorrow"), resolve it relative to today: ${today}
 - If no year is specified, assume the current year (${today.substring(0, 4)})
-- If time is ambiguous, prefer evening (7-10pm) for nightlife/music, afternoon for other
+- Do NOT invent dates or times: if no concrete date appears in the text or flyer, skip the event; if no time appears, leave time empty
 - If venue/location is not mentioned, leave empty — do not guess
 - Return an empty array if no events are found
 
@@ -391,6 +395,7 @@ async function extractEventsWithAI(
 ): Promise<ExtractedEvent[]> {
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' }).format(new Date())
   const BATCH_SIZE = 15
+  const MAX_IMAGES_PER_BATCH = 8
   const allEvents: ExtractedEvent[] = []
 
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
@@ -403,6 +408,23 @@ async function extractEventsWithAI(
 
     const prompt = buildExtractionPrompt(messages, today)
 
+    // Flyer images ride along as vision blocks — most party posts carry
+    // their date/time/venue only on the flyer, not in the message text
+    // deno-lint-ignore no-explicit-any
+    const contentBlocks: any[] = [{ type: 'text', text: prompt }]
+    let imageCount = 0
+    batch.forEach((m, idx) => {
+      if (imageCount >= MAX_IMAGES_PER_BATCH) return
+      const imgs = (m.attachments || []).filter(a => /^image\//.test(a.content_type || '') && a.url).slice(0, 2)
+      for (const a of imgs) {
+        if (imageCount >= MAX_IMAGES_PER_BATCH) break
+        contentBlocks.push({ type: 'text', text: `Flyer image for Message ${idx + 1}:` })
+        contentBlocks.push({ type: 'image', source: { type: 'url', url: a.url } })
+        imageCount++
+      }
+    })
+    if (imageCount > 0) console.log(`Extraction batch ${i / BATCH_SIZE + 1}: ${imageCount} flyer image(s) attached`)
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -413,7 +435,8 @@ async function extractEventsWithAI(
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        messages: [{ role: 'user', content: contentBlocks }],
       }),
     })
 
@@ -553,7 +576,33 @@ async function forwardToCanonicalStore(events: ExtractedEvent[]): Promise<Record
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-  const payload = events.map(ev => ({
+  // Idempotency by source message: AI re-extraction of the same Discord
+  // message can jitter (e.g. "Block Party" vs "Block Party on Liberty"),
+  // and the canonical store keys on extracted fields — so a renamed
+  // re-extraction would mint a duplicate event. Once a message permalink
+  // has produced an event row, later runs don't get to create another.
+  let toForward = events
+  const permalinks = [...new Set(events.map(e => e.url).filter(u => u && u.includes('discord.com/channels/')))]
+  if (permalinks.length > 0) {
+    try {
+      const { data: existing } = await getSupabase()
+        .from('events')
+        .select('url')
+        .eq('source_id', AGAPE_SOURCE_ID)
+        .in('url', permalinks)
+      const ingested = new Set((existing || []).map(r => r.url))
+      const before = toForward.length
+      toForward = events.filter(e => !e.url.includes('discord.com/channels/') || !ingested.has(e.url))
+      if (toForward.length !== before) {
+        console.log(`Idempotency: skipped ${before - toForward.length} event(s) whose source message is already ingested`)
+      }
+    } catch (err) {
+      console.error('Idempotency check failed (forwarding all):', (err as Error).message)
+    }
+  }
+  if (toForward.length === 0) return { cached: 0, updated: 0, skippedIngested: events.length }
+
+  const payload = toForward.map(ev => ({
     source: AGAPE_SOURCE_ID,
     date: ev.date,
     time: ev.time || '',
@@ -580,10 +629,10 @@ async function forwardToCanonicalStore(events: ExtractedEvent[]): Promise<Record
       events: payload,
       sourceOutcomes: [{
         sourceId: AGAPE_SOURCE_ID,
-        sourceName: 'Agape #events',
+        sourceName: 'Agape Recommended',
         sourceUrl: 'discord://agape/#events',
         sourceType: 'discord',
-        eventCount: events.length,
+        eventCount: toForward.length,
         ok: true,
       }],
     }),
