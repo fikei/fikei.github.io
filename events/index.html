@@ -2078,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.36.2';
-  console.log(`[events] v${VERSION} - cache purge (stale truncated lists), 12-page fetch, Eventim link support`);
+  const VERSION = '1.37.0';
+  console.log(`[events] v${VERSION} - The Faight Collective source (auto-added via the new-source mechanism)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2113,6 +2113,7 @@ body {
     { id: 'garysguide-sf', name: "Gary's Guide SF", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=sf', region: 'bay-area', description: 'Tech & startup events' },
     // Bay Area — Social (Luma discover feed)
     { id: 'luma-sf', name: 'Luma SF', category: 'social', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=discover&id=discplace-BDj7GNbGlsF7Cka', region: 'bay-area', description: "What's happening in San Francisco" },
+    { id: 'thefaight-sf', name: 'The Faight', category: 'social', type: 'thefaight', url: 'https://www.thefaight.com/events', region: 'bay-area', description: 'Community arts venue on Haight St' },
     // Bay Area — Agape curation feed (private rows: visible only when signed in)
     { id: 'discord-agape-events', name: 'Agape Recommended', category: 'social', type: 'discord', url: null, region: 'bay-area', description: 'Agape community recommendations' },
     // One-off events added by users via the add-event function
