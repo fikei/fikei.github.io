@@ -7,7 +7,7 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 console.log(`[cache-events] v${VERSION} - music_type classification at insert (enrichment refines)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -141,7 +141,7 @@ const EVENT_URL_PATTERNS: RegExp[] = [
   /^https?:\/\/shotgun\.live\/(?:[a-z]{2}\/)?events\/[\w-]+$/,
   /^https?:\/\/tixr\.com\/groups\/[\w-]+\/events\/[\w-]+$/,
   /^https?:\/\/[\w-]+\.secretparty\.io\/[\w-]+$/,
-  /^https?:\/\/(?:wl\.)?seetickets\.us\/event\/[\w/-]+$/,
+  /^https?:\/\/(?:wl\.)?(?:seetickets|eventim)\.us\/event\/[\w/-]+$/,
   /^https?:\/\/meetup\.com\/[\w-]+\/events\/\d+$/,
 ]
 
@@ -152,7 +152,7 @@ function canonicalizeEventUrl(raw: string | undefined | null): string | null {
     u.hash = ''
     u.search = ''
     let s = u.toString().toLowerCase().replace(/\/+$/, '')
-    s = s.replace('://www.', '://').replace('://luma.com/', '://lu.ma/')
+    s = s.replace('://www.', '://').replace('://luma.com/', '://lu.ma/').replace('://wl.seetickets.us/', '://wl.eventim.us/')
     return EVENT_URL_PATTERNS.some(p => p.test(s)) ? s : null
   } catch {
     return null

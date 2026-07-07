@@ -2078,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.36.1';
-  console.log(`[events] v${VERSION} - paged L2 fetch past the 1000-row PostgREST cap (far-future events vanished)`);
+  const VERSION = '1.36.2';
+  console.log(`[events] v${VERSION} - cache purge (stale truncated lists), 12-page fetch, Eventim link support`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2414,7 +2414,7 @@ body {
   const STORAGE_KEY = 'ctrl-rodeo-event-sources';
   const ONBOARDED_KEY = 'ctrl-rodeo-events-onboarded';
   const SETTINGS_KEY = 'ctrl-rodeo-events-settings';
-  const CACHE_KEY = 'ctrl-rodeo-events-cache-v2' // v2: invalidates caches predating the iCal timezone fix;
+  const CACHE_KEY = 'ctrl-rodeo-events-cache-v3' // v2: invalidates caches predating the iCal timezone fix;
   const CACHE_MAX_AGE = 15 * 60 * 1000; // 15 minutes
 
   // --- Source Management ---
@@ -3109,7 +3109,7 @@ body {
       // 12s ceiling per page so a hung request can't leave the spinner up.
       const data = [];
       let error = null;
-      for (let page = 0; page < 8; page++) {
+      for (let page = 0; page < 12; page++) {
         const query = supabaseClient
           .from('events')
           .select('*')
