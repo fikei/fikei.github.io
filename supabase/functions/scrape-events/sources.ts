@@ -27,6 +27,8 @@ export const STOCK_SOURCES: EventSource[] = [
   { id: 'garysguide-sf', name: "Gary's Guide SF", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=sf', region: 'bay-area', description: 'Tech & startup events' },
   // Bay Area — Social (Luma discover feed)
   { id: 'luma-sf', name: 'Luma SF', category: 'social', type: 'ical', url: 'https://api2.luma.com/ics/get?entity=discover&id=discplace-BDj7GNbGlsF7Cka', region: 'bay-area', description: "What's happening in San Francisco" },
+  // Bay Area — Community venue (Lower Haight)
+  { id: 'thefaight-sf', name: 'The Faight', category: 'social', type: 'thefaight', url: 'https://www.thefaight.com/events', region: 'bay-area', description: 'Community arts venue on Haight St' },
   // New York — Tech & Networking
   { id: 'garysguide-nyc', name: "Gary's Guide NYC", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=nyc', region: 'new-york', description: 'Tech & startup events' },
 ]

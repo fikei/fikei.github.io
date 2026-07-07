@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.8.0'
-console.log(`[scrape-events] v${VERSION} - RA window 14d → 90d with pagination (long-lead bookings were silently dropped)`)
+const VERSION = '1.9.0'
+console.log(`[scrape-events] v${VERSION} - The Faight Collective parser (thefaight.com/events cards)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -34,6 +34,7 @@ import { scrapeRss } from './parsers/rss.ts'
 import { scrapeFamsf } from './parsers/famsf.ts'
 import { scrapeSfpl } from './parsers/sfpl.ts'
 import { scrapeCommonwealth } from './parsers/commonwealth.ts'
+import { scrapeTheFaight } from './parsers/thefaight.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,6 +111,7 @@ async function scrapeSource(source: EventSource): Promise<ScrapedEvent[]> {
     case 'famsf': return scrapeFamsf(source)
     case 'sfpl': return scrapeSfpl(source)
     case 'commonwealth': return scrapeCommonwealth(source)
+    case 'thefaight': return scrapeTheFaight(source)
     default:
       console.log(`[scrape-events] Unknown source type: ${source.type} for ${source.id}`)
       return []
