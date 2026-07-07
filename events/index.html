@@ -48,6 +48,138 @@ body {
   padding-top: var(--space-6);
 }
 
+/* ============================================
+   Pulse strip — events-per-day density
+   Stacked per-category bars for the next 30 days.
+   Sticky under the page header on desktop and
+   collapses to a slim ribbon on scroll.
+   ============================================ */
+.pulse {
+  position: sticky;
+  top: var(--sticky-offset, 0px);
+  z-index: 20;
+  background: var(--bg);
+  padding: var(--space-3) 0 var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.pulse__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  max-height: 16px;
+  overflow: hidden;
+  transition: max-height var(--duration-normal) var(--ease-default),
+              opacity var(--duration-normal) var(--ease-default),
+              margin-bottom var(--duration-normal) var(--ease-default);
+}
+
+.pulse__label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+}
+
+.pulse__total {
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse__legend {
+  display: flex;
+  gap: var(--space-3);
+  margin-left: auto;
+  overflow: hidden;
+}
+
+.pulse__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.pulse__legend-dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.pulse__track {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 56px;
+  border-bottom: var(--border-thin) solid var(--border);
+  transition: height var(--duration-normal) var(--ease-default);
+}
+
+/* Each day is a button; segments stack bottom-up in category order */
+.pulse__day {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
+.pulse__day:hover .pulse__seg { filter: brightness(1.3); }
+
+.pulse__seg { width: 100%; flex: 0 0 auto; }
+.pulse__seg--empty { height: 2px; background: var(--border-subtle); }
+
+/* A selected day keeps full strength; the rest recede */
+.pulse--has-selection .pulse__day:not(.pulse__day--selected) { opacity: 0.3; }
+
+.pulse__axis {
+  display: flex;
+  gap: 3px;
+  max-height: 14px;
+  overflow: hidden;
+  transition: max-height var(--duration-normal) var(--ease-default),
+              opacity var(--duration-normal) var(--ease-default);
+}
+
+.pulse__axis-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 9px;
+  color: var(--fg-subtle);
+  text-align: center;
+  letter-spacing: var(--tracking-wide);
+  padding-top: 2px;
+  white-space: nowrap;
+}
+
+.pulse__axis-cell--today { color: var(--fg); font-weight: 700; }
+
+/* Collapse on scroll — only where the strip is sticky (desktop) */
+@media (min-width: 601px) {
+  .pulse--collapsed { padding: var(--space-2) 0; }
+  .pulse--collapsed .pulse__head,
+  .pulse--collapsed .pulse__axis { max-height: 0; opacity: 0; margin-bottom: 0; }
+  .pulse--collapsed .pulse__track { height: 14px; }
+}
+
+@media (max-width: 600px) {
+  .pulse { position: static; padding-top: var(--space-2); }
+  .pulse__track { height: 40px; }
+  .pulse__track, .pulse__axis { gap: 2px; }
+  .pulse__legend { display: none; }
+}
+
 /* Sources bar */
 .sources-bar {
   display: flex;
@@ -1503,6 +1635,17 @@ body {
     <!-- Main events content (hidden during onboarding) -->
     <div id="eventsContent" style="display:none">
 
+    <!-- Pulse strip — events per day, next 30 days -->
+    <div class="pulse" id="pulseStrip" style="display:none">
+      <div class="pulse__head">
+        <span class="pulse__label">Next 30 days</span>
+        <span class="pulse__total" id="pulseTotal"></span>
+        <div class="pulse__legend" id="pulseLegend"></div>
+      </div>
+      <div class="pulse__track" id="pulseTrack"></div>
+      <div class="pulse__axis" id="pulseAxis"></div>
+    </div>
+
     <!-- Sources bar -->
     <div class="sources-bar">
       <div class="sources-bar__chips" id="sourceChips"></div>
@@ -1809,8 +1952,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.19.1';
-  console.log(`[events] v${VERSION} - cache-key bump: purge stale pre-timezone-fix event caches`);
+  const VERSION = '1.20.0';
+  console.log(`[events] v${VERSION} - Pulse strip: events-per-day density viz, category colors, collapses on scroll`);
 
   // ============================================
   // Stock Sources Catalog
@@ -1897,6 +2040,20 @@ body {
     'literary': 'Literary', 'wellness': 'Wellness', 'other': 'Other',
   };
   const CATEGORY_ORDER = ['music', 'film', 'art', 'comedy', 'theater', 'tech', 'social', 'literary', 'wellness', 'other'];
+  // Fixed hues per category for the pulse strip, so a color always means the
+  // same thing (unlike per-source hash colors)
+  const CATEGORY_COLORS = {
+    'music': 'hsl(96, 85%, 60%)',
+    'film': 'hsl(203, 70%, 58%)',
+    'art': 'hsl(327, 75%, 62%)',
+    'comedy': 'hsl(48, 90%, 56%)',
+    'theater': 'hsl(18, 80%, 60%)',
+    'tech': 'hsl(258, 65%, 66%)',
+    'social': 'hsl(178, 55%, 52%)',
+    'literary': 'hsl(288, 45%, 62%)',
+    'wellness': 'hsl(140, 40%, 55%)',
+    'other': 'hsl(0, 0%, 45%)',
+  };
   function getEventCategory(contentType) { return CONTENT_TYPE_CATEGORY[contentType] || 'other'; }
 
   // ============================================
@@ -2858,6 +3015,9 @@ body {
     // Exhibitions rail (shown above all views)
     renderExhibitionsRail();
 
+    // Pulse strip (events-per-day density, above everything)
+    renderPulse();
+
     // Stats
     const enabledCount = state.sources.filter(s => s.enabled).length;
     document.getElementById('statsText').textContent = `${state.events.length} events from ${enabledCount} source${enabledCount !== 1 ? 's' : ''}`;
@@ -2882,6 +3042,101 @@ body {
       btn.classList.toggle('active', btn.dataset.view === state.view);
     });
   }
+
+  // --- Pulse strip (events-per-day density) ---
+  const PULSE_DAYS = 30;
+
+  function renderPulse() {
+    const strip = document.getElementById('pulseStrip');
+    if (!strip) return;
+    // Ignore the date-range filter so the strip stays a stable overview
+    // while a selected day narrows the list below it
+    const events = getFilteredEvents({ ignoreDateRange: true });
+
+    const days = [];
+    const cursor = new Date();
+    for (let i = 0; i < PULSE_DAYS; i++) { days.push(localDateStr(cursor)); cursor.setDate(cursor.getDate() + 1); }
+
+    const counts = new Map(days.map(ds => [ds, {}]));
+    const catsSeen = new Set();
+    const distinct = new Set();
+    events.forEach(ev => {
+      if (!ev.date) return;
+      const cat = getEventCategory(ev.contentType);
+      const bump = (ds) => {
+        const byCat = counts.get(ds);
+        if (!byCat) return;
+        byCat[cat] = (byCat[cat] || 0) + 1;
+        catsSeen.add(cat);
+        distinct.add(eventKeyFor(ev));
+      };
+      if (ev.endDate && ev.endDate > ev.date) days.forEach(ds => { if (eventSpansDate(ev, ds)) bump(ds); });
+      else bump(ev.date);
+    });
+
+    if (distinct.size === 0) { strip.style.display = 'none'; return; }
+    strip.style.display = '';
+
+    const dayTotals = days.map(ds => Object.values(counts.get(ds)).reduce((a, b) => a + b, 0));
+    const max = Math.max(...dayTotals);
+    const today = localToday();
+    const selected = (state.filters.dateFrom && state.filters.dateFrom === state.filters.dateTo) ? state.filters.dateFrom : null;
+    strip.classList.toggle('pulse--has-selection', !!selected);
+
+    document.getElementById('pulseTotal').textContent = `${distinct.size} event${distinct.size !== 1 ? 's' : ''}`;
+    document.getElementById('pulseLegend').innerHTML = CATEGORY_ORDER.filter(c => catsSeen.has(c)).map(c =>
+      `<span class="pulse__legend-item"><span class="pulse__legend-dot" style="background:${CATEGORY_COLORS[c]}"></span>${CATEGORY_LABELS[c]}</span>`
+    ).join('');
+
+    let trackHtml = '';
+    let axisHtml = '';
+    days.forEach((ds, i) => {
+      const byCat = counts.get(ds);
+      const dayTotal = dayTotals[i];
+      const d = new Date(ds + 'T00:00:00');
+      const cls = ['pulse__day'];
+      if (ds === selected) cls.push('pulse__day--selected');
+      const tipDate = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const breakdown = CATEGORY_ORDER.filter(c => byCat[c]).map(c => `${byCat[c]} ${CATEGORY_LABELS[c].toLowerCase()}`).join(', ');
+      const tip = dayTotal > 0 ? `${tipDate} — ${dayTotal} event${dayTotal !== 1 ? 's' : ''} (${breakdown})` : `${tipDate} — no events`;
+      let segs = '';
+      if (dayTotal === 0) segs = '<span class="pulse__seg pulse__seg--empty"></span>';
+      else CATEGORY_ORDER.forEach(c => {
+        if (!byCat[c]) return;
+        segs += `<span class="pulse__seg" style="height:${(byCat[c] / max * 100).toFixed(2)}%;background:${CATEGORY_COLORS[c]}"></span>`;
+      });
+      trackHtml += `<button class="${cls.join(' ')}" data-date="${ds}" title="${escHtml(tip)}" aria-label="${escHtml(tip)}">${segs}</button>`;
+      // Label Mondays and today on the axis; the rest stay quiet
+      const label = (ds === today || d.getDay() === 1) ? String(d.getDate()) : '';
+      axisHtml += `<span class="pulse__axis-cell${ds === today ? ' pulse__axis-cell--today' : ''}">${label}</span>`;
+    });
+    const track = document.getElementById('pulseTrack');
+    track.innerHTML = trackHtml;
+    document.getElementById('pulseAxis').innerHTML = axisHtml;
+
+    // Click a day: toggle a single-day date filter (bind once)
+    if (!track.dataset.bound) {
+      track.dataset.bound = '1';
+      track.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pulse__day');
+        if (!btn) return;
+        const ds = btn.dataset.date;
+        const isSel = state.filters.dateFrom === ds && state.filters.dateTo === ds;
+        state.filters.dateFrom = isSel ? '' : ds;
+        state.filters.dateTo = isSel ? '' : ds;
+        document.getElementById('filterDateFrom').value = state.filters.dateFrom;
+        document.getElementById('filterDateTo').value = state.filters.dateTo;
+        render();
+      });
+    }
+  }
+
+  // Collapse the sticky strip to a slim ribbon once the page scrolls.
+  // Threshold (120px) exceeds the collapse's own height change (~60px)
+  // so toggling can't oscillate at the boundary.
+  window.addEventListener('scroll', () => {
+    document.getElementById('pulseStrip')?.classList.toggle('pulse--collapsed', window.scrollY > 120);
+  }, { passive: true });
 
   function renderExhibitionsRail() {
     const rail = document.getElementById('exhibitionsRail');
@@ -3322,7 +3577,7 @@ body {
     }
   }
 
-  function getFilteredEvents() {
+  function getFilteredEvents(opts = {}) {
     return state.events.filter(ev => {
       const { search, city, source, dateFrom, dateTo, category, contentType, agape, interested } = state.filters;
       if (agape && !((ev.recommendedBy && ev.recommendedBy.includes('agape')) || (ev.sources && ev.sources.includes('discord-agape-events')))) return false;
@@ -3333,9 +3588,11 @@ body {
       if (category && getEventCategory(ev.contentType) !== category) return false;
       if (contentType && ev.contentType !== contentType) return false;
       // Date range filter: multi-day events pass if any part overlaps the filter range
-      const evEnd = ev.endDate || ev.date;
-      if (dateFrom && evEnd < dateFrom) return false;
-      if (dateTo && ev.date > dateTo) return false;
+      if (!opts.ignoreDateRange) {
+        const evEnd = ev.endDate || ev.date;
+        if (dateFrom && evEnd < dateFrom) return false;
+        if (dateTo && ev.date > dateTo) return false;
+      }
       return true;
     });
   }
