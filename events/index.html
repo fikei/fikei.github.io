@@ -2072,7 +2072,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.32.0';
+  const VERSION = '1.33.0';
   console.log(`[events] v${VERSION} - GCal connect race fix (ticketed status) + calendar-sync nudge after 2+ bookmarks`);
 
   // ============================================
@@ -2261,12 +2261,32 @@ body {
     if (el) el.style.display = (window.CtrlAuth && CtrlAuth.isAdmin()) ? '' : 'none';
   }
 
+  // Agape membership: null = unknown/anon, true/false once checked.
+  // Data access is enforced by RLS; this only drives the ★ Agape filter UX.
+  let agapeMember = null;
+  async function checkAgapeMembership() {
+    const token = getAccessToken();
+    if (!token) { agapeMember = null; return; }
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'status' })
+      });
+      if (!resp.ok) return;
+      const status = await resp.json();
+      agapeMember = !!status.isMember;
+      log(`Agape membership: ${status.linked ? (agapeMember ? 'member' : 'not a member') : 'discord not linked'}`);
+    } catch (e) { log('Agape membership check failed: ' + e.message); }
+  }
+
   document.addEventListener('ctrl:auth:signedin', async (e) => {
     const wasLoggedOut = !currentUser;
     currentUser = e.detail.user;
     updateDebugLogVisibility();
     if (wasLoggedOut) {
       log('Logged in as ' + (currentUser.email || 'user'));
+      checkAgapeMembership();
       loadBookmarks();
       loadCalendarSyncState();
       const cloudLoaded = await loadSourcesCloud();
@@ -2285,6 +2305,7 @@ body {
 
   document.addEventListener('ctrl:auth:signedout', () => {
     currentUser = null;
+    agapeMember = null;
     updateDebugLogVisibility();
     state.bookmarks = new Map();
     resetCalendarSyncState();
@@ -4416,6 +4437,14 @@ body {
     document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
     document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
     document.getElementById('filterAgape').addEventListener('click', () => {
+      // Agape recs are members-only: point non-members at the unlock path
+      if (!currentUser) { CtrlAuth.openLoginModal(); return; }
+      if (agapeMember === false) {
+        if (confirm('Agape recommendations are available to members of the Agape Discord server. Connect your Discord account on the account page?')) {
+          window.location.href = '/account/#discord';
+        }
+        return;
+      }
       state.filters.agape = !state.filters.agape;
       updateFilterChips();
       render();
@@ -5137,6 +5166,7 @@ body {
     if (currentUser && supabaseClient) {
       const cloudLoaded = await loadSourcesCloud();
       if (cloudLoaded) log('Init: using cloud sources');
+      checkAgapeMembership();
       loadBookmarks();
       loadCalendarSyncState();
     }
