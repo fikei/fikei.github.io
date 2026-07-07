@@ -2078,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.36.0';
-  console.log(`[events] v${VERSION} - new stock sources auto-enable for existing users (tombstoned removals stay removed)`);
+  const VERSION = '1.36.1';
+  console.log(`[events] v${VERSION} - paged L2 fetch past the 1000-row PostgREST cap (far-future events vanished)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3103,18 +3103,29 @@ body {
         fromDate = localDateStr(past);
       }
       log(`L2 cache: querying ${enabledIds.length} source(s) from ${fromDate}`);
-      // 12s ceiling so a hung request can't leave the spinner up forever
-      const query = supabaseClient
-        .from('events')
-        .select('*')
-        .in('source_id', enabledIds)
-        .gte('date', fromDate)
-        .order('date', { ascending: true });
-      const timeout = new Promise(resolve =>
-        setTimeout(() => resolve({ data: null, error: { message: 'timed out after 12s' } }), 12000));
-      const { data, error } = await Promise.race([query, timeout]);
-      if (error) { log('L2 cache: query error — ' + error.message); return null; }
-      if (!data || data.length === 0) { log('L2 cache: empty'); return null; }
+      // Paged fetch — PostgREST caps responses at 1000 rows and the store now
+      // holds 2600+ upcoming; a single query silently dropped everything past
+      // ~3 weeks out (far-future events and their Agape links vanished).
+      // 12s ceiling per page so a hung request can't leave the spinner up.
+      const data = [];
+      let error = null;
+      for (let page = 0; page < 8; page++) {
+        const query = supabaseClient
+          .from('events')
+          .select('*')
+          .in('source_id', enabledIds)
+          .gte('date', fromDate)
+          .order('date', { ascending: true })
+          .range(page * 1000, page * 1000 + 999);
+        const timeout = new Promise(resolve =>
+          setTimeout(() => resolve({ data: null, error: { message: 'timed out after 12s' } }), 12000));
+        const res = await Promise.race([query, timeout]);
+        if (res.error) { error = res.error; break; }
+        data.push(...(res.data || []));
+        if (!res.data || res.data.length < 1000) break;
+      }
+      if (error && data.length === 0) { log('L2 cache: query error — ' + error.message); return null; }
+      if (data.length === 0) { log('L2 cache: empty'); return null; }
       // Merge rows that are the same physical event scraped from different
       // sources (shared canonical_key). One row is shown with all source
       // tokens; richer fields win regardless of which source supplied them.
