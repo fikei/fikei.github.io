@@ -2045,8 +2045,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.24.0';
-  console.log(`[events] v${VERSION} - Settings rename, beta Month/List switcher (default off), Agape Recommended (no member), price column hidden`);
+  const VERSION = '1.24.1';
+  console.log(`[events] v${VERSION} - L2 freshness check reconciles on any count difference (live event count)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2939,8 +2939,10 @@ body {
   async function checkL2Freshness() {
     try {
       const cachedL2 = await loadSupabaseCachedEvents();
-      if (cachedL2 && cachedL2.length > state.events.length + 5) {
-        log(`DB has fresher data (${cachedL2.length} vs ${state.events.length}): updating`);
+      // Any count difference means the visible "N events" line is lying —
+      // reconcile on shrinkage (expired/removed events) as well as growth
+      if (cachedL2 && cachedL2.length !== state.events.length) {
+        log(`DB count differs (${cachedL2.length} vs ${state.events.length}): updating`);
         state.events = cachedL2;
         state.events.forEach(ev => {
           ev.contentType = getSourceCategory(ev.source);
