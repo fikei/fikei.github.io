@@ -1682,6 +1682,15 @@ body {
         <span class="form-hint" id="oneOffStatus"></span>
       </div>
 
+      <!-- Beta features -->
+      <div class="form-group" id="betaGroup">
+        <label class="form-label">Beta</label>
+        <label style="display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; font-size: var(--text-xs);">
+          <input type="checkbox" id="betaShowRecommended" style="margin-top: 2px;">
+          <span>Show &ldquo;Recommended for you&rdquo;<br><span style="color: var(--fg-subtle); font-size: var(--text-2xs);">Personalized picks based on your Boards. Off by default.</span></span>
+        </label>
+      </div>
+
       <div style="font-size: var(--text-2xs); color: var(--fg-subtle); text-align: center; text-transform: uppercase; letter-spacing: var(--tracking-wider); margin: var(--space-3) 0;">add more</div>
 
       <!-- Pin-based suggestions (logged-in users) -->
@@ -1818,8 +1827,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.17.2';
-  console.log(`[events] v${VERSION} - tiat (art & technology Luma calendar) stock source`);
+  const VERSION = '1.18.0';
+  console.log(`[events] v${VERSION} - beta setting: show/hide Recommended for you (default off)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2085,6 +2094,7 @@ body {
       sources: state.sources,
       view: state.view,
       sort: state.sort,
+      showRecommended: !!state.showRecommended,
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
@@ -2096,6 +2106,7 @@ body {
         const settings = JSON.parse(saved);
         if (settings.view) state.view = settings.view;
         if (settings.sort) state.sort = settings.sort;
+        state.showRecommended = !!settings.showRecommended; // beta, default off
       }
     } catch (e) { /* ignore */ }
   }
@@ -3859,6 +3870,19 @@ body {
       updateFilterChips();
       render();
     });
+    const betaRec = document.getElementById('betaShowRecommended');
+    if (betaRec) {
+      betaRec.checked = !!state.showRecommended;
+      betaRec.addEventListener('change', (e) => {
+        state.showRecommended = e.target.checked;
+        saveSettings();
+        if (state.showRecommended) {
+          loadRecommendedEvents();
+        } else {
+          document.getElementById('recommendedSection').style.display = 'none';
+        }
+      });
+    }
     document.getElementById('oneOffAddBtn').addEventListener('click', async () => {
       const input = document.getElementById('oneOffUrl');
       const status = document.getElementById('oneOffStatus');
@@ -4529,6 +4553,12 @@ body {
     try {
       const section = document.getElementById('recommendedSection');
       const container = document.getElementById('recommendedCards');
+
+      // Beta setting (default off): hide the section entirely unless enabled
+      if (!state.showRecommended) {
+        section.style.display = 'none';
+        return;
+      }
 
       // Recommendations require authentication
       if (!currentUser) {
