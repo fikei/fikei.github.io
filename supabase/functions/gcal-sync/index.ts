@@ -11,7 +11,7 @@
 // POST /functions/v1/gcal-sync   (Authorization: Bearer <user JWT>)
 // Body: { action: 'connect-url' | 'exchange' | 'status' | 'settings' | 'sync' | 'disconnect', ... }
 
-const VERSION = '1.1.1'
+const VERSION = '1.2.0'
 console.log(`[gcal-sync] v${VERSION} — ctrl.events Google Calendar sync (bookmarked + agape)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -185,7 +185,19 @@ async function getDesiredItems(row: SyncRow): Promise<DesiredItem[]> {
   const today = todayISO()
   const byKey = new Map<string, DesiredItem>()
 
+  // Agape sync requires verified Agape Discord membership (this function runs
+  // service-role, so the events RLS gate doesn't apply — enforce it here too)
+  let agapeAllowed = false
   if (row.sync_agape) {
+    const { data: m } = await db
+      .from('user_discord_membership')
+      .select('is_agape_member')
+      .eq('user_id', row.user_id)
+      .maybeSingle()
+    agapeAllowed = !!m?.is_agape_member
+  }
+
+  if (row.sync_agape && agapeAllowed) {
     // Agape-recommended events: tagged rows + the Agape Discord feed
     const { data: agapeRows } = await db
       .from('events')

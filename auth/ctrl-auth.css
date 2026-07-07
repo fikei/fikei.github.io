@@ -281,6 +281,17 @@
   flex-shrink: 0;
 }
 
+/* Discord button */
+.ctrl-auth-btn--discord {
+  margin-bottom: var(--space-3);
+}
+
+.ctrl-auth-btn--discord svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 /* Divider */
 .ctrl-auth-divider {
   display: flex;
