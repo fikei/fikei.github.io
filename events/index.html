@@ -1720,7 +1720,7 @@ body {
     <div class="pulse" id="pulseStrip">
       <div id="pulseViz" style="display:none">
         <div class="pulse__head">
-          <span class="pulse__label">Next 90 days</span>
+          <span class="pulse__label" id="statsText"></span>
           <span class="pulse__total" id="pulseTotal"></span>
           <div class="pulse__legend" id="pulseLegend"></div>
           <div class="pulse__mode">
@@ -1768,7 +1768,6 @@ body {
 
     <!-- Stats + View Toggle -->
     <div class="stats-bar">
-      <span id="statsText">0 events</span>
       <span id="statsFiltered"></span>
       <div class="view-toggle">
         <button class="view-toggle__btn active" data-view="table">List</button>
@@ -2042,8 +2041,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.23.0';
-  console.log(`[events] v${VERSION} - Pulse strip: sticky scroll header (date + filters), scrollspy highlight, tap-to-jump, 2x collapsed ribbon`);
+  const VERSION = '1.23.1';
+  console.log(`[events] v${VERSION} - Pulse strip head shows the global event/source count; duplicate stats line removed`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3185,8 +3184,9 @@ body {
     strip.querySelectorAll('.pulse__mode-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.mode === state.pulseMode));
 
-    document.getElementById('pulseTotal').textContent =
-      `${distinct.size} event${distinct.size !== 1 ? 's' : ''}` + (dots && dotUnit > 1 ? ` · 1 dot ≈ ${dotUnit}` : '');
+    // The head's count is the global statsText line; this slot only carries
+    // the dot-scale note when it applies
+    document.getElementById('pulseTotal').textContent = (dots && dotUnit > 1) ? `1 dot ≈ ${dotUnit}` : '';
     document.getElementById('pulseLegend').innerHTML = CATEGORY_ORDER.filter(c => catsSeen.has(c)).map(c =>
       `<span class="pulse__legend-item"><span class="pulse__legend-dot" style="background:${CATEGORY_COLORS[c]}"></span>${CATEGORY_LABELS[c]}</span>`
     ).join('');
