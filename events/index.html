@@ -241,21 +241,22 @@ body {
   border-right: var(--border-thin) solid var(--border-subtle);
 }
 
-/* Collapse on scroll — only where the strip is sticky (desktop) */
-@media (min-width: 601px) {
-  .pulse--collapsed { padding: var(--space-2) 0; }
-  .pulse--collapsed .pulse__head,
-  .pulse--collapsed .pulse__axis { max-height: 0; opacity: 0; margin-bottom: 0; }
-  .pulse--collapsed .pulse__track { height: 28px; }
-  .pulse--collapsed .pulse__current:not(:empty) { display: inline-flex; align-items: center; }
-  .pulse--collapsed .sources-bar { margin-top: var(--space-2); }
-}
+/* Collapse on scroll — all breakpoints; the strip is the scroll header */
+.pulse--collapsed { padding: var(--space-2) 0; }
+.pulse--collapsed .pulse__head,
+.pulse--collapsed .pulse__axis { max-height: 0; opacity: 0; margin-bottom: 0; }
+.pulse--collapsed .pulse__track { height: 28px; }
+.pulse--collapsed .pulse__current:not(:empty) { display: inline-flex; align-items: center; }
+.pulse--collapsed .sources-bar { margin-top: var(--space-2); }
 
 @media (max-width: 600px) {
-  .pulse { position: static; padding-top: var(--space-2); }
+  .pulse { padding-top: var(--space-2); }
   .pulse__track { height: 40px; }
+  .pulse--collapsed .pulse__track { height: 24px; }
   .pulse__legend { display: none; }
   .pulse__mode { margin-left: auto; }
+  /* One compact row: scrolled-to date | chips (scroll) | filter */
+  .pulse .sources-bar { flex-wrap: nowrap; }
 }
 
 /* First-load equalizer loader — same LED-tick language as the pulse strip */
@@ -322,8 +323,8 @@ body {
 .data-table tbody tr.agape-row:hover { background: color-mix(in srgb, #e8c547 9%, var(--bg-surface)); }
 .data-table tbody tr.agape-row td:first-child { box-shadow: inset 2px 0 0 #e8c547; }
 @media (max-width: 600px) {
-  /* Mobile cards: spine on the card edge, wash over the card surface */
-  .data-table tbody tr.agape-row { box-shadow: inset 2px 0 0 #e8c547; background: color-mix(in srgb, #e8c547 5%, var(--bg-surface)); }
+  /* Mobile rows are flat: spine on the row's left edge, wash over the row */
+  .data-table tbody tr.agape-row { box-shadow: inset 2px 0 0 #e8c547; background: color-mix(in srgb, #e8c547 5%, transparent); }
   .data-table tbody tr.agape-row td:first-child { box-shadow: none; }
 }
 
@@ -1520,9 +1521,10 @@ body {
   .stats-bar { flex-wrap: wrap; gap: var(--space-2); }
 }
 
-/* ---- Responsive: card layout replaces the table below 600px ----
-   A phone-width table survives only by hiding columns; cards keep
-   date/time/name/venue/tags/price/source all visible. Placed after the
+/* ---- Responsive: flat list rows replace the table below 600px ----
+   Same visual language as the desktop table: hairline row separators,
+   underlined event links, uppercase muted micro-labels, bordered colored
+   source tokens — just restacked for a narrow viewport. Placed after the
    480px block so its display overrides win the cascade. */
 @media (max-width: 600px) {
   .data-table-wrap { border: none; overflow: visible; }
@@ -1533,17 +1535,14 @@ body {
     display: grid;
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
-      "date time price"
+      "time type bm"
       "name name name"
       "venue venue venue"
       "genre genre source";
     column-gap: var(--space-2);
     row-gap: 2px;
-    padding: var(--space-3);
-    margin-bottom: var(--space-2);
-    border: var(--border-thin) solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--bg-surface);
+    padding: var(--space-3) 0;
+    border-bottom: var(--border-thin) solid var(--border-subtle);
   }
   .data-table tbody td {
     display: block;
@@ -1554,23 +1553,16 @@ body {
     max-width: none;
     white-space: normal;
   }
-  /* Hierarchy: time anchors scanning within a date group, name is primary,
-     venue·city one muted line, tags + source demoted to plain text
-     ("show, don't decorate" — no boxes inside boxes). */
-  /* Date and price columns are hidden, so the bookmark shares the time
-     row instead of holding an empty header row on every card */
-  .data-table tbody tr {
-    grid-template-columns: auto 1fr auto auto;
-    grid-template-areas:
-      "time time ages bm"
-      "name name name name"
-      "venue venue venue venue"
-      "genre genre genre source";
-  }
   .data-table .col-bm { grid-area: bm; width: auto; padding: 0; text-align: right; align-self: start; }
   .data-table .col-date { display: none; }
-  .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg); }
+  .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg-muted); font-variant-numeric: tabular-nums; }
   .col-time .mobile-date-range { display: inline; }
+  .data-table .col-type {
+    grid-area: type; display: block; width: auto;
+    font-size: var(--text-2xs); text-transform: uppercase;
+    letter-spacing: var(--tracking-wider); color: var(--fg-subtle);
+    align-self: center;
+  }
   .data-table .col-name { grid-area: name; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-tight); margin-top: 2px; }
   .data-table .col-name .event-thumb { display: none; }
   .data-table .col-venue {
@@ -1580,7 +1572,7 @@ body {
   }
   .data-table .col-venue .venue-city { display: inline; }
   .data-table .col-venue .venue-city::before { content: '\00A0\00B7'; }
-  .data-table .col-ages { grid-area: ages; display: block; width: auto; font-size: var(--text-2xs); color: var(--fg-subtle); text-align: right; }
+  .data-table .col-ages { display: none; }
   .data-table .col-price { display: none; }
   .data-table .col-genre { grid-area: genre; display: block; min-width: 0; margin-top: var(--space-2); align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .data-table .col-genre .genre-tag {
@@ -1588,41 +1580,34 @@ body {
     font-size: var(--text-2xs); color: var(--fg-subtle);
   }
   .data-table .col-genre .genre-tag + .genre-tag::before { content: '\00A0\00B7\00A0'; color: var(--fg-subtle); }
-  .data-table .col-source { grid-area: source; width: auto; text-align: right; margin-top: var(--space-2); align-self: end; }
-  .data-table .col-source .token--source {
-    white-space: nowrap;
-    border: none !important; background: none; padding: 0;
-    font-size: var(--text-2xs); letter-spacing: var(--tracking-wide);
-  }
-  .data-table .col-type,
+  /* Source tokens keep their desktop identity: bordered, source-colored.
+     min-width 0 stops nowrap tokens from blowing the grid track past the
+     viewport; multiple tokens wrap as whole units. */
+  .data-table .col-source { grid-area: source; width: auto; min-width: 0; text-align: right; margin-top: var(--space-2); align-self: end; }
+  .data-table .col-source .token { white-space: nowrap; }
   .data-table .col-promoter { display: none; }
 
-  /* Sticky date headers group the cards; the per-card date is redundant */
+  /* Date separators: same quiet uppercase labels as the desktop table.
+     The sticky pulse header carries the scrolled-to date, so these no
+     longer need to stick. */
   .data-table tbody tr.date-group {
     display: block;
-    position: sticky;
-    top: var(--sticky-offset, 0px);
-    z-index: 5;
-    background: var(--bg);
     border: none;
-    border-radius: 0;
-    padding: var(--space-2) 0;
-    margin-bottom: var(--space-2);
-    border-bottom: var(--border-thin) solid var(--border-subtle);
+    padding: 0;
+    background: var(--bg);
   }
   .data-table tbody td.date-group__label {
     display: block;
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wider);
-    color: var(--fg);
+    padding: var(--space-4) 0 var(--space-1);
   }
   .data-table--grouped .col-date { display: none; }
 
   /* Category chips + type sub-filter: single horizontally scrolling rows
-     (DS .filters pattern) instead of wrapping into a tall stack */
+     (DS .filters pattern). Chips share one row with the scrolled-to date
+     and the filter button so the sticky header stays shallow. */
   .sources-bar__chips {
-    flex: 0 0 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -1639,12 +1624,13 @@ body {
   .type-filter::-webkit-scrollbar { display: none; }
   .type-filter__chip { flex-shrink: 0; white-space: nowrap; }
 
-  /* Filter bar: stack controls full-width (search min-width overflows otherwise) */
-  .filter-bar { flex-direction: column; align-items: stretch; }
+  /* Filter bar: compact 2-column grid — inputs span both columns, the
+     date pair and the toggle buttons sit two-up */
+  .filter-bar { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
   .filter-bar .input,
   .filter-bar .select,
-  .filter-bar .input--search,
-  .filter-bar .input--date { width: 100%; min-width: 0; flex: none; }
+  .filter-bar .input--search { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .filter-bar .input--date { grid-column: auto; width: 100%; min-width: 0; }
 }
 
 /* ---- Touch feedback: hover styles never fire on touch devices ---- */
@@ -2075,8 +2061,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.30.2';
-  console.log(`[events] v${VERSION} - Mobile audit fix: bookmark shares the time row (empty card header row removed)`);
+  const VERSION = '1.31.0';
+  console.log(`[events] v${VERSION} - Mobile: sticky scroll header (collapse + date + chips) and flat desktop-language rows`);
 
   // ============================================
   // Stock Sources Catalog
