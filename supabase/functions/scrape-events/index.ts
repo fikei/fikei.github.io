@@ -10,7 +10,7 @@
 //   POST { action: "status" }                     → return last run info
 
 const VERSION = '1.8.0'
-console.log(`[scrape-events] v${VERSION} - RA window 14d → 90d with pagination (long-lead bookings were silently dropped)`)
+console.log(`[scrape-events] v${VERSION} - seetickets-wp parser (The Chapel, Rickshaw Stop server-rendered cards)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -29,6 +29,7 @@ import { scrapeIcal } from './parsers/ical.ts'
 import { scrapeEventbriteOrg } from './parsers/eventbrite-org.ts'
 import { scrapeAta } from './parsers/ata.ts'
 import { scrapeBottomOfTheHill } from './parsers/bottomofthehill.ts'
+import { scrapeSeeticketsWp } from './parsers/seetickets-wp.ts'
 import { scrapeJson } from './parsers/json.ts'
 import { scrapeRss } from './parsers/rss.ts'
 import { scrapeFamsf } from './parsers/famsf.ts'
@@ -105,6 +106,7 @@ async function scrapeSource(source: EventSource): Promise<ScrapedEvent[]> {
     case 'eventbrite-org': return scrapeEventbriteOrg(source)
     case 'ata': return scrapeAta(source)
     case 'bottomofthehill': return scrapeBottomOfTheHill(source)
+    case 'seetickets-wp': return scrapeSeeticketsWp(source)
     case 'json': return scrapeJson(source)
     case 'rss': return scrapeRss(source)
     case 'famsf': return scrapeFamsf(source)
