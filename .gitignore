@@ -39,3 +39,7 @@ npm-debug.log*
 *.tmp
 *.temp
 .claude/scheduled_tasks*.lock
+
+# Claude Code local state (never commit)
+.claude/worktrees/
+.claude/settings.local*.json
