@@ -250,12 +250,17 @@ body {
 .pulse--collapsed .sources-bar { margin-top: var(--space-2); }
 
 @media (max-width: 600px) {
-  .pulse { padding-top: var(--space-2); }
+  /* Filter rides top-right, directly above the Bars/Dots tag — the extra
+     padding-top reserves its band. When collapsed (head hidden) it falls
+     back into the compact chips row. */
+  .pulse { padding-top: calc(var(--space-2) + 30px); }
+  .pulse .sources-bar__filter-btn { position: absolute; top: var(--space-2); right: 0; margin-left: 0; }
+  .pulse--collapsed .sources-bar__filter-btn { position: static; margin-left: var(--space-2); }
   .pulse__track { height: 40px; }
   .pulse--collapsed .pulse__track { height: 24px; }
   .pulse__legend { display: none; }
   .pulse__mode { margin-left: auto; }
-  /* One compact row: scrolled-to date | chips (scroll) | filter */
+  /* One compact row: scrolled-to date | chips (scroll) [| filter when collapsed] */
   .pulse .sources-bar { flex-wrap: nowrap; }
 }
 
@@ -1538,7 +1543,7 @@ body {
       "time type bm"
       "name name name"
       "venue venue venue"
-      "genre genre source";
+      "genre genre genre";
     column-gap: var(--space-2);
     row-gap: 2px;
     padding: var(--space-3) 0;
@@ -1580,11 +1585,8 @@ body {
     font-size: var(--text-2xs); color: var(--fg-subtle);
   }
   .data-table .col-genre .genre-tag + .genre-tag::before { content: '\00A0\00B7\00A0'; color: var(--fg-subtle); }
-  /* Source tokens keep their desktop identity: bordered, source-colored.
-     min-width 0 stops nowrap tokens from blowing the grid track past the
-     viewport; multiple tokens wrap as whole units. */
-  .data-table .col-source { grid-area: source; width: auto; min-width: 0; text-align: right; margin-top: var(--space-2); align-self: end; }
-  .data-table .col-source .token { white-space: nowrap; }
+  /* Source column hidden on mobile — the row stays about the event */
+  .data-table .col-source { display: none; }
   .data-table .col-promoter { display: none; }
 
   /* Date separators: same quiet uppercase labels as the desktop table.
@@ -2061,8 +2063,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.31.0';
-  console.log(`[events] v${VERSION} - Mobile: sticky scroll header (collapse + date + chips) and flat desktop-language rows`);
+  const VERSION = '1.31.1';
+  console.log(`[events] v${VERSION} - Mobile: source column hidden; Filter rides top-right above Bars/Dots`);
 
   // ============================================
   // Stock Sources Catalog
