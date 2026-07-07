@@ -281,9 +281,19 @@
   flex-shrink: 0;
 }
 
-/* Discord button */
+/* Discord button — primary sign-in option (Agape recs unlock via Discord) */
 .ctrl-auth-btn--discord {
   margin-bottom: var(--space-3);
+  background: #5865f2;
+  border-color: #5865f2;
+  color: #fff;
+}
+
+.ctrl-auth-btn--discord:hover {
+  background: #4752c4;
+  border-color: #4752c4;
+  color: #fff;
+  opacity: 1;
 }
 
 .ctrl-auth-btn--discord svg {
