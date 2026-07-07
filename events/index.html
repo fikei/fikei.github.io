@@ -2064,8 +2064,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.27.0';
-  console.log(`[events] v${VERSION} - Within-day time sort; start times normalized to military (24h)`);
+  const VERSION = '1.27.1';
+  console.log(`[events] v${VERSION} - Agape rows show only the ★ Agape token (no duplicate source token)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3477,8 +3477,9 @@ body {
   function renderTable(sorted) {
     const tbody = document.getElementById('eventsBody');
     const rowHtml = ev => {
-      const sourceIds = ev.sources || [ev.source];
       const isAgape = ev.agape || isAgapeEvent(ev);
+      // The ★ Agape token stands in for the feed — no duplicate source token
+      const sourceIds = (ev.sources || [ev.source]).filter(sid => sid !== 'discord-agape-events');
       let sourceTagsHtml = sourceIds.map(sid => {
         const sName = state.sources.find(s => s.id === sid)?.name || sid;
         const sColor = getSourceColor(sid);
