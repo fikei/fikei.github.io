@@ -55,7 +55,7 @@ export async function scrapeSeeticketsWp(source: EventSource): Promise<ScrapedEv
 
   for (const seg of segments) {
     const card = seg.slice(0, 4000)
-    const titleM = card.match(/class="[^"]*\btitle\b[^"]*"[^>]*>\s*<a href="(https:\/\/wl\.seetickets\.us\/event\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/)
+    const titleM = card.match(/class="[^"]*\btitle\b[^"]*"[^>]*>\s*<a href="(https:\/\/wl\.(?:seetickets|eventim)\.us\/event\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/)
     const dateM = textOf(card, 'date').match(/([A-Za-z]{3,9})\s+(\d{1,2})/)
     if (!titleM || !dateM) continue
 

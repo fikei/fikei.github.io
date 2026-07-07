@@ -190,7 +190,7 @@ async function fetchAllMessages(
 // the AI can't extract a dated event from them, so resolve the linked page
 // itself (JSON-LD Event schema). Message text stays recommendation context.
 
-const PLATFORM_URL_RE = /https?:\/\/(?:www\.)?(?:partiful\.com\/e\/[\w-]+|lu\.ma\/[\w.-]+|luma\.com\/[\w.-]+|eventbrite\.com\/e\/[\w-]+|dice\.fm\/(?:event|partner)\/[\w/-]+|shotgun\.live\/(?:[a-z]{2}\/)?events\/[\w-]+|tixr\.com\/groups\/[\w-]+\/events\/[\w-]+|[\w-]+\.secretparty\.io\/[\w-]+|(?:wl\.)?seetickets\.us\/event\/[\w/-]+|meetup\.com\/[\w-]+\/events\/\d+)/gi
+const PLATFORM_URL_RE = /https?:\/\/(?:www\.)?(?:partiful\.com\/e\/[\w-]+|lu\.ma\/[\w.-]+|luma\.com\/[\w.-]+|eventbrite\.com\/e\/[\w-]+|dice\.fm\/(?:event|partner)\/[\w/-]+|shotgun\.live\/(?:[a-z]{2}\/)?events\/[\w-]+|tixr\.com\/groups\/[\w-]+\/events\/[\w-]+|[\w-]+\.secretparty\.io\/[\w-]+|(?:wl\.)?(?:seetickets|eventim)\.us\/event\/[\w/-]+|meetup\.com\/[\w-]+\/events\/\d+)/gi
 
 // deno-lint-ignore no-explicit-any
 function findLdEventNode(node: any): any | null {
