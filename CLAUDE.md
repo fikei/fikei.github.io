@@ -49,7 +49,7 @@ Personal curation platform — collect, organize, and build on everything that m
 
   | Product | Version location | Console pattern |
   |---------|-----------------|-----------------|
-  | Boards | `boards/index.html` ~line 6483: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
+  | Boards | `boards/index.html` ~line 7625: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
   | Supabase functions | Each function's `index.ts` top: `const VERSION = 'X.Y.Z'` | `[function-name] vX.Y.Z - description` |
 
   New products/functions: add `const VERSION` + `console.log` at entry point.
