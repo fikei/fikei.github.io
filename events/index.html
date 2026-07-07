@@ -283,6 +283,16 @@ body {
   color: #e8c547;
 }
 
+/* Agape Recommended rows: gold spine + faint wash alongside the token */
+.data-table tbody tr.agape-row { background: color-mix(in srgb, #e8c547 5%, transparent); }
+.data-table tbody tr.agape-row:hover { background: color-mix(in srgb, #e8c547 9%, var(--bg-surface)); }
+.data-table tbody tr.agape-row td:first-child { box-shadow: inset 2px 0 0 #e8c547; }
+@media (max-width: 600px) {
+  /* Mobile cards: spine on the card edge, wash over the card surface */
+  .data-table tbody tr.agape-row { box-shadow: inset 2px 0 0 #e8c547; background: color-mix(in srgb, #e8c547 5%, var(--bg-surface)); }
+  .data-table tbody tr.agape-row td:first-child { box-shadow: none; }
+}
+
 .source-chip__count {
   margin-left: var(--space-1);
   opacity: 0.6;
@@ -571,7 +581,8 @@ body {
 /* Table overrides — column widths */
 .data-table-wrap { margin-bottom: var(--space-8); }
 .data-table th { font-size: var(--text-2xs); }
-.data-table .col-date { width: 110px; white-space: nowrap; }
+/* Date column hidden — the date-group separator rows carry the date */
+.data-table .col-date { display: none; }
 .data-table .col-time { width: 44px; max-width: 52px; white-space: nowrap; font-size: var(--text-2xs); color: var(--fg-muted); padding-left: 4px; padding-right: 2px; }
 .data-table .col-time .data-table__sort { display: none; }
 .data-table .col-name { min-width: 180px; }
@@ -1521,7 +1532,7 @@ body {
       "genre genre genre source";
   }
   .data-table .col-bm { grid-area: bm; width: auto; padding: 0; text-align: right; }
-  .data-table .col-date { grid-area: date; width: auto; font-size: var(--text-2xs); color: var(--fg-muted); }
+  .data-table .col-date { display: none; }
   .data-table .col-time { grid-area: time; display: block; width: auto; max-width: none; font-size: var(--text-xs); color: var(--fg); }
   .col-time .mobile-date-range { display: inline; }
   .data-table .col-name { grid-area: name; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-tight); margin-top: 2px; }
@@ -2045,8 +2056,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.24.1';
-  console.log(`[events] v${VERSION} - L2 freshness check reconciles on any count difference (live event count)`);
+  const VERSION = '1.25.0';
+  console.log(`[events] v${VERSION} - Agape rows: gold spine + wash + token; date column hidden (date groups carry it)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3390,12 +3401,13 @@ body {
     const tbody = document.getElementById('eventsBody');
     const rowHtml = ev => {
       const sourceIds = ev.sources || [ev.source];
+      const isAgape = ev.agape || isAgapeEvent(ev);
       let sourceTagsHtml = sourceIds.map(sid => {
         const sName = state.sources.find(s => s.id === sid)?.name || sid;
         const sColor = getSourceColor(sid);
         return `<span class="token token--source" data-source-id="${escHtml(sid)}" style="border-color: ${sColor}; color: ${sColor};">${escHtml(sName)}</span>`;
       }).join(' ');
-      if (ev.agape || isAgapeEvent(ev)) {
+      if (isAgape) {
         sourceTagsHtml = `<span class="token token--agape" title="Agape Recommended">★ Agape</span> ` + sourceTagsHtml;
       }
       const titleAttr = ev.description ? ` title="${escHtml(ev.description)}"` : '';
@@ -3435,7 +3447,7 @@ body {
       const bmCell = `<td class="col-bm"><button class="bm-btn${isBm ? ' bm-btn--on' : ''}" data-bm-key="${encodeURIComponent(bmKey)}" aria-pressed="${isBm}" title="${isBm ? 'Interested — click to remove' : 'Mark as interested'}">
         <svg width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
       </button></td>`;
-      return `<tr>
+      return `<tr${isAgape ? ' class="agape-row"' : ''}>
         ${bmCell}
         <td class="col-date">${dateDisplay}</td>
         <td class="col-time"${timeTip}>${timeDisplay}${mobileRangeHtml}</td>
