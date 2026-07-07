@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.6.1'
-console.log(`[cache-events] v${VERSION} - per-event visibility override for user-submitted events`)
+const VERSION = '1.7.0'
+console.log(`[cache-events] v${VERSION} - music_type classification at insert (enrichment refines)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -103,6 +103,28 @@ function visibilityFor(sourceId: string, classes: Map<string, SourceMeta>): 'pub
   if (meta.source_class === 'curation' || meta.source_class === 'private-ticketing') return 'private'
   if (meta.demoted) return 'private'
   return 'public'
+}
+
+// --- Music-type classification (insert-time; enrich-event's AI refines) ---
+const MUSIC_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival']
+const MUSIC_TYPE_KEYWORDS: Array<[string, string[]]> = [
+  ['electronic', ['electronic','techno','house','dj','dance','edm','bass','dubstep','drum & bass','dnb','trance','rave','club','garage','breaks','glitch','hyphy']],
+  ['rock', ['rock','indie','alternative','punk','metal','grunge','shoegaze','emo','psychedelic','post-']],
+  ['pop', ['pop']],
+  ['hiphop', ['hip-hop','hip hop','rap','r&b','rnb','soul','funk']],
+  ['jazz', ['jazz','blues','swing']],
+  ['folk', ['folk','country','americana','bluegrass','singer-songwriter','singer/songwriter','acoustic','tribute']],
+  ['world', ['latin','reggae','afrobeat','cumbia','salsa','brazilian','perreo','world']],
+]
+
+function classifyMusicType(ev: ScrapedEvent): string | null {
+  const ct = ev.contentType || ''
+  if (!MUSIC_CONTENT_TYPES.includes(ct)) return null
+  const hay = ((ev.genre || '') + (ct === 'dj-set' ? ' dj' : '')).toLowerCase()
+  for (const [key, kws] of MUSIC_TYPE_KEYWORDS) {
+    if (kws.some(k => hay.includes(k))) return key
+  }
+  return 'other-music'
 }
 
 // --- Canonical URL (dedup ladder rung 1) ---
@@ -505,6 +527,7 @@ serve(async (req: Request) => {
         promoter: ev.promoter || null,
         url: ev.url,
         content_type: ev.contentType || null,
+        music_type: classifyMusicType(ev),
         description: ev.description || null,
         posted_by: ev.postedBy || null,
         recommended_by: ev.recommendedBy && ev.recommendedBy.length > 0 ? ev.recommendedBy : null,
