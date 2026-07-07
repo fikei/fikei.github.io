@@ -2078,8 +2078,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.34.0';
-  console.log(`[events] v${VERSION} - music-type filters (sticky sub-nav chips + settings mutes); Ticketmaster venue stock sources`);
+  const VERSION = '1.35.0';
+  console.log(`[events] v${VERSION} - music taxonomy: persisted music_type, sub-genre drill-down, bucket colors, junk-tag cleanup`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2162,23 +2162,36 @@ body {
   // Music-type buckets: genre strings (TM/SeeTickets/19hz/AI) mapped to a
   // small stable set for the sticky sub-nav filter and the settings mutes
   const MUSIC_TYPES = {
-    'electronic': { label: 'Electronic / DJ', kw: ['electronic','techno','house','dj','dance','edm','bass','dubstep','drum & bass','dnb','trance','rave','club','garage','breaks','glitch','hyphy'] },
-    'rock': { label: 'Rock / Indie', kw: ['rock','indie','alternative','punk','metal','grunge','shoegaze','emo','psychedelic','post-'] },
-    'pop': { label: 'Pop', kw: ['pop','synthpop','k-pop','electropop','hyperpop'] },
-    'hiphop': { label: 'Hip-Hop / R&B', kw: ['hip-hop','hip hop','rap','r&b','rnb','soul','funk','neo-soul'] },
-    'jazz': { label: 'Jazz / Blues', kw: ['jazz','blues','swing'] },
-    'folk': { label: 'Folk / Country', kw: ['folk','country','americana','bluegrass','singer-songwriter','singer/songwriter','acoustic','tribute'] },
-    'world': { label: 'World / Latin', kw: ['latin','reggae','reggaeton','afrobeat','world','cumbia','salsa','brazilian','perreo'] },
-    'other-music': { label: 'Other Music', kw: [] },
+    'electronic': { label: 'Electronic / DJ', color: '#7ee787', kw: ['electronic','techno','house','dj','dance','edm','bass','dubstep','drum & bass','dnb','trance','rave','club','garage','breaks','glitch','hyphy'] },
+    'rock': { label: 'Rock / Indie', color: '#f0883e', kw: ['rock','indie','alternative','punk','metal','grunge','shoegaze','emo','psychedelic','post-'] },
+    'pop': { label: 'Pop', color: '#f778ba', kw: ['pop','synthpop','k-pop','electropop','hyperpop'] },
+    'hiphop': { label: 'Hip-Hop / R&B', color: '#d2a8ff', kw: ['hip-hop','hip hop','rap','r&b','rnb','soul','funk','neo-soul'] },
+    'jazz': { label: 'Jazz / Blues', color: '#79c0ff', kw: ['jazz','blues','swing'] },
+    'folk': { label: 'Folk / Country', color: '#e3b341', kw: ['folk','country','americana','bluegrass','singer-songwriter','singer/songwriter','acoustic','tribute'] },
+    'world': { label: 'World / Latin', color: '#56d4dd', kw: ['latin','reggae','reggaeton','afrobeat','world','cumbia','salsa','brazilian','perreo'] },
+    'other-music': { label: 'Other Music', color: '#8b949e', kw: [] },
   };
 
   function musicTypeFor(ev) {
     if (getEventCategory(ev.contentType) !== 'music') return null;
+    // Server-persisted classification wins (keyword+AI, computed at ingest/enrichment)
+    if (ev.musicType && MUSIC_TYPES[ev.musicType]) return ev.musicType;
     const hay = [ev.genre || '', (ev.enrichedTags || []).join(' '), ev.contentType === 'dj-set' ? 'dj' : ''].join(' ').toLowerCase();
     for (const [key, def] of Object.entries(MUSIC_TYPES)) {
       if (def.kw.some(k => hay.includes(k))) return key;
     }
     return 'other-music';
+  }
+
+  // Junk-tag guard: sources ship SEO keywords ("<title> tickets", long phrases)
+  function isJunkTag(t, evName) {
+    if (!t) return true;
+    const lt = t.toLowerCase();
+    if (lt.length > 24) return true;
+    if (lt.split(/\s+/).length > 3) return true;
+    if (/ticket|presale|rsvp|\?|http/.test(lt)) return true;
+    if (evName && evName.toLowerCase().includes(lt) && lt.length > 8) return true;
+    return false;
   }
 
   // Map granular contentType → top-level category (for primary tab grouping)
@@ -2371,7 +2384,7 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', agape: false, interested: false, showPast: false },
+    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', agape: false, interested: false, showPast: false },
     userLoc: null, // { lat, lng } from browser geolocation, session-cached
     hiddenCategories: new Set(), // categories hidden everywhere via Settings
     mutedMusicTypes: new Set(), // music types hidden everywhere via Settings
@@ -3120,6 +3133,7 @@ body {
           description: row.description || '', imageUrl: row.image_url || '',
           enrichedTags: row.tags || [],
           recommendedBy: row.recommended_by || [], postedBy: row.posted_by || '',
+          musicType: row.music_type || null,
         };
         const existing = byCanonical.get(key);
         if (!existing) {
@@ -3132,6 +3146,7 @@ body {
             if (!existing.recommendedBy.includes(r)) existing.recommendedBy.push(r);
           }
           if (!existing.postedBy && ev.postedBy) existing.postedBy = ev.postedBy;
+          if (!existing.musicType && ev.musicType) existing.musicType = ev.musicType;
           if (!existing.time && ev.time) existing.time = ev.time;
           if (!existing.genre && ev.genre) existing.genre = ev.genre;
           if (!existing.price && ev.price) existing.price = ev.price;
@@ -3749,13 +3764,15 @@ body {
       const typeLabel = CONTENT_TYPES[ev.contentType] || '';
       // Tags: AI-enriched > keyword-detected > cleaned genre (fallback)
       const tagSet = new Map(); // lower → original
-      const addTag = (t) => { if (t) { const k = t.toLowerCase(); if (!tagSet.has(k)) tagSet.set(k, t); } };
+      const addTag = (t) => { if (t && !isJunkTag(t, ev.name)) { const k = t.toLowerCase(); if (!tagSet.has(k)) tagSet.set(k, t); } };
       (ev.enrichedTags || []).forEach(addTag);
       detectEventTags(ev).forEach(addTag);
       const cleanedGenre = cleanGenreField(ev.genre) || inferGenreFromContext(ev);
       if (cleanedGenre) cleanedGenre.split(/,\s*/).forEach(addTag);
       const allTags = [...tagSet.values()].slice(0, 4);
-      const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
+      const mtColor = (musicTypeFor(ev) && MUSIC_TYPES[musicTypeFor(ev)]) ? MUSIC_TYPES[musicTypeFor(ev)].color : null;
+        const tagStyle = mtColor ? ` style="border-color:${mtColor}66;color:${mtColor};"` : '';
+        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle}>${escHtml(g)}</span>`).join('');
       // Price with tooltip
       const priceData = formatPriceDisplay(ev.price);
       const priceTitle = priceData.full ? ` title="${escHtml(priceData.full)}"` : '';
@@ -4002,7 +4019,9 @@ body {
             if (allTags.length < 6 && !allTags.some(g => g.toLowerCase() === t.toLowerCase())) allTags.push(t);
           }
         }
-        const genreHtml = allTags.map(g => `<span class="genre-tag">${escHtml(g)}</span>`).join('');
+        const mtColor = (musicTypeFor(ev) && MUSIC_TYPES[musicTypeFor(ev)]) ? MUSIC_TYPES[musicTypeFor(ev)].color : null;
+        const tagStyle = mtColor ? ` style="border-color:${mtColor}66;color:${mtColor};"` : '';
+        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle}>${escHtml(g)}</span>`).join('');
         const descHtml = ev.description ? `<div class="day-detail__desc">${escHtml(ev.description)}</div>` : '';
         const imgHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="day-detail__img" alt="" loading="lazy">` : '';
         return `<li class="day-detail__item" data-name="${escHtml(ev.name)}">
@@ -4088,6 +4107,7 @@ body {
         state.filters.category = state.filters.category === cat ? '' : cat;
         state.filters.contentType = '';
         state.filters.musicType = '';
+        state.filters.subGenre = '';
         updateContentTypeFilter();
         render();
       });
@@ -4123,10 +4143,14 @@ body {
 
   function getFilteredEvents(opts = {}) {
     return state.events.filter(ev => {
-      const { search, city, source, distance, dateFrom, dateTo, category, contentType, musicType, agape, interested } = state.filters;
+      const { search, city, source, distance, dateFrom, dateTo, category, contentType, musicType, subGenre, agape, interested } = state.filters;
       const mt = musicTypeFor(ev);
       if (mt && state.mutedMusicTypes.has(mt)) return false;
       if (musicType && mt !== musicType) return false;
+      if (subGenre) {
+        const toks = (ev.genre || '').toLowerCase().split(/,\s*/).map(t => t.trim()).concat((ev.enrichedTags || []).map(t => t.toLowerCase()));
+        if (!toks.includes(subGenre)) return false;
+      }
       if (state.hiddenCategories.has(getEventCategory(ev.contentType))) return false;
       // Distance: city-centroid haversine against the user's location.
       // Unknown cities are excluded while the filter is active; if location
@@ -4155,7 +4179,7 @@ body {
 
   function clearAllFilters() {
     const hadPast = state.filters.showPast;
-    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', agape: false, interested: false, showPast: false };
+    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', agape: false, interested: false, showPast: false };
     updateFilterChips();
     if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
@@ -4187,16 +4211,47 @@ body {
       const present = Object.keys(MUSIC_TYPES).filter(k => counts[k]);
       if (present.length <= 1) { container.style.display = 'none'; return; }
       container.style.display = 'flex';
+      container.style.flexWrap = 'wrap';
       const allActive = !state.filters.musicType;
       let html = `<button class="type-filter__chip ${allActive ? 'active' : ''}" data-musictype="">All</button>`;
       present.forEach(k => {
         const active = state.filters.musicType === k;
-        html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-musictype="${k}">${escHtml(MUSIC_TYPES[k].label)} <span style="opacity:0.6">${counts[k]}</span></button>`;
+        const c = MUSIC_TYPES[k].color;
+        const chipStyle = active ? '' : ` style="border-color:${c}66;color:${c};"`;
+        html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-musictype="${k}"${chipStyle}>${escHtml(MUSIC_TYPES[k].label)} <span style="opacity:0.6">${counts[k]}</span></button>`;
       });
+
+      // Sub-genre drill-down: a second chip row scoped to the selected bucket,
+      // built from the real genre vocabulary present in those events
+      if (state.filters.musicType) {
+        const bucketEvents = scoped.filter(e => musicTypeFor(e) === state.filters.musicType);
+        const gCounts = {};
+        bucketEvents.forEach(e => {
+          (e.genre || '').toLowerCase().split(/,\s*/).map(t => t.trim()).forEach(t => {
+            if (t && !isJunkTag(t, '')) gCounts[t] = (gCounts[t] || 0) + 1;
+          });
+        });
+        const top = Object.entries(gCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        if (top.length > 1) {
+          const c = MUSIC_TYPES[state.filters.musicType].color;
+          html += `<span style="flex-basis:100%;height:0;"></span>`;
+          html += `<button class="type-filter__chip ${!state.filters.subGenre ? 'active' : ''}" data-subgenre="" style="font-size:var(--text-2xs);">All ${escHtml(MUSIC_TYPES[state.filters.musicType].label)}</button>`;
+          top.forEach(([g, n]) => {
+            const active = state.filters.subGenre === g;
+            html += `<button class="type-filter__chip ${active ? 'active' : ''}" data-subgenre="${escHtml(g)}" style="font-size:var(--text-2xs);${active ? '' : `border-color:${c}44;color:${c};`}">${escHtml(g)} <span style="opacity:0.6">${n}</span></button>`;
+          });
+        }
+      }
+
       container.innerHTML = html;
       container.querySelectorAll('.type-filter__chip').forEach(chip => {
         chip.addEventListener('click', () => {
-          state.filters.musicType = chip.dataset.musictype || '';
+          if (chip.dataset.subgenre !== undefined) {
+            state.filters.subGenre = chip.dataset.subgenre || '';
+          } else {
+            state.filters.musicType = chip.dataset.musictype || '';
+            state.filters.subGenre = '';
+          }
           updateContentTypeFilter();
           render();
         });

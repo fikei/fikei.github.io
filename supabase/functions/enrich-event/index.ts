@@ -6,8 +6,8 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
-const VERSION = '1.2.0'
-console.log(`[enrich-event] v${VERSION} - authoritative source categories + full content-type taxonomy in AI prompt`)
+const VERSION = '1.3.0'
+console.log(`[enrich-event] v${VERSION} - AI music_type classification (fixed 8-bucket taxonomy)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -203,7 +203,7 @@ function extractMetadata(html: string, pageUrl: string): {
 async function classifyWithAI(event: {
   name: string, venue: string, genre: string, content_type: string,
   description: string, tags: string[]
-}): Promise<{ genre: string, content_type: string } | null> {
+}): Promise<{ genre: string, content_type: string, music_type: string | null } | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.log('[enrich-event] ANTHROPIC_API_KEY not set, skipping AI classification')
@@ -217,6 +217,8 @@ async function classifyWithAI(event: {
 
 2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, tech, social, art, design, literary, wellness, other
 
+3. "music_type" — ONLY for music events, one of: electronic, rock, pop, hiphop, jazz, folk, world, other-music. Use the dominant style (electronic = techno/house/DJ/club; rock = rock/indie/punk/metal; folk = folk/country/americana/tribute; world = latin/reggae/afro). null for non-music events.
+
 Event name: ${event.name}
 Venue: ${event.venue}
 Current genre: ${event.genre || 'unknown'}
@@ -224,7 +226,7 @@ Current type: ${event.content_type || 'unknown'}
 Description: ${desc}
 Tags: ${event.tags.join(', ')}
 
-Respond with JSON only: {"genre": "...", "content_type": "..."}`
+Respond with JSON only: {"genre": "...", "content_type": "...", "music_type": "..." or null}`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -259,6 +261,9 @@ Respond with JSON only: {"genre": "...", "content_type": "..."}`
       return {
         genre: typeof result.genre === 'string' ? result.genre : '',
         content_type: typeof result.content_type === 'string' ? result.content_type : '',
+        music_type: (typeof result.music_type === 'string' &&
+          ['electronic','rock','pop','hiphop','jazz','folk','world','other-music'].includes(result.music_type))
+          ? result.music_type : null,
       }
     }
   } catch (e) {
@@ -351,6 +356,7 @@ async function enrichSingleEvent(
       ...(authoritativeType
         ? { content_type: authoritativeType }
         : (aiResult?.content_type ? { content_type: aiResult.content_type } : {})),
+      ...(aiResult?.music_type ? { music_type: aiResult.music_type } : {}),
       enrichment_status: 'completed',
       enriched_at: new Date().toISOString(),
       enrichment_error: null,
