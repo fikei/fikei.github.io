@@ -4,12 +4,40 @@
 import { type ScrapedEvent, fetchUrl, parseLocationString } from './utils.ts'
 import type { EventSource } from '../sources.ts'
 
-export async function scrapeIcal(source: EventSource): Promise<ScrapedEvent[]> {
-  const text = await fetchUrl(source.url)
-  return parseIcal(text, source.id, source.category)
+// UTC iCal timestamps (Luma publishes DTSTART:...Z) must be converted to the
+// source region's timezone — naively slicing the date put every evening event
+// on the next day and dropped the time entirely.
+const REGION_TZ: Record<string, string> = {
+  'bay-area': 'America/Los_Angeles',
+  'los-angeles': 'America/Los_Angeles',
+  'seattle': 'America/Los_Angeles',
+  'new-york': 'America/New_York',
 }
 
-function parseIcal(text: string, sourceId: string, category?: string): ScrapedEvent[] {
+export async function scrapeIcal(source: EventSource): Promise<ScrapedEvent[]> {
+  const text = await fetchUrl(source.url)
+  const tz = REGION_TZ[source.region] || 'America/Los_Angeles'
+  return parseIcal(text, source.id, source.category, tz)
+}
+
+function icalToLocal(raw: string, tz: string): { date: string; time: string } {
+  const clean = raw.replace(/[^0-9TZ]/g, '')
+  const m = clean.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/)
+  if (!m) return { date: '', time: '' }
+  const [, y, mo, d, hh, mm, ss, z] = m
+  if (!hh) return { date: `${y}-${mo}-${d}`, time: '' } // all-day
+  if (!z) return { date: `${y}-${mo}-${d}`, time: `${hh}:${mm}` } // TZID/floating: already local
+  const utc = new Date(Date.UTC(+y, +mo - 1, +d, +hh, +mm, +(ss || 0)))
+  // sv-SE formats as "YYYY-MM-DD HH:MM"
+  const local = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(utc)
+  const [date, time] = local.split(' ')
+  return { date, time: time || '' }
+}
+
+function parseIcal(text: string, sourceId: string, category: string | undefined, tz: string): ScrapedEvent[] {
   // RFC 5545 line-unfolding: CRLF + (SPACE|TAB) continues the previous line.
   const unfolded = text.replace(/\r?\n[ \t]/g, '')
 
@@ -25,6 +53,7 @@ function parseIcal(text: string, sourceId: string, category?: string): ScrapedEv
     }
 
     const dtstart = get('DTSTART')
+    const { date: startDate, time: startTime } = dtstart ? icalToLocal(dtstart, tz) : { date: '', time: '' }
     const loc = parseLocationString(get('LOCATION'))
 
     // URL: prefer URL field, else first https link in DESCRIPTION (Luma, etc.)
@@ -41,8 +70,8 @@ function parseIcal(text: string, sourceId: string, category?: string): ScrapedEv
       .slice(0, 1500)
 
     events.push({
-      date: dtstart ? parseIcalDate(dtstart) : '',
-      time: '',
+      date: startDate,
+      time: startTime,
       name: get('SUMMARY'),
       venue: loc.venue,
       address: loc.address,
@@ -58,8 +87,3 @@ function parseIcal(text: string, sourceId: string, category?: string): ScrapedEv
   return events
 }
 
-function parseIcalDate(str: string): string {
-  const clean = str.replace(/[^0-9T]/g, '')
-  if (clean.length >= 8) return `${clean.substring(0, 4)}-${clean.substring(4, 6)}-${clean.substring(6, 8)}`
-  return str
-}

@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.7.1'
-console.log(`[scrape-events] v${VERSION} - ical parser carries source category as content_type`)
+const VERSION = '1.7.2'
+console.log(`[scrape-events] v${VERSION} - ical UTC timestamps converted to region timezone (Luma evening events were dated tomorrow)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
