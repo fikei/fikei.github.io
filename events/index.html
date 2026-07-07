@@ -311,6 +311,11 @@ body {
   border: var(--border-thin) solid #e8c547;
   color: #e8c547;
 }
+.token--agape.token--active {
+  background: #e8c547;
+  color: var(--bg);
+  border-color: #e8c547;
+}
 
 /* Agape Recommended rows: gold spine + faint wash alongside the token */
 .data-table tbody tr.agape-row { background: color-mix(in srgb, #e8c547 5%, transparent); }
@@ -2070,8 +2075,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.29.0';
-  console.log(`[events] v${VERSION} - 2-step onboarding (all sources by default, numbered category interests, keyboard nav); category renames`);
+  const VERSION = '1.30.0';
+  console.log(`[events] v${VERSION} - ★ Agape as a top-level chip (cross-cut: composes with category filters)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3895,13 +3900,19 @@ body {
     const present = CATEGORY_ORDER.filter(c => counts[c] > 0);
 
     let html = `<button class="token ${allActive ? 'token--active' : ''}" data-category="">All<span class="source-chip__count">${chipEvents.length}</span></button>`;
+    // Agape rides as a top-level chip even though it's a cross-cut, not a
+    // category — it composes with a category selection rather than replacing it
+    const agapeCount = chipEvents.filter(e => e.agape || isAgapeEvent(e)).length;
+    if (agapeCount > 0) {
+      html += `<button class="token token--agape ${state.filters.agape ? 'token--active' : ''}" data-agape="1">★ Agape<span class="source-chip__count">${agapeCount}</span></button>`;
+    }
     html += present.map(c => {
       const active = activeCategory === c;
       return `<button class="token ${active ? 'token--active' : ''}" data-category="${escHtml(c)}">${escHtml(CATEGORY_LABELS[c] || c)}<span class="source-chip__count">${counts[c]}</span></button>`;
     }).join('');
     container.innerHTML = html;
 
-    container.querySelectorAll('.token').forEach(chip => {
+    container.querySelectorAll('.token[data-category]').forEach(chip => {
       chip.addEventListener('click', () => {
         const cat = chip.dataset.category;
         // Toggle off if clicking active; clear contentType sub-filter on category switch
@@ -3910,6 +3921,11 @@ body {
         updateContentTypeFilter();
         render();
       });
+    });
+    container.querySelector('.token[data-agape]')?.addEventListener('click', () => {
+      state.filters.agape = !state.filters.agape;
+      updateFilterChips();
+      render();
     });
   }
 
