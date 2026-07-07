@@ -1794,6 +1794,9 @@ body {
     </div>
 
     <!-- Recommended For You (populated by JS if Boards data exists) -->
+    <!-- Google Calendar sync nudge (signed-in users with a few bookmarks, until connected/dismissed) -->
+    <div id="calSyncNudge" style="display:none"></div>
+
     <div id="recommendedSection" style="display:none">
       <div class="recommended-header">
         <h3 class="recommended-title">Recommended for you</h3>
@@ -2069,8 +2072,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.31.3';
-  console.log(`[events] v${VERSION} - hiddenCategories + beta flags survive cloud sync (Tech toggle no longer reverts on refresh)`);
+  const VERSION = '1.32.0';
+  console.log(`[events] v${VERSION} - GCal connect race fix (ticketed status) + calendar-sync nudge after 2+ bookmarks`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2622,13 +2625,29 @@ body {
       const r = data.result;
       calSync.statusMsg = `Synced: ${r.pushed} added, ${r.updated} updated, ${r.deleted} removed` + (r.errors ? `, ${r.errors} errors` : '');
     }
+    renderCalSyncNudge();
+  }
+
+  // Responses can land out of order (e.g. a slow 'status' fired at page load must
+  // not stomp the 'exchange' that just connected). Every status-bearing call takes
+  // a ticket; only the most recent call is allowed to apply its response.
+  let _calSyncTicket = 0;
+  async function gcalSyncStatusCall(action, payload = {}) {
+    const ticket = ++_calSyncTicket;
+    const data = await gcalSyncCall(action, payload);
+    if (ticket !== _calSyncTicket) {
+      log(`Calendar sync: stale '${action}' response ignored`);
+      return null;
+    }
+    applyCalSyncStatus(data);
+    return data;
   }
 
   async function loadCalendarSyncState() {
     if (!currentUser) return;
     try {
-      applyCalSyncStatus(await gcalSyncCall('status'));
-      renderCalSyncModal();
+      const data = await gcalSyncStatusCall('status');
+      if (data) renderCalSyncModal();
     } catch (e) { log('Calendar sync status failed: ' + e.message); }
   }
 
@@ -2644,8 +2663,8 @@ body {
     clearTimeout(_calSyncDebounce);
     _calSyncDebounce = setTimeout(async () => {
       try {
-        const data = await gcalSyncCall('sync');
-        applyCalSyncStatus(data);
+        const data = await gcalSyncStatusCall('sync');
+        if (!data) return;
         log('Calendar sync: ' + (calSync.statusMsg || 'ok'));
         renderCalSyncModal();
       } catch (e) { log('Calendar sync failed: ' + e.message); }
@@ -2671,11 +2690,11 @@ body {
     if (!expected || stateParam !== expected) { log('Google callback: state mismatch, ignoring'); return; }
     localStorage.removeItem(GCAL_STATE_KEY);
     if (!currentUser) { log('Google callback: not signed in, ignoring'); return; }
+    calSync.loaded = true; // suppress the modal's automatic 'status' load while exchanging
     openCalSyncModal();
     setCalSyncBodyMsg('Connecting Google Calendar…');
     try {
-      const data = await gcalSyncCall('exchange', { code, redirectUri: window.location.origin + '/events/', timezone: regionTimezone() });
-      applyCalSyncStatus(data);
+      await gcalSyncStatusCall('exchange', { code, redirectUri: window.location.origin + '/events/', timezone: regionTimezone() });
       if (!calSync.statusMsg) calSync.statusMsg = 'Connected.';
       log('Google Calendar connected');
     } catch (e) {
@@ -2689,6 +2708,47 @@ body {
     document.getElementById('calSyncModal').classList.add('modal--visible');
     renderCalSyncModal();
     if (currentUser && !calSync.loaded) loadCalendarSyncState();
+  }
+
+  // --- Home-page nudge: after a few bookmarks, prompt calendar connect ---
+  const GCAL_NUDGE_DISMISSED_KEY = 'ctrl-rodeo-gcal-nudge-dismissed';
+  const GCAL_NUDGE_MIN_BOOKMARKS = 2;
+
+  function renderCalSyncNudge() {
+    const el = document.getElementById('calSyncNudge');
+    if (!el) return;
+    const show = !!currentUser && calSync.loaded && !calSync.connected &&
+      state.bookmarks.size >= GCAL_NUDGE_MIN_BOOKMARKS &&
+      !localStorage.getItem(GCAL_NUDGE_DISMISSED_KEY);
+    if (!show) { el.style.display = 'none'; return; }
+
+    if (!el.dataset.rendered) {
+      el.dataset.rendered = '1';
+      el.innerHTML = `
+        <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); border: var(--border-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); font-size: var(--text-xs);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; color: var(--fg-muted);"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span style="flex: 1; color: var(--fg-muted); min-width: 0;">You've marked <strong id="calSyncNudgeCount" style="color: var(--fg);"></strong> events as interested — keep them on a <strong style="color: var(--fg);">ctrl.events</strong> Google calendar automatically.</span>
+          <button class="btn btn--sm btn--filled" id="calSyncNudgeConnect" style="flex-shrink:0;">Connect</button>
+          <button class="btn btn--sm btn--ghost" id="calSyncNudgeDismiss" title="Don't show again" aria-label="Dismiss" style="flex-shrink:0; padding: 2px 8px;">&times;</button>
+        </div>`;
+      document.getElementById('calSyncNudgeConnect').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        e.target.textContent = 'Redirecting…';
+        try { await startGoogleConnect(); }
+        catch (err) {
+          e.target.disabled = false;
+          e.target.textContent = 'Connect';
+          log('Nudge connect failed: ' + err.message);
+          openCalSyncModal();
+        }
+      });
+      document.getElementById('calSyncNudgeDismiss').addEventListener('click', () => {
+        localStorage.setItem(GCAL_NUDGE_DISMISSED_KEY, '1');
+        el.style.display = 'none';
+      });
+    }
+    document.getElementById('calSyncNudgeCount').textContent = state.bookmarks.size;
+    el.style.display = '';
   }
 
   function setCalSyncBodyMsg(msg) {
@@ -2741,7 +2801,7 @@ body {
 
     const applySettings = async (payload) => {
       calSync.busy = true; renderCalSyncModal();
-      try { applyCalSyncStatus(await gcalSyncCall('settings', payload)); }
+      try { await gcalSyncStatusCall('settings', payload); }
       catch (e) { calSync.statusMsg = 'Error: ' + e.message; }
       calSync.busy = false; renderCalSyncModal();
     };
@@ -2750,14 +2810,14 @@ body {
     document.getElementById('calSyncAgape')?.addEventListener('change', (e) => applySettings({ syncAgape: e.target.checked }));
     document.getElementById('calSyncNow')?.addEventListener('click', async () => {
       calSync.busy = true; calSync.statusMsg = 'Syncing…'; renderCalSyncModal();
-      try { applyCalSyncStatus(await gcalSyncCall('sync')); }
+      try { await gcalSyncStatusCall('sync'); }
       catch (e) { calSync.statusMsg = 'Sync failed: ' + e.message; }
       calSync.busy = false; renderCalSyncModal();
     });
     document.getElementById('calSyncDisconnect')?.addEventListener('click', async (e) => {
       e.preventDefault();
       if (!confirm('Disconnect Google Calendar? The ctrl.events calendar stays in Google, but syncing stops.')) return;
-      try { applyCalSyncStatus(await gcalSyncCall('disconnect')); calSync.statusMsg = 'Disconnected.'; }
+      try { await gcalSyncStatusCall('disconnect'); calSync.statusMsg = 'Disconnected.'; }
       catch (err) { calSync.statusMsg = 'Error: ' + err.message; }
       renderCalSyncModal();
     });
@@ -3290,6 +3350,9 @@ body {
 
     // Exhibitions rail (shown above all views)
     renderExhibitionsRail();
+
+    // Calendar-sync nudge tracks bookmark count + connection state
+    renderCalSyncNudge();
 
     // Pulse strip (events-per-day density, above everything)
     renderPulse();
