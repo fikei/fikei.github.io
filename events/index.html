@@ -195,6 +195,11 @@ body {
 /* A selected day keeps full strength; the rest recede */
 .pulse--has-selection .pulse__day:not(.pulse__day--selected) { opacity: 0.3; }
 
+/* Scrollspy: while scrolling the list, only the needle for the date at the
+   top of the viewport stays lit */
+.pulse--spy .pulse__day:not(.pulse__day--current) { opacity: 0.25; }
+.pulse__day--current .pulse__seg { filter: brightness(1.25); }
+
 .pulse__axis {
   display: flex;
   width: max-content;
@@ -222,12 +227,31 @@ body {
 .pulse__axis-cell--today { color: var(--fg); font-weight: 700; }
 .pulse__axis-cell--month { color: var(--fg-muted); font-weight: 700; letter-spacing: var(--tracking-wider); }
 
+/* The sources bar lives inside the sticky header; the strip's own
+   padding provides the rhythm */
+.pulse .sources-bar { margin-bottom: 0; margin-top: var(--space-3); }
+
+/* Scrolled-to date — appears in the collapsed header next to the filters */
+.pulse__current {
+  display: none;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--fg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding-right: var(--space-2);
+  border-right: var(--border-thin) solid var(--border-subtle);
+}
+
 /* Collapse on scroll — only where the strip is sticky (desktop) */
 @media (min-width: 601px) {
   .pulse--collapsed { padding: var(--space-2) 0; }
   .pulse--collapsed .pulse__head,
   .pulse--collapsed .pulse__axis { max-height: 0; opacity: 0; margin-bottom: 0; }
-  .pulse--collapsed .pulse__track { height: 14px; }
+  .pulse--collapsed .pulse__track { height: 28px; }
+  .pulse--collapsed .pulse__current:not(:empty) { display: inline-flex; align-items: center; }
+  .pulse--collapsed .sources-bar { margin-top: var(--space-2); }
 }
 
 @media (max-width: 600px) {
@@ -1692,31 +1716,34 @@ body {
     <!-- Main events content (hidden during onboarding) -->
     <div id="eventsContent" style="display:none">
 
-    <!-- Pulse strip — events per day, next 30 days -->
-    <div class="pulse" id="pulseStrip" style="display:none">
-      <div class="pulse__head">
-        <span class="pulse__label">Next 90 days</span>
-        <span class="pulse__total" id="pulseTotal"></span>
-        <div class="pulse__legend" id="pulseLegend"></div>
-        <div class="pulse__mode">
-          <button class="pulse__mode-btn" data-mode="needles">Bars</button>
-          <button class="pulse__mode-btn" data-mode="dots">Dots</button>
+    <!-- Pulse strip — sticky scroll header: density viz + current date + top-level filters -->
+    <div class="pulse" id="pulseStrip">
+      <div id="pulseViz" style="display:none">
+        <div class="pulse__head">
+          <span class="pulse__label">Next 90 days</span>
+          <span class="pulse__total" id="pulseTotal"></span>
+          <div class="pulse__legend" id="pulseLegend"></div>
+          <div class="pulse__mode">
+            <button class="pulse__mode-btn" data-mode="needles">Bars</button>
+            <button class="pulse__mode-btn" data-mode="dots">Dots</button>
+          </div>
+        </div>
+        <div class="pulse__scroll">
+          <div class="pulse__track" id="pulseTrack"></div>
+          <div class="pulse__axis" id="pulseAxis"></div>
         </div>
       </div>
-      <div class="pulse__scroll">
-        <div class="pulse__track" id="pulseTrack"></div>
-        <div class="pulse__axis" id="pulseAxis"></div>
-      </div>
-    </div>
 
-    <!-- Sources bar -->
-    <div class="sources-bar">
-      <div class="sources-bar__chips" id="sourceChips"></div>
-      <button class="btn btn--sm btn--ghost" id="forceRefreshBtn" title="Force refresh all sources (Shift+R)" style="padding:4px 6px;font-size:14px;line-height:1;opacity:0.5;min-width:0;" onclick="window.__forceRefreshSources && window.__forceRefreshSources()">⟳</button>
-      <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
-        Filter
-      </button>
+      <!-- Sources bar — rides in the sticky header with the scrolled-to date -->
+      <div class="sources-bar">
+        <span class="pulse__current" id="pulseCurrent"></span>
+        <div class="sources-bar__chips" id="sourceChips"></div>
+        <button class="btn btn--sm btn--ghost" id="forceRefreshBtn" title="Force refresh all sources (Shift+R)" style="padding:4px 6px;font-size:14px;line-height:1;opacity:0.5;min-width:0;" onclick="window.__forceRefreshSources && window.__forceRefreshSources()">⟳</button>
+        <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
+          Filter
+        </button>
+      </div>
     </div>
 
     <!-- Filters — DS: .filter-bar (collapsible) -->
@@ -2015,8 +2042,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.22.0';
-  console.log(`[events] v${VERSION} - Pulse strip: LED-tick needles, 90-day window, static pitch, subtle baseline`);
+  const VERSION = '1.23.0';
+  console.log(`[events] v${VERSION} - Pulse strip: sticky scroll header (date + filters), scrollspy highlight, tap-to-jump, 2x collapsed ribbon`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3109,6 +3136,7 @@ body {
 
   // --- Pulse strip (events-per-day density) ---
   const PULSE_DAYS = 90;
+  let pulseSpyRows = []; // date-group rows, refreshed by renderTable (scrollspy anchors)
 
   function renderPulse() {
     const strip = document.getElementById('pulseStrip');
@@ -3138,8 +3166,11 @@ body {
       else bump(ev.date);
     });
 
-    if (distinct.size === 0) { strip.style.display = 'none'; return; }
-    strip.style.display = '';
+    // The strip itself stays visible (it carries the source chips); only the
+    // visualization hides when there's nothing to plot
+    const viz = document.getElementById('pulseViz');
+    if (distinct.size === 0) { viz.style.display = 'none'; return; }
+    viz.style.display = '';
 
     const dayTotals = days.map(ds => Object.values(counts.get(ds)).reduce((a, b) => a + b, 0));
     const max = Math.max(...dayTotals);
@@ -3207,21 +3238,35 @@ body {
     track.innerHTML = trackHtml;
     document.getElementById('pulseAxis').innerHTML = axisHtml;
 
-    // Click a day: toggle a single-day date filter (bind once)
+    // Click a day: jump-scroll the list to that date (bind once)
     if (!track.dataset.bound) {
       track.dataset.bound = '1';
       track.addEventListener('click', (e) => {
         const btn = e.target.closest('.pulse__day');
-        if (!btn) return;
-        const ds = btn.dataset.date;
-        const isSel = state.filters.dateFrom === ds && state.filters.dateTo === ds;
-        state.filters.dateFrom = isSel ? '' : ds;
-        state.filters.dateTo = isSel ? '' : ds;
-        document.getElementById('filterDateFrom').value = state.filters.dateFrom;
-        document.getElementById('filterDateTo').value = state.filters.dateTo;
-        render();
+        if (btn) jumpToDate(btn.dataset.date);
       });
     }
+  }
+
+  // Jump-scroll the list so the tapped date's group header sits just below
+  // the sticky header. Empty days land on the nearest date with events.
+  function jumpToDate(ds) {
+    if (!pulseSpyRows.length) return;
+    let row = null, bestDiff = Infinity;
+    for (const r of pulseSpyRows) {
+      const diff = Math.abs(new Date(r.dataset.date) - new Date(ds));
+      if (diff < bestDiff) { bestDiff = diff; row = r; }
+    }
+    if (!row) return;
+    const align = () => {
+      const headerH = document.querySelector('.page-header')?.offsetHeight || 0;
+      const stripH = document.getElementById('pulseStrip')?.offsetHeight || 0;
+      window.scrollTo(0, window.scrollY + row.getBoundingClientRect().top - headerH - stripH - 4);
+    };
+    align();
+    // The strip collapses in response to the jump, and its height animates —
+    // re-align once the collapse transition has settled
+    setTimeout(align, 400);
   }
 
   // Mode toggle (bars | dots), persisted per user
@@ -3233,11 +3278,48 @@ body {
     });
   });
 
-  // Collapse the sticky strip to a slim ribbon once the page scrolls.
-  // Threshold (120px) exceeds the collapse's own height change (~60px)
-  // so toggling can't oscillate at the boundary.
+  // Collapse the sticky strip to a slim ribbon once the page scrolls, and
+  // scrollspy the list: while scrolled, only the needle for the date at the
+  // top of the viewport stays lit. Threshold (120px) exceeds the collapse's
+  // own height change so toggling can't oscillate at the boundary.
+  function updatePulseScroll() {
+    const strip = document.getElementById('pulseStrip');
+    if (!strip) return;
+    const collapsed = window.scrollY > 120;
+    strip.classList.toggle('pulse--collapsed', collapsed);
+
+    // Scrollspy over the date-grouped list: which date is at the top of
+    // the viewport right now?
+    let currentDate = null;
+    if (collapsed && state.view === 'table' && pulseSpyRows.length) {
+      const offset = (document.querySelector('.page-header')?.offsetHeight || 0) + strip.offsetHeight + 8;
+      for (const row of pulseSpyRows) {
+        if (row.getBoundingClientRect().top <= offset) currentDate = row.dataset.date;
+        else break;
+      }
+    }
+
+    // Date label in the sticky header
+    const cur = document.getElementById('pulseCurrent');
+    if (cur) cur.textContent = currentDate
+      ? new Date(currentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      : '';
+
+    // Highlight only the scrolled-to day (a manual single-day date filter
+    // already owns the highlight via pulse--has-selection)
+    const currentBtn = (currentDate && !strip.classList.contains('pulse--has-selection'))
+      ? strip.querySelector(`.pulse__day[data-date="${currentDate}"]`)
+      : null;
+    strip.classList.toggle('pulse--spy', !!currentBtn);
+    strip.querySelectorAll('.pulse__day--current').forEach(el => el.classList.remove('pulse__day--current'));
+    if (currentBtn) currentBtn.classList.add('pulse__day--current');
+  }
+
+  let _pulseScrollTick = false;
   window.addEventListener('scroll', () => {
-    document.getElementById('pulseStrip')?.classList.toggle('pulse--collapsed', window.scrollY > 120);
+    if (_pulseScrollTick) return;
+    _pulseScrollTick = true;
+    requestAnimationFrame(() => { _pulseScrollTick = false; updatePulseScroll(); });
   }, { passive: true });
 
   function renderExhibitionsRail() {
@@ -3364,11 +3446,12 @@ body {
         lastDate = ev.date;
         const d = new Date(ev.date + 'T00:00:00');
         const label = isNaN(d) ? ev.date : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        html += `<tr class="date-group"><td colspan="11" class="date-group__label">${escHtml(label)}</td></tr>`;
+        html += `<tr class="date-group" data-date="${escHtml(ev.date)}"><td colspan="11" class="date-group__label">${escHtml(label)}</td></tr>`;
       }
       html += rowHtml(ev);
     }
     tbody.innerHTML = html;
+    pulseSpyRows = grouped ? [...tbody.querySelectorAll('tr.date-group')] : [];
 
     // Sort indicators
     document.querySelectorAll('.data-table th').forEach(th => {
