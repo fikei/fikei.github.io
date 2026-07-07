@@ -13,8 +13,8 @@
 // Body: { url: string }
 // Returns: { event, visibility, merged: boolean }
 
-const VERSION = '1.0.0'
-console.log(`[add-event] v${VERSION} - one-off event submission by link`)
+const VERSION = '1.0.1'
+console.log(`[add-event] v${VERSION} - PT-local date anchor + Z-timestamp handling`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -72,12 +72,22 @@ function extractJsonLd(html: string): Extracted | null {
       const ev = findEventNode(JSON.parse(m[1]))
       if (!ev || !ev.name || !ev.startDate) continue
       const start = String(ev.startDate)
+      let date = start.split('T')[0]
+      let time = (start.split('T')[1] || '').slice(0, 5)
+      if (/Z$/.test(start)) {
+        // Z-normalized publishers need UTC->PT; offset-formatted are already local
+        const local = new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false,
+        }).format(new Date(start))
+        ;[date, time] = local.split(' ')
+      }
       const loc = ev.location && !Array.isArray(ev.location) ? ev.location : (ev.location?.[0] || {})
       const addr = loc.address || {}
       const offers = Array.isArray(ev.offers) ? ev.offers[0] : ev.offers
       return {
-        date: start.split('T')[0],
-        time: (start.split('T')[1] || '').slice(0, 5),
+        date,
+        time,
         name: String(ev.name).slice(0, 200),
         venue: String(loc.name || '').slice(0, 120),
         address: String(typeof addr === 'string' ? addr : addr.streetAddress || '').slice(0, 200),
@@ -104,7 +114,7 @@ async function extractWithAI(html: string, url: string, apiKey: string): Promise
     .replace(/\s+/g, ' ')
     .slice(0, 4000)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' }).format(new Date())
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
