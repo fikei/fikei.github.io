@@ -215,11 +215,8 @@ body {
 .pulse .sources-bar { margin-bottom: 0; margin-top: var(--space-3); }
 .pulse .filter-bar { margin-bottom: 0; margin-top: var(--space-3); }
 
-/* Scrolled-to date — appears in the collapsed header next to the filters.
-   Tap to open a native date picker (single-day filter); the overlaid
-   <input type=date> is the real control, invisibly filling the label. */
+/* Scrolled-to date — appears in the collapsed header next to the filters */
 .pulse__current {
-  position: relative;
   display: none;
   font-size: var(--text-2xs);
   text-transform: uppercase;
@@ -229,43 +226,28 @@ body {
   font-variant-numeric: tabular-nums;
   padding-right: var(--space-2);
   border-right: var(--border-thin) solid var(--border-subtle);
-  cursor: pointer;
 }
-.pulse__current-label { pointer-events: none; }
-.pulse__datepick {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-}
-/* A single-day date filter keeps the label lit even in the expanded header */
-.pulse--has-selection .pulse__current.has-date { display: inline-flex; align-items: center; }
 
 /* Collapse on scroll — all breakpoints; the strip is the scroll header */
 .pulse--collapsed { padding: var(--space-2) 0; }
 .pulse--collapsed .pulse__head,
 .pulse--collapsed .pulse__axis { max-height: 0; opacity: 0; margin-bottom: 0; }
 .pulse--collapsed .pulse__track { height: 28px; }
-.pulse--collapsed .pulse__current.has-date { display: inline-flex; align-items: center; }
+.pulse--collapsed .pulse__current:not(:empty) { display: inline-flex; align-items: center; }
 .pulse--collapsed .sources-bar { margin-top: var(--space-2); }
 
 @media (max-width: 600px) {
-  /* Filter button stays inline to the left of the chip slider in every state
-     (expanded and collapsed) — it's a static, order:-1 flex item from base
-     scope; no absolute top-right pinning. */
+  /* Filter rides top-right, directly above the Bars/Dots tag — the extra
+     padding-top reserves its band. When collapsed (head hidden) it falls
+     back into the compact chips row. */
+  .pulse { padding-top: calc(var(--space-2) + 30px); }
+  .pulse .sources-bar__filter-btn { position: absolute; top: var(--space-2); right: 0; margin-left: 0; }
+  .pulse--collapsed .sources-bar__filter-btn { position: static; margin-left: var(--space-2); }
   .pulse__track { height: 40px; }
   .pulse--collapsed .pulse__track { height: 24px; }
   .pulse__legend { display: none; }
-  /* Chip slider + full-width date bar come from base scope; the sources bar
-     wraps (base default) so the 100%-basis date drops below the chips rather
-     than overlapping them. */
+  /* One compact row: scrolled-to date | chips (scroll) [| filter when collapsed] */
+  .pulse .sources-bar { flex-wrap: nowrap; }
 }
 
 /* First-load equalizer loader — same LED-tick language as the pulse strip */
@@ -309,35 +291,13 @@ body {
   flex-wrap: wrap;
 }
 
-/* Category chips: one horizontally scrolling row at every width (DS .filters
-   pattern), sharing the sources bar with the filter button; the scrolled-to
-   date wraps to its own full-width bar below. */
 .sources-bar__chips {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* basis 0 (not auto) so the slider shares the filter button's row rather
-     than wrapping below it on narrow screens; min-width:0 lets it scroll */
-  flex: 1 1 0;
-  min-width: 0;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  flex: 1;
 }
-.sources-bar__chips::-webkit-scrollbar { display: none; }
-.sources-bar__chips .token { flex-shrink: 0; white-space: nowrap; }
-
-/* Scrolled-to date is a full-width bar below the chip slider (all widths) */
-.sources-bar .pulse__current {
-  order: 99;
-  flex-basis: 100%;
-  padding: var(--space-1) 0 0;
-  border-top: var(--border-thin) solid var(--border-subtle);
-  border-right: none;
-  margin-top: var(--space-1);
-}
-.sources-bar .pulse__current:not(.has-date) { display: none; border: none; margin: 0; padding: 0; }
 
 .token--agape {
   border: var(--border-thin) solid #e8c547;
@@ -430,15 +390,12 @@ body {
 }
 
 .sources-bar__filter-btn {
-  order: -1;
-  margin-left: 0;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   flex-shrink: 0;
 }
-/* Icon-only at every width; the text label is redundant next to the glyph */
-.sources-bar__filter-label { display: none; }
 
 .sources-bar__filter-btn.active {
   border-color: var(--border);
@@ -744,13 +701,9 @@ body {
 .type-filter {
   display: flex;
   gap: var(--space-1);
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
-.type-filter::-webkit-scrollbar { display: none; }
 
 .type-filter__chip {
   font-size: var(--text-2xs);
@@ -765,7 +718,6 @@ body {
   transition: all var(--duration-fast) var(--ease-default);
 }
 
-.type-filter__chip { flex-shrink: 0; white-space: nowrap; }
 .type-filter__chip:hover { color: var(--fg); border-color: var(--border); }
 .type-filter__chip.active { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
@@ -1467,8 +1419,21 @@ body {
 .genre-tag[data-tag] { cursor: pointer; }
 
 @media (max-width: 768px) {
-  /* Sources-bar chrome (icon filter, chip slider, full-width date bar) is now
-     base-scope for desktop parity — see the .sources-bar rules above. */
+  /* Filter button: icon-only, pinned left of the category slider */
+  .sources-bar { flex-wrap: wrap; }
+  .sources-bar__filter-btn { order: -1; }
+  .sources-bar__filter-label { display: none; }
+  /* Scrolled-to date becomes a full-width bar below the slider */
+  .sources-bar .pulse__current {
+    order: 99;
+    flex-basis: 100%;
+    display: block;
+    padding: var(--space-1) 0 0;
+    border-top: var(--border-thin) solid var(--border-subtle);
+    margin-top: var(--space-1);
+  }
+  .sources-bar .pulse__current:empty { display: none; border: none; margin: 0; padding: 0; }
+
   .data-table .col-time,
   .data-table .col-type,
   .data-table .col-genre,
@@ -1650,11 +1615,35 @@ body {
   }
   .data-table--grouped .col-date { display: none; }
 
-  /* Filter bar: compact 2-column grid — inputs span both columns */
+  /* Category chips + type sub-filter: single horizontally scrolling rows
+     (DS .filters pattern). Chips share one row with the scrolled-to date
+     and the filter button so the sticky header stays shallow. */
+  .sources-bar__chips {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sources-bar__chips::-webkit-scrollbar { display: none; }
+  .sources-bar__chips .token { flex-shrink: 0; white-space: nowrap; }
+  .type-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .type-filter::-webkit-scrollbar { display: none; }
+  .type-filter__chip { flex-shrink: 0; white-space: nowrap; }
+
+  /* Filter bar: compact 2-column grid — inputs span both columns, the
+     date pair and the toggle buttons sit two-up */
   .filter-bar { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
   .filter-bar .input,
   .filter-bar .select,
   .filter-bar .input--search { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  .filter-bar .input--date { grid-column: auto; width: 100%; min-width: 0; }
 }
 
 /* ---- Touch feedback: hover styles never fire on touch devices ---- */
@@ -1763,7 +1752,7 @@ body {
 
       <!-- Sources bar — rides in the sticky header with the scrolled-to date -->
       <div class="sources-bar">
-        <span class="pulse__current" id="pulseCurrent"><span class="pulse__current-label" id="pulseCurrentLabel"></span><input type="date" class="pulse__datepick" id="filterDatePick" aria-label="Filter by date"></span>
+        <span class="pulse__current" id="pulseCurrent"></span>
         <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn" aria-label="Filter">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
           <span class="sources-bar__filter-label">Filter</span>
@@ -1787,6 +1776,8 @@ body {
       <select class="input select" id="filterSource">
         <option value="">All Sources</option>
       </select>
+      <input type="date" class="input input--date" id="filterDateFrom" title="From date">
+      <input type="date" class="input input--date" id="filterDateTo" title="To date">
       <button class="btn btn--sm btn--ghost" id="filterAgape" title="Only Agape Recommended events">★ Agape Recommended</button>
       <button class="btn btn--sm btn--ghost" id="filterInterested" title="Only events you bookmarked as interested"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-1px"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Interested</button>
       <button class="btn btn--sm btn--ghost" id="filterPast" title="Include past events (last 60 days)">Past events</button>
@@ -2091,8 +2082,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.42.1';
-  console.log(`[events] v${VERSION} - filter button stays inline-left of the chip slider in every state (no mobile top-right pin)`);
+  const VERSION = '1.41.0';
+  console.log(`[events] v${VERSION} - Agape Recommended is a tappable per-event tag; bookmark filter uses the row icon`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3679,20 +3670,11 @@ body {
       }
     }
 
-    // Date label in the sticky header. Shows the scrolled-to date while
-    // collapsed, or the selected day when a single-day date filter is active
-    // (so the tappable picker stays reachable even when the page isn't
-    // scrolled). The overlaid <input type=date> keeps its value in sync.
+    // Date label in the sticky header
     const cur = document.getElementById('pulseCurrent');
-    const curLabel = document.getElementById('pulseCurrentLabel');
-    const picker = document.getElementById('filterDatePick');
-    const selDay = (state.filters.dateFrom && state.filters.dateFrom === state.filters.dateTo) ? state.filters.dateFrom : null;
-    const labelDate = currentDate || selDay;
-    if (curLabel) curLabel.textContent = labelDate
-      ? new Date(labelDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    if (cur) cur.textContent = currentDate
+      ? new Date(currentDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       : '';
-    if (cur) cur.classList.toggle('has-date', !!labelDate);
-    if (picker) picker.value = labelDate || '';
 
     // Highlight only the scrolled-to day (a manual single-day date filter
     // already owns the highlight via pulse--has-selection)
@@ -4302,7 +4284,8 @@ body {
     document.getElementById('filterCity').value = '';
     const fd = document.getElementById('filterDistance'); if (fd) fd.value = '';
     const fs = document.getElementById('filterSource'); if (fs) fs.value = '';
-    const dp = document.getElementById('filterDatePick'); if (dp) dp.value = '';
+    document.getElementById('filterDateFrom').value = '';
+    document.getElementById('filterDateTo').value = '';
     updateContentTypeFilter();
     render();
   }
@@ -4713,15 +4696,8 @@ body {
       render();
     });
     document.getElementById('filterSource').addEventListener('change', (e) => { state.filters.source = e.target.value; render(); });
-    // Tappable scrolled-to date opens a native picker → single-day filter.
-    // Picking a day filters to it and scrolls there; clearing removes it.
-    document.getElementById('filterDatePick').addEventListener('change', (e) => {
-      const v = e.target.value;
-      state.filters.dateFrom = v;
-      state.filters.dateTo = v;
-      render();
-      if (v) jumpToDate(v);
-    });
+    document.getElementById('filterDateFrom').addEventListener('change', (e) => { state.filters.dateFrom = e.target.value; render(); });
+    document.getElementById('filterDateTo').addEventListener('change', (e) => { state.filters.dateTo = e.target.value; render(); });
     document.getElementById('filterAgape').addEventListener('click', () => {
       // Agape recs are members-only: point non-members at the unlock path
       if (!currentUser) { CtrlAuth.openLoginModal(); return; }
