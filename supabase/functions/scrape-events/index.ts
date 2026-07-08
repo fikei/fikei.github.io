@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.10.0'
-console.log(`[scrape-events] v${VERSION} - The Faight Collective parser (thefaight.com/events cards)`)
+const VERSION = '1.11.0'
+console.log(`[scrape-events] v${VERSION} - stale-row reconciliation: renamed/cancelled listings no longer linger as duplicates`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -283,6 +283,60 @@ async function completeRun(
   }
 }
 
+
+// --- Stale-row reconciliation ---
+// A successful scrape is the full truth of what a listing source currently
+// publishes. Future-dated rows the scrape didn't touch are stale — renamed
+// upstream (Bottom of the Hill annotates edits into the title, minting a new
+// event_key), cancelled, or removed — and used to linger as duplicates
+// forever. cache-events bumps scraped_at for every row present in a run, so
+// anything older than the run start wasn't in this scrape.
+// Guardrails: only after a fully clean cache push, only for ok sources with
+// events, and skipped when the stale share smells like a partial scrape
+// (mass delete + re-add would churn enrichment).
+async function reconcileStaleRows(
+  supabase: ReturnType<typeof createClient>,
+  outcomes: SourceOutcome[],
+  runStartIso: string,
+): Promise<number> {
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Los_Angeles' }).format(new Date())
+  let totalDeleted = 0
+  for (const o of outcomes) {
+    if (!o.ok || o.eventCount === 0) continue
+    try {
+      const { count } = await supabase
+        .from('events')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_id', o.sourceId)
+        .gte('date', today)
+        .lt('scraped_at', runStartIso)
+      const stale = count || 0
+      if (stale === 0) continue
+      const cap = Math.max(20, Math.ceil(o.eventCount * 0.3))
+      if (stale > cap) {
+        console.log(`[scrape-events] Reconcile ${o.sourceId}: ${stale} stale rows exceeds cap ${cap} — skipping (partial scrape?)`)
+        continue
+      }
+      const { data, error } = await supabase
+        .from('events')
+        .delete()
+        .eq('source_id', o.sourceId)
+        .gte('date', today)
+        .lt('scraped_at', runStartIso)
+        .select('id')
+      if (error) {
+        console.error(`[scrape-events] Reconcile ${o.sourceId} delete failed: ${error.message}`)
+      } else if (data && data.length > 0) {
+        totalDeleted += data.length
+        console.log(`[scrape-events] Reconcile ${o.sourceId}: deleted ${data.length} stale row(s)`)
+      }
+    } catch (e) {
+      console.error(`[scrape-events] Reconcile ${o.sourceId} error: ${(e as Error).message}`)
+    }
+  }
+  return totalDeleted
+}
+
 // --- Main scrape orchestration ---
 
 async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> {
@@ -290,6 +344,7 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, serviceKey)
 
+  const runStartIso = new Date().toISOString()
   const runId = await createRun(supabase, triggeredBy)
   const sources = await loadSources(supabase)
   const semaphore = createSemaphore(5)
@@ -367,6 +422,14 @@ async function scrapeAll(triggeredBy: string): Promise<Record<string, unknown>> 
   // Push all events to cache-events
   const cacheResult = await pushToCache(allEvents, sourceOutcomes, supabaseUrl, serviceKey)
   console.log(`[scrape-events] Cache: ${cacheResult.cached} new, ${cacheResult.updated} updated, ${cacheResult.enrichQueued} enrich queued`)
+  // Stale-row reconciliation — only when every cache batch landed, else a
+  // dropped batch would make its source's current rows look stale
+  if (cacheResult.batchErrors.length === 0) {
+    const reconciled = await reconcileStaleRows(supabase, sourceOutcomes, runStartIso)
+    if (reconciled > 0) console.log(`[scrape-events] Reconciled ${reconciled} stale row(s) across sources`)
+  } else {
+    console.log('[scrape-events] Skipping reconciliation: cache batch errors present')
+  }
   // Batch failures mean scraped events were dropped — record them in the run
   for (const be of cacheResult.batchErrors) {
     errorLog.push({ sourceId: '_cache-batch', error: be })
@@ -441,6 +504,7 @@ async function scrapeSingle(sourceId: string): Promise<Record<string, unknown>> 
   }
 
   const start = Date.now()
+  const runStartIso = new Date().toISOString()
   try {
     const events = await scrapeSource(source)
     const durationMs = Date.now() - start
@@ -459,6 +523,9 @@ async function scrapeSingle(sourceId: string): Promise<Record<string, unknown>> 
     }
 
     const cacheResult = await pushToCache(events, [outcome], supabaseUrl, serviceKey)
+    if (cacheResult.batchErrors.length === 0) {
+      await reconcileStaleRows(supabase, [outcome], runStartIso)
+    }
 
     return {
       sourceId: source.id,
