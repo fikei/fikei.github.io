@@ -1414,7 +1414,48 @@ body {
 }
 
 /* ---- Responsive: Tablet (768px) ---- */
+/* Agape Recommended bar — mobile-only tappable filter entry */
+.agape-bar {
+  display: none;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+  background: none;
+  border: var(--border-thin) solid #e8c54766;
+  border-radius: var(--radius-sm, 4px);
+  color: #e8c547;
+  font-size: var(--text-xs);
+  font-family: inherit;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: center;
+}
+
+.venue-tap { cursor: pointer; }
+.venue-tap:hover, .venue-tap--active { text-decoration: underline; text-underline-offset: 2px; }
+.genre-tag[data-tag] { cursor: pointer; }
+
 @media (max-width: 768px) {
+  /* Filter button: icon-only, pinned left of the category slider */
+  .sources-bar { flex-wrap: wrap; }
+  .sources-bar__filter-btn { order: -1; }
+  .sources-bar__filter-label { display: none; }
+  /* Scrolled-to date becomes a full-width bar below the slider */
+  .sources-bar .pulse__current {
+    order: 99;
+    flex-basis: 100%;
+    display: block;
+    padding: var(--space-1) 0 0;
+    border-top: var(--border-thin) solid var(--border-subtle);
+    margin-top: var(--space-1);
+  }
+  .sources-bar .pulse__current:empty { display: none; border: none; margin: 0; padding: 0; }
+  /* Agape chip hides in the slider until its filter is active */
+  .sources-bar__chips .token--agape { display: none; }
+  .sources-bar__chips .token--agape.token--active { display: inline-flex; }
+  .agape-bar { display: block; }
+
   .data-table .col-time,
   .data-table .col-type,
   .data-table .col-genre,
@@ -1734,12 +1775,14 @@ body {
       <!-- Sources bar — rides in the sticky header with the scrolled-to date -->
       <div class="sources-bar">
         <span class="pulse__current" id="pulseCurrent"></span>
-        <div class="sources-bar__chips" id="sourceChips"></div>
-        <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn">
+        <button class="btn btn--sm btn--ghost sources-bar__filter-btn" id="filterToggleBtn" aria-label="Filter">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1" y1="3" x2="11" y2="3"/><line x1="3" y1="6" x2="9" y2="6"/><line x1="5" y1="9" x2="7" y2="9"/></svg>
-          Filter
+          <span class="sources-bar__filter-label">Filter</span>
         </button>
+        <div class="sources-bar__chips" id="sourceChips"></div>
       </div>
+      <!-- Mobile: tappable Agape bar + scrolled-to date bar (CSS-gated) -->
+      <button id="agapeBar" class="agape-bar" style="display:none">★ Agape Recommended</button>
 
       <!-- Filters — DS: .filter-bar (collapsible), opens inside the sticky header -->
       <div class="filter-bar filter-bar--collapsible" id="filterBar" style="display:none">
@@ -2063,8 +2106,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.39.0';
-  console.log(`[events] v${VERSION} - Bars/Dots toggle removed; needles are the visualization`);
+  const VERSION = '1.40.0';
+  console.log(`[events] v${VERSION} - mobile: date bar, icon filter, Agape bar; venue+tag tap filters; bookmark chip; tag hygiene`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2169,10 +2212,23 @@ body {
     return 'other-music';
   }
 
-  // Junk-tag guard: sources ship SEO keywords ("<title> tickets", long phrases)
+  function normalizeVenueKey(v) {
+    return (v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  // Junk-tag guard: no source names, no category/type echoes ("music" on a
+  // Music event), no SEO keywords ("<title> tickets"), no title fragments
+  const JUNK_TAG_WORDS = new Set([
+    'eventbrite','seetickets','eventim','ticketmaster','dice','luma','lu.ma','partiful','tixr',
+    'resident advisor','ra','shotgun','bandsintown','songkick','19hz','see tickets',
+    'music','live','live music','dj set','festival','film','comedy','theater','theatre','tech',
+    'social','art','arts','design','literary','wellness','exhibition','other','event','events',
+    'arts & culture','san francisco','sf','bay area','concert','show',
+  ]);
   function isJunkTag(t, evName) {
     if (!t) return true;
-    const lt = t.toLowerCase();
+    const lt = t.toLowerCase().trim();
+    if (JUNK_TAG_WORDS.has(lt)) return true;
     if (lt.length > 24) return true;
     if (lt.split(/\s+/).length > 3) return true;
     if (/ticket|presale|rsvp|\?|http/.test(lt)) return true;
@@ -2370,7 +2426,7 @@ body {
     events: [],
     sources: [],
     sourceHealth: {},  // { sourceId: { status, consecutive_failures, success_rate, last_failure_reason, ... } }
-    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', agape: false, interested: false, showPast: false },
+    filters: { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', venue: '', tag: '', agape: false, interested: false, showPast: false },
     userLoc: null, // { lat, lng } from browser geolocation, session-cached
     hiddenCategories: new Set(), // categories hidden everywhere via Settings
     mutedMusicTypes: new Set(), // music types hidden everywhere via Settings
@@ -3790,7 +3846,9 @@ body {
       // which would lose multi-day ranges — surface those in the time slot
       const mobileRangeHtml = (!timeStart && ev.endDate) ? `<span class="mobile-date-range">${escHtml(dateDisplay)}</span>` : '';
       // Venue + city combined
-      const venueHtml = escHtml(ev.venue) + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
+      const venueKey = normalizeVenueKey(ev.venue);
+      const venueActive = state.filters.venue && state.filters.venue === venueKey;
+      const venueHtml = `<span class="venue-tap${venueActive ? ' venue-tap--active' : ''}" data-venue="${escHtml(venueKey)}" data-venue-label="${escHtml(ev.venue)}" title="Tap to filter by venue">${escHtml(ev.venue)}</span>` + (ev.city ? `<span class="venue-city"> ${escHtml(ev.city)}</span>` : '');
       // Type
       const typeLabel = CONTENT_TYPES[ev.contentType] || '';
       // Tags: AI-enriched > keyword-detected > cleaned genre (fallback)
@@ -3803,7 +3861,7 @@ body {
       const allTags = [...tagSet.values()].slice(0, 4);
       const mtColor = (musicTypeFor(ev) && MUSIC_TYPES[musicTypeFor(ev)]) ? MUSIC_TYPES[musicTypeFor(ev)].color : null;
         const tagStyle = mtColor ? ` style="border-color:${mtColor}66;color:${mtColor};"` : '';
-        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle}>${escHtml(g)}</span>`).join('');
+        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle} data-tag="${escHtml(g.toLowerCase())}" title="Tap to filter by tag">${escHtml(g)}</span>`).join('');
       // Price with tooltip
       const priceData = formatPriceDisplay(ev.price);
       const priceTitle = priceData.full ? ` title="${escHtml(priceData.full)}"` : '';
@@ -4052,7 +4110,7 @@ body {
         }
         const mtColor = (musicTypeFor(ev) && MUSIC_TYPES[musicTypeFor(ev)]) ? MUSIC_TYPES[musicTypeFor(ev)].color : null;
         const tagStyle = mtColor ? ` style="border-color:${mtColor}66;color:${mtColor};"` : '';
-        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle}>${escHtml(g)}</span>`).join('');
+        const genreHtml = allTags.map(g => `<span class="genre-tag"${tagStyle} data-tag="${escHtml(g.toLowerCase())}" title="Tap to filter by tag">${escHtml(g)}</span>`).join('');
         const descHtml = ev.description ? `<div class="day-detail__desc">${escHtml(ev.description)}</div>` : '';
         const imgHtml = ev.imageUrl ? `<img src="${escHtml(ev.imageUrl)}" class="day-detail__img" alt="" loading="lazy">` : '';
         return `<li class="day-detail__item" data-name="${escHtml(ev.name)}">
@@ -4125,6 +4183,18 @@ body {
     if (agapeCount > 0) {
       html += `<button class="token token--agape ${state.filters.agape ? 'token--active' : ''}" data-agape="1">★ Agape<span class="source-chip__count">${agapeCount}</span></button>`;
     }
+    // Bookmarked filter chip (shown once anything is bookmarked)
+    if (state.bookmarks && state.bookmarks.size > 0) {
+      const bmCount = chipEvents.filter(e => state.bookmarks.has(eventKeyFor(e))).length;
+      html += `<button class="token token--bookmark ${state.filters.interested ? 'token--active' : ''}" data-bookmarkchip="1" title="Only bookmarked events">🔖<span class="source-chip__count">${bmCount}</span></button>`;
+    }
+    // Active venue / tag filters ride as removable chips
+    if (state.filters.venue) {
+      html += `<button class="token token--active" data-venuechip="1" title="Tap to clear venue filter">${escHtml(state.filters.venueLabel || 'Venue')} ×</button>`;
+    }
+    if (state.filters.tag) {
+      html += `<button class="token token--active" data-tagchip="1" title="Tap to clear tag filter">#${escHtml(state.filters.tag)} ×</button>`;
+    }
     html += present.map(c => {
       const active = activeCategory === c;
       return `<button class="token ${active ? 'token--active' : ''}" data-category="${escHtml(c)}">${escHtml(CATEGORY_LABELS[c] || c)}<span class="source-chip__count">${counts[c]}</span></button>`;
@@ -4148,6 +4218,27 @@ body {
       updateFilterChips();
       render();
     });
+    container.querySelector('.token[data-bookmarkchip]')?.addEventListener('click', () => {
+      state.filters.interested = !state.filters.interested;
+      updateFilterChips();
+      render();
+    });
+    container.querySelector('.token[data-venuechip]')?.addEventListener('click', () => {
+      state.filters.venue = ''; state.filters.venueLabel = '';
+      render();
+    });
+    container.querySelector('.token[data-tagchip]')?.addEventListener('click', () => {
+      state.filters.tag = '';
+      render();
+    });
+
+    // Mobile: a dedicated tappable bar for Agape (the chip itself is hidden
+    // in the slider until the filter is active)
+    const bar = document.getElementById('agapeBar');
+    if (bar) {
+      bar.style.display = (agapeCount > 0 && !state.filters.agape) ? '' : 'none';
+      bar.onclick = () => { state.filters.agape = true; updateFilterChips(); render(); };
+    }
   }
 
   // --- Filtering ---
@@ -4182,6 +4273,11 @@ body {
         const toks = (ev.genre || '').toLowerCase().split(/,\s*/).map(t => t.trim()).concat((ev.enrichedTags || []).map(t => t.toLowerCase()));
         if (!toks.includes(subGenre)) return false;
       }
+      if (state.filters.venue && normalizeVenueKey(ev.venue) !== state.filters.venue) return false;
+      if (state.filters.tag) {
+        const toks = (ev.genre || '').toLowerCase().split(/,\s*/).map(t => t.trim()).concat((ev.enrichedTags || []).map(t => t.toLowerCase()));
+        if (!toks.includes(state.filters.tag)) return false;
+      }
       if (state.hiddenCategories.has(getEventCategory(ev.contentType))) return false;
       // Distance: city-centroid haversine against the user's location.
       // Unknown cities are excluded while the filter is active; if location
@@ -4210,7 +4306,7 @@ body {
 
   function clearAllFilters() {
     const hadPast = state.filters.showPast;
-    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', agape: false, interested: false, showPast: false };
+    state.filters = { search: '', city: '', source: '', distance: '', dateFrom: '', dateTo: '', category: '', contentType: '', musicType: '', subGenre: '', venue: '', tag: '', agape: false, interested: false, showPast: false };
     updateFilterChips();
     if (hadPast) fetchAllSources(true);
     document.getElementById('filterSearch').value = '';
@@ -4721,6 +4817,22 @@ body {
 
     // Bookmark ("interested") toggle
     document.getElementById('eventsBody').addEventListener('click', (e) => {
+      const venueEl = e.target.closest('.venue-tap');
+      if (venueEl) {
+        e.preventDefault(); e.stopPropagation();
+        const key = venueEl.dataset.venue;
+        if (state.filters.venue === key) { state.filters.venue = ''; state.filters.venueLabel = ''; }
+        else { state.filters.venue = key; state.filters.venueLabel = venueEl.dataset.venueLabel; }
+        render();
+        return;
+      }
+      const tagEl = e.target.closest('.genre-tag[data-tag]');
+      if (tagEl) {
+        e.preventDefault(); e.stopPropagation();
+        state.filters.tag = state.filters.tag === tagEl.dataset.tag ? '' : tagEl.dataset.tag;
+        render();
+        return;
+      }
       const btn = e.target.closest('.bm-btn');
       if (!btn) return;
       e.preventDefault();
