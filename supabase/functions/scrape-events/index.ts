@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.11.1'
-console.log(`[scrape-events] v${VERSION} - Bottom of the Hill: RSS edit-log dedupe (newest item per page), annotation-stripped names, time sanity guard`)
+const VERSION = '1.11.2'
+console.log(`[scrape-events] v${VERSION} - surface cache-events partial-failure errors; reconciliation skips on any`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -201,6 +201,11 @@ async function pushToCache(
 
       if (resp.ok) {
         const result = await resp.json()
+        // cache-events reports partial failures (e.g. a failed bulk update) inside
+        // a 200 body — surface them so reconciliation knows rows may look stale
+        if (Array.isArray(result.errors) && result.errors.length > 0) {
+          batchErrors.push(...result.errors.map((e: unknown) => String(e)))
+        }
         totalCached += result.cached || 0
         totalUpdated += result.updated || 0
         totalEnrichQueued += result.enrichQueued || 0
