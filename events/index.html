@@ -114,11 +114,27 @@ body {
 
 /* Track + axis share one horizontal scroller so the fixed needle pitch
    survives narrow viewports (scrolls instead of squeezing) */
+.pulse__viewport { position: relative; }
+
 .pulse__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
+
+/* Edge fades hint that the timeline continues beyond the screen */
+.pulse__fade {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 42px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.pulse__fade--left { left: 0; background: linear-gradient(to right, var(--bg, #0a0a0a), transparent); }
+.pulse__fade--right { right: 0; background: linear-gradient(to left, var(--bg, #0a0a0a), transparent); }
+.pulse__viewport.can-left .pulse__fade--left,
+.pulse__viewport.can-right .pulse__fade--right { opacity: 1; }
 .pulse__scroll::-webkit-scrollbar { display: none; }
 
 .pulse__track {
@@ -1740,9 +1756,13 @@ body {
             <button class="pulse__mode-btn" data-mode="dots">Dots</button>
           </div>
         </div>
-        <div class="pulse__scroll">
-          <div class="pulse__track" id="pulseTrack"></div>
-          <div class="pulse__axis" id="pulseAxis"></div>
+        <div class="pulse__viewport">
+          <div class="pulse__scroll" id="pulseScroll">
+            <div class="pulse__track" id="pulseTrack"></div>
+            <div class="pulse__axis" id="pulseAxis"></div>
+          </div>
+          <div class="pulse__fade pulse__fade--left" aria-hidden="true"></div>
+          <div class="pulse__fade pulse__fade--right" aria-hidden="true"></div>
         </div>
       </div>
 
@@ -2078,8 +2098,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.37.0';
-  console.log(`[events] v${VERSION} - The Faight Collective source (auto-added via the new-source mechanism)`);
+  const VERSION = '1.38.0';
+  console.log(`[events] v${VERSION} - pulse strip: full-horizon track, auto-follow scrolling, edge fades`);
 
   // ============================================
   // Stock Sources Catalog
@@ -3505,7 +3525,14 @@ body {
   }
 
   // --- Pulse strip (events-per-day density) ---
-  const PULSE_DAYS = 90;
+  const PULSE_MIN_DAYS = 90, PULSE_MAX_DAYS = 400;
+  function pulseSpanDays(events) {
+    let maxDate = '';
+    events.forEach(ev => { const d = ev.endDate || ev.date; if (d && d > maxDate) maxDate = d; });
+    if (!maxDate) return PULSE_MIN_DAYS;
+    const span = Math.ceil((new Date(maxDate + 'T00:00:00') - new Date(localToday() + 'T00:00:00')) / 86400000) + 3;
+    return Math.max(PULSE_MIN_DAYS, Math.min(PULSE_MAX_DAYS, span));
+  }
   let pulseSpyRows = []; // date-group rows, refreshed by renderTable (scrollspy anchors)
 
   function renderPulse() {
@@ -3515,9 +3542,12 @@ body {
     // while a selected day narrows the list below it
     const events = getFilteredEvents({ ignoreDateRange: true });
 
+    // Run the track to the last known event — past the screen edge — and
+    // let the strip scroll horizontally as time moves forward
+    const spanDays = pulseSpanDays(events);
     const days = [];
     const cursor = new Date();
-    for (let i = 0; i < PULSE_DAYS; i++) { days.push(localDateStr(cursor)); cursor.setDate(cursor.getDate() + 1); }
+    for (let i = 0; i < spanDays; i++) { days.push(localDateStr(cursor)); cursor.setDate(cursor.getDate() + 1); }
 
     const counts = new Map(days.map(ds => [ds, {}]));
     const catsSeen = new Set();
@@ -3608,6 +3638,8 @@ body {
     const track = document.getElementById('pulseTrack');
     track.innerHTML = trackHtml;
     document.getElementById('pulseAxis').innerHTML = axisHtml;
+    // Refresh edge fades now that the track has real width
+    document.getElementById('pulseScroll')?.dispatchEvent(new Event('scroll'));
 
     // Click a day: jump-scroll the list to that date (bind once)
     if (!track.dataset.bound) {
@@ -3685,13 +3717,67 @@ body {
       : null;
     strip.classList.toggle('pulse--spy', !!currentBtn);
     strip.querySelectorAll('.pulse__day--current').forEach(el => el.classList.remove('pulse__day--current'));
-    if (currentBtn) currentBtn.classList.add('pulse__day--current');
+    if (currentBtn) {
+      currentBtn.classList.add('pulse__day--current');
+      followPulseDay(currentBtn);
+    }
+  }
+
+  // Glide the strip horizontally so the day being read stays in view —
+  // parked ~1/3 from the left edge so upcoming days are always previewed.
+  // Skipped while the user is dragging the strip themselves.
+  let _pulseUserScrollUntil = 0;
+  function followPulseDay(btn) {
+    const scroller = btn.closest('.pulse__scroll');
+    if (!scroller || Date.now() < _pulseUserScrollUntil) return;
+    // Only glide when the day drifts toward the edges of the visible strip
+    const rel = btn.offsetLeft - scroller.scrollLeft;
+    const w = scroller.clientWidth;
+    if (rel < w * 0.12 || rel > w * 0.72) {
+      tweenScrollLeft(scroller, Math.max(0, btn.offsetLeft - w * 0.33));
+    }
+  }
+
+  // rAF tween: both the smooth-scroll JS API and CSS scroll-behavior get
+  // cancelled by concurrent page scrolling, so the glide is hand-rolled
+  let _pulseTween = null;
+  function tweenScrollLeft(el, target) {
+    if (_pulseTween) cancelAnimationFrame(_pulseTween);
+    const start = el.scrollLeft, delta = target - start, dur = 380, t0 = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      el.scrollLeft = start + delta * (1 - Math.pow(1 - p, 3)); // ease-out cubic
+      if (p < 1) _pulseTween = requestAnimationFrame(step);
+      else _pulseTween = null;
+    };
+    _pulseTween = requestAnimationFrame(step);
+    // rAF is throttled in occluded tabs — guarantee arrival regardless
+    setTimeout(() => {
+      if (Math.abs(el.scrollLeft - target) > 4) el.scrollLeft = target;
+    }, dur + 250);
   }
 
   // Direct call, no rAF throttle: rAF never fires in a hidden tab, which
   // jammed the throttle flag and froze the collapse/scrollspy permanently.
   // The handler is cheap (class toggle + ≤90 rect reads when collapsed).
   window.addEventListener('scroll', updatePulseScroll, { passive: true });
+
+  // Strip edge fades + user-drag grace: manual strip scrolling pauses the
+  // scrollspy auto-follow briefly so the two never fight
+  (function initPulseStripScroll() {
+    const scroller = document.getElementById('pulseScroll');
+    if (!scroller) return;
+    const viewport = scroller.parentElement;
+    const updateFades = () => {
+      viewport.classList.toggle('can-left', scroller.scrollLeft > 8);
+      viewport.classList.toggle('can-right', scroller.scrollLeft < scroller.scrollWidth - scroller.clientWidth - 8);
+    };
+    scroller.addEventListener('scroll', updateFades, { passive: true });
+    ['wheel', 'touchstart', 'pointerdown'].forEach(evt =>
+      scroller.addEventListener(evt, () => { _pulseUserScrollUntil = Date.now() + 4000; }, { passive: true }));
+    new ResizeObserver(updateFades).observe(scroller);
+    setTimeout(updateFades, 500);
+  })();
 
   function renderExhibitionsRail() {
     const rail = document.getElementById('exhibitionsRail');
