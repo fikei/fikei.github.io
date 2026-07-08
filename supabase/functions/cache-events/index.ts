@@ -7,8 +7,8 @@
 // Body: { events: Event[], sourceOutcomes?: SourceOutcome[] }
 // Returns: { cached, updated, enrichQueued, healthUpdated, errors }
 
-const VERSION = '1.7.1'
-console.log(`[cache-events] v${VERSION} - music_type classification at insert (enrichment refines)`)
+const VERSION = '1.8.0'
+console.log(`[cache-events] v${VERSION} - bulk-update dedupe by event_key (poisoned-batch fix: duplicate keys killed all updates in a batch)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -583,11 +583,18 @@ serve(async (req: Request) => {
     // single intra-batch collision doesn't abort the whole insert (Postgres
     // unique-constraint violation kills a multi-row insert atomically).
     const seenKeys = new Set<string>()
+    const seenUpdateKeys = new Set<string>()
     const toInsert: Record<string, unknown>[] = []
     const toUpdate: Record<string, unknown>[] = []
     for (const r of validRows) {
       const k = r.event_key as string
-      if (existingMap.has(k)) { toUpdate.push(r); continue }
+      if (existingMap.has(k)) {
+        // De-dupe updates too: a bulk upsert that touches the same row twice
+        // dies atomically ("ON CONFLICT cannot affect row a second time"),
+        // silently killing scraped_at refresh for every source in the batch
+        if (!seenUpdateKeys.has(k)) { seenUpdateKeys.add(k); toUpdate.push(r) }
+        continue
+      }
       if (seenKeys.has(k)) continue
       seenKeys.add(k)
       toInsert.push(r)
