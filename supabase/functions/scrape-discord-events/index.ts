@@ -14,8 +14,8 @@
 //
 // Returns: { events: [...], meta: { ... }, cached: boolean }
 
-const VERSION = '1.5.0'
-console.log(`[scrape-discord-events] v${VERSION} - flyer-image vision extraction, no invented times, message-permalink idempotency`)
+const VERSION = '1.5.1'
+console.log(`[scrape-discord-events] v${VERSION} - idempotency widened to all URLs (external links re-extracted duplicates too)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -582,7 +582,9 @@ async function forwardToCanonicalStore(events: ExtractedEvent[]): Promise<Record
   // re-extraction would mint a duplicate event. Once a message permalink
   // has produced an event row, later runs don't get to create another.
   let toForward = events
-  const permalinks = [...new Set(events.map(e => e.url).filter(u => u && u.includes('discord.com/channels/')))]
+  // Any URL counts as identity — external links (ra.co, luma, tixr) posted
+  // to the channel re-extract with jitter just like permalinked posts did
+  const permalinks = [...new Set(events.map(e => e.url).filter(Boolean))]
   if (permalinks.length > 0) {
     try {
       const { data: existing } = await getSupabase()
@@ -592,7 +594,7 @@ async function forwardToCanonicalStore(events: ExtractedEvent[]): Promise<Record
         .in('url', permalinks)
       const ingested = new Set((existing || []).map(r => r.url))
       const before = toForward.length
-      toForward = events.filter(e => !e.url.includes('discord.com/channels/') || !ingested.has(e.url))
+      toForward = events.filter(e => !e.url || !ingested.has(e.url))
       if (toForward.length !== before) {
         console.log(`Idempotency: skipped ${before - toForward.length} event(s) whose source message is already ingested`)
       }
