@@ -6,8 +6,8 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
-const VERSION = '1.3.0'
-console.log(`[enrich-event] v${VERSION} - AI music_type classification (fixed 8-bucket taxonomy)`)
+const VERSION = '1.3.1'
+console.log(`[enrich-event] v${VERSION} - descriptive activity tags for social/art; no source/title/category echoes`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -213,7 +213,7 @@ async function classifyWithAI(event: {
   const desc = (event.description || '').substring(0, 300)
   const prompt = `You are classifying a live event. Given the event details below, return a JSON object with two fields:
 
-1. "genre" — the music/art genre (e.g. "Techno", "House", "Hip-Hop", "Jazz", "Rock", "Comedy", "Film", "Indie", "Drum & Bass"). Use the most specific genre that fits. If multiple genres apply, comma-separate up to 3. Return "" if truly unknown.
+1. "genre" — up to 3 comma-separated descriptive tags. For music: the specific genre ("Techno", "Indie Rock", "Jazz"). For social events: the activity ("Networking", "Dinner Party", "Rooftop Party", "Book Club", "Run Club", "Trivia"). For art/design: the form ("Gallery Opening", "Immersive Art", "Ceramics Workshop", "Figure Drawing", "Screen Printing", "Photography"). Never use source names (Eventbrite, Luma), the event title, or bare category words (music/art/social/event). Return "" if truly unknown.
 
 2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, tech, social, art, design, literary, wellness, other
 
