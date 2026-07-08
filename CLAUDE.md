@@ -20,14 +20,11 @@ Personal curation platform — collect, organize, and build on everything that m
 1. **Plan hierarchy:** Phases > Epics > Stories > Tasks. "Work item" = any item; determine fidelity level and place in the project plan.
 2. **Show complete code blocks** with full paths. Don't summarize when exact text is needed.
 3. **End every response** with a "Next Steps" section (numbered steps + commands) or "No action needed."
-4. **Plans** live in `docs/execution/project-plan/`. Never edit manually — use `/plan`.
+4. **Docs travel with code:** when a change affects plans, architecture, or UX docs, update the relevant files under `docs/` directly in the same PR. Plans live in `docs/execution/project-plan/`.
 5. **Notion sync:** update markdown in `docs/`, list in `notion-structure.json`, push. Details: `docs/infrastructure/NOTION-SYNC-GUIDE.md`.
-6. **After significant work:** run `/pm changelog`.
-7. **Design system:** check `design-system/` before any UI work. Document new CSS classes in `design-system/README.md`.
-8. **Announce doc changes:** state file path and what changed.
-9. **After shipping a feature:** `/plan` to update tasks + `/ux <area>` if UI changed.
-10. **Widget work:** check `design-system/widgets.html` stoplight audit before starting (Green=ok, Yellow=needs dev action, Orange=needs review, Red=blocked).
-11. **Never edit docs directly** — use Documentation Agent slash commands. After code work, recommend `/plan`, `/arch` (if architecture changed), `/ux` (if UI changed). See `.claude/agents/documentation-agent.md`.
+6. **Design system:** check `design-system/` before any UI work. Document new CSS classes in `design-system/README.md`.
+7. **Announce doc changes:** state file path and what changed.
+8. **Widget work:** check `design-system/widgets.html` stoplight audit before starting (Green=ok, Yellow=needs dev action, Orange=needs review, Red=blocked).
 
 ---
 
@@ -94,8 +91,7 @@ Personal curation platform — collect, organize, and build on everything that m
 
 ## Agents
 
-One agent (Claude Code) with 8 operational modes. Definition: `.claude/agents/AGENT-DEFINITION.md`
-Slash commands (`/plan /arch /capture /ux /branch /cleanup /pm`): `.claude/agents/documentation-agent.md`
+Optional specialized subagent definitions live in `.claude/agents/` (documentation, security, PM, etc.) — use via the Agent tool when a task fits; not required for routine work.
 
 ---
 
