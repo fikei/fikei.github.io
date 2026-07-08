@@ -19,14 +19,29 @@ function to24h(time: string): string {
   const ampm = m[3].toUpperCase()
   if (ampm === 'PM' && h !== 12) h += 12
   if (ampm === 'AM' && h === 12) h = 0
-  return `${String(h).padStart(2, '0')}:${m[2] || '00'}`
+  if (h > 23) return ''
+  const out = `${String(h).padStart(2, '0')}:${m[2] || '00'}`
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(out) ? out : ''
 }
 
 export async function scrapeBottomOfTheHill(source: EventSource): Promise<ScrapedEvent[]> {
   const xml = await fetchUrl(source.url)
   const events: ScrapedEvent[] = []
 
+  // The feed is an append-only edit log: every upstream edit (lineup change,
+  // "----now All Ages" note, cancellation) adds a NEW <item> for the same
+  // per-date page and the old items stay — 100+ pages appear 2-3x. Group by
+  // link and keep only the newest pubDate: the venue's latest word.
+  const newestByLink = new Map<string, { ts: number; item: string }>()
   for (const item of xml.split('<item>').slice(1)) {
+    const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() || source.url
+    const pub = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || ''
+    const ts = pub ? new Date(pub).getTime() || 0 : 0
+    const prev = newestByLink.get(link)
+    if (!prev || ts > prev.ts) newestByLink.set(link, { ts, item })
+  }
+
+  for (const { item } of newestByLink.values()) {
     const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || ''
     const desc = decodeEntities(item.match(/<description>([\s\S]*?)<\/description>/)?.[1] || '')
     const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() || source.url
@@ -41,7 +56,12 @@ export async function scrapeBottomOfTheHill(source: EventSource): Promise<Scrape
     cutoff.setDate(cutoff.getDate() - 7)
     if (date < cutoff.toISOString().split('T')[0]) continue
 
-    const name = dm[4].split('~').map(s => s.trim()).filter(s => s && s.toUpperCase() !== 'TBA').join(', ')
+    // Strip inline edit annotations ("----now All Ages", "----now this show
+    // is not announced...") — they're notes, not lineup
+    const name = dm[4].split('~')
+      .map(s => s.replace(/\s*-{2,}\s*now\b[\s\S]*$/i, '').trim())
+      .filter(s => s && s.toUpperCase() !== 'TBA')
+      .join(', ')
     if (!name) continue
 
     const descText = desc.replace(/<[^>]+>/g, ' ')
