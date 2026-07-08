@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.11.0'
-console.log(`[scrape-events] v${VERSION} - stale-row reconciliation: renamed/cancelled listings no longer linger as duplicates`)
+const VERSION = '1.11.1'
+console.log(`[scrape-events] v${VERSION} - Bottom of the Hill: RSS edit-log dedupe (newest item per page), annotation-stripped names, time sanity guard`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
