@@ -5,26 +5,9 @@
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchPipeline, fetchRecommendations }] = await Promise.all([
+const [{ fetchPipeline, fetchRecommendations, BUCKETS, bucketFor, isVisibleRole, normalizeBucket }] = await Promise.all([
   import('../pipeline.js' + V),
 ]);
-
-// Bucket-assignment for pipeline rows — mirrors job-pipeline.js exactly.
-// Kept in sync by hand. Status taxonomy is now 3 values.
-function bucketFor(r) {
-  switch (r.status) {
-    case 'Active':  return 'active';
-    case 'Archive': return 'archive';
-    default:        return 'leads';
-  }
-}
-function isVisibleRole(r) {
-  if (!r.url) return false;
-  const company = (r.company || '').toLowerCase();
-  if (company === 'strava') return false;
-  if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
-  return true;
-}
 
 // Primary-nav line icons — 20px, 1.8 stroke, inherit currentColor.
 // The ONLY place icons are allowed (DESIGN.md rule 7). Keep in sync with
@@ -38,10 +21,10 @@ export const NAV_ICONS = {
 };
 
 // Nav taxonomy: Inbox is top-level (the daily loop shouldn't hide under
-// Jobs); Jobs holds the pipeline buckets. Sub-items are either a
-// bucket-filter on /ladder/jobs/ (matched by `bucket`) or a real sub-page
-// (matched by `path` prefix). `countKey` says which count to show.
-// Bucket VALUES ('active') are the data model; labels are display-only.
+// Jobs); Jobs holds the six pipeline buckets — Saved, the four in-progress
+// stages, and Archive — as first-class sub-items (matched by `bucket`). The
+// Search plan sub-items are real sub-pages (matched by `section`). `countKey`
+// says which count to show. Keep in sync with the mobile drawer in app.js.
 const ROUTES = [
   { href: '/ladder/jobs/recommended/', label: 'Inbox', icon: 'inbox',
     match: /^\/ladder\/jobs\/recommended\/?/, countKey: 'recommended' },
@@ -51,9 +34,12 @@ const ROUTES = [
     icon: 'jobs',
     match: /^\/ladder\/jobs(?!\/recommended)\/?/,
     sub: [
-      { href: '/ladder/jobs/?bucket=leads',     label: 'Saved',       bucket: 'leads',   countKey: 'leads' },
-      { href: '/ladder/jobs/?bucket=active',    label: 'In progress', bucket: 'active',  countKey: 'active' },
-      { href: '/ladder/jobs/?bucket=archive',   label: 'Archive',     bucket: 'archive' },
+      { href: '/ladder/jobs/?bucket=saved',        label: 'Saved',        bucket: 'saved',        countKey: 'saved' },
+      { href: '/ladder/jobs/?bucket=drafting',     label: 'Drafting',     bucket: 'drafting',     countKey: 'drafting' },
+      { href: '/ladder/jobs/?bucket=applied',      label: 'Applied',      bucket: 'applied',      countKey: 'applied' },
+      { href: '/ladder/jobs/?bucket=interviewing', label: 'Interviewing', bucket: 'interviewing', countKey: 'interviewing' },
+      { href: '/ladder/jobs/?bucket=offer',        label: 'Offer',        bucket: 'offer',        countKey: 'offer' },
+      { href: '/ladder/jobs/?bucket=archive',      label: 'Archive',      bucket: 'archive',      countKey: 'archive' },
     ],
   },
   { href: '/ladder/history/',  label: 'Profile',     icon: 'profile',  match: /^\/ladder\/history\/?/ },
@@ -81,14 +67,14 @@ export class JobRail extends LitElement {
   static properties = {
     path:   { state: true },
     bucket: { state: true },
-    counts: { state: true },        // { leads, active, recommended } or null
+    counts: { state: true },        // { saved, drafting, applied, interviewing, offer, archive, recommended } or null
     email:  { state: true },
   };
 
   constructor() {
     super();
     this.path = location.pathname;
-    this.bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
+    this.bucket = normalizeBucket(new URLSearchParams(location.search).get('bucket')) || 'saved';
     this.sectionParam = new URLSearchParams(location.search).get('section') || null;
     this.counts = null;
     this.email = window.CtrlAuth?.getUser?.()?.email || '';
@@ -137,14 +123,16 @@ export class JobRail extends LitElement {
         fetchRecommendations({ view: 'all', floor: true, limit: 1 }).catch(() => null),
       ]);
       const roles = (pipe?.roles || []).filter(isVisibleRole);
-      const leads  = roles.filter(r => bucketFor(r) === 'leads').length;
-      const active = roles.filter(r => bucketFor(r) === 'active').length;
+      // One count per bucket (Saved · 4 stages · Archive), derived from the
+      // shared bucketFor so the rail never drifts from the list.
+      const counts = Object.fromEntries(BUCKETS.map(b => [b, 0]));
+      for (const r of roles) counts[bucketFor(r)]++;
       // `total` is the true count of all matching recs; `count` is only the
       // returned page size (caps at the server's page limit, e.g. 100).
-      const recommended = recs?.total ?? recs?.count ?? (recs?.recommendations?.length ?? 0);
-      this.counts = { leads, active, recommended };
-      // Broadcast so other mobile chrome (the drawer + segmented .subnav-bar
-      // in app.js) can pull the same counts without re-fetching.
+      counts.recommended = recs?.total ?? recs?.count ?? (recs?.recommendations?.length ?? 0);
+      this.counts = counts;
+      // Broadcast so the mobile drawer in app.js can pull the same counts
+      // without re-fetching.
       document.dispatchEvent(new CustomEvent('job:rail:counts', { detail: this.counts }));
     } finally {
       this._loading = false;

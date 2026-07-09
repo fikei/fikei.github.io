@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.15.1';
-console.log(`[jobs-pipe] v${VERSION} - fit.ts: optional watchedCompany flag suppresses the public/mega-cap hard fail for watched-company roles`);
+const VERSION = '0.16.0';
+console.log(`[jobs-pipe] v${VERSION} - every Active row carries a stage (default 'drafting'); stage-less Active writes no longer wipe the stage`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -212,10 +212,11 @@ serve(async (req) => {
       }
 
       // Read current row so we can apply the auto-promote / exit-reason rules.
-      const cur = await sql<{ status: string | null }[]>`
-        select status from job.pipeline_roles where slug = ${slug} limit 1`;
+      const cur = await sql<{ status: string | null; stage: string | null }[]>`
+        select status, stage from job.pipeline_roles where slug = ${slug} limit 1`;
       if (!cur[0]) return err('role not found', 404);
       const currentStatus = cur[0].status || 'Saved';
+      const currentStage  = cur[0].stage || null;
 
       // Auto-promotion rule: any non-null stage implies Active. Caller
       // may pass stage='applied' alone (no status) on a Saved row;
@@ -230,8 +231,14 @@ serve(async (req) => {
         return err('exit_reason required when archiving', 400);
       }
 
-      // Stage only valid on Active rows. Saved/Archive carry stage=null.
-      const finalStage = finalStatus === 'Active' ? (stage ?? null) : null;
+      // Stage only valid on Active rows (Saved/Archive carry stage=null), and
+      // every Active row MUST have a stage — the four stages are first-class
+      // bucket pages now, so a stage-less Active row would have no home.
+      // Default to 'drafting' (the pipeline entry point). Writes that don't
+      // touch stage preserve the current one rather than wiping it.
+      const finalStage = finalStatus === 'Active'
+        ? (hasStage ? (stage ?? 'drafting') : (currentStage ?? 'drafting'))
+        : null;
 
       // exit_reason cleared when not Archive.
       const finalExitReason = finalStatus === 'Archive'

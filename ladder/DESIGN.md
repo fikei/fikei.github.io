@@ -43,7 +43,7 @@ Nav labels are one-word nouns in sentence case; URLs and DB status values never 
 | Surface | Name | Notes |
 |-|-|-|
 | /ladder/jobs/recommended/ | **Inbox** | Top-level nav item (the daily loop), not under Jobs. Formerly "For You". |
-| /ladder/jobs/ buckets | **Saved · In progress · Archive** | Display labels; DB status values stay `Saved/Active/Archive` (`STATUS_LABELS` in ladder-pipeline.js). |
+| /ladder/jobs/ buckets | **Saved · Drafting · Applied · Interviewing · Offer · Archive** | Six first-class buckets, all at the same level, nested under **Jobs** in primary nav (rail `sub` + mobile drawer — there is no in-page sub-nav bar). Derived from DB `status` (`Saved/Active/Archive`) + `stage` (`drafting/applied/interviewing/offer`) by the shared `bucketFor()` in `pipeline.js` (single source of truth; `BUCKETS`/`BUCKET_LABELS` there too). An Active row always has a stage (default `drafting`). URLs: `?bucket=<id>`; legacy `leads`→`saved`, `active`→`drafting`. |
 | /ladder/history/ | **Profile** | Formerly "Your career". |
 | /ladder/vision/ | **Search plan** | Subpages: Targets · Signals · Rules · Sources. |
 | Page titles | `<Page> — Ladder` | No slash-prefix branding anywhere ("Ask Ladder", gate says "Ladder"). |

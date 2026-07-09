@@ -7,22 +7,9 @@
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const [{ fetchPipeline, fetchRecommendations }] = await Promise.all([
+const [{ fetchPipeline, fetchRecommendations, bucketFor, isVisibleRole, STAGE_IDS }] = await Promise.all([
   import('../pipeline.js' + V),
 ]);
-
-function isVisibleRole(r) {
-  if (!r.url) return false;
-  const company = (r.company || '').toLowerCase();
-  if (company === 'strava') return false;
-  if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
-  return true;
-}
-function bucketOf(r) {
-  if (r.status === 'Active') return 'active';
-  if (r.status === 'Archive') return 'archive';
-  return 'leads';
-}
 
 export class JobHome extends LitElement {
   createRenderRoot() { return this; }
@@ -60,8 +47,9 @@ export class JobHome extends LitElement {
         fetchRecommendations({ view: 'top' }).catch(() => null),
       ]);
       const roles = (pipe?.roles || []).filter(isVisibleRole);
-      const leads  = roles.filter(r => bucketOf(r) === 'leads').length;
-      const active = roles.filter(r => bucketOf(r) === 'active').length;
+      const leads  = roles.filter(r => bucketFor(r) === 'saved').length;
+      // "In progress" summary = every role in one of the four stage buckets.
+      const active = roles.filter(r => STAGE_IDS.includes(bucketFor(r))).length;
       const recommended = recs?.count ?? (recs?.recommendations?.length ?? 0);
       this.counts = { leads, active, recommended };
       this.topRecs = (recs?.recommendations || []).slice(0, 5);

@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.27.0";
-console.log(`[ladder] v${VERSION} - review viewer: ?rec= deep-link in URL, ←/→ arrow-key traversal, Skip button`);
+const VERSION = "2.28.0";
+console.log(`[ladder] v${VERSION} - pipeline split into 6 buckets (Saved · Drafting · Applied · Interviewing · Offer · Archive) under Jobs in primary nav; flat "Move to" menu`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -117,7 +117,6 @@ async function applySignedInState(email) {
   document.dispatchEvent(new CustomEvent('job:auth:ready', { detail: { email } }));
   injectFooter();
   injectMobileBar();
-  injectSubnavBar();
   injectChat();
 }
 
@@ -171,8 +170,18 @@ function injectMobileBar() {
 const DRAWER_ITEMS = [
   { href: '/ladder/jobs/recommended/', label: 'Inbox',       countKey: 'recommended', match: /^\/ladder\/jobs\/recommended\/?/,
     icon: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
-  { href: '/ladder/jobs/',             label: 'Jobs',        countKey: 'leads',       match: /^\/ladder\/jobs(?!\/recommended)\/?/,
-    icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
+  { href: '/ladder/jobs/',             label: 'Jobs',        match: /^\/ladder\/jobs(?!\/recommended)\/?/,
+    icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    // Six pipeline buckets as first-class sub-items (primary nav, no in-page
+    // sub-nav bar). Keep in sync with the Jobs `sub` in components/ladder-rail.js.
+    sub: [
+      { href: '/ladder/jobs/?bucket=saved',        label: 'Saved',        bucket: 'saved',        countKey: 'saved' },
+      { href: '/ladder/jobs/?bucket=drafting',     label: 'Drafting',     bucket: 'drafting',     countKey: 'drafting' },
+      { href: '/ladder/jobs/?bucket=applied',      label: 'Applied',      bucket: 'applied',      countKey: 'applied' },
+      { href: '/ladder/jobs/?bucket=interviewing', label: 'Interviewing', bucket: 'interviewing', countKey: 'interviewing' },
+      { href: '/ladder/jobs/?bucket=offer',        label: 'Offer',        bucket: 'offer',        countKey: 'offer' },
+      { href: '/ladder/jobs/?bucket=archive',      label: 'Archive',      bucket: 'archive',      countKey: 'archive' },
+    ] },
   { href: '/ladder/history/',          label: 'Profile',     match: /^\/ladder\/history\/?/,
     icon: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
   { href: '/ladder/vision/',           label: 'Search plan', match: /^\/ladder\/vision\/?/,
@@ -195,14 +204,36 @@ function injectNavDrawer() {
         <span class="brand__text">Ladder</span>
       </a>
       <ul class="nav-drawer__list">
-        ${DRAWER_ITEMS.map(i => `
+        ${DRAWER_ITEMS.map(i => {
+          const parentActive = i.match.test(here);
+          // Normalize the current ?bucket= so legacy links still highlight
+          // the right sub-item (leads→saved, active→drafting).
+          const curBucket = (() => {
+            const b = new URLSearchParams(location.search).get('bucket');
+            if (!b || b === 'leads') return 'saved';
+            if (b === 'active') return 'drafting';
+            return b;
+          })();
+          const sub = (parentActive && i.sub) ? `
+            <ul class="nav-drawer__sublist">
+              ${i.sub.map(s => `
+                <li>
+                  <a class="nav-drawer__subitem" href="${s.href}" aria-current="${curBucket === s.bucket ? 'page' : 'false'}">
+                    <span class="nav-sub__label">${s.label}</span>
+                    ${s.countKey ? `<span class="nav-count" data-count="${s.countKey}" hidden></span>` : ''}
+                  </a>
+                </li>`).join('')}
+            </ul>` : '';
+          return `
           <li>
-            <a class="nav-drawer__item" href="${i.href}" aria-current="${i.match.test(here) ? 'page' : 'false'}">
+            <a class="nav-drawer__item" href="${i.href}" aria-current="${parentActive ? 'page' : 'false'}">
               <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${i.icon}</svg></span>
               <span class="nav-label">${i.label}</span>
               ${i.countKey ? `<span class="nav-count" data-count="${i.countKey}" hidden></span>` : ''}
             </a>
-          </li>`).join('')}
+            ${sub}
+          </li>`;
+        }).join('')}
       </ul>
       <div class="nav-drawer__user">
         <span class="rail-user__dot" aria-hidden="true"></span>
@@ -239,77 +270,9 @@ function toggleNavDrawer(open) {
   document.body.style.overflow = open ? 'hidden' : '';
 }
 
-// Inject the mobile segmented sub-nav (sticky under mobile-bar). Only
-// populated on /ladder/jobs/ today; data-has-items toggles visibility so
-// CSS only shows it when there's something to switch between. Counts are
-// kept in sync by listening to the same 'job:pipeline:refresh' that the
-// rail uses to refresh its count badges.
-function injectSubnavBar() {
-  if (document.querySelector('.subnav-bar')) return;
-  const app = document.querySelector('.app');
-  if (!app) return;
-
-  const bar = document.createElement('nav');
-  bar.className = 'subnav-bar';
-  bar.setAttribute('aria-label', 'Sub-navigation');
-  bar.dataset.hasItems = 'false';
-  bar.innerHTML = `<div class="subnav-bar__row"></div>`;
-  // Place directly after the mobile-bar (which has been inserted before .app).
-  const mb = document.querySelector('.mobile-bar');
-  if (mb) mb.after(bar);
-  else document.body.insertBefore(bar, app);
-
-  const row = bar.querySelector('.subnav-bar__row');
-  const here = location.pathname;
-  // Pipeline buckets only — the Inbox is its own top-level page now, so
-  // /ladder/jobs/recommended/ gets no segmented sub-nav.
-  const isJobs = /^\/ladder\/jobs(?!\/recommended)\/?/.test(here) && !/^\/ladder\/jobs\/drill/.test(here);
-
-  if (!isJobs) {
-    bar.dataset.hasItems = 'false';
-    return;
-  }
-
-  // Keep in sync with the Jobs sub-items in components/ladder-rail.js.
-  const ITEMS = [
-    { href: '/ladder/jobs/?bucket=leads',   label: 'Saved',       bucket: 'leads',  countKey: 'leads' },
-    { href: '/ladder/jobs/?bucket=active',  label: 'In progress', bucket: 'active', countKey: 'active' },
-    { href: '/ladder/jobs/?bucket=archive', label: 'Archive',     bucket: 'archive' },
-  ];
-  const bucket = new URLSearchParams(location.search).get('bucket') || 'leads';
-  row.innerHTML = ITEMS.map(i => {
-    const active = bucket === i.bucket;
-    return `<a class="subnav-bar__item" href="${i.href}" aria-current="${active ? 'page' : 'false'}"
-              data-count-key="${i.countKey || ''}">
-              <span class="subnav-bar__label">${i.label}</span>
-              ${i.countKey ? `<span class="nav-count" data-count="${i.countKey}" hidden></span>` : ''}
-            </a>`;
-  }).join('');
-  bar.dataset.hasItems = 'true';
-
-  const applyCounts = (counts) => {
-    if (!counts) return;
-    for (const el of bar.querySelectorAll('[data-count]')) {
-      const k = el.getAttribute('data-count');
-      const n = counts[k];
-      if (n == null) { el.hidden = true; continue; }
-      el.hidden = false;
-      el.textContent = String(n);
-    }
-  };
-
-  // The rail component already fetches and stores counts on itself; listen
-  // for its broadcast event and apply.
-  const askRail = () => {
-    const rail = document.querySelector('ladder-rail');
-    if (rail?.counts) applyCounts(rail.counts);
-  };
-  document.addEventListener('job:rail:counts', (e) => applyCounts(e.detail));
-  document.addEventListener('job:pipeline:refresh', () => setTimeout(askRail, 200));
-  askRail();
-}
-
-// (Bottom tab bar removed — drawer is the only mobile nav now.)
+// (The mobile segmented sub-nav bar was removed — the pipeline buckets now
+// live in primary navigation, nested under Jobs in both the rail and the
+// mobile drawer above. Bottom tab bar was removed earlier too.)
 
 // Global toast host. Components all over the app dispatch
 // `job:toast { detail: { msg } }` — this is the single renderer (there
