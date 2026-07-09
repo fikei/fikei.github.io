@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.24.0";
-console.log(`[ladder] v${VERSION} - persistent "Scanning Gmail…" draining loader on For You; Gmail reconnect now force-kicks a scan`);
+const VERSION = "2.25.0";
+console.log(`[ladder] v${VERSION} - per-row dismiss ("not for me") button on Inbox rows`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 

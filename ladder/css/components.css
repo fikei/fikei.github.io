@@ -6209,6 +6209,14 @@ body[data-auth-state="out"] job-chat { display: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Trailing action cluster — quiet dismiss + primary Review, balanced as a
+   pair so the row reads as a two-choice triage (skip / look closer). */
+.inbox-row__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .inbox-row__review {
   flex-shrink: 0;
   height: 36px;
@@ -6217,6 +6225,24 @@ body[data-auth-state="out"] job-chat { display: none; }
   border: 0;
 }
 .inbox-row__review:hover { background: var(--bg-overlay); }
+/* "Not for me" — icon-only, muted until hover so Review stays the dominant
+   action; hover reveals an error tint to signal removal. Same 36px target
+   and pill radius as the header ⋯ trigger for a consistent icon-button feel. */
+.inbox-row__dismiss {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease, transform 80ms ease;
+}
+.inbox-row__dismiss:hover { background: var(--bg-overlay); color: var(--error); }
+.inbox-row__dismiss:active { transform: translateY(1px); }
 .inbox-row--skeleton { gap: var(--space-3); }
 .inbox-row--skeleton .inbox-row__text { flex: 1; gap: 6px; }
 
