@@ -32,4 +32,11 @@ Line heights: `--lh-display: 1.1`, `--lh-title: 1.25`, `--lh-body: 1.55`, `--lh-
 
 ## Cache busting
 
-Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js`. The string is appended to `<link>`/`<script>` URLs and to dynamic `import(...)` calls so GH Pages' 10-minute `max-age` doesn't shadow new deploys.
+Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js` **and** the hardcoded `?v=` query on every `/ladder/**/*.html` `<script>` tag (grep `v=<old>` to catch them all). The string is appended to `<link>`/`<script>` URLs and to dynamic `import(...)` calls so GH Pages' 10-minute `max-age` doesn't shadow new deploys.
+
+## For You — source state banners
+
+Above the recommendations table (`ladder-recommendations-table`), two mutually-informative strips:
+
+- `.recs-health-banner` (error-colored) — a source is **blind**: dead Gmail token (`needsReauth` → "Reconnect Gmail" button) or a `lastError`. Distinct from "no new recs".
+- `.recs-draining` (accent-colored, with `.recs-draining__spinner`) — the backend is **actively scanning Gmail**. Shown while a pull run we kicked is in flight; auto-clears when the gmail-jobs source's `lastRunAt` advances past the kick (polled every 8s) or after a 150s safety cap. Triggered by: the manual **Refresh** button, a fresh **Gmail reconnect** (which also force-runs the scan), and resumed on mount if a recent kick hasn't completed (survives the reconnect OAuth round-trip). The kick timestamp lives in `localStorage['job:lastPullKickAt']`, shared with `pipeline.js` `refreshSources()`.

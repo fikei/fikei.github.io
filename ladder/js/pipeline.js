@@ -10,11 +10,19 @@ const PULL_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/pull-rec
 // truth (user_sources.schedule_cron vs last_run_at).
 const PULL_MIN_INTERVAL_MS = 5 * 60 * 1000;     // 5 min — half the server's 15-min cadence
 
-export async function refreshSources({ silent = false } = {}) {
-  // Throttle: if we kicked a pull within PULL_MIN_INTERVAL_MS, skip.
+// force:    bypass the client throttle (used for high-signal triggers like a
+//           fresh Gmail reconnect where the user expects an immediate scan).
+// sourceId: force-run ONE user_source by id, bypassing the server's is-due
+//           gate (POST {id}). Without it we POST {} → all enabled+due sources,
+//           same as cron. Reconnect passes the gmail-jobs id so the scan runs
+//           even if the source ran (and failed) minutes ago and isn't "due".
+export async function refreshSources({ silent = false, force = false, sourceId = null } = {}) {
+  // Throttle: if we kicked a pull within PULL_MIN_INTERVAL_MS, skip — unless
+  // force is set. The kick timestamp doubles as the "draining since" marker
+  // the recs table polls against, so we always stamp it when we actually fire.
   try {
     const lastTs = Number(localStorage.getItem('job:lastPullKickAt') || 0);
-    if (Date.now() - lastTs < PULL_MIN_INTERVAL_MS) {
+    if (!force && Date.now() - lastTs < PULL_MIN_INTERVAL_MS) {
       return { kicked: false, throttled: true, lastKickAt: new Date(lastTs).toISOString() };
     }
     localStorage.setItem('job:lastPullKickAt', String(Date.now()));
@@ -30,15 +38,15 @@ export async function refreshSources({ silent = false } = {}) {
     fetch(PULL_URL, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      // No body → all enabled+due user_sources run, same as the cron path.
-      body: JSON.stringify({}),
+      // {id} → force that one source (bypasses is-due); {} → all due sources.
+      body: JSON.stringify(sourceId ? { id: sourceId } : {}),
       keepalive: true,
     }).catch(() => { /* fire-and-forget; server completes its own work */ });
   } catch (e) {
     kickedOk = false;
     if (!silent) console.warn('[refreshSources] kick failed:', e.message);
   }
-  return { kicked: kickedOk, throttled: false };
+  return { kicked: kickedOk, throttled: false, kickAt: Date.now() };
 }
 
 async function authHeader() {

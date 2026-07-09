@@ -30,6 +30,11 @@ const COLUMNS = [
 // Page size for the infinite-scroll fetch. Server caps at 200; 100 keeps
 // each round-trip light while filling a tall viewport in one or two pages.
 const PAGE_SIZE = 100;
+// Draining loader tuning. A single pull run is ~30–90s; cap the loader so it
+// can never stick if a run dies. Poll cadence balances responsiveness vs load.
+const DRAIN_MAX_MS   = 150 * 1000;
+const DRAIN_POLL_MS  = 8 * 1000;
+const PULL_KICK_KEY  = 'job:lastPullKickAt';   // shared with pipeline.js refreshSources
 
 function relTime(iso) {
   if (!iso) return '';
@@ -68,6 +73,7 @@ export class JobRecommendationsTable extends LitElement {
     _refreshFeedback:    { state: true },
     _health:             { state: true },
     _reconnecting:       { state: true },
+    _draining:           { state: true },
     _total:              { state: true },
     _loadingMore:        { state: true },
     _hasMore:            { state: true },
@@ -90,6 +96,12 @@ export class JobRecommendationsTable extends LitElement {
     this._refreshFeedback = '';
     this._health = [];
     this._reconnecting = false;
+    // Draining = a scan the backend is actively working. Set when we kick a
+    // pull (manual refresh, Gmail reconnect) and cleared when the gmail-jobs
+    // source's lastRunAt advances past the kick, or after DRAIN_MAX_MS.
+    this._draining = false;
+    this._drainKickAt = 0;   // ms epoch of the kick we're waiting on
+    this._drainPoll = null;  // setInterval handle
     this._total = 0;
     this._offset = 0;
     this._loadingMore = false;
@@ -152,23 +164,89 @@ export class JobRecommendationsTable extends LitElement {
     `;
   }
 
+  // ----- Draining loader -------------------------------------------------
+  // "Draining" means the backend is actively scanning Gmail for this user.
+  // We know a scan is in flight because we (or a prior page, via the shared
+  // localStorage kick timestamp) just fired one; it's done when the
+  // gmail-jobs source's lastRunAt advances past the kick we're waiting on.
+
+  _gmailHealth() {
+    return (this._health || []).find(s => s.type === 'gmail-jobs') || null;
+  }
+
+  // Has the gmail-jobs source completed a run since `kickAt`?
+  _drainDoneFor(kickAt) {
+    const g = this._gmailHealth();
+    if (!g || !g.lastRunAt) return false;
+    return new Date(g.lastRunAt).getTime() >= kickAt - 1000;   // 1s clock slack
+  }
+
+  // Begin/refresh the draining indicator for the run kicked at `kickAt`.
+  // Idempotent: re-kicking (e.g. a second refresh) just extends the wait.
+  _startDraining(kickAt) {
+    this._drainKickAt = kickAt || Date.now();
+    this._draining = true;
+    this.requestUpdate();
+    if (this._drainPoll) return;   // already polling
+    this._drainPoll = setInterval(() => this._pollDrain(), DRAIN_POLL_MS);
+  }
+
+  _stopDraining() {
+    this._draining = false;
+    if (this._drainPoll) { clearInterval(this._drainPoll); this._drainPoll = null; }
+    this.requestUpdate();
+  }
+
+  async _pollDrain() {
+    // Timed out — clear so the loader can never wedge on a dead run.
+    if (Date.now() - this._drainKickAt > DRAIN_MAX_MS) { this._stopDraining(); return; }
+    // Re-fetch to pick up fresh recs AND updated sourceHealth.lastRunAt.
+    await this._fetchPage({ reset: true });
+    if (this._drainDoneFor(this._drainKickAt)) this._stopDraining();
+    this.requestUpdate();
+  }
+
+  // On (re)mount, resume the loader if a recent kick hasn't completed yet —
+  // survives navigation and the Gmail-reconnect OAuth round-trip.
+  _resumeDrainingIfPending() {
+    let kickAt = 0;
+    try { kickAt = Number(localStorage.getItem(PULL_KICK_KEY) || 0); } catch { /* ignore */ }
+    if (!kickAt) return;
+    if (Date.now() - kickAt > DRAIN_MAX_MS) return;   // stale kick, ignore
+    if (this._drainDoneFor(kickAt)) return;           // already finished
+    this._startDraining(kickAt);
+  }
+
+  _renderDrainingBanner() {
+    if (!this._draining) return nothing;
+    return html`
+      <div class="recs-draining" role="status" aria-live="polite">
+        <span class="recs-draining__spinner" aria-hidden="true"></span>
+        <span class="recs-draining__msg">Scanning Gmail for new roles… new matches appear here automatically.</span>
+      </div>
+    `;
+  }
+
   async _onRefresh() {
     if (this._refreshing) return;
     this._refreshing = true;
     this.requestUpdate();
     try {
-      const r = await refreshSources();
-      this._refreshFeedback = r.throttled
-        ? 'Recently refreshed — try again in a few minutes.'
-        : 'Scanning Gmail for new roles…';
-      setTimeout(async () => {
-        await this._fetchPage({ reset: true });
-        this.requestUpdate();
-      }, 8000);
+      // Force-run the gmail-jobs source by id (bypasses the server is-due gate)
+      // so an explicit Refresh always scans and the loader clears on real
+      // completion; keep the client throttle so the button can't be spammed.
+      const gmailId = (this._gmailHealth() || {}).id || null;
+      const r = await refreshSources({ sourceId: gmailId });
+      if (r.throttled) {
+        this._refreshFeedback = 'Recently refreshed — try again in a few minutes.';
+        setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
+      } else {
+        // Real kick → show the persistent draining loader until it completes.
+        this._startDraining(r.kickAt || Date.now());
+      }
     } finally {
       this._refreshing = false;
       this.requestUpdate();
-      setTimeout(() => { this._refreshFeedback = ''; this.requestUpdate(); }, 10000);
     }
   }
 
@@ -201,9 +279,20 @@ export class JobRecommendationsTable extends LitElement {
     // Gmail just reconnected (app.js fires this after a successful token
     // exchange) → hide the disconnected banner optimistically without
     // waiting for the next scan to clear last_error server-side.
-    this._onGmailConnected = () => {
+    this._onGmailConnected = async () => {
+      // Capture the source id before we drop the row from _health.
+      const gmailId = (this._gmailHealth() || {}).id || null;
+      // Optimistically clear the disconnected banner without waiting for the
+      // next scan to clear last_error server-side.
       this._health = (this._health || []).filter(s => s.type !== 'gmail-jobs');
       this.requestUpdate();
+      // Reconnect is a high-signal trigger: force an immediate scan (bypass the
+      // client throttle AND the server is-due gate) and show the draining
+      // loader until it completes, instead of waiting up to 15 min for cron.
+      try {
+        const r = await refreshSources({ force: true, sourceId: gmailId });
+        if (r.kicked) this._startDraining(r.kickAt || Date.now());
+      } catch (e) { console.warn('[recs-table] post-reconnect kick failed', e); }
     };
     document.addEventListener('job:gmail:connected', this._onGmailConnected);
     // Infinite scroll: when the viewport nears the bottom of the document,
@@ -227,6 +316,7 @@ export class JobRecommendationsTable extends LitElement {
     document.removeEventListener('click', this._onDocClick);
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onScroll);
+    if (this._drainPoll) { clearInterval(this._drainPoll); this._drainPoll = null; }
     super.disconnectedCallback();
   }
 
@@ -246,6 +336,9 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'loading';
     await this._fetchPage({ reset: true });
     if (this.state === 'loading') this.state = 'loaded';
+    // If a scan was kicked recently (this session or just before an OAuth
+    // reconnect round-trip) and hasn't finished, resume the draining loader.
+    this._resumeDrainingIfPending();
   }
 
   // Fetch one page from the server (server-side sorted). reset=true starts
@@ -552,6 +645,7 @@ export class JobRecommendationsTable extends LitElement {
           </button>
         ` : nothing}
       </header>
+      ${this._renderDrainingBanner()}
       ${this._renderHealthBanner()}
       ${rows.length === 0 ? html`
         <div class="placeholder">
