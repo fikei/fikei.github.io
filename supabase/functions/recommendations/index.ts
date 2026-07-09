@@ -6,9 +6,25 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
+import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.19.0';
-console.log(`[recommendations] v${VERSION} - sourceHealth returns source id so the UI can force-run gmail-jobs on reconnect and show a draining loader`);
+const VERSION = '0.20.0';
+console.log(`[recommendations] v${VERSION} - below-your-bar drawer honors the role-name filter (universe include + blocked-title exclude); sourceHealth returns source id for gmail-jobs reconnect`);
+
+// Role universe for the below-bar gate when the user hasn't defined their
+// own vision.target_titles. Kept in sync with pull-recommendations'
+// DEFAULT_ROLE_UNIVERSE — the above-bar pull pipeline filters titles to
+// this set, so the below-bar complement must gate on the same family or it
+// leaks off-track roles (e.g. engineering) that only exist in the table
+// from watched companies / gmail / legacy pulls.
+const DEFAULT_ROLE_UNIVERSE = [
+  'product manager', 'product management', 'product lead', 'product owner',
+  'head of product', 'director of product', 'director, product',
+  'vp of product', 'vp product', 'chief product', 'cpo',
+  'group product manager', 'gpm', 'principal product', 'staff product',
+  'senior product', 'founding product', 'founding pm', 'product strategy',
+  'platform product', 'technical product manager', 'tpm',
+];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -160,6 +176,30 @@ serve(async (req) => {
         blocked = br.map(b => b.company_norm);
       } catch { /* table absent / transient — don't fail the page */ }
 
+      // Role-name gate for the below-your-bar drawer. Above-bar rows were
+      // title-filtered to the role universe at pull time; the floor=below
+      // complement returns graded-but-failing rows straight from the table,
+      // so without this it surfaces off-track titles (engineering, etc.).
+      // Re-apply the same include (role universe / vision.target_titles) +
+      // exclude (vision.blocked_titles), mirroring pull-recommendations.
+      // Only loaded for the below path — the other views don't need it.
+      let universePatterns: string[] = [];
+      let blockedPatterns: string[] = [];
+      if (belowFloor) {
+        // Escape LIKE wildcards so a phrase matches as a plain substring
+        // (default '\' escape char), matching pull-recommendations' includes().
+        const likeEsc = (s: string) => `%${s.replace(/([\\%_])/g, '\\$1')}%`;
+        try {
+          const targetTitles = await loadVisionStringArray(sql, 'target_titles');
+          const universe = (targetTitles.length ? targetTitles : DEFAULT_ROLE_UNIVERSE)
+            .map(s => s.toLowerCase().trim()).filter(Boolean);
+          const blockedTitles = (await loadVisionStringArray(sql, 'blocked_titles'))
+            .map(s => s.toLowerCase().trim()).filter(Boolean);
+          universePatterns = universe.map(likeEsc);
+          blockedPatterns = blockedTitles.map(likeEsc);
+        } catch { /* vision absent — leave the gate open rather than blank the drawer */ }
+      }
+
       // URL normalizer — strips scheme, leading www., query string,
       // fragment, and trailing slashes so the same posting matches across
       // sources (e.g. a Gmail-sourced rec vs. the URL the user pasted when
@@ -229,6 +269,12 @@ serve(async (req) => {
                   and coalesce(array_length(r.hard_fails, 1), 0) = 0
                   and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
               end)))
+          -- floor=below: also honor the role-name filter so the drawer
+          -- stays on-track (in the role universe, not a blocked title).
+          and (${!belowFloor} or (
+            (${universePatterns.length === 0} or lower(coalesce(r.title, '')) like any(${universePatterns}::text[]))
+            and (${blockedPatterns.length === 0} or lower(coalesce(r.title, '')) not like all(${blockedPatterns}::text[]))
+          ))
           and (${!isWildcard} or (r.candidate_score >= ${WILDCARD_MIN_STRENGTH}
                                   and coalesce(r.fit_score, 100) < ${WILDCARD_MAX_FIT}))
           and (${blocked.length === 0} or lower(trim(r.company)) <> all(${blocked}::text[]))
