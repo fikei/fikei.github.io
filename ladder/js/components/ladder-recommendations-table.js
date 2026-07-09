@@ -397,6 +397,8 @@ export class JobRecommendationsTable extends LitElement {
     this.state = 'loading';
     await this._fetchPage({ reset: true });
     if (this.state === 'loading') this.state = 'loaded';
+    // Reopen a deep-linked role (?rec=) once the inbox list is in.
+    this._openFromUrl();
     // If a scan was kicked recently (this session or just before an OAuth
     // reconnect round-trip) and hasn't finished, resume the draining loader.
     this._resumeDrainingIfPending();
@@ -412,6 +414,9 @@ export class JobRecommendationsTable extends LitElement {
       const bl = await fetchRecommendations({ view: 'all', floor: 'below', limit: 200, sort: 'suggestedAt', dir: 'desc' });
       this._below = Array.isArray(bl?.recommendations) ? bl.recommendations : [];
     } catch { this._below = []; }
+    // A deep-linked role may live in a below-your-bar drawer, which loads
+    // after the main list — retry the reopen now that those rows are in.
+    this._openFromUrl();
   }
 
   // Fetch one page from the server. Inbox order: newest batch first —
@@ -555,6 +560,23 @@ export class JobRecommendationsTable extends LitElement {
     this._reviewBelowDay = null;
   }
 
+  // Deep-link: a ?rec=<id> in the URL (the viewer writes it while open, so it
+  // survives a refresh / share) reopens the viewer at that role. Searches the
+  // inbox queue first, then the below-your-bar drawers. No-op if already open,
+  // absent, or the row isn't in the loaded set.
+  _openFromUrl() {
+    if (this._reviewIndex != null) return;
+    let id = null;
+    try { id = new URL(location.href).searchParams.get('rec'); } catch { /* */ }
+    if (!id) return;
+    const iIdx = this._sorted().findIndex(r => r.id === id);
+    if (iIdx >= 0) { this._openReview(iIdx); return; }
+    for (const [day, rows] of this._belowByDay()) {
+      const bIdx = rows.findIndex(r => r.id === id);
+      if (bIdx >= 0) { this._openBelowReview(day, bIdx); return; }
+    }
+  }
+
   _renderReview() {
     if (this._reviewIndex == null) return nothing;
     // Below-bar reviews walk that day's drawer queue; otherwise the inbox.
@@ -569,6 +591,7 @@ export class JobRecommendationsTable extends LitElement {
       <ladder-review-overlay
         .items=${rows}
         .index=${index}
+        @review-index=${(e) => { this._reviewIndex = e.detail.index; }}
         @review-close=${() => this._closeReview()}
         @review-save=${(e) => this._onAdd(e.detail.rec)}
         @review-dismiss=${(e) => this._onDismiss(e.detail.rec)}
