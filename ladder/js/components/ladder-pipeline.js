@@ -2,27 +2,20 @@
 // rows. Each column header is a sort toggle (3-state: none → asc → desc).
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 const V = (new URL(import.meta.url)).search;
-const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources } = await import('../pipeline.js' + V);
+const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources,
+        STAGES, STAGE_IDS, BUCKETS, BUCKET_LABELS, bucketFor, normalizeBucket, isVisibleRole } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { loadRoleSignals, chipClassForSignal, ackEvent } = await import('../applicationEvents.js' + V);
 const { renderLocation } = await import('../format.js' + V);
 
-// Status taxonomy (3-value). Bucket name → status name:
-//   leads  → 'Saved'
-//   active → 'Active'  (with sub-stage: drafting/applied/interviewing/offer)
-//   archive→ 'Archive' (with exit_reason)
-const STATUS_OPTIONS = ['Saved', 'Active', 'Archive'];
-// Display labels for status values — the DB keeps 'Active'; the UI says
-// 'In progress' (clearer state pair with Saved/Archive).
-const STATUS_LABELS = { Saved: 'Saved', Active: 'In progress', Archive: 'Archive' };
-
-const STAGES = [
-  { id: 'drafting',     label: 'Drafting' },
-  { id: 'applied',      label: 'Applied' },
-  { id: 'interviewing', label: 'Interviewing' },
-  { id: 'offer',        label: 'Offer' },
-];
+// Bucket taxonomy (STAGES / BUCKETS / BUCKET_LABELS / bucketFor / isVisibleRole)
+// is imported from ../pipeline.js — the single source of truth shared with the
+// rail and mobile home. The six buckets are Saved · Drafting · Applied ·
+// Interviewing · Offer · Archive, derived from status (Saved/Active/Archive) +
+// stage. The "Move to" menu offers all six flat; picking a stage promotes the
+// row to Active with that stage, Saved clears the stage, Archive opens the
+// exit-reason modal.
 
 // Softer-language exit reasons. Order = "didn't apply" → "applied but
 // didn't progress" → "circumstance" so the user sees the natural
@@ -40,14 +33,6 @@ const EXIT_REASONS = [
   { id: 'other',                    label: "Something else" },
 ];
 
-function bucketFor(r) {
-  switch (r.status) {
-    case 'Active':  return 'active';
-    case 'Archive': return 'archive';
-    default:        return 'leads';
-  }
-}
-
 // Fit modal labels + render helper live in ./ladder-fit-modal.js so the
 // recommendations carousel can reuse the same tooltip.
 
@@ -64,32 +49,26 @@ const COLUMNS = [
   { id: 'menu',   label: '',       sortKey: null },
 ];
 
-// Manual ordering — user can drag rows in the Saved (leads) bucket. Order
-// persists in localStorage as a per-bucket array of slugs. Any column sort
-// overrides it; a "Use custom order" button restores it.
+// Manual ordering — user can drag rows within a bucket. Order persists in
+// localStorage as a per-bucket array of slugs (one key per bucket). Any column
+// sort overrides it; a "Use custom order" button restores it.
 const MANUAL_ORDER_KEY = 'job:jobs:manualOrder';
 function loadManualOrders() {
+  const empty = () => Object.fromEntries(BUCKETS.map(b => [b, []]));
   try {
     const raw = localStorage.getItem(MANUAL_ORDER_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
-    return {
-      leads:   Array.isArray(parsed.leads)   ? parsed.leads   : [],
-      active:  Array.isArray(parsed.active)  ? parsed.active  : [],
-      archive: Array.isArray(parsed.archive) ? parsed.archive : [],
-    };
-  } catch { return { leads: [], active: [], archive: [] }; }
+    const out = empty();
+    for (const b of BUCKETS) if (Array.isArray(parsed[b])) out[b] = parsed[b];
+    // Legacy migration: the old 3-bucket shape stored 'leads' (→ saved). The
+    // old 'active' order spanned all stages, so it can't be split cleanly —
+    // drop it and let each stage page re-establish its own order.
+    if (Array.isArray(parsed.leads) && !out.saved.length) out.saved = parsed.leads;
+    return out;
+  } catch { return empty(); }
 }
 function saveManualOrders(orders) {
   try { localStorage.setItem(MANUAL_ORDER_KEY, JSON.stringify(orders)); } catch {}
-}
-
-// Drop rows without an apply link, and any Strava postings (out of scope).
-function isVisibleRole(r) {
-  if (!r.url) return false;
-  const company = (r.company || '').toLowerCase();
-  if (company === 'strava') return false;
-  if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
-  return true;
 }
 
 function isArchived(r) { return !!r.archivedAt; }
@@ -108,7 +87,7 @@ export class JobPipeline extends LitElement {
     sortDir: { state: true },
     selectedRow:          { state: true },
     selectedScoreWhich:   { state: true },
-    bucket: { state: true },         // 'leads' | 'active' | 'archive'
+    bucket: { state: true },         // saved | drafting | applied | interviewing | offer | archive
     openMenuSlug: { state: true },
     livenessChecking: { state: true },
     livenessResult: { state: true },
@@ -122,8 +101,6 @@ export class JobPipeline extends LitElement {
     // "N new jobs added" banner. Accumulates entries dispatched via
     // job:pipeline:added until the user dismisses it.
     addedBanner: { state: true },
-    // Active sub-stage tab filter. null = "All".
-    activeStageFilter: { state: true },
     // Archive-flow modal state.
     archivingRow:    { state: true },
     archiveReason:   { state: true },
@@ -149,15 +126,22 @@ export class JobPipeline extends LitElement {
     this.hoverConns = null;
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
-    this.bucket = (b === 'leads' || b === 'active' || b === 'archive') ? b : 'leads';
+    const stageQ = params.get('stage');
+    // Six buckets now (Saved · 4 stages · Archive). Normalize legacy names:
+    // leads→saved, active→drafting, and the old ?bucket=active&stage=<X> form
+    // collapses to the <X> stage page.
+    let resolved = normalizeBucket(b);
+    if (b === 'active' && STAGE_IDS.includes(stageQ)) resolved = stageQ;
+    this.bucket = resolved || 'saved';
     // Default to fit-score (desc) on every bucket, including Saved. A saved
     // manual drag order is still one click away via "Use my order".
     this.sortKey = 'score';
     this.sortDir = 'desc';
-    if (b !== this.bucket) {
-      // Normalise URL so subnav highlight matches.
+    if (b !== this.bucket || stageQ != null) {
+      // Normalise URL so nav highlight matches and the legacy stage param drops.
       const qs = new URLSearchParams(location.search);
       qs.set('bucket', this.bucket);
+      qs.delete('stage');
       history.replaceState(null, '', `${location.pathname}?${qs}`);
     }
     document.dispatchEvent(new CustomEvent('job:jobs:bucket', { detail: { bucket: this.bucket } }));
@@ -172,8 +156,6 @@ export class JobPipeline extends LitElement {
     this.pasteSaving = false;
     this.pasteError = '';
     this.addedBanner = { roles: [], dismissed: false };
-    const stageQ = params.get('stage');
-    this.activeStageFilter = STAGES.some(s => s.id === stageQ) ? stageQ : null;
     this.archivingRow = null;
     this.archiveReason = null;
     this.archiveContext = '';
@@ -231,7 +213,7 @@ export class JobPipeline extends LitElement {
     };
     document.addEventListener('job:pipeline:added', this._onAdded);
     this._onPopState = () => {
-      const b = new URLSearchParams(location.search).get('bucket') || 'leads';
+      const b = normalizeBucket(new URLSearchParams(location.search).get('bucket')) || 'saved';
       if (b !== this.bucket) {
         this.bucket = b;
         document.dispatchEvent(new CustomEvent('job:jobs:bucket', { detail: { bucket: b } }));
@@ -299,7 +281,7 @@ export class JobPipeline extends LitElement {
       // background. Debounced via localStorage so we don't hammer ATSes
       // on every page load. Replaces the explicit "Check liveness"
       // button — list reflects whatever's still posted at the URL.
-      if (this.bucket === 'leads') this._maybeAutoLiveness();
+      if (this._isSaved) this._maybeAutoLiveness();
     } catch (e) {
       this.error = String(e);
       this.state = 'error';
@@ -424,14 +406,7 @@ export class JobPipeline extends LitElement {
   _sorted() {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
-    const arr = this.roles.filter(r => {
-      if (!isVisibleRole(r) || !bucketFilter(r, this.bucket)) return false;
-      // Active sub-tab filter: when set, only rows whose stage matches.
-      if (this.bucket === 'active' && this.activeStageFilter) {
-        return (r.stage || null) === this.activeStageFilter;
-      }
-      return true;
-    });
+    const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket));
     if (key === 'manual') {
       const order = this._manualOrders[this.bucket] || [];
       const idx = new Map(order.map((slug, i) => [slug, i]));
@@ -518,14 +493,17 @@ export class JobPipeline extends LitElement {
     this.requestUpdate();
   }
 
-  // Status-only change (used by 3-button status group on Active rows).
-  async _changeStatus(r, status) {
-    if (status === r.status) return;
-    if (status === 'Archive') return this._openArchiveModal(r);
-    // Saved or Active — clear stage when leaving Active, otherwise keep it.
-    const patch = { status, stage: status === 'Active' ? r.stage : null };
-    if (status !== 'Archive') patch.exit_reason = null;
-    await this._applyPatch(r, patch);
+  // "Move to <bucket>" — the single flat action behind every menu option.
+  // Saved / a stage / Archive all live at the same level; a stage promotes the
+  // row to Active with that stage (the server mirrors the auto-promote rule),
+  // Saved clears the stage, Archive opens the exit-reason modal.
+  async _moveToBucket(r, bucket) {
+    this.openMenuSlug = null;
+    if (bucket === bucketFor(r)) return;                       // already there
+    if (bucket === 'archive') return this._openArchiveModal(r);
+    if (bucket === 'saved')   return this._applyPatch(r, { status: 'Saved', stage: null, exit_reason: null });
+    // A stage bucket → Active + that stage.
+    return this._applyPatch(r, { status: 'Active', stage: bucket, exit_reason: null });
   }
 
   _detailHref(r) { return `/ladder/jobs/${r.slug}/`; }
@@ -535,26 +513,9 @@ export class JobPipeline extends LitElement {
     this.openMenuSlug = this.openMenuSlug === slug ? null : slug;
   }
 
-  _switchBucket(bucket, e) {
-    e.preventDefault();
-    if (bucket === this.bucket) return;
-    this.bucket = bucket;
-    // Clear stage filter when leaving Active; it's a no-op elsewhere.
-    if (bucket !== 'active') {
-      this.activeStageFilter = null;
-      const qs = new URLSearchParams(location.search);
-      qs.delete('stage');
-      history.replaceState(null, '', `${location.pathname}?${qs}`);
-    }
-    // All buckets default to fit-desc, including Saved. The user's manual drag
-    // order is still available via "Use my order".
-    this.sortKey = 'score';
-    this.sortDir = 'desc';
-    const qs = new URLSearchParams(location.search);
-    qs.set('bucket', bucket);
-    history.pushState(null, '', `${location.pathname}?${qs}`);
-    document.dispatchEvent(new CustomEvent('job:jobs:bucket', { detail: { bucket } }));
-  }
+  // Bucket-shape helpers used across render/column logic.
+  get _isStageBucket() { return STAGE_IDS.includes(this.bucket); }
+  get _isSaved()       { return this.bucket === 'saved'; }
 
   async _onArchive(r, archived) {
     this.openMenuSlug = null;
@@ -593,7 +554,7 @@ export class JobPipeline extends LitElement {
   _onBackdropClick(e) { if (e.target.classList.contains('fit-modal__backdrop')) this._closeFitModal(); }
 
   // --- Drag-to-reorder (Saved bucket only) -----------------------------
-  _canReorder() { return this.bucket === 'leads'; }
+  _canReorder() { return this._isSaved; }
 
   _onDragStart(r, e) {
     if (!this._canReorder()) return;
@@ -660,8 +621,7 @@ export class JobPipeline extends LitElement {
 
   _renderMenuCell(r) {
     const menuOpen = this.openMenuSlug === r.slug;
-    const cur = r.status || 'Saved';
-    const curStage = r.stage || null;
+    const cur = bucketFor(r);
     return html`
       <div class="row-menu">
         <button class="row-menu__trigger" aria-label="Row actions"
@@ -670,26 +630,14 @@ export class JobPipeline extends LitElement {
         ${menuOpen ? html`
           <div class="row-menu__panel row-menu__panel--wide" role="menu" @click=${(e) => e.stopPropagation()}>
             <div class="row-menu__group-label">Move to</div>
-            ${STATUS_OPTIONS.map(s => html`
+            ${BUCKETS.map(b => html`
               <button role="menuitem"
-                      class=${'row-menu__item row-menu__item--status' + (cur === s ? ' is-current' : '')}
-                      @click=${() => this._changeStatusFromMenu(r, s)}>
-                <span class="row-menu__check" aria-hidden="true">${cur === s ? '✓' : ''}</span>
-                <span>${STATUS_LABELS[s] || s}</span>
+                      class=${'row-menu__item row-menu__item--status' + (cur === b ? ' is-current' : '')}
+                      @click=${() => this._moveToBucket(r, b)}>
+                <span class="row-menu__check" aria-hidden="true">${cur === b ? '✓' : ''}</span>
+                <span>${BUCKET_LABELS[b]}</span>
               </button>
             `)}
-            ${cur === 'Active' ? html`
-              <div class="row-menu__divider" role="separator"></div>
-              <div class="row-menu__group-label">Stage</div>
-              ${STAGES.map(s => html`
-                <button role="menuitem"
-                        class=${'row-menu__item row-menu__item--stage' + (curStage === s.id ? ' is-current' : '')}
-                        @click=${() => this._setStageFromMenu(r, s.id)}>
-                  <span class="row-menu__check" aria-hidden="true">${curStage === s.id ? '✓' : ''}</span>
-                  <span>${s.label}</span>
-                </button>
-              `)}
-            ` : nothing}
             <div class="row-menu__divider" role="separator"></div>
             <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
               Delete…
@@ -698,20 +646,6 @@ export class JobPipeline extends LitElement {
         ` : nothing}
       </div>
     `;
-  }
-
-  async _changeStatusFromMenu(r, status) {
-    this.openMenuSlug = null;
-    await this._changeStatus(r, status);
-  }
-
-  // Selecting a stage from the menu auto-promotes status to Active on
-  // a Saved row (mirror of server-side rule). Re-selecting the same
-  // stage clears it.
-  async _setStageFromMenu(r, stage) {
-    this.openMenuSlug = null;
-    const next = r.stage === stage ? null : stage;
-    await this._applyPatch(r, { stage: next, status: 'Active' });
   }
 
   _openArchiveModal(r) {
@@ -789,50 +723,15 @@ export class JobPipeline extends LitElement {
     `;
   }
 
-  _setStageFilter(stage, e) {
-    e?.preventDefault?.();
-    this.activeStageFilter = stage;
-    const qs = new URLSearchParams(location.search);
-    if (stage) qs.set('stage', stage);
-    else qs.delete('stage');
-    history.pushState(null, '', `${location.pathname}?${qs}`);
-  }
-
-  _renderActiveStageTabs(rows) {
-    // Count Active rows per stage (including 'unset' bucket). Counts are
-    // taken from this.roles (full set), not the filtered rows, so the
-    // tabs always show totals even when one is active.
-    const allActive = this.roles.filter(r => isVisibleRole(r) && bucketFor(r) === 'active');
-    const counts = { all: allActive.length };
-    for (const s of STAGES) counts[s.id] = allActive.filter(r => (r.stage || null) === s.id).length;
-    const cur = this.activeStageFilter;
-    void rows;
-    return html`
-      <nav class="stage-tabs" aria-label="Active stage filter">
-        <button class=${'stage-tabs__tab' + (cur === null ? ' is-active' : '')}
-                @click=${(e) => this._setStageFilter(null, e)}>
-          All <span class="stage-tabs__count">${counts.all}</span>
-        </button>
-        ${STAGES.map(s => html`
-          <button class=${'stage-tabs__tab' + (cur === s.id ? ' is-active' : '')}
-                  @click=${(e) => this._setStageFilter(s.id, e)}>
-            ${s.label} <span class="stage-tabs__count">${counts[s.id]}</span>
-          </button>
-        `)}
-      </nav>
-    `;
-  }
-
   _renderStatusCell(r) {
     const s = r.status || 'Saved';
-    const stageObj = r.stage ? STAGES.find(x => x.id === r.stage) : null;
+    const bucket = bucketFor(r);
+    const stageObj = STAGES.find(x => x.id === bucket);
     const exitObj = r.exitReason ? EXIT_REASONS.find(x => x.id === r.exitReason) : null;
 
-    // On the Active bucket the high-level status is always "Active" — the
-    // useful information is the current interview step. Promote the stage
-    // to the primary pill; fall back to the Active pill only when no
-    // stage is set yet (e.g. just-promoted row awaiting first stage).
-    if (this.bucket === 'active' && stageObj) {
+    // On a stage page the useful information is which step the role is at, so
+    // the stage is the primary pill (reusing the existing stage pill classes).
+    if (stageObj) {
       const stageCls = 'status-pill status-pill--stage-' + stageObj.id;
       return html`
         <span class=${stageCls + (r._saving ? ' is-saving' : '')}>${stageObj.label}</span>
@@ -853,14 +752,15 @@ export class JobPipeline extends LitElement {
     // Status column is meaningless on Leads (it's always New/empty there).
     // On the Active bucket the column shows the interview stage, so the
     // header reads "Stage" rather than "Status".
-    // 'connections' (warm-intro avatars) only appears on the Leads bucket —
+    // 'connections' (warm-intro avatars) only appears on the Saved bucket —
     // that's where Ian is deciding whether to pursue, so "who do I know
     // here?" is most actionable. It replaces the Status column there (Status
-    // is meaningless on Leads anyway).
+    // is meaningless on Saved anyway). On a stage page the Status column shows
+    // the stage.
     return COLUMNS
-      .filter(c => !(c.id === 'status' && this.bucket === 'leads'))
-      .filter(c => !(c.id === 'connections' && this.bucket !== 'leads'))
-      .map(c => (c.id === 'status' && this.bucket === 'active') ? { ...c, label: 'Stage', sortKey: 'stage' } : c);
+      .filter(c => !(c.id === 'status' && this._isSaved))
+      .filter(c => !(c.id === 'connections' && !this._isSaved))
+      .map(c => (c.id === 'status' && this._isStageBucket) ? { ...c, label: 'Stage', sortKey: 'stage' } : c);
   }
 
   _renderHeader() {
@@ -900,7 +800,7 @@ export class JobPipeline extends LitElement {
   }
 
   _renderRow(r) {
-    const showStatus = this.bucket !== 'leads';
+    const showStatus = !this._isSaved;
     const reorder = this._canReorder();
     const cls = 'pipeline-row'
       + (r.status === 'Archive' ? ' is-archived' : '')
@@ -928,7 +828,7 @@ export class JobPipeline extends LitElement {
             <div class="role-cell__text">
               <div class="role-cell__title">
                 ${r.title || '(untitled)'}
-                ${this.bucket === 'leads' && r.engagedAt
+                ${this._isSaved && r.engagedAt
                   ? html`<span class="in-progress-pill" title="You've viewed or applied to this role">In progress</span>`
                   : nothing}
               </div>
@@ -938,7 +838,7 @@ export class JobPipeline extends LitElement {
           </div>
         </td>
         <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
-        ${this.bucket === 'leads' ? html`<td class="col col-connections" data-label="Network">${this._renderConnectionsCell(r)}</td>` : nothing}
+        ${this._isSaved ? html`<td class="col col-connections" data-label="Network">${this._renderConnectionsCell(r)}</td>` : nothing}
         <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
         ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
@@ -1091,7 +991,7 @@ export class JobPipeline extends LitElement {
   }
 
   _renderSkeletonRow() {
-    const showStatus = this.bucket !== 'leads';
+    const showStatus = !this._isSaved;
     return html`
       <tr class="skeleton-row">
         <td class="col col-fit"><span class="skeleton skeleton--pill" style="width:40px;height:24px;"></span></td>
@@ -1101,7 +1001,7 @@ export class JobPipeline extends LitElement {
           <span class="skeleton" style="width:50%;height:11px;display:block;"></span>
         </td>
         <td class="col col-signal"></td>
-        ${this.bucket === 'leads' ? html`<td class="col col-connections"><span class="skeleton skeleton--pill" style="width:64px;height:28px;"></span></td>` : nothing}
+        ${this._isSaved ? html`<td class="col col-connections"><span class="skeleton skeleton--pill" style="width:64px;height:28px;"></span></td>` : nothing}
         <td class="col col-sector"><span class="skeleton" style="width:80px;height:16px;"></span></td>
         ${showStatus ? html`<td class="col col-status"><span class="skeleton skeleton--pill" style="width:120px;height:32px;"></span></td>` : nothing}
         <td class="col col-menu"><span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);"></span></td>
@@ -1245,13 +1145,13 @@ export class JobPipeline extends LitElement {
       </div>`;
     }
     const rows = this._sorted();
-    const bucketLabel = { leads: 'Saved', active: 'In progress', archive: 'Archive' }[this.bucket];
+    const bucketLabel = BUCKET_LABELS[this.bucket] || 'Saved';
     const added = this.addedBanner?.roles || [];
     const showAddedBanner = added.length > 0 && !this.addedBanner.dismissed;
 
     return html`
-      ${this.bucket === 'active' ? this._renderLiveBanners() : nothing}
-      ${this.bucket === 'active' ? this._renderNeedsAttention() : nothing}
+      ${this._isStageBucket ? this._renderLiveBanners() : nothing}
+      ${this._isStageBucket ? this._renderNeedsAttention() : nothing}
 
       ${showAddedBanner ? this._renderAddedBanner(added) : nothing}
 
@@ -1291,10 +1191,10 @@ export class JobPipeline extends LitElement {
         ${this.sortKey === 'manual'
           ? html`in your custom order. <span class="muted">Drag rows to rearrange.</span>`
           : html`sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.`}
-        ${this.bucket === 'leads' && this.sortKey !== 'manual' && this._manualOrders.leads.length ? html`
+        ${this._isSaved && this.sortKey !== 'manual' && this._manualOrders.saved.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Use my order</button>
         ` : nothing}
-        ${this.bucket === 'leads' && this.sortKey !== 'manual' && !this._manualOrders.leads.length ? html`
+        ${this._isSaved && this.sortKey !== 'manual' && !this._manualOrders.saved.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Arrange manually</button>
         ` : nothing}
         <button class="btn btn--sm btn--accent"
@@ -1315,7 +1215,6 @@ export class JobPipeline extends LitElement {
           ${this.pasteError ? html`<span class="muted" style="color:var(--error);font-size:var(--font-size-small);">${this.pasteError}</span>` : nothing}
         </form>
       ` : nothing}
-      ${this.bucket === 'active' ? this._renderActiveStageTabs(rows) : nothing}
       <div class="pipeline-table-wrap">
         <table class="pipeline-table">
           <thead>${this._renderHeader()}</thead>
@@ -1328,8 +1227,8 @@ export class JobPipeline extends LitElement {
       ${rows.length === 0 ? html`
         <div class="placeholder" style="margin-top:var(--space-4);">
           <h2>No ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'} yet</h2>
-          <p>${this.bucket === 'leads' ? 'Add a posting or wait for the crawler to find a fit.'
-              : this.bucket === 'active' ? 'Pick a stage on a Saved role via the row menu — it moves here automatically.'
+          <p>${this._isSaved ? 'Add a posting or wait for the crawler to find a fit.'
+              : this._isStageBucket ? `Use a role's row menu → Move to → ${bucketLabel} to bring it here.`
               : 'Archived roles land here, with the reason you gave.'}</p>
         </div>
       ` : nothing}

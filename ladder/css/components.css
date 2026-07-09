@@ -3557,74 +3557,8 @@ button.link-subtle {
   text-overflow: ellipsis;
 }
 
-/* Stage tabs — filterable sub-tabs on the Active bucket. */
-.stage-tabs {
-  display: inline-flex;
-  gap: 2px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
-}
-/* On phones, the 5 stage chips can't fit on one line in 360–400px. Drop
-   the pill container so the row can scroll horizontally without an ugly
-   wrapping pill. The chips themselves keep their pill styling. */
-@media (max-width: 720px) {
-  .stage-tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    border-radius: 0;
-    max-width: 100%;
-    gap: var(--space-2);
-  }
-  .stage-tabs::-webkit-scrollbar { display: none; }
-  .stage-tabs__tab {
-    flex-shrink: 0;
-    border: 1px solid var(--border);
-    background: var(--bg-surface);
-  }
-  .stage-tabs__tab.is-active {
-    border-color: var(--accent);
-  }
-}
-.stage-tabs__tab {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  padding: 6px var(--space-3);
-  border-radius: var(--radius-pill);
-  font-size: var(--font-size-small);
-  font-weight: var(--fw-medium);
-  color: var(--fg-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.stage-tabs__tab:hover { background: var(--bg-elevated); color: var(--fg); }
-.stage-tabs__tab.is-active { background: var(--accent); color: var(--accent-fg); }
-.stage-tabs__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  padding: 0 6px;
-  height: 16px;
-  border-radius: 999px;
-  background: var(--bg-elevated);
-  color: var(--fg-muted);
-  font-size: 10px;
-  font-weight: var(--fw-semibold);
-}
-.stage-tabs__tab.is-active .stage-tabs__count { background: rgba(255,255,255,0.18); color: inherit; }
+/* (Stage filter tabs removed — the four in-progress stages are now first-class
+   bucket pages in the primary nav, not sub-tabs on an "Active" bucket.) */
 
 /* Archive modal — softer-language exit reason picker. */
 .archive-modal-scrim {
@@ -6587,6 +6521,34 @@ body[data-auth-state="out"] job-chat { display: none; }
   font-weight: var(--fw-semibold);
 }
 .nav-drawer__item .nav-count { margin-left: auto; }
+
+/* Nested pipeline buckets under Jobs in the mobile drawer. Mirrors the rail's
+   .nav-sublist (indent + left rule), sized for touch. */
+.nav-drawer__sublist {
+  list-style: none;
+  margin: var(--space-1) 0 var(--space-2) calc(var(--space-3) + 20px);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-drawer__subitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-weight: var(--fw-medium);
+  font-size: var(--font-size-small);
+  text-decoration: none;
+}
+.nav-drawer__subitem:hover { background: var(--bg-surface); color: var(--fg); text-decoration: none; }
+.nav-drawer__subitem[aria-current="page"] { background: var(--bg-overlay); color: var(--fg); font-weight: var(--fw-semibold); }
+.nav-drawer__subitem .nav-count { margin-left: auto; }
+
 .nav-drawer__user,
 .rail-user {
   display: flex;

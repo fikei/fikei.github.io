@@ -5,6 +5,56 @@ const ADD_ROLE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/add-
 const REC_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recommendations';
 const PULL_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/pull-recommendations';
 
+// ----- Pipeline bucket taxonomy (single source of truth) -------------------
+// The DB stores status (Saved/Active/Archive) + stage (drafting/applied/
+// interviewing/offer). The UI derives SIX first-class buckets from those:
+// Saved, the four in-progress stages, and Archive. bucketFor() is the one
+// mapping — imported by the rail, the jobs list, and the mobile home so the
+// three never drift (they each used to carry their own copy).
+export const STAGES = [
+  { id: 'drafting',     label: 'Drafting' },
+  { id: 'applied',      label: 'Applied' },
+  { id: 'interviewing', label: 'Interviewing' },
+  { id: 'offer',        label: 'Offer' },
+];
+export const STAGE_IDS = STAGES.map(s => s.id);
+export const BUCKETS = ['saved', ...STAGE_IDS, 'archive'];
+export const BUCKET_LABELS = {
+  saved: 'Saved',
+  drafting: 'Drafting', applied: 'Applied', interviewing: 'Interviewing', offer: 'Offer',
+  archive: 'Archive',
+};
+
+// status + stage → bucket. An Active row always resolves to a stage bucket;
+// a missing/unknown stage falls back to 'drafting' (the pipeline entry point),
+// matching the backend default so no Active row is ever bucket-less.
+export function bucketFor(r) {
+  if (r?.status === 'Archive') return 'archive';
+  if (r?.status === 'Active')  return STAGE_IDS.includes(r.stage) ? r.stage : 'drafting';
+  return 'saved';
+}
+
+// Normalize a raw ?bucket= value, translating legacy names (leads→saved,
+// active→drafting) so old links/bookmarks keep working. Returns null when
+// the value isn't recognizable so callers can apply their own default.
+export function normalizeBucket(raw) {
+  if (!raw) return null;
+  if (BUCKETS.includes(raw)) return raw;
+  if (raw === 'leads')  return 'saved';
+  if (raw === 'active') return 'drafting';
+  return null;
+}
+
+// Shared visibility filter — drops rows without a URL and Strava postings.
+// (Was duplicated in the rail and the jobs list.)
+export function isVisibleRole(r) {
+  if (!r?.url) return false;
+  const company = (r.company || '').toLowerCase();
+  if (company === 'strava') return false;
+  if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
+  return true;
+}
+
 // Soft client-side rate limit so first-load auto-fire doesn't hammer the
 // endpoint when the user tab-hops. Server-side gating is the source of
 // truth (user_sources.schedule_cron vs last_run_at).
