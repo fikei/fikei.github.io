@@ -65,4 +65,11 @@ The For You surface follows a **triage, don't browse** model (inbox → review �
 
 ## Cache busting
 
-Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js`, the `?v=` on every HTML `<link>`/`<script>`, **and the `@import url("./components.css?v=…")` inside `base.css`** — that import is the easy one to forget and it silently pins component styles to the 10-minute edge cache.
+Every PR that touches `/ladder/js` or `/ladder/css` bumps `VERSION` in `ladder/js/app.js`, the `?v=` on every HTML `<link>`/`<script>`, **and the `@import url("./components.css?v=…")` inside `base.css`** — that import is the easy one to forget and it silently pins component styles to the 10-minute edge cache. (`grep -rn "v=<old>" ladder/` catches them all.)
+
+## For You — source state banners
+
+Above the recommendations table (`ladder-recommendations-table`), two mutually-informative strips:
+
+- `.recs-health-banner` (error-colored) — a source is **blind**: dead Gmail token (`needsReauth` → "Reconnect Gmail" button) or a `lastError`. Distinct from "no new recs".
+- `.recs-draining` (accent-colored, with `.recs-draining__spinner`) — the backend is **actively scanning Gmail**. Shown while a pull run we kicked is in flight; auto-clears when the gmail-jobs source's `lastRunAt` advances past the kick (polled every 8s) or after a 150s safety cap. Triggered by: the manual **Refresh** button, a fresh **Gmail reconnect** (which also force-runs the scan), and resumed on mount if a recent kick hasn't completed (survives the reconnect OAuth round-trip). The kick timestamp lives in `localStorage['job:lastPullKickAt']`, shared with `pipeline.js` `refreshSources()`.

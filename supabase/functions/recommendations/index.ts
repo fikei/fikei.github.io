@@ -7,8 +7,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.18.0';
-console.log(`[recommendations] v${VERSION} - ?floor=below complement view for the per-day below-your-bar drawer`);
+const VERSION = '0.19.0';
+console.log(`[recommendations] v${VERSION} - sourceHealth returns source id so the UI can force-run gmail-jobs on reconnect and show a draining loader`);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -303,7 +303,8 @@ serve(async (req) => {
       let sourceHealth: unknown[] = [];
       try {
         sourceHealth = await sql`
-          select s.type,
+          select s.id,
+                 s.type,
                  s.enabled,
                  s.last_run_at   as "lastRunAt",
                  s.last_run_count as "lastRunCount",
