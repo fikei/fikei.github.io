@@ -115,6 +115,19 @@ export class JobRecommendationsTable extends LitElement {
     // When set (a day label), the review overlay walks that day's
     // below-bar queue instead of the main inbox.
     this._reviewBelowDay = null;
+    // Review overlay ↔ browser history. Opening the overlay pushes a history
+    // entry so the phone/desktop Back gesture closes the overlay and returns
+    // to the Inbox, instead of navigating off the page (to /jobs). True while
+    // that pushed entry is live.
+    this._reviewHistoryActive = false;
+    this._onReviewPop = () => {
+      // Back pressed with the overlay open: the entry is already popped, so
+      // just tear down the overlay state and stop listening.
+      this._reviewHistoryActive = false;
+      window.removeEventListener('popstate', this._onReviewPop);
+      this._reviewIndex = null;
+      this._reviewBelowDay = null;
+    };
   }
 
   // ----- Source health banner ------------------------------------------
@@ -364,6 +377,7 @@ export class JobRecommendationsTable extends LitElement {
     document.removeEventListener('click', this._onDocClick);
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onScroll);
+    window.removeEventListener('popstate', this._onReviewPop);
     super.disconnectedCallback();
   }
 
@@ -513,9 +527,33 @@ export class JobRecommendationsTable extends LitElement {
 
   // ----- Review overlay --------------------------------------------------
 
-  _openReview(index) { this._reviewBelowDay = null; this._reviewIndex = index; }
-  _openBelowReview(day, index) { this._reviewBelowDay = day; this._reviewIndex = index; }
-  _closeReview()     { this._reviewIndex = null; this._reviewBelowDay = null; }
+  _openReview(index) { this._reviewBelowDay = null; this._reviewIndex = index; this._enterReviewHistory(); }
+  _openBelowReview(day, index) { this._reviewBelowDay = day; this._reviewIndex = index; this._enterReviewHistory(); }
+
+  // Push a single history entry for this open session (guarded so advancing
+  // through the queue doesn't stack duplicates) and listen for Back.
+  _enterReviewHistory() {
+    if (this._reviewHistoryActive) return;
+    this._reviewHistoryActive = true;
+    history.pushState({ ladderReview: true }, '');
+    window.addEventListener('popstate', this._onReviewPop);
+  }
+
+  // Programmatic close (× / Esc / queue drained). If our pushed entry is still
+  // on top, pop it — that fires _onReviewPop, which clears the overlay state.
+  // Otherwise clear directly.
+  _closeReview() {
+    if (this._reviewHistoryActive) {
+      // Flip the guard synchronously so a re-entrant close (× + Esc racing)
+      // can't fire a second history.back() before popstate lands and over-pop
+      // us off the page.
+      this._reviewHistoryActive = false;
+      history.back();   // → popstate → _onReviewPop tears down overlay state
+      return;
+    }
+    this._reviewIndex = null;
+    this._reviewBelowDay = null;
+  }
 
   _renderReview() {
     if (this._reviewIndex == null) return nothing;
