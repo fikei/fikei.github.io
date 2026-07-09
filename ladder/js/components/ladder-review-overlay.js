@@ -47,8 +47,16 @@ export class LadderReviewOverlay extends LitElement {
     this._fullFor = null;    // rec id the fetch belongs to
     this._scoreOpen = null;  // 'fit' | 'candidate' | null
     this._menuOpen = false;
+    this._baseUrl = null;    // URL to restore (rec param stripped) on close
     this._onKey = (e) => {
-      if (e.key === 'Escape') this._close();
+      // Don't hijack keys while typing; let the score modal own its own keys.
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'Escape') { this._close(); return; }
+      if (this._scoreOpen) return;
+      // Left/Right walk the queue without deciding (matches the Skip button).
+      if (e.key === 'ArrowRight') { e.preventDefault(); this._go(1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); this._go(-1); }
     };
   }
 
@@ -56,10 +64,20 @@ export class LadderReviewOverlay extends LitElement {
     super.connectedCallback();
     document.addEventListener('keydown', this._onKey);
     document.body.style.overflow = 'hidden';
+    // Remember where we opened from (without any stale ?rec=) so closing the
+    // viewer restores a clean URL; while open, the current rec's id is
+    // reflected into the URL by _syncUrl() so the role is shareable and
+    // survives a refresh.
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete('rec');
+      this._baseUrl = u.pathname + u.search + u.hash;
+    } catch { this._baseUrl = null; }
   }
   disconnectedCallback() {
     document.removeEventListener('keydown', this._onKey);
     document.body.style.overflow = '';
+    if (this._baseUrl != null) { try { history.replaceState(history.state, '', this._baseUrl); } catch { /* */ } }
     super.disconnectedCallback();
   }
 
@@ -72,12 +90,36 @@ export class LadderReviewOverlay extends LitElement {
       this._full = null;
       this._scoreOpen = null;
       this._menuOpen = false;
+      this._syncUrl(rec.id);
       fetchRecommendation(rec.id)
         .then(full => { if (this._fullFor === rec.id) this._full = full; })
         .catch(() => { /* base row data is enough to decide */ });
       // New card — scroll its body back to the top.
       requestAnimationFrame(() => { this.querySelector('.review__scroll')?.scrollTo(0, 0); });
     }
+  }
+
+  // Reflect the current rec's unique id into the URL (?rec=<id>) without a
+  // navigation, so the open role is shareable, survives a refresh, and the
+  // arrow-key / Skip traversal keeps the address bar in sync.
+  _syncUrl(id) {
+    try {
+      const u = new URL(location.href);
+      if (id) u.searchParams.set('rec', id); else u.searchParams.delete('rec');
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch { /* history unavailable — non-critical */ }
+  }
+
+  // Walk the queue without acting on the current role (Skip / arrow keys).
+  // Clamped to the queue bounds; keeps the parent's index in sync so a later
+  // save/dismiss re-render doesn't snap us back.
+  _go(delta) {
+    const n = this.items?.length || 0;
+    if (!n) return;
+    const next = Math.min(n - 1, Math.max(0, this.index + delta));
+    if (next === this.index) return;
+    this.index = next;
+    this.dispatchEvent(new CustomEvent('review-index', { detail: { index: next }, bubbles: true }));
   }
 
   _close()  { this.dispatchEvent(new CustomEvent('review-close', { bubbles: true })); }
@@ -224,6 +266,11 @@ export class LadderReviewOverlay extends LitElement {
         <footer class="review__foot">
           <button class="btn review__btn review__btn--dismiss" @click=${() => this._emit('review-dismiss')}>
             Not for me
+          </button>
+          <button class="btn review__btn review__btn--skip" @click=${() => this._go(1)}
+                  ?disabled=${this.index >= this.items.length - 1}
+                  title="Skip for now (→) — stays in your queue">
+            Skip
           </button>
           <button class="btn btn--accent review__btn" @click=${() => this._emit('review-save')}>
             Save
