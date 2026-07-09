@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.19.0';
-console.log(`[recommendations] v${VERSION} - below-your-bar drawer now honors the role-name filter (universe include + blocked-title exclude)`);
+const VERSION = '0.20.0';
+console.log(`[recommendations] v${VERSION} - below-your-bar drawer honors the role-name filter (universe include + blocked-title exclude); sourceHealth returns source id for gmail-jobs reconnect`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -349,7 +349,8 @@ serve(async (req) => {
       let sourceHealth: unknown[] = [];
       try {
         sourceHealth = await sql`
-          select s.type,
+          select s.id,
+                 s.type,
                  s.enabled,
                  s.last_run_at   as "lastRunAt",
                  s.last_run_count as "lastRunCount",
