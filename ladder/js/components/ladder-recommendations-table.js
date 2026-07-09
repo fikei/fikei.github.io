@@ -514,9 +514,19 @@ export class JobRecommendationsTable extends LitElement {
             ${sub ? html`<span class="inbox-row__sub">${sub}</span>` : nothing}
           </span>
         </button>
-        <button class="btn btn--sm inbox-row__review" @click=${open}>
-          Review <span aria-hidden="true">→</span>
-        </button>
+        <div class="inbox-row__actions">
+          <button class="inbox-row__dismiss" title="Not for me"
+                  aria-label=${'Dismiss ' + (rec.title || 'this role')}
+                  @click=${() => this._onDismiss(rec)}>
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor"
+                    stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="btn btn--sm inbox-row__review" @click=${open}>
+            Review <span aria-hidden="true">→</span>
+          </button>
+        </div>
       </li>
     `;
   }
