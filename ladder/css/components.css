@@ -3669,11 +3669,30 @@ button.link-subtle {
   min-width: 0;
 }
 .pipeline-table .col-role .role-cell__text { min-width: 0; flex: 1; }
-.pipeline-table .col-role .role-cell__title,
 .pipeline-table .col-role .role-cell__company {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Title is a flex row so the ease chip / in-progress pill stay visible while
+   only the title TEXT truncates. (Chip lived inside the ellipsis box before,
+   so long titles clipped it off — v2.31.1 fix.) */
+.pipeline-table .col-role .role-cell__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pipeline-table .col-role .role-cell__title-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pipeline-table .col-role .role-cell__title .ease-chip,
+.pipeline-table .col-role .role-cell__title .in-progress-pill {
+  flex: 0 0 auto;
+  margin-left: 0;
 }
 .pipeline-table .col-sector .tag-chips {
   flex-wrap: wrap;
