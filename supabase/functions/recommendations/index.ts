@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.21.0';
-console.log(`[recommendations] v${VERSION} - Inbox quality gate keyed on fit_score ONLY (Strength/candidate floor removed for good_fits); default sort is fit_score desc`);
+const VERSION = '0.21.1';
+console.log(`[recommendations] v${VERSION} - Inbox gate keyed on fit_score ONLY + default sort fit_score desc; floored Inbox re-applies the role-name universe filter so removing the Strength floor doesn't leak off-universe (engineering/ops) titles from watched-company/gmail sources`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -184,10 +184,11 @@ serve(async (req) => {
       // so without this it surfaces off-track titles (engineering, etc.).
       // Re-apply the same include (role universe / vision.target_titles) +
       // exclude (vision.blocked_titles), mirroring pull-recommendations.
-      // Only loaded for the below path — the other views don't need it.
+      // Loaded for the floored default Inbox (applyFloor) and the below-bar
+      // drawer (belowFloor); the unfloored inspection views don't need it.
       let universePatterns: string[] = [];
       let blockedPatterns: string[] = [];
-      if (belowFloor) {
+      if (belowFloor || applyFloor) {
         // Escape LIKE wildcards so a phrase matches as a plain substring
         // (default '\' escape char), matching pull-recommendations' includes().
         const likeEsc = (s: string) => `%${s.replace(/([\\%_])/g, '\\$1')}%`;
@@ -276,6 +277,15 @@ serve(async (req) => {
           -- floor=below: also honor the role-name filter so the drawer
           -- stays on-track (in the role universe, not a blocked title).
           and (${!belowFloor} or (
+            (${universePatterns.length === 0} or lower(coalesce(r.title, '')) like any(${universePatterns}::text[]))
+            and (${blockedPatterns.length === 0} or lower(coalesce(r.title, '')) not like all(${blockedPatterns}::text[]))
+          ))
+          -- floor=1 (default Inbox): also gate on the role-name universe.
+          -- The main view has no pull-time title guard for watched-company /
+          -- gmail rows, so once the Strength floor was removed (v0.21.0),
+          -- off-universe titles (engineering, ops, solutions) could leak in.
+          -- Watched companies in 'all' mode opt out — they asked for everything.
+          and (${!applyFloor} or coalesce(w.filter_mode, 'good_fits') = 'all' or (
             (${universePatterns.length === 0} or lower(coalesce(r.title, '')) like any(${universePatterns}::text[]))
             and (${blockedPatterns.length === 0} or lower(coalesce(r.title, '')) not like all(${blockedPatterns}::text[]))
           ))
