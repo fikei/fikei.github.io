@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.17.0';
-console.log(`[jobs-pipe] v${VERSION} - exit_reason 'rejected_no_interview' (Updates-queue auto-archive mapping)`);
+const VERSION = '0.18.0';
+console.log(`[jobs-pipe] v${VERSION} - apply_ease tier fields in listRoles (Easy Apply badge)`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -58,6 +58,9 @@ async function listRoles() {
       r.is_live as "isLive",
       r.liveness_checked_at as "livenessCheckedAt",
       r.engaged_at as "engagedAt",
+      r.apply_ease as "applyEase",
+      r.apply_ease_meta as "applyEaseMeta",
+      r.canonical_apply_url as "canonicalApplyUrl",
       r.source_email_url as "sourceEmailUrl",
       r.updated_at as "updatedAt",
       coalesce(ra_resume.role_slug is not null, false) as "hasResume",

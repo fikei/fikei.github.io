@@ -45,6 +45,45 @@ export function normalizeBucket(raw) {
   return null;
 }
 
+// ----- Apply-ease taxonomy (Easy Apply badge) ------------------------------
+// Tiers written by classify-apply-ease / extract-application-fields. One
+// presentation map shared by the table chip, the detail header, and the
+// Updates digest so labels never drift. `special` refines its label from
+// apply_ease_meta (video vs email).
+export const APPLY_EASE_META = {
+  easy:         { label: 'Easy apply',    title: 'No written questions — resume, contact info and quick selects only' },
+  short_answer: { label: 'Short answers', title: 'One or two short written answers required' },
+  essay:        { label: 'Essays',        title: 'Long-form written answers required' },
+  special:      { label: 'Extra steps',   title: 'Video, portfolio, or email application' },
+  portal:       { label: 'Portal',        title: 'Account-gated application portal' },
+};
+
+// r → { tier, label, title } or null when unclassified/unknown (no badge).
+export function applyEaseInfo(r) {
+  const tier = r?.applyEase;
+  const base = APPLY_EASE_META[tier];
+  if (!base) return null;
+  const m = r?.applyEaseMeta || {};
+  let label = base.label;
+  let title = base.title;
+  if (tier === 'special') {
+    if (m.video)       { label = 'Video required'; title = 'The application asks for a recorded video'; }
+    else if (m.email_apply) { label = 'Email to apply'; title = 'Applications go by email, not a form'; }
+  }
+  if (tier === 'short_answer' && m.short_answers > 0) {
+    label = `${m.short_answers + (m.required_essays || 0)} short answer${(m.short_answers + (m.required_essays || 0)) === 1 ? '' : 's'}`;
+  }
+  if (tier === 'essay' && m.required_essays > 0) {
+    label = `${m.required_essays} essay${m.required_essays === 1 ? '' : 's'}`;
+  }
+  const bits = [];
+  if (m.ats && m.ats !== 'unknown') bits.push(m.ats);
+  if (typeof m.questions === 'number') bits.push(`${m.questions} question${m.questions === 1 ? '' : 's'}`);
+  if (m.requires_cover_letter) bits.push('cover letter required');
+  if (bits.length) title += ` · ${bits.join(' · ')}`;
+  return { tier, label, title };
+}
+
 // Shared visibility filter — drops rows without a URL and Strava postings.
 // (Was duplicated in the rail and the jobs list.)
 export function isVisibleRole(r) {

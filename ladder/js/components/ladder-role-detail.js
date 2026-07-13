@@ -24,7 +24,7 @@ async function getTurndown() {
   return td;
 }
 const V = (new URL(import.meta.url)).search;
-const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole, updateRole }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
+const [{ renderMarkdown }, { generateAsset, fetchPipeline, readRolePrefill, fetchCoverRationale, applyCoverEdit, addNarrative, engageRole, rescoreRole, updateRole, applyEaseInfo }, { readRoleAsset, writeRoleAsset }, { logoSrc, logoInitial }, { diffMarkdown, highlightPhrases, applyAIHighlights }, { renderFitCardBody, renderCandidateCardBody }] = await Promise.all([
   import('../markdown.js' + V),
   import('../pipeline.js' + V),
   import('../roleAsset.js' + V),
@@ -1976,6 +1976,7 @@ export class JobRoleDetail extends LitElement {
           <div class="role-header__title">
             <h1>${this._renderTitleEditable(r)}</h1>
             <p class="role-header__sub">${this._renderCompanyEditable(r)}${r?.sector ? html`<span class="role-header__sub-sep"> · ${r.sector}</span>` : nothing}</p>
+            ${this._renderApplyRequirements(r)}
           </div>
         </div>
         <div class="role-header__actions">
@@ -2013,6 +2014,31 @@ export class JobRoleDetail extends LitElement {
       </section>
 
       ${takeover}
+    `;
+  }
+
+  // "Application requirements" line (Phase 16.1) — the ease tier chip plus a
+  // one-line breakdown of what the form actually asks for, so the user knows
+  // whether this is a 2-minute submit before opening anything.
+  _renderApplyRequirements(r) {
+    const info = applyEaseInfo(r);
+    if (!info) return nothing;
+    const m = r?.applyEaseMeta || {};
+    const bits = [];
+    if (m.requires_resume) bits.push('resume');
+    if (m.requires_cover_letter) bits.push('cover letter');
+    if (typeof m.questions === 'number' && m.questions > 0) {
+      const auto = m.questions - (m.required_essays || 0) - (m.short_answers || 0);
+      if (auto > 0) bits.push(`${auto} quick question${auto === 1 ? '' : 's'}`);
+    }
+    if (m.short_answers > 0) bits.push(`${m.short_answers} short answer${m.short_answers === 1 ? '' : 's'}`);
+    if (m.required_essays > 0) bits.push(`${m.required_essays} essay${m.required_essays === 1 ? '' : 's'}`);
+    return html`
+      <p class="role-header__apply-req">
+        <span class="ease-chip ease-chip--${info.tier}" title=${info.title}>${info.label}</span>
+        ${bits.length ? html`<span class="muted">Application asks for: ${bits.join(', ')}.</span>` : nothing}
+        ${info.tier === 'easy' ? html`<span class="muted">~2 min with your saved details.</span>` : nothing}
+      </p>
     `;
   }
 

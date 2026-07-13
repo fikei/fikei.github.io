@@ -40,35 +40,35 @@ Simple and direct: classify every role's application form, show one chip.
 ### Epic 16.1-A: Classification backend
 
 **Story: apply-ease schema**
-- [ ] Migration: `pipeline_roles` + `recommended_roles` gain `apply_ease text`, `apply_ease_meta jsonb`, `apply_ease_checked_at timestamptz`, `canonical_apply_url text`
-- [ ] `apply_ease_meta` shape: `{ats, questions, required_essays, short_answers, requires_cover_letter, video, email_apply, source_url}`
+- [x] Migration: `pipeline_roles` + `recommended_roles` gain `apply_ease text`, `apply_ease_meta jsonb`, `apply_ease_checked_at timestamptz`, `canonical_apply_url text`
+- [x] `apply_ease_meta` shape: `{ats, questions, required_essays, short_answers, requires_cover_letter, video, email_apply, source_url}`
 
 **Story: classifier**
-- [ ] Pure tier function over `extract-application-fields` output (required `long_text` → essay; video/portfolio/email → special; non-whitelisted required `short_text` → short_answer; else easy)
-- [ ] Unit-test against the 21 audited forms as fixtures (OpenAI/Airbnb/Speak → easy, Mindbody ×2 → short_answer, Midi/Galileo/Kiddom → essay, Solace/Splitwise → special)
-- [ ] `extract-application-fields` version bump; classification returned alongside the schema
+- [x] Pure tier function over `extract-application-fields` output (required `long_text` → essay; video/portfolio/email → special; non-whitelisted required `short_text` → short_answer; else easy)
+- [x] Unit-test against the 21 audited forms as fixtures (OpenAI/Airbnb/Speak → easy, Mindbody ×2 → short_answer, Midi/Galileo/Kiddom → essay, Solace/Splitwise → special)
+- [x] `extract-application-fields` version bump; classification returned alongside the schema
 
 **Story: sweep + on-save**
-- [ ] Nightly sweep (jobs-pipe action or dedicated cron): Saved + Drafting roles where `apply_ease_checked_at` is null or >14d, call extraction, store tier
-- [ ] Fire-and-forget classify when a role enters Saved from the frontend
-- [ ] Per-run cap + backoff so one sweep can't hammer an ATS
+- [x] Nightly sweep (jobs-pipe action or dedicated cron): Saved + Drafting roles where `apply_ease_checked_at` is null or >14d, call extraction, store tier
+- [x] Fire-and-forget classify when a role enters Saved from the frontend
+- [x] Per-run cap + backoff so one sweep can't hammer an ATS
 
 **Story: LinkedIn → ATS resolution**
-- [ ] For `linkedin.com/jobs/view/*` URLs, resolve offsite `companyApplyUrl` (guest endpoint first, Haiku-over-careers-page fallback, same pattern as `enrich-job-source`)
-- [ ] Store in `canonical_apply_url`; classify the resolved URL
-- [ ] Closed-on-LinkedIn detection while we're there (audit found Symbium dead but `is_live=true`)
+- [x] For `linkedin.com/jobs/view/*` URLs, resolve offsite `companyApplyUrl` (guest endpoint first, Haiku-over-careers-page fallback, same pattern as `enrich-job-source`)
+- [x] Store in `canonical_apply_url`; classify the resolved URL
+- [x] Closed-on-LinkedIn detection while we're there (audit found Symbium dead but `is_live=true`)
 
 **Story: liveness fix (piggyback)**
-- [ ] Greenhouse `302 → board root` counted as closed, not alive (audit: Anthropic + Garner false-alive)
+- [x] Greenhouse `302 → board root` counted as closed, not alive (audit: Anthropic + Garner false-alive)
 
 ### Epic 16.1-B: Badge UI
 
-- [ ] Chip in Saved/Drafting table rows: `⚡ Easy apply` / `✍️ Short answers` / `📝 Essays` / `🎥 Video` / `✉️ Email` — no chip when `unknown`
-- [ ] Tooltip renders `apply_ease_meta` (ATS, #questions, cover letter y/n)
-- [ ] "Easy apply" quick-filter pill on the Saved page
-- [ ] Role detail: "Application requirements" card (auto-fillable ✅ vs needs-your-words ✍️, estimated effort)
-- [ ] Updates queue digest row when a sweep finds new easy applies ("⚡ 3 saved jobs are easy applies — ~2 min each"), click → filtered Saved table; Dismiss supported
-- [ ] Ladder version bump + `design-system/README.md` entry for the chip variants
+- [x] Chip in Saved/Drafting table rows: `⚡ Easy apply` / `✍️ Short answers` / `📝 Essays` / `🎥 Video` / `✉️ Email` — no chip when `unknown`
+- [x] Tooltip renders `apply_ease_meta` (ATS, #questions, cover letter y/n)
+- [x] "Easy apply" quick-filter pill on the Saved page
+- [x] Role detail: "Application requirements" card (auto-fillable ✅ vs needs-your-words ✍️, estimated effort)
+- [x] Updates queue digest row when a sweep finds new easy applies ("⚡ 3 saved jobs are easy applies — ~2 min each"), click → filtered Saved table; Dismiss supported
+- [x] Ladder version bump + `design-system/README.md` entry for the chip variants
 
 ---
 

@@ -176,6 +176,7 @@ const ICONS = {
   mail:     `<svg ${SVG_ATTRS}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>`,
   clock:    `<svg ${SVG_ATTRS}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
   calendar: `<svg ${SVG_ATTRS}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`,
+  bolt:     `<svg ${SVG_ATTRS}><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>`,
 };
 
 export const UPDATE_KIND_META = {
@@ -189,6 +190,9 @@ export const UPDATE_KIND_META = {
   reply_pending:       { tint: 'amber', icon: ICONS.mail,     chip: 'Reply pending',   actionLabel: 'Open in Gmail' },
   stale:               { tint: 'gray',  icon: ICONS.clock,    chip: 'Quiet',           actionLabel: 'Follow up' },
   calendar_today:      { tint: 'blue',  icon: ICONS.calendar, chip: 'Interview',       actionLabel: 'Open role' },
+  // Synthetic digest row built client-side from apply_ease tiers (16.1) —
+  // no application_events row behind it.
+  easy_apply:          { tint: 'green', icon: ICONS.bolt,     chip: 'Easy apply',      actionLabel: 'Show them' },
 };
 
 export function updateKindMeta(kind) {
