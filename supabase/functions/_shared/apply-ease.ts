@@ -41,6 +41,7 @@ const SHORT_TEXT_WHITELIST: RegExp[] = [
   /current (company|employer|location|role|title)|where are you (currently )?(based|located)/i,
   /^\s*if (yes|no|you selected|applicable)/i,
   /currently employed by|worked (at|for)/i,
+  /please rate|rate your/i,     // 1–5 self-rating scales (Ashby Score fields)/i
   /country|state|city|time ?zone/i,
   /visa|sponsorship/i,
 ];
