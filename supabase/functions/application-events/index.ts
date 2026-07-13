@@ -51,7 +51,7 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.6.1';
+const VERSION = '1.6.2';
 console.log(`[application-events] v${VERSION} - undo re-opens the prompt (decision stays on the table); low-confidence copy only below the auto floor`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -462,7 +462,10 @@ async function listUpdates(userEmail: string): Promise<Response> {
     }
   }
 
-  // 2. Records — actions the system took in the last 7 days, undo-able.
+  // 2. Records — actions taken in the last 7 days, undo-able. The window
+  // is on the ACTION time (reviewed_at for one-click resolves, received_at
+  // for scan-time auto-actions) — resolving a weeks-old email must still
+  // produce a visible record.
   const records = await sql<Array<{
     event_id: string; role_slug: string; company_name: string; title: string;
     auto_action: string; event_type: string; summary: string | null;
@@ -470,14 +473,15 @@ async function listUpdates(userEmail: string): Promise<Response> {
   }>>`
     select ae.id as event_id, ae.role_slug, r.company_name, r.title,
            ae.auto_action, ae.event_type, ae.summary,
-           r.stage, r.exit_reason, ae.received_at::text as received_at
+           r.stage, r.exit_reason,
+           coalesce(ae.reviewed_at, ae.received_at)::text as received_at
       from job.application_events ae
       join job.pipeline_roles r on r.slug = ae.role_slug
      where ae.auto_action is not null
        and ae.dismissed_at is null and ae.undone_at is null
-       and ae.received_at > now() - interval '7 days'
+       and coalesce(ae.reviewed_at, ae.received_at) > now() - interval '7 days'
        and r.deleted_at is null
-     order by ae.received_at desc`;
+     order by coalesce(ae.reviewed_at, ae.received_at) desc`;
   for (const rec of records) {
     if (rec.auto_action === 'stage_offer') {
       upsert({
