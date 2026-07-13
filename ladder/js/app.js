@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.31.0";
-console.log(`[ladder] v${VERSION} - Easy Apply setup flow: answer bank onboarding, Settings mirror, readiness check + Ready-to-submit chip`);
+const VERSION = "2.31.1";
+console.log(`[ladder] v${VERSION} - fix: ease chip clipped off long role titles (title now truncates, chip stays)`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
