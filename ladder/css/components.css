@@ -2265,23 +2265,8 @@ button.link-subtle {
   border-radius: var(--radius-md);
 }
 
-/* --- Closed-since-last-visit banner --- */
-.closed-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  background: rgba(168,32,13,0.08);
-  border: 1px solid rgba(168,32,13,0.18);
-  border-radius: var(--radius-md);
-  color: var(--fg);
-  margin: 0 0 var(--space-4);
-  font-size: var(--font-size-small);
-}
-.closed-banner strong { display: block; margin-bottom: 2px; color: var(--error); }
-.closed-banner .muted { display: block; margin-top: var(--space-1); }
-[data-theme="generic-dark"] .closed-banner { background: rgba(255,122,110,0.10); border-color: rgba(255,122,110,0.28); }
+/* (Closed-since-last-visit banner removed — role closures are rows in the
+   Updates queue on the Inbox now.) */
 
 /* --- Paste-a-link form --- */
 .paste-row {
