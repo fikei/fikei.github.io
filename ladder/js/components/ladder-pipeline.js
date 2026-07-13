@@ -4,7 +4,8 @@ import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources,
-        STAGES, STAGE_IDS, BUCKETS, BUCKET_LABELS, bucketFor, normalizeBucket, isVisibleRole, applyEaseInfo } = await import('../pipeline.js' + V);
+        STAGES, STAGE_IDS, BUCKETS, BUCKET_LABELS, bucketFor, normalizeBucket, isVisibleRole, applyEaseInfo,
+        classifyApplyEaseForSlug } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { ackEvent, loadUpdates, resolveEvent, undoEvent, dismissUpdate, updateKindMeta, roleMatchedEvents } = await import('../applicationEvents.js' + V);
@@ -222,6 +223,9 @@ export class JobPipeline extends LitElement {
       const existing = new Map((this.addedBanner.roles || []).map(r => [r.slug, r]));
       for (const r of next) if (r?.slug) existing.set(r.slug, r);
       this.addedBanner = { roles: Array.from(existing.values()), dismissed: false };
+      // Classify the new arrivals' apply-ease in the background so the badge
+      // shows up on this visit, not after the next sweep tick.
+      for (const r of next) if (r?.slug) classifyApplyEaseForSlug(r.slug);
       // Confirmation info, not state — auto-dismiss; the roles are visible
       // in the list itself. Timer resets while adds keep arriving.
       clearTimeout(this._addedHideTimer);

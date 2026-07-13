@@ -54,7 +54,7 @@ Simple and direct: classify every role's application form, show one chip.
 - [x] Per-run cap + backoff so one sweep can't hammer an ATS
 
 **Story: LinkedIn → ATS resolution**
-- [x] For `linkedin.com/jobs/view/*` URLs, resolve offsite `companyApplyUrl` (guest endpoint first, Haiku-over-careers-page fallback, same pattern as `enrich-job-source`)
+- [x] For `linkedin.com/jobs/view/*` URLs, resolve offsite `companyApplyUrl` via the guest endpoint (Haiku-over-careers-page fallback deferred to 16.2 — guest endpoint covers the current bucket)
 - [x] Store in `canonical_apply_url`; classify the resolved URL
 - [x] Closed-on-LinkedIn detection while we're there (audit found Symbium dead but `is_live=true`)
 

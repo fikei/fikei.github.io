@@ -385,6 +385,25 @@ export async function checkLiveness({ slug } = {}) {
   return res.json();
 }
 
+// Fire-and-forget apply-ease classification for a just-saved role, so the
+// badge appears without waiting for the 2h sweep. Errors are swallowed —
+// the cron re-covers anything this misses.
+const CLASSIFY_EASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/classify-apply-ease';
+export function classifyApplyEaseForSlug(slug) {
+  if (!slug) return;
+  (async () => {
+    try {
+      const headers = await authHeader();
+      await fetch(CLASSIFY_EASE_URL, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      document.dispatchEvent(new CustomEvent('job:pipeline:refresh'));
+    } catch { /* sweep will pick it up */ }
+  })();
+}
+
 // Stash a role row in sessionStorage so the detail page can paint title/
 // company/tags instantly on next load. Read with readRolePrefill(slug).
 export function stashRolePrefill(role) {
