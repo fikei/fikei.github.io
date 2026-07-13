@@ -203,3 +203,12 @@ Design pattern documented in `ladder/DESIGN.md` (Updates queue / Signal chips).
 | Mount at top of Inbox (/ladder/jobs/recommended/) — Inbox is the MVP "Today" surface | ✓ |
 | Queue removed from Jobs bucket pages; Signal chips stay (click falls through to role page) | ✓ |
 | Mutations dispatch `job:pipeline:refresh` so open tables re-sync | ✓ |
+
+### Story 5.5 — Type batching in the Updates queue (v2.33)
+
+| Task | Status |
+|------|--------|
+| Same-kind rows collapse into one group row (count badge, company preview, latest timestamp) | ✓ |
+| "Show all N" expander → inset drawer of individual rows, each with its own action + × | ✓ |
+| Group × dismisses every instance (server dismiss for event rows, local keys for synthetic) | ✓ |
+| Bespoke closure digest replaced by the generic grouping (closures emit per-role again) | ✓ |
