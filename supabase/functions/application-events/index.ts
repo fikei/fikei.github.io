@@ -46,12 +46,13 @@ import {
   userIdForEmail,
 } from '../_shared/google-tokens.ts';
 import { scanApplicationResponses, mapRejectionExitReason } from '../_shared/gmail-application-scan.ts';
+import { AUTO_RESOLVE } from '../_shared/gmail-application-classifier.ts';
 import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.6.0';
-console.log(`[application-events] v${VERSION} - Updates queue: proactive resolve/undo/dismiss + 30d no-response sweep`);
+const VERSION = '1.6.1';
+console.log(`[application-events] v${VERSION} - undo re-opens the prompt (decision stays on the table); low-confidence copy only below the auto floor`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
@@ -404,28 +405,41 @@ async function listUpdates(userEmail: string): Promise<Response> {
     if (!cur || item.priority < cur.priority) byRole.set(item.role_slug, item);
   };
 
-  // 1. Prompts — below-floor offers/rejections awaiting the one click.
+  // 1. Prompts — offers/rejections awaiting the one click: below-floor
+  //    classifications, events that predate the proactive policy, and
+  //    decisions re-opened by an undo (prompts ignore undone_at — undo
+  //    clears auto_action and restores needs_review, see undoEvent).
   const prompts = await sql<Array<{
     event_id: string; role_slug: string; company_name: string; title: string;
-    event_type: string; summary: string | null; stage: string | null;
+    event_type: string; summary: string | null; confidence: number | null; stage: string | null;
     gmail_thread_id: string; gmail_api_id: string | null; received_at: string;
   }>>`
     select ae.id as event_id, ae.role_slug, r.company_name, r.title,
-           ae.event_type, ae.summary, r.stage,
+           ae.event_type, ae.summary, ae.confidence, r.stage,
            ae.gmail_thread_id, ae.gmail_api_id, ae.received_at::text as received_at
       from job.application_events ae
       join job.pipeline_roles r on r.slug = ae.role_slug
      where ae.needs_review = true and ae.reviewed_at is null
-       and ae.dismissed_at is null and ae.undone_at is null
+       and ae.dismissed_at is null
        and r.deleted_at is null
      order by ae.received_at desc`;
+  // "low confidence" is only true below the auto-resolve floor — events
+  // that predate the policy (or were re-opened by undo) can be high-
+  // confidence and must not claim otherwise.
+  const promptDetail = (p: { summary: string | null; confidence: number | null; event_type: string }) => {
+    const floor = AUTO_RESOLVE[p.event_type as keyof typeof AUTO_RESOLVE]?.floor ?? 0;
+    const belowFloor = (p.confidence ?? 0) < floor;
+    const parts = [p.summary || ''];
+    if (belowFloor) parts.push('low confidence, so nothing was changed');
+    return parts.filter(Boolean).join(' · ');
+  };
   for (const p of prompts) {
     if (p.event_type === 'offer_received') {
       upsert({
         kind: 'prompt_offer', action: 'stage_offer', priority: 1,
         event_id: p.event_id, role_slug: p.role_slug, company: p.company_name, title: p.title,
         text: `${p.company_name} looks like an offer`,
-        detail: `${p.summary || ''} · low confidence, so nothing was changed`.replace(/^ · /, ''),
+        detail: promptDetail(p),
         gmail_thread_id: p.gmail_thread_id, gmail_api_id: p.gmail_api_id, received_at: p.received_at,
       });
     } else if (p.event_type === 'rejection_any_stage') {
@@ -434,7 +448,7 @@ async function listUpdates(userEmail: string): Promise<Response> {
         kind: 'prompt_rejection', action: 'archive', priority: 1,
         event_id: p.event_id, role_slug: p.role_slug, company: p.company_name, title: p.title,
         text: `${p.company_name} looks like a rejection`,
-        detail: `${p.summary || ''} · low confidence, so nothing was changed`.replace(/^ · /, ''),
+        detail: promptDetail(p),
         suggested_exit_reason: suggested,
         gmail_thread_id: p.gmail_thread_id, gmail_api_id: p.gmail_api_id, received_at: p.received_at,
       });
@@ -655,8 +669,8 @@ async function undoEvent(body: Record<string, unknown>): Promise<Response> {
   if (!eventId) return err('eventId required');
 
   const sql = db();
-  const rows = await sql<Array<{ id: string; role_slug: string; auto_action: string | null; prev_state: Record<string, unknown> | null; undone_at: string | null }>>`
-    select id, role_slug, auto_action, prev_state, undone_at::text as undone_at
+  const rows = await sql<Array<{ id: string; role_slug: string; event_type: string; auto_action: string | null; prev_state: Record<string, unknown> | null; undone_at: string | null }>>`
+    select id, role_slug, event_type, auto_action, prev_state, undone_at::text as undone_at
       from job.application_events where id = ${eventId} limit 1`;
   if (!rows.length) return err('event not found', 404);
   const ev = rows[0];
@@ -672,12 +686,30 @@ async function undoEvent(body: Record<string, unknown>): Promise<Response> {
            exit_context = ${p.exit_context ?? null},
            status_changed_at = now(), updated_at = now()
      where slug = ${ev.role_slug}`;
-  await sql`
-    update job.application_events
-       set undone_at    = now(),
-           needs_review = false,
-           reviewed_at  = coalesce(reviewed_at, now())
-     where id = ${eventId}`;
+  // Undo restores the role AND re-opens the decision: offer/rejection
+  // events go back to being a one-click prompt in the feed (dismissible
+  // with ×) instead of vanishing forever. Synthetic sweep events don't
+  // re-prompt — their idempotency key already blocks a re-sweep.
+  const reopenAsPrompt = ev.event_type === 'offer_received' || ev.event_type === 'rejection_any_stage';
+  if (reopenAsPrompt) {
+    await sql`
+      update job.application_events
+         set undone_at    = now(),
+             auto_action  = null,
+             prev_state   = null,
+             needs_review = true,
+             reviewed_at  = null
+       where id = ${eventId}`;
+  } else {
+    await sql`
+      update job.application_events
+         set undone_at    = now(),
+             auto_action  = null,
+             prev_state   = null,
+             needs_review = false,
+             reviewed_at  = coalesce(reviewed_at, now())
+       where id = ${eventId}`;
+  }
 
   const role = await sql<Array<{ slug: string; status: string; stage: string | null; exit_reason: string | null }>>`
     select slug, status, stage, exit_reason from job.pipeline_roles where slug = ${ev.role_slug}`;
