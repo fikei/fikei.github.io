@@ -4313,11 +4313,15 @@ button.link-subtle {
 }
 .role-header__apply-req .ease-chip { margin-left: 0; }
 
-/* Updates queue — the single notification surface, top of every Jobs
-   bucket page. One elevated card, hairline-divided rows (inbox pattern).
-   Each row: tinted icon circle · text · ONE action button · × dismiss.
+/* Updates queue — the single notification surface, top of the Inbox.
+   One elevated card, hairline-divided rows (inbox pattern). Each row:
+   tinted icon circle · text · ONE action button · × dismiss.
    Lifecycle: rows are server-backed (auto-actions ≤7d, prompts until
-   resolved); × persists to dismissed_at (localStorage for synthetic rows). */
+   resolved); × persists to dismissed_at (localStorage for synthetic rows).
+   Width matches the inbox column so the two read as one surface. */
+ladder-updates { display: block; }
+ladder-updates .updates-queue { max-width: 760px; }
+
 .updates-queue {
   margin: 0 0 var(--space-4);
   padding: var(--space-2) var(--space-4);
