@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.28.0";
-console.log(`[ladder] v${VERSION} - pipeline split into 6 buckets (Saved · Drafting · Applied · Interviewing · Offer · Archive) under Jobs in primary nav; flat "Move to" menu`);
+const VERSION = "2.29.0";
+console.log(`[ladder] v${VERSION} - Updates queue: proactive auto-resolution (offer/rejection/no-response) with Undo; replaces live banners + needs-attention widget`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -288,19 +288,35 @@ function injectToastHost() {
   document.addEventListener('job:toast', (e) => {
     const msg = e.detail?.msg;
     if (!msg) return;
-    const el = document.createElement('button');
+    // Optional inline action: { action: 'Undo', onAction: fn } renders a
+    // second button inside the toast (Updates-queue undo confirmations).
+    const actionLabel = e.detail?.action;
+    const onAction = typeof e.detail?.onAction === 'function' ? e.detail.onAction : null;
+    const el = document.createElement('div');
     el.className = 'toast';
-    el.type = 'button';
-    el.textContent = msg;
-    el.title = 'Dismiss';
+    el.setAttribute('role', 'status');
     const remove = () => {
       el.classList.add('toast--leaving');
       setTimeout(() => el.remove(), 200);
     };
-    el.addEventListener('click', remove);
+    const msgBtn = document.createElement('button');
+    msgBtn.type = 'button';
+    msgBtn.className = 'toast__msg';
+    msgBtn.textContent = msg;
+    msgBtn.title = 'Dismiss';
+    msgBtn.addEventListener('click', remove);
+    el.appendChild(msgBtn);
+    if (actionLabel && onAction) {
+      const actBtn = document.createElement('button');
+      actBtn.type = 'button';
+      actBtn.className = 'toast__action';
+      actBtn.textContent = actionLabel;
+      actBtn.addEventListener('click', () => { remove(); onAction(); });
+      el.appendChild(actBtn);
+    }
     host.appendChild(el);
     while (host.children.length > 3) host.firstChild.remove();
-    setTimeout(remove, 4500);
+    setTimeout(remove, e.detail?.duration || 4500);
   });
 }
 injectToastHost();

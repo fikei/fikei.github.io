@@ -35,6 +35,29 @@ export async function ackEvent(eventId) {
   return post(APP_EVENTS_URL, { action: 'ack', eventId });
 }
 
+// ---- Updates queue (proactive model) ----
+
+// Feed of system actions (undo-able records) + one-click prompts +
+// reply-pending + stale rows. One item per role, priority-ordered.
+export async function loadUpdates() {
+  return post(APP_EVENTS_URL, { action: 'updates' });
+}
+
+// One-click prompt action: resolution 'stage_offer' | 'archive'.
+export async function resolveEvent(eventId, resolution, { exit_reason, exit_context } = {}) {
+  return post(APP_EVENTS_URL, { action: 'resolve', eventId, resolution, exit_reason, exit_context });
+}
+
+// Revert an auto/prompted action from the event's stored prev_state.
+export async function undoEvent(eventId) {
+  return post(APP_EVENTS_URL, { action: 'undo', eventId });
+}
+
+// Acknowledge (×) a feed row — server-persisted.
+export async function dismissUpdate(eventId) {
+  return post(APP_EVENTS_URL, { action: 'dismiss', eventId });
+}
+
 export async function runBackfill({ roleSlug, batchSize = 5, windowDays = 30 } = {}) {
   return post(APP_EVENTS_URL, { action: 'backfill', roleSlug, batchSize, windowDays });
 }
@@ -139,6 +162,39 @@ export function chipClassForSignal(signal) {
   }
 }
 
+// ---- Updates-queue presentation map ----
+// One taxonomy for the queue rows AND the table Signal chips: per feed
+// `kind` — tint class, inline SVG line icon (no emoji, per DESIGN.md),
+// short chip label, and the single action's button label.
+
+const SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+const ICONS = {
+  award:    `<svg ${SVG_ATTRS}><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg>`,
+  archive:  `<svg ${SVG_ATTRS}><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>`,
+  xcircle:  `<svg ${SVG_ATTRS}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`,
+  stairs:   `<svg ${SVG_ATTRS}><path d="M4 20h4v-4h4v-4h4V8h4"/></svg>`,
+  mail:     `<svg ${SVG_ATTRS}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>`,
+  clock:    `<svg ${SVG_ATTRS}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+  calendar: `<svg ${SVG_ATTRS}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`,
+};
+
+export const UPDATE_KIND_META = {
+  auto_offer:          { tint: 'green', icon: ICONS.award,    chip: 'Offer',           actionLabel: 'Undo' },
+  auto_archive:        { tint: 'red',   icon: ICONS.archive,  chip: 'Archived',        actionLabel: 'Undo archive' },
+  no_response_archive: { tint: 'gray',  icon: ICONS.archive,  chip: 'No response',     actionLabel: 'Undo archive' },
+  auto_advance:        { tint: 'blue',  icon: ICONS.stairs,   chip: 'Moved forward',   actionLabel: 'Open role' },
+  prompt_offer:        { tint: 'green', icon: ICONS.award,    chip: 'Offer — confirm', actionLabel: 'Move to offer' },
+  prompt_rejection:    { tint: 'red',   icon: ICONS.xcircle,  chip: 'Rejection',       actionLabel: 'Archive role' },
+  prompt_other:        { tint: 'amber', icon: ICONS.mail,     chip: 'New update',      actionLabel: 'Open role' },
+  reply_pending:       { tint: 'amber', icon: ICONS.mail,     chip: 'Reply pending',   actionLabel: 'Open in Gmail' },
+  stale:               { tint: 'gray',  icon: ICONS.clock,    chip: 'Quiet',           actionLabel: 'Follow up' },
+  calendar_today:      { tint: 'blue',  icon: ICONS.calendar, chip: 'Interview',       actionLabel: 'Open role' },
+};
+
+export function updateKindMeta(kind) {
+  return UPDATE_KIND_META[kind] || UPDATE_KIND_META.prompt_other;
+}
+
 export function eventTypeLabel(eventType) {
   switch (eventType) {
     case 'applied_confirmation':   return 'Applied';
@@ -157,4 +213,5 @@ export function eventTypeLabel(eventType) {
 window.JobApplicationEvents = {
   listEvents, needsAttention, ackEvent, runBackfill, roleMatchedEvents,
   loadRoleSignals, chipClassForSignal, eventTypeLabel,
+  loadUpdates, resolveEvent, undoEvent, dismissUpdate, updateKindMeta,
 };

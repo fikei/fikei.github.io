@@ -20,17 +20,25 @@ export const APPLICATION_EVENT_TYPES = [
 export type ApplicationEventType = typeof APPLICATION_EVENT_TYPES[number];
 
 // Forward-stage auto-advance: event_type → stage to write on pipeline_roles.
-// Forward only — offers + rejections never auto-advance per locked decision.
 export const FORWARD_AUTO_ADVANCE: Record<ApplicationEventType, { stage: 'applied' | 'interviewing'; floor: number } | null> = {
   applied_confirmation:  { stage: 'applied',       floor: 0.8  },
   screen_scheduled:      { stage: 'interviewing',  floor: 0.8  },
   next_round_invited:    { stage: 'interviewing',  floor: 0.7  },
   take_home_assigned:    { stage: 'interviewing',  floor: 0.8  },
-  offer_received:        null,   // surfaces in Needs-Attention, user confirms
-  rejection_any_stage:   null,   // surfaces in Needs-Attention, captures exit_reason
+  offer_received:        null,   // handled by AUTO_RESOLVE below
+  rejection_any_stage:   null,   // handled by AUTO_RESOLVE below
   follow_up_needed:      null,
   interview_rescheduled: null,
   informational:         null,
+};
+
+// Proactive resolution (Updates-queue rev): high-confidence outcomes are
+// ACTED on at scan time and surfaced as undo-able records in the Updates
+// feed. Below these floors the event becomes a one-click prompt instead
+// (needs_review=true) — the system never acts on a shaky classification.
+export const AUTO_RESOLVE: Partial<Record<ApplicationEventType, { action: 'stage_offer' | 'archived'; floor: number }>> = {
+  offer_received:      { action: 'stage_offer', floor: 0.85 },
+  rejection_any_stage: { action: 'archived',    floor: 0.75 },
 };
 
 // Confidence floor to even *persist* the event row. Below this we drop
@@ -43,11 +51,13 @@ export const PERSIST_CONFIDENCE_FLOOR = 0.6;
 // (poison-resistance per the brief).
 export const THREAD_ASSOCIATION_FLOOR = 0.8;
 
-// Auto-advance is forward only; offers + rejections always need_review.
-// follow_up_needed / interview_rescheduled / informational write
-// needs_review=true so they bubble into Needs-Attention on UI open.
-export function shouldNeedReview(eventType: ApplicationEventType): boolean {
-  return eventType === 'offer_received' || eventType === 'rejection_any_stage';
+// Offers + rejections only need review when the classification is below
+// the AUTO_RESOLVE floor — at or above it the scan acts and the event
+// surfaces as an undo-able record instead of a prompt.
+export function shouldNeedReview(eventType: ApplicationEventType, confidence: number): boolean {
+  const auto = AUTO_RESOLVE[eventType];
+  if (!auto) return false;
+  return confidence < auto.floor;
 }
 
 // Stages classifier may emit (used to populate application_events.detected_stage).

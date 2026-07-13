@@ -49,7 +49,8 @@ const KIND_BY_TAB = {
   'cover-letter': 'cover-letter',
 };
 
-const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel } = await import('../applicationEvents.js' + V);
+const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel,
+        resolveEvent: resolveApplicationEvent, undoEvent: undoApplicationEvent } = await import('../applicationEvents.js' + V);
 // Side-effect import — registers the <ladder-apply> custom element used by the
 // "Apply with /ladder" launch button below.
 await import('./ladder-apply.js' + V);
@@ -400,6 +401,45 @@ export class JobRoleDetail extends LitElement {
       );
     } catch (e) {
       console.warn('[role-detail] ack failed:', e.message);
+    }
+  }
+
+  // One-click resolution for below-floor offer/rejection prompts —
+  // mirrors the Updates queue: applies the role mutation + acks the event
+  // server-side, with Undo via toast.
+  async _onResolveActivityEvent(ev, resolution, dom) {
+    dom?.stopPropagation();
+    try {
+      await resolveApplicationEvent(ev.id, resolution);
+      document.dispatchEvent(new CustomEvent('job:toast', {
+        detail: {
+          msg: resolution === 'archive' ? 'Role archived' : 'Moved to Offer',
+          action: 'Undo',
+          duration: 8000,
+          onAction: async () => {
+            try {
+              await undoApplicationEvent(ev.id);
+              const pipeline = await fetchPipeline();
+              this.role = (pipeline.roles || []).find(r => r.slug === this.slug) || this.role;
+              await this._loadActivity();
+            } catch (e) { console.warn('[role-detail] undo failed:', e.message); }
+          },
+        },
+      }));
+      await this._loadActivity();
+    } catch (e) {
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Couldn't apply: ${e.message}` } }));
+    }
+  }
+
+  async _onUndoActivityEvent(ev, dom) {
+    dom?.stopPropagation();
+    try {
+      await undoApplicationEvent(ev.id);
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: 'Restored' } }));
+      await this._loadActivity();
+    } catch (e) {
+      console.warn('[role-detail] undo failed:', e.message);
     }
   }
 
@@ -2060,17 +2100,51 @@ export class JobRoleDetail extends LitElement {
           </div>
           <div class="activity-event__summary">${ev.summary || '(no summary)'}</div>
           <div class="activity-event__meta">
-            ${ev.auto_applied ? html`<span class="muted">Auto-advanced to ${ev.detected_stage || '—'}</span>` : nothing}
-            ${ev.needs_user_reply ? html`<span class="activity-event__reply-flag">⚠ You haven't replied yet</span>` : nothing}
-            ${gmailUrl ? html`<a href=${gmailUrl} target="_blank" rel="noopener noreferrer">📧 Source email</a>` : nothing}
+            ${this._activityAutoActionLabel(ev)}
+            ${ev.needs_user_reply ? html`<span class="activity-event__reply-flag">You haven't replied yet</span>` : nothing}
+            ${gmailUrl ? html`<a href=${gmailUrl} target="_blank" rel="noopener noreferrer">Source email</a>` : nothing}
             ${ev.confidence != null ? html`<span class="muted">Confidence ${(ev.confidence * 100).toFixed(0)}%</span>` : nothing}
-            ${ev.needs_review && !ev.reviewed_at ? html`
-              <button class="activity-event__ack" @click=${(e) => this._onAckActivityEvent(ev, e)}>Mark as seen</button>
-            ` : nothing}
+            ${this._activityActions(ev)}
           </div>
         </div>
       </article>
     `;
+  }
+
+  // What the system did for this event (undo-able), or nothing.
+  _activityAutoActionLabel(ev) {
+    if (ev.undone_at) return html`<span class="muted">Undone</span>`;
+    switch (ev.auto_action) {
+      case 'stage_offer':    return html`<span class="muted">Moved to Offer automatically</span>`;
+      case 'archived':       return html`<span class="muted">Archived automatically</span>`;
+      case 'archived_stale': return html`<span class="muted">Archived — no response in 30 days</span>`;
+      case 'stage_advance':  return html`<span class="muted">Auto-advanced to ${ev.detected_stage || '—'}</span>`;
+      default:
+        return ev.auto_applied ? html`<span class="muted">Auto-advanced to ${ev.detected_stage || '—'}</span>` : nothing;
+    }
+  }
+
+  // Single action per event, mirroring the Updates queue: Undo for
+  // auto-actions, one-click resolve for below-floor prompts, Mark as seen
+  // for everything else still unreviewed.
+  _activityActions(ev) {
+    if (ev.auto_action && !ev.undone_at) {
+      return html`
+        <button class="activity-event__ack" @click=${(e) => this._onUndoActivityEvent(ev, e)}>Undo</button>`;
+    }
+    if (ev.needs_review && !ev.reviewed_at) {
+      if (ev.event_type === 'offer_received') {
+        return html`
+          <button class="activity-event__ack" @click=${(e) => this._onResolveActivityEvent(ev, 'stage_offer', e)}>Move to offer</button>`;
+      }
+      if (ev.event_type === 'rejection_any_stage') {
+        return html`
+          <button class="activity-event__ack" @click=${(e) => this._onResolveActivityEvent(ev, 'archive', e)}>Archive role</button>`;
+      }
+      return html`
+        <button class="activity-event__ack" @click=${(e) => this._onAckActivityEvent(ev, e)}>Mark as seen</button>`;
+    }
+    return nothing;
   }
 }
 
