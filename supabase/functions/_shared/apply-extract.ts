@@ -216,9 +216,12 @@ export async function extractLever(l: Extract<Ats, { kind: 'lever' }>, sourceUrl
 // ----- Ashby -------------------------------------------------------------
 export async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl: string): Promise<Schema> {
   // Ashby exposes a public GraphQL endpoint for the unauthenticated
-  // applicant-facing job page. Schema fields below match what their JS
-  // bundle requests on the apply page (verified 2025-Q2). If the
-  // response shape changes we fall back to HTML extraction.
+  // applicant-facing job page. `applicationForm.sections[].fieldEntries[].field`
+  // is a JSON scalar carrying {path, title, type, isNullable, selectableValues}
+  // (verified live 2026-07-13; the older applicationFormDefinition field was
+  // removed and had been silently failing into the HTML fallback). Field
+  // types observed: String, Email, Phone, Location, Date, Boolean,
+  // ValueSelect, MultiValueSelect, LongText, File, Number, Score.
   const query = `
     query ApiJobPosting($organizationHostedJobsPageName: String!, $jobPostingId: String!) {
       jobPosting(
@@ -226,15 +229,7 @@ export async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl
         jobPostingId: $jobPostingId
       ) {
         id title
-        applicationFormDefinition {
-          sections {
-            descriptionHtml
-            fields {
-              path field { type title isNullable selectableValues descriptionHtml }
-              isRequired
-            }
-          }
-        }
+        applicationForm { sections { title fieldEntries { isRequired field descriptionHtml } } }
       }
     }`;
   try {
@@ -249,8 +244,8 @@ export async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl
     });
     if (!res.ok) throw new Error(`ashby ${res.status}`);
     const data = await res.json();
-    const sections = data?.data?.jobPosting?.applicationFormDefinition?.sections;
-    if (!Array.isArray(sections)) throw new Error('ashby: missing form definition');
+    const sections = data?.data?.jobPosting?.applicationForm?.sections;
+    if (!Array.isArray(sections)) throw new Error('ashby: missing application form');
 
     const general: GenField[] = [];
     const custom:  CustomQ[]  = [];
@@ -258,21 +253,22 @@ export async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl
     let needsCover  = false;
 
     for (const sec of sections) {
-      for (const f of (sec.fields || [])) {
-        const path = String(f?.path || '');
-        const title = stripHtml(String(f?.field?.title || '')).trim();
-        const type  = String(f?.field?.type || '').toLowerCase();
-        const required = !!f?.isRequired;
+      for (const fe of (sec.fieldEntries || [])) {
+        const f = fe?.field || {};
+        const path = String(f.path || '');
+        const title = stripHtml(String(f.title || '')).trim();
+        const type  = String(f.type || '').toLowerCase();
+        const required = !!fe?.isRequired;
         const id = path || title.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
 
         if (/resume/.test(path) || /resume/i.test(title))         { needsResume = true; continue; }
         if (/cover/.test(path)  || /cover\s*letter/i.test(title)) { needsCover  = true; continue; }
 
-        const options = Array.isArray(f?.field?.selectableValues)
-          ? f.field.selectableValues.map((v: { label?: string; value?: string }) => String(v.label ?? v.value ?? ''))
+        const options = Array.isArray(f.selectableValues)
+          ? f.selectableValues.map((v: { label?: string; value?: string }) => String(v.label ?? v.value ?? ''))
           : undefined;
 
-        if (type === 'shorttext' || type === 'string') {
+        if (type === 'string' || type === 'shorttext') {
           const mapped = inferMapping(title);
           if (mapped) general.push({ id, label: title, type: 'text', required, maps_to: mapped });
           else        custom.push({ id, prompt: title, type: 'short_text', required });
@@ -282,14 +278,19 @@ export async function extractAshby(a: Extract<Ats, { kind: 'ashby' }>, sourceUrl
           general.push({ id, label: title || 'Email', type: 'email', required, maps_to: 'email' });
         } else if (type === 'phone') {
           general.push({ id, label: title || 'Phone', type: 'phone', required, maps_to: 'phone' });
-        } else if (type === 'url' || type === 'socialmediaurl') {
+        } else if (type === 'location') {
+          general.push({ id, label: title || 'Location', type: 'text', required, maps_to: 'location' });
+        } else if (type === 'date' || type === 'number' || type === 'score') {
+          custom.push({ id, prompt: title, type: 'short_text', required });
+        } else if (type === 'url' || type === 'sociallink' || type === 'socialmediaurl') {
           const mapped = inferMapping(title);
           if (mapped) general.push({ id, label: title, type: 'url', required, maps_to: mapped });
           else        custom.push({ id, prompt: title, type: 'url', required });
-        } else if (type === 'singleselect' || type === 'yesno' || type === 'boolean') {
-          if (type === 'yesno' || type === 'boolean') custom.push({ id, prompt: title, type: 'yes_no', required });
-          else custom.push({ id, prompt: title, type: 'select', required, options });
-        } else if (type === 'multiselect') {
+        } else if (type === 'boolean' || type === 'yesno') {
+          custom.push({ id, prompt: title, type: 'yes_no', required });
+        } else if (type === 'valueselect' || type === 'singleselect') {
+          custom.push({ id, prompt: title, type: 'select', required, options });
+        } else if (type === 'multivalueselect' || type === 'multiselect') {
           custom.push({ id, prompt: title, type: 'multiselect', required, options });
         } else if (type === 'file') {
           custom.push({ id, prompt: title, type: 'file', required });
@@ -380,6 +381,47 @@ Rules:
   };
 }
 
+// Company career pages that embed a Greenhouse board (careers.airbnb.com,
+// codeforamerica.org?gh_jid=…): sniff the board token + job id out of the
+// page HTML / URL and read the structured questions from boards-api instead
+// of guessing from HTML. Returns null when no embed is found.
+async function tryGreenhouseEmbed(url: string, html: string | null): Promise<Schema | null> {
+  const candidates: Array<{ board: string; id: string }> = [];
+  const u = (() => { try { return new URL(url); } catch { return null; } })();
+  const ghJid = u?.searchParams.get('gh_jid');
+
+  if (html) {
+    // embed script/iframe: …greenhouse.io/embed/job_app?for=<board>&token=<id>
+    const m = html.match(/greenhouse\.io\/embed\/job_app\?[^"' ]*for=([a-z0-9-]+)[^"' ]*token=(\d+)/i)
+           || html.match(/greenhouse\.io\/embed\/job_app\?[^"' ]*token=(\d+)[^"' ]*for=([a-z0-9-]+)/i);
+    if (m) {
+      const [board, id] = m[0].includes('for=' + m[1]) ? [m[1], m[2]] : [m[2], m[1]];
+      candidates.push({ board, id });
+    }
+    const forOnly = html.match(/boards\.greenhouse\.io\/embed\/job_board\/js\?for=([a-z0-9-]+)/i);
+    if (forOnly && ghJid) candidates.push({ board: forOnly[1], id: ghJid });
+  }
+  // Last resort: gh_jid + board token guessed from the host's 2nd-level name
+  // ("codeforamerica.org" → codeforamerica), which is Greenhouse's default.
+  if (ghJid && u) {
+    const host2ld = u.hostname.replace(/^www\./, '').split('.')[0].replace(/-/g, '');
+    candidates.push({ board: host2ld, id: ghJid });
+  }
+  // Numeric path id on a careers.<company>.com page often IS the gh job id.
+  if (!candidates.length && u && /careers\./.test(u.hostname)) {
+    const pathId = u.pathname.match(/(\d{6,})/)?.[1];
+    const host2ld = u.hostname.replace(/^(www|careers)\./, '').split('.')[0].replace(/-/g, '');
+    if (pathId) candidates.push({ board: host2ld, id: pathId });
+  }
+
+  for (const c of candidates) {
+    try {
+      return await extractGreenhouse({ kind: 'greenhouse', board: c.board, id: c.id }, url);
+    } catch { /* try next candidate */ }
+  }
+  return null;
+}
+
 // One entry point shared by the endpoint and the sweep: detect → extract →
 // (on any primary-path failure) HTML fallback.
 export async function extractSchema(url: string): Promise<Schema> {
@@ -388,7 +430,11 @@ export async function extractSchema(url: string): Promise<Schema> {
     if (ats.kind === 'greenhouse')      return await extractGreenhouse(ats, url);
     else if (ats.kind === 'ashby')      return await extractAshby(ats, url);
     else if (ats.kind === 'lever')      return await extractLever(ats, url);
-    const html = await fetchText(url);
+    let html: string | null = null;
+    try { html = await fetchText(url); } catch { /* page may block bots */ }
+    const embedded = await tryGreenhouseEmbed(url, html);
+    if (embedded) return embedded;
+    if (html == null) html = await fetchText(url);      // surface the real fetch error
     return await extractHtmlFallback(url, html, ats.kind);
   } catch (e) {
     console.warn('[apply-extract] primary path failed, html fallback', e);

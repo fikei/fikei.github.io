@@ -123,3 +123,22 @@ Deno.test('empty extraction → unknown', () => {
   const s = schema({ general: [], requires: { resume: false, cover_letter: false }, notes: 'fallback via Haiku (unknown)' });
   assertEquals(classifyApplyEase(s).tier, 'unknown');
 });
+
+Deno.test('regression: client-rendered ashby misread as account_gated → unknown, not portal', () => {
+  const s = schema({
+    ats: 'ashby', source_url: 'https://jobs.ashbyhq.com/x/y',
+    general: [], requires: { resume: false, cover_letter: false }, notes: 'account_gated',
+  });
+  assertEquals(classifyApplyEase(s).tier, 'unknown');
+});
+
+Deno.test('regression: Everlywell conditional "If yes…" long_text is not an essay', () => {
+  const s = schema({
+    ats: 'lever',
+    custom_questions: [
+      q('If yes, please describe those obligations', 'long_text'),
+      q('How many years of product experience do you have?', 'short_text'),
+    ],
+  });
+  assertEquals(classifyApplyEase(s).tier, 'easy');
+});

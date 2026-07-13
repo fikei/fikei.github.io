@@ -67,7 +67,11 @@ export function classifyApplyEase(schema: Schema): { tier: ApplyEaseTier; meta: 
   const general = Array.isArray(schema.general) ? schema.general : [];
   const notes = String(schema.notes || '');
 
-  const requiredEssays = custom.filter(q => q.required && q.type === 'long_text').length;
+  // Conditional follow-ups ("If yes, please describe…") only apply when the
+  // parent answer triggers them — they don't make a form an essay session.
+  const CONDITIONAL_RE = /^\s*if (yes|no|you selected|applicable|so)\b/i;
+  const requiredEssays = custom.filter(q =>
+    q.required && q.type === 'long_text' && !CONDITIONAL_RE.test(q.prompt || '')).length;
   const videoQ = custom.some(q => q.required && (VIDEO_RE.test(q.prompt || '') || PORTFOLIO_GATED_RE.test(q.prompt || '')));
   const shortFrees = custom.filter(q =>
     q.required && q.type === 'short_text' && !isWhitelistedShortText(q));
@@ -91,7 +95,12 @@ export function classifyApplyEase(schema: Schema): { tier: ApplyEaseTier; meta: 
 
   if (emailApply)                { meta.reason = 'apply by email';   return { tier: 'special', meta }; }
   if (videoQ)                    { meta.reason = 'video required';   return { tier: 'special', meta }; }
-  if (accountGated || PORTAL_HOST_RE.test(host)) {
+  // Haiku sometimes reads a client-rendered ATS page (empty static HTML) as
+  // "sign in to apply". Only trust account_gated when the ATS isn't one we
+  // know serves public forms — for ashby/greenhouse/lever an empty fallback
+  // means extraction failed, and the unknown branch below handles that.
+  const knownPublicAts = /^(ashby|greenhouse|lever)$/.test(schema.ats || '');
+  if ((accountGated && !knownPublicAts) || PORTAL_HOST_RE.test(host)) {
     meta.reason = 'account-gated portal';
     return { tier: 'portal', meta };
   }
