@@ -30,6 +30,7 @@ import {
   type ApplicationEventType,
   type ClassifiedApplicationEvent,
   ATS_PLATFORM_DOMAINS,
+  AUTO_RESOLVE,
   FORWARD_AUTO_ADVANCE,
   PERSIST_CONFIDENCE_FLOOR,
   THREAD_ASSOCIATION_FLOOR,
@@ -56,6 +57,8 @@ interface PipelineRoleRow {
   title:              string;
   stage:              string | null;
   status:             string;
+  exit_reason:        string | null;
+  exit_context:       string | null;
   applied_at:         string | null;
   gmail_thread_ids:   string[];
   process_outline:    Record<string, unknown> | null;
@@ -66,6 +69,7 @@ export interface ApplicationScanResult {
   classified:    number;        // messages handed to Haiku
   inserted:      number;        // event rows actually inserted
   autoAdvanced:  number;        // roles whose stage moved forward
+  autoResolved:  number;        // offers/rejections the scan acted on (undo-able)
   needsReview:   number;        // events flagged for user attention
   skippedNoMatch:number;        // messages where no role could be matched
 }
@@ -99,7 +103,7 @@ export async function scanApplicationResponses(args: {
   const deadline = Date.now() + Math.max(5_000, args.budgetMs ?? 40_000);
 
   const out: ApplicationScanResult = {
-    classified: 0, inserted: 0, autoAdvanced: 0, needsReview: 0, skippedNoMatch: 0,
+    classified: 0, inserted: 0, autoAdvanced: 0, autoResolved: 0, needsReview: 0, skippedNoMatch: 0,
   };
   // Gmail API ids of every message that produced at least one event row,
   // collected so we can stamp the Ladder label in one batchModify call
@@ -116,6 +120,8 @@ export async function scanApplicationResponses(args: {
            r.title,
            r.stage,
            r.status,
+           r.exit_reason,
+           r.exit_context,
            r.applied_at::text                  as applied_at,
            coalesce(r.gmail_thread_ids, '{}')  as gmail_thread_ids,
            r.process_outline,
@@ -330,7 +336,27 @@ export async function scanApplicationResponses(args: {
     const autoApply   = !!adv
                       && classified.confidence >= adv.floor
                       && wouldRank > currentRank;
-    const needsReview = shouldNeedReview(classified.event_type);
+    const needsReview = shouldNeedReview(classified.event_type, classified.confidence);
+
+    // Proactive resolution — offers/rejections at or above the floor are
+    // acted on now and surface as undo-able rows in the Updates feed.
+    // stage_offer stays forward-only; archive never re-archives.
+    const auto = AUTO_RESOLVE[classified.event_type];
+    const autoResolve = !!auto
+      && classified.confidence >= auto.floor
+      && (auto.action !== 'stage_offer' || STAGE_RANK['offer'] > currentRank)
+      && (auto.action !== 'archived'    || matchedRole.status !== 'Archive');
+
+    const autoAction = autoResolve && auto
+      ? auto.action
+      : (autoApply ? 'stage_advance' : null);
+    // prev_state powers Undo — captured for every mutation the scan makes.
+    const prevState = autoAction ? {
+      status:       matchedRole.status,
+      stage:        matchedRole.stage,
+      exit_reason:  matchedRole.exit_reason,
+      exit_context: matchedRole.exit_context,
+    } : null;
 
     const detectedStage = stageForEventType(classified.event_type);
     const receivedAt    = msg.internalDate
@@ -345,13 +371,15 @@ export async function scanApplicationResponses(args: {
         role_slug, gmail_message_id, gmail_thread_id, gmail_api_id,
         sender, subject, event_type, detected_stage,
         summary, confidence, round_label, round_n,
-        auto_applied, needs_review, received_at, source
+        auto_applied, needs_review, received_at, source,
+        auto_action, prev_state
       ) values (
         ${matchedRole.slug}, ${messageId}, ${msg.threadId}, ${msg.id},
         ${sender}, ${subject}, ${classified.event_type}, ${detectedStage},
         ${classified.summary}, ${classified.confidence},
         ${classified.round_label ?? null}, ${classified.round_n ?? null},
-        ${autoApply}, ${needsReview}, ${receivedAt}, ${eventSource}
+        ${autoApply || autoResolve}, ${needsReview}, ${receivedAt}, ${eventSource},
+        ${autoAction}, ${prevState ? sql.json(prevState) : null}
       )
       on conflict (gmail_message_id) do nothing
       returning id`;
@@ -361,9 +389,42 @@ export async function scanApplicationResponses(args: {
     labelTargets.push(msg.id);
 
     // Update role: last_activity_at always; gmail_thread_ids only at
-    // THREAD_ASSOCIATION_FLOOR (poison-resistance); stage on auto-advance.
+    // THREAD_ASSOCIATION_FLOOR (poison-resistance); stage/status when the
+    // policy fired.
     const associateThread = classified.confidence >= THREAD_ASSOCIATION_FLOOR;
-    if (autoApply && adv) {
+    if (autoResolve && auto?.action === 'archived') {
+      const exitReason = await mapRejectionExitReason(sql, matchedRole);
+      await sql`
+        update job.pipeline_roles
+           set status            = 'Archive',
+               stage             = null,
+               exit_reason       = ${exitReason},
+               status_changed_at = now(),
+               last_activity_at  = ${receivedAt},
+               gmail_thread_ids  = case
+                 when ${associateThread} and not (${msg.threadId} = any(gmail_thread_ids))
+                   then gmail_thread_ids || ${msg.threadId}::text
+                 else gmail_thread_ids
+               end,
+               updated_at        = now()
+         where slug = ${matchedRole.slug}`;
+      out.autoResolved++;
+    } else if (autoResolve && auto?.action === 'stage_offer') {
+      await sql`
+        update job.pipeline_roles
+           set status            = 'Active',
+               stage             = 'offer',
+               status_changed_at = now(),
+               last_activity_at  = ${receivedAt},
+               gmail_thread_ids  = case
+                 when ${associateThread} and not (${msg.threadId} = any(gmail_thread_ids))
+                   then gmail_thread_ids || ${msg.threadId}::text
+                 else gmail_thread_ids
+               end,
+               updated_at        = now()
+         where slug = ${matchedRole.slug}`;
+      out.autoResolved++;
+    } else if (autoApply && adv) {
       await sql`
         update job.pipeline_roles
            set stage             = ${adv.stage},
@@ -413,6 +474,30 @@ export async function scanApplicationResponses(args: {
 }
 
 // ---------- helpers ----------
+
+// Rejection → exit_reason mapping for the auto-archive. Where in the
+// process the role died decides the funnel bucket:
+//   offer stage                          → other (rare; user can refine)
+//   interviewing past the screen         → rejected_after_interview
+//   interviewing at the screen           → rejected_after_screen
+//   applied / drafting / no stage        → rejected_no_interview
+export async function mapRejectionExitReason(
+  sql: ReturnType<typeof db>,
+  role: { slug: string; stage: string | null },
+): Promise<string> {
+  const stage = role.stage ?? '';
+  if (stage === 'offer') return 'other';
+  if (stage === 'interviewing') {
+    const past = await sql<{ ok: number }[]>`
+      select 1 as ok from job.application_events
+       where role_slug = ${role.slug}
+         and (event_type in ('next_round_invited', 'take_home_assigned')
+              or coalesce(round_n, 1) >= 2)
+       limit 1`;
+    return past.length ? 'rejected_after_interview' : 'rejected_after_screen';
+  }
+  return 'rejected_no_interview';
+}
 
 async function listMessagesByQuery(accessToken: string, query: string, maxIds: number): Promise<string[]> {
   const ids: string[] = [];

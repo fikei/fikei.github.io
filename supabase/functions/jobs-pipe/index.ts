@@ -19,8 +19,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.16.0';
-console.log(`[jobs-pipe] v${VERSION} - every Active row carries a stage (default 'drafting'); stage-less Active writes no longer wipe the stage`);
+const VERSION = '0.17.0';
+console.log(`[jobs-pipe] v${VERSION} - exit_reason 'rejected_no_interview' (Updates-queue auto-archive mapping)`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -32,6 +32,7 @@ const EXIT_REASON_ENUM = new Set([
   'applied_no_response',
   'rejected_after_screen',
   'rejected_after_interview',
+  'rejected_no_interview',       // rejection email arrived before any interview
   'role_closed',
   'withdrew',                    // I stepped away mid-process
   'other',

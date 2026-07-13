@@ -154,3 +154,42 @@ Every email response on an open application gets classified, attached to the rol
 | Pipeline row chip visible on Active rows | Pending |
 | Needs-Attention widget shows when actionables exist | Pending |
 | Process-tracker strip renders when `process_outline` populated | Pending |
+
+---
+
+## Epic 5: Updates Queue — Proactive Resolution (v2.29)
+
+Rev 2 of the post-application journey. The system now ACTS on high-confidence
+outcomes instead of parking them behind acknowledgment, and all notification
+surfaces collapse into one Updates queue at the top of every Jobs bucket page.
+Design pattern documented in `ladder/DESIGN.md` (Updates queue / Signal chips).
+
+### Story 5.1 — Proactive auto-resolution (backend)
+
+| Task | Status |
+|------|--------|
+| Migration 103: `auto_action`, `prev_state`, `undone_at`, `dismissed_at` on application_events; `no_response_timeout` event type; `stale-sweep` source | ✓ |
+| `AUTO_RESOLVE` policy: offer ≥0.85 → stage Offer; rejection ≥0.75 → Archive with stage-mapped exit_reason (`mapRejectionExitReason`) | ✓ |
+| New exit reason `rejected_no_interview` (jobs-pipe + frontend EXIT_REASONS) | ✓ |
+| 30-day applied-quiet sweep → Archive as `applied_no_response` (synthetic event, undo-sticky) | ✓ |
+| application-events v1.6.0: `updates` feed, `resolve`, `undo` (from `prev_state`, any time), `dismiss` (server-persisted) | ✓ |
+| reply_pending in the aggregated feed (events ≤14d, ≤10 thread walks) | ✓ |
+
+### Story 5.2 — Updates queue UI (frontend)
+
+| Task | Status |
+|------|--------|
+| `.updates-queue` card on every Jobs bucket page — inbox-row pattern, one action per row + × dismiss | ✓ |
+| Live banners + Needs-Attention widget deleted (markup, handlers, CSS) | ✓ |
+| Signal chips unified with queue taxonomy (icon + short label, click → scroll/highlight queue row) | ✓ |
+| Emoji replaced with inline SVG line icons (queue, chips, activity tab) | ✓ |
+| Toast host supports inline action (Undo, 8s) | ✓ |
+| Role-detail Activity tab: Undo on auto-actions, one-click resolve on prompts | ✓ |
+
+### Story 5.3 — Verification
+
+| Task | Status |
+|------|--------|
+| Seed offer/rejection/low-confidence events; verify auto_action + prev_state + role mutations | Pending |
+| Undo restores prior status/stage/exit_reason; queue row clears; re-sweep blocked | Pending |
+| Chrome pass: queue on all buckets, chip click highlight, dismissals persist across reload | Pending |

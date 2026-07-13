@@ -4149,8 +4149,8 @@ button.link-subtle {
 /* ── Phase 2.0 — application-tracker UI ─────────────────────────── */
 
 /* Signal chips: single highest-priority indicator on a pipeline row,
-   plus the per-card chip inside the Needs-Attention widget. Color
-   semantics mirror the five-signal catalog in the PRD. */
+   mirroring the role's Updates-queue row (same icon + tint taxonomy).
+   Chips are buttons — clicking one jumps to the queue row. */
 .signal-chip {
   display: inline-flex;
   align-items: center;
@@ -4172,77 +4172,104 @@ button.link-subtle {
 .signal-chip--yellow { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 60%, transparent); background: color-mix(in srgb, var(--warning)  6%, transparent); }
 .signal-chip--green  { color: var(--success); border-color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
 .signal-chip--blue   { color: #60a5fa;        border-color: #60a5fa;        background: color-mix(in srgb, #60a5fa        14%, transparent); }
+.signal-chip--btn { cursor: pointer; font: inherit; font-size: var(--font-size-caption); font-weight: 500; }
+.signal-chip--btn:hover { filter: brightness(1.15); }
+.signal-chip__icon { display: inline-flex; width: 12px; height: 12px; flex-shrink: 0; }
+.signal-chip__icon svg { width: 12px; height: 12px; }
 
 /* Compact chip cell inside the pipeline table — small column. */
 .col-signal { width: 1%; white-space: nowrap; }
 .col-signal .signal-chip { font-size: 11px; max-width: 240px; }
 
-/* Needs-Attention widget — above the Active table. */
-.needs-attention {
-  display: grid;
-  gap: var(--space-2);
+/* Updates queue — the single notification surface, top of every Jobs
+   bucket page. One elevated card, hairline-divided rows (inbox pattern).
+   Each row: tinted icon circle · text · ONE action button · × dismiss.
+   Lifecycle: rows are server-backed (auto-actions ≤7d, prompts until
+   resolved); × persists to dismissed_at (localStorage for synthetic rows). */
+.updates-queue {
   margin: 0 0 var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-2);
-  background: var(--bg-elev);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
-.needs-attention__header {
+.updates-queue__header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-1);
   font-size: var(--font-size-small);
   color: var(--fg-muted);
 }
-.needs-attention__header strong { color: var(--fg); }
-.needs-attention__list {
-  display: grid;
-  gap: var(--space-2);
-}
-.needs-attention__card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2) var(--space-3);
-  align-items: center;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-1);
-  background: var(--bg);
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-}
-.needs-attention__card:hover { border-color: var(--border-strong); background: var(--bg-elev); }
-.needs-attention__title { font-weight: 500; color: var(--fg); }
-.needs-attention__title .muted { color: var(--fg-muted); font-weight: 400; }
-.needs-attention__detail { font-size: var(--font-size-small); color: var(--fg-muted); margin-top: 2px; }
-.needs-attention__signal { justify-self: end; }
-
-/* Live-arrival banners — auto-fade target. */
-.live-banner {
+.updates-queue__header strong { color: var(--fg); font-size: var(--font-size-body); }
+.updates-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--accent-strong);
-  border-radius: var(--radius-2);
-  background: color-mix(in srgb, var(--accent-strong) 8%, var(--bg-elev));
-  margin: 0 0 var(--space-3);
+  padding: 10px 0;
+  position: relative;
 }
-.live-banner__icon { font-size: 20px; line-height: 1; }
-.live-banner__body { flex: 1 1 auto; font-size: var(--font-size-small); }
-.live-banner__body strong { color: var(--fg); }
-.live-banner__close {
-  background: transparent;
-  border: 0;
-  font-size: 20px;
-  line-height: 1;
+/* Inset divider — starts after the icon column (32px icon + 12px gap). */
+.updates-row::after {
+  content: '';
+  position: absolute;
+  left: 44px;
+  right: 0;
+  bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+.updates-row:last-child::after { display: none; }
+.updates-row.is-highlighted { background: color-mix(in srgb, var(--accent-strong) 10%, transparent); transition: background 400ms ease; }
+.updates-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   color: var(--fg-muted);
-  cursor: pointer;
-  padding: 0 var(--space-1);
+  background: var(--bg-surface);
 }
-.live-banner__close:hover { color: var(--fg); }
+.updates-row__icon svg { width: 16px; height: 16px; }
+.updates-row__icon--green { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.updates-row__icon--red   { color: var(--error);   background: color-mix(in srgb, var(--error)   12%, transparent); }
+.updates-row__icon--amber { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.updates-row__icon--blue  { color: #60a5fa;        background: color-mix(in srgb, #60a5fa        14%, transparent); }
+.updates-row__body { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
+.updates-row__text {
+  font-size: var(--font-size-small);
+  color: var(--fg);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.updates-row__text:hover strong { text-decoration: underline; }
+.updates-row__detail {
+  font-size: var(--font-size-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.updates-row__action { flex-shrink: 0; white-space: nowrap; }
+.updates-row__dismiss {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.updates-row__dismiss:hover { background: var(--bg-surface); color: var(--fg); }
 
 /* Activity timeline tab on drill page. */
 .activity-timeline {
@@ -6826,6 +6853,9 @@ body[data-auth-state="out"] job-chat { display: none; }
 .toast {
   pointer-events: auto;
   max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   padding: 10px var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -6835,9 +6865,30 @@ body[data-auth-state="out"] job-chat { display: none; }
   font-size: var(--font-size-small);
   line-height: var(--lh-tight);
   text-align: left;
-  cursor: pointer;
   box-shadow: var(--shadow-md);
   animation: toast-in 160ms ease;
+}
+/* Message + optional action are separate buttons inside the pill:
+   message click dismisses; action (e.g. Undo) runs its handler. */
+.toast__msg {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.toast__action {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
 }
 .toast--leaving { opacity: 0; transition: opacity 200ms ease; }
 @keyframes toast-in {
