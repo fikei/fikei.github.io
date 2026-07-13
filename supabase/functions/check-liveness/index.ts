@@ -10,8 +10,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[check-liveness] v${VERSION}`);
+const VERSION = '0.2.0';
+console.log(`[check-liveness] v${VERSION} - greenhouse dead-job 302 detection`);
 
 const BATCH = 10;
 const TIMEOUT_MS = 8000;
@@ -34,6 +34,21 @@ async function probe(url: string): Promise<{ status: number | null; error?: stri
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
+    // Greenhouse removes dead jobs by 302-redirecting the job URL to the
+    // board root — redirect:'follow' turns that into a 200 and the row reads
+    // as alive forever (bit us on 2 real roles, 2026-07-13). Probe job-page
+    // URLs on greenhouse.io manually: a redirect whose Location drops the
+    // job id means the posting is gone → report 404.
+    if (/greenhouse\.io$/i.test(new URL(url).hostname) && /\/jobs\/(\d+)/.test(url)) {
+      const jobId = url.match(/\/jobs\/(\d+)/)![1];
+      const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: controller.signal });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location') || '';
+        return { status: loc.includes(jobId) ? res.status : 404 };
+      }
+      return { status: res.status };
+    }
+
     // Many ATS pages don't honour HEAD — fall back to GET.
     let res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal });
     if (res.status === 405 || res.status === 501) {

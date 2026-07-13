@@ -4,7 +4,8 @@ import { LitElement, html, nothing } from 'https://esm.run/lit@3';
 import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
 const { fetchPipeline, updateRole, setArchived, deleteRole, stashRolePrefill, checkLiveness, addRole, refreshSources,
-        STAGES, STAGE_IDS, BUCKETS, BUCKET_LABELS, bucketFor, normalizeBucket, isVisibleRole } = await import('../pipeline.js' + V);
+        STAGES, STAGE_IDS, BUCKETS, BUCKET_LABELS, bucketFor, normalizeBucket, isVisibleRole, applyEaseInfo,
+        classifyApplyEaseForSlug } = await import('../pipeline.js' + V);
 const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { ackEvent, loadUpdates, resolveEvent, undoEvent, dismissUpdate, updateKindMeta, roleMatchedEvents } = await import('../applicationEvents.js' + V);
@@ -34,6 +35,16 @@ const EXIT_REASONS = [
   { id: 'withdrew',                 label: "I stepped away mid-process" },
   { id: 'other',                    label: "Something else" },
 ];
+
+// Easy Apply chip icons — same line-icon style as the Updates queue set.
+const EASE_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+const EASE_ICONS = {
+  easy:         `<svg ${EASE_SVG_ATTRS}><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>`,
+  short_answer: `<svg ${EASE_SVG_ATTRS}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
+  essay:        `<svg ${EASE_SVG_ATTRS}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>`,
+  special:      `<svg ${EASE_SVG_ATTRS}><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`,
+  portal:       `<svg ${EASE_SVG_ATTRS}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+};
 
 // Fit modal labels + render helper live in ./ladder-fit-modal.js so the
 // recommendations carousel can reuse the same tooltip.
@@ -115,6 +126,8 @@ export class JobPipeline extends LitElement {
     updateBusy:      { state: true },
     // Hover-card state for the Network column: { conns, x, y } | null.
     hoverConns:      { state: true },
+    // "⚡ Easy apply" quick filter (Saved + Drafting). Mirrored in ?ease=easy.
+    easeFilter:      { state: true },
   };
 
   constructor() {
@@ -136,6 +149,7 @@ export class JobPipeline extends LitElement {
     let resolved = normalizeBucket(b);
     if (b === 'active' && STAGE_IDS.includes(stageQ)) resolved = stageQ;
     this.bucket = resolved || 'saved';
+    this.easeFilter = params.get('ease') === 'easy';
     // Default to fit-score (desc) on every bucket, including Saved. A saved
     // manual drag order is still one click away via "Use my order".
     this.sortKey = 'score';
@@ -209,6 +223,9 @@ export class JobPipeline extends LitElement {
       const existing = new Map((this.addedBanner.roles || []).map(r => [r.slug, r]));
       for (const r of next) if (r?.slug) existing.set(r.slug, r);
       this.addedBanner = { roles: Array.from(existing.values()), dismissed: false };
+      // Classify the new arrivals' apply-ease in the background so the badge
+      // shows up on this visit, not after the next sweep tick.
+      for (const r of next) if (r?.slug) classifyApplyEaseForSlug(r.slug);
       // Confirmation info, not state — auto-dismiss; the roles are visible
       // in the list itself. Timer resets while adds keep arriving.
       clearTimeout(this._addedHideTimer);
@@ -459,6 +476,14 @@ export class JobPipeline extends LitElement {
         if (it.event_id) { try { await ackEvent(it.event_id); } catch { /* best-effort */ } }
         break;
       }
+      case 'ease_filter': {
+        if (this.bucket === 'saved') {
+          if (!this.easeFilter) this._toggleEaseFilter();
+        } else {
+          window.location.assign('/ladder/jobs/?bucket=saved&ease=easy');
+        }
+        break;
+      }
       case 'follow_up': {
         const q = encodeURIComponent(it.company || '');
         window.open(`https://mail.google.com/mail/u/0/#search/${q}`, '_blank', 'noopener');
@@ -534,7 +559,8 @@ export class JobPipeline extends LitElement {
   _sorted() {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
-    const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket));
+    const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket)
+      && (!this.easeFilter || r.applyEase === 'easy'));
     if (key === 'manual') {
       const order = this._manualOrders[this.bucket] || [];
       const idx = new Map(order.map((slug, i) => [slug, i]));
@@ -959,6 +985,7 @@ export class JobPipeline extends LitElement {
                 ${this._isSaved && r.engagedAt
                   ? html`<span class="in-progress-pill" title="You've viewed or applied to this role">In progress</span>`
                   : nothing}
+                ${this._renderEaseChip(r)}
               </div>
               <div class="role-cell__company">${r.company || ''}</div>
               ${renderLocation(r.location)}
@@ -972,6 +999,47 @@ export class JobPipeline extends LitElement {
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
     `;
+  }
+
+  // ---- Easy Apply badge (Phase 16.1) ----
+  // Chip taxonomy lives in pipeline.js (applyEaseInfo); the icon set matches
+  // the Updates-queue line-icon style (no emoji, per DESIGN.md). Only Saved
+  // and Drafting badge — later stages have already been applied to.
+  _renderEaseChip(r) {
+    if (!(this._isSaved || this.bucket === 'drafting')) return nothing;
+    const info = applyEaseInfo(r);
+    if (!info) return nothing;
+    return html`<span class="ease-chip ease-chip--${info.tier}" title=${info.title}>
+      <span class="ease-chip__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS[info.tier] || EASE_ICONS.essay)}</span>${info.label}
+    </span>`;
+  }
+
+  _toggleEaseFilter() {
+    this.easeFilter = !this.easeFilter;
+    const qs = new URLSearchParams(location.search);
+    if (this.easeFilter) qs.set('ease', 'easy'); else qs.delete('ease');
+    history.replaceState(null, '', `${location.pathname}?${qs}`);
+  }
+
+  // Synthetic Updates row: "N saved jobs are easy applies". Recomputed from
+  // roles on every render (never persisted); a dismissal parks it for the
+  // day via the same localStorage set the other synthetic rows use.
+  _easyApplyDigest() {
+    if (!this.roles?.length) return null;
+    const easies = this.roles.filter(r =>
+      isVisibleRole(r) && bucketFor(r) === 'saved' && r.applyEase === 'easy' && !r.engagedAt);
+    if (!easies.length) return null;
+    const preview = easies.slice(0, 3).map(r => r.company).filter(Boolean).join(', ');
+    const it = {
+      kind: 'easy_apply', action: 'ease_filter', priority: 6,
+      role_slug: 'easy-apply-digest',
+      href: '/ladder/jobs/?bucket=saved&ease=easy',
+      text: `${easies.length} saved ${easies.length === 1 ? 'job is an easy apply' : 'jobs are easy applies'} — no written questions`,
+      detail: preview + (easies.length > 3 ? ` +${easies.length - 3} more` : ''),
+      received_at: new Date().toISOString(),
+    };
+    if (this._localDismissedUpdates.has(this._updateKey(it))) return null;
+    return it;
   }
 
   _renderLogo(r, size = 'sm') {
@@ -1187,7 +1255,9 @@ export class JobPipeline extends LitElement {
   // hairline-divided rows (inbox pattern), each row a record of what the
   // system did (Undo) or a single-action prompt. × acknowledges.
   _renderUpdatesQueue() {
-    const items = this.updates || [];
+    const items = [...(this.updates || [])];
+    const digest = this._easyApplyDigest();
+    if (digest) items.push(digest);
     if (!items.length) return nothing;
     return html`
       <section class="updates-queue" aria-label="Updates">
@@ -1207,7 +1277,7 @@ export class JobPipeline extends LitElement {
       <div class="updates-row" id=${`update-${it.role_slug}`}>
         <span class="updates-row__icon updates-row__icon--${meta.tint}" aria-hidden="true">${unsafeHTML(meta.icon)}</span>
         <div class="updates-row__body">
-          <a class="updates-row__text" href=${`/ladder/jobs/${it.role_slug}/`}>
+          <a class="updates-row__text" href=${it.href || `/ladder/jobs/${it.role_slug}/`}>
             <strong>${it.text}</strong>
             ${it.title ? html`<span class="muted"> · ${it.title}</span>` : nothing}
             ${it.received_at ? html`<span class="muted"> · ${this._relTime(it.received_at)}</span>` : nothing}
@@ -1300,6 +1370,15 @@ export class JobPipeline extends LitElement {
         ${this.sortKey === 'manual'
           ? html`in your custom order. <span class="muted">Drag rows to rearrange.</span>`
           : html`sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.`}
+        ${(this._isSaved || this.bucket === 'drafting')
+          && (this.easeFilter || this.roles.some(r => isVisibleRole(r) && bucketFilter(r, this.bucket) && r.applyEase === 'easy')) ? html`
+          <button class="btn btn--sm ease-filter-pill ${this.easeFilter ? 'is-active' : ''}"
+                  title="Show only roles with no written application questions"
+                  @click=${() => this._toggleEaseFilter()}>
+            <span class="ease-chip__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS.easy)}</span>
+            Easy apply${this.easeFilter ? ' ✕' : ''}
+          </button>
+        ` : nothing}
         ${this._isSaved && this.sortKey !== 'manual' && this._manualOrders.saved.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Use my order</button>
         ` : nothing}
