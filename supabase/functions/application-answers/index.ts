@@ -20,8 +20,8 @@ import { db } from '../_shared/job-db.ts';
 import { extractSchema, callClaude, type Schema } from '../_shared/apply-extract.ts';
 import { CANONICAL_QUESTIONS, computeCoverage, matchPrompt } from '../_shared/answer-bank.ts';
 
-const VERSION = '0.1.0';
-console.log(`[application-answers] v${VERSION} - Easy Apply answer bank (list/upsert/seed/coverage)`);
+const VERSION = '0.2.0';
+console.log(`[application-answers] v${VERSION} - resume_extract action + coverage readiness stamping`);
 
 const KEY_RE = /^[a-z0-9_]+$/;
 const SLUG_RE = /^[a-z0-9_-]+$/;
@@ -139,6 +139,7 @@ async function coverage(sql: Sql, userId: string, slug: string) {
 
   const answered = new Set(Object.keys(await listAnswers(sql, userId)));
   const cov = computeCoverage(schema!, answered);
+  let stamped = false;
 
   // Haiku tail: try to map required questions the heuristics missed.
   if (cov.unmatched_required.length) {
@@ -170,7 +171,42 @@ async function coverage(sql: Sql, userId: string, slug: string) {
     }
   }
 
-  return jsonResp({ slug, ats: schema!.ats, coverage: cov });
+  // Stamp readiness onto the role row so the table can render the filled
+  // "Ready to submit" chip without recomputing coverage per row.
+  try {
+    await sql`
+      update job.pipeline_roles set
+        apply_ease_meta = coalesce(apply_ease_meta, '{}'::jsonb)
+          || jsonb_build_object('coverage_pct', ${cov.pct}::int, 'ready', ${cov.ready}::boolean)
+      where slug = ${slug};
+    `;
+    stamped = true;
+  } catch (e) { console.warn('[application-answers] coverage stamp failed', (e as Error).message); }
+
+  return jsonResp({ slug, ats: schema!.ats, coverage: cov, stamped });
+}
+
+// ---- resume_extract: seed the bank from an uploaded resume's text ---------
+async function resumeExtract(sql: Sql, userId: string, text: string) {
+  const sys = `Extract application-form answers from a resume. Return ONLY JSON:
+{"legal_name": string|null, "email": string|null, "phone": string|null,
+ "location": string|null, "linkedin_url": string|null, "github_url": string|null,
+ "portfolio_url": string|null, "years_experience_pm": number|null}
+years_experience_pm = total years of product-management (or closest) experience from the work history dates. Use null when not present — never invent.`;
+  const out = await callClaude(sys, text.slice(0, 30_000), 700);
+  const parsed = JSON.parse(out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1));
+  const seeded: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!VALID_KEYS.has(key) || value == null || value === '') continue;
+    await sql`
+      insert into job.application_answers (user_id, canonical_key, value, source, updated_at)
+      values (${userId}, ${key}, ${sql.json(value)}, 'resume_extract', now())
+      on conflict (user_id, canonical_key) do update set
+        value = excluded.value, source = 'resume_extract', updated_at = now();
+    `;
+    seeded[key] = value;
+  }
+  return seeded;
 }
 
 serve(async (req) => {
@@ -225,6 +261,13 @@ serve(async (req) => {
       const slug = String(body.slug || '').toLowerCase();
       if (!SLUG_RE.test(slug)) return err('invalid slug', 400);
       return await coverage(sql, user.id, slug);
+    }
+
+    if (action === 'resume_extract') {
+      const text = String(body.text || '');
+      if (text.trim().length < 100) return err('resume text too short', 400);
+      const seeded = await resumeExtract(sql, user.id, text);
+      return jsonResp({ seeded, answers: await listAnswers(sql, user.id) });
     }
 
     return err(`unknown action '${action}'`, 400);

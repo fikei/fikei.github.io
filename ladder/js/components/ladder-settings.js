@@ -9,6 +9,9 @@
 // router/launcher.
 
 import { LitElement, html, nothing } from 'https://esm.run/lit@3';
+const V = (new URL(import.meta.url)).search;
+const { answersList, answersUpsert } = await import('../apply.js' + V);
+await import('./ladder-easy-apply-setup.js' + V);   // registers <ladder-easy-apply-setup>
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const MCP_TOKENS_URL = `${SUPABASE_URL}/functions/v1/job-mcp-tokens`;
@@ -26,6 +29,11 @@ export class JobSettings extends LitElement {
     mcpNewLabel:   { state: true },
     mcpFreshToken: { state: true },   // raw token shown once after creation
     mcpFreshLabel: { state: true },
+    // Easy Apply answer bank mirror (16.2b).
+    easyAnswers:   { state: true },   // null | {key: {value, source, updated_at}}
+    easyRegistry:  { state: true },
+    easyEditKey:   { state: true },   // key currently being edited inline
+    easyEditVal:   { state: true },
   };
 
   constructor() {
@@ -38,6 +46,10 @@ export class JobSettings extends LitElement {
     this.mcpNewLabel = '';
     this.mcpFreshToken = '';
     this.mcpFreshLabel = '';
+    this.easyAnswers = null;
+    this.easyRegistry = [];
+    this.easyEditKey = null;
+    this.easyEditVal = '';
   }
 
   connectedCallback() {
@@ -45,9 +57,12 @@ export class JobSettings extends LitElement {
     this._load();
     this._onReady = () => this._load();
     document.addEventListener('job:auth:ready', this._onReady);
+    this._onEaseDone = () => this._loadEasyAnswers();
+    document.addEventListener('job:easyapply:setup-done', this._onEaseDone);
   }
   disconnectedCallback() {
     document.removeEventListener('job:auth:ready', this._onReady);
+    document.removeEventListener('job:easyapply:setup-done', this._onEaseDone);
     super.disconnectedCallback();
   }
 
@@ -70,9 +85,93 @@ export class JobSettings extends LitElement {
       if (error) { console.warn('[settings] profile fetch failed', error); }
       this.profile = data;
       await this._loadMcpTokens();
+      this._loadEasyAnswers();       // fire-and-forget; card shows its own state
     } finally {
       this.loading = false;
     }
+  }
+
+  async _loadEasyAnswers() {
+    try {
+      const res = await answersList();
+      this.easyAnswers = res.answers || {};
+      this.easyRegistry = res.registry || [];
+    } catch (e) {
+      console.warn('[settings] easy-apply answers fetch failed', e.message);
+      this.easyAnswers = {};
+      this.easyRegistry = [];
+    }
+  }
+
+  _easyValueLabel(v) {
+    if (v == null) return '—';
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'object') {
+      if (Array.isArray(v.metros)) return `${v.metros.join(', ')}${v.max_days_per_week != null ? ` · ≤${v.max_days_per_week}d/wk office` : ''}`;
+      if (v.base_floor != null || v.total_floor != null) return `$${(v.base_floor ?? v.total_floor).toLocaleString?.() ?? v.base_floor} (${v.policy || 'floor'})`;
+      return JSON.stringify(v);
+    }
+    return String(v);
+  }
+
+  async _saveEasyEdit(key) {
+    const reg = (this.easyRegistry || []).find(c => c.key === key);
+    let value = this.easyEditVal;
+    if (reg?.kind === 'boolean') value = /^(y|yes|true)$/i.test(value);
+    else if (reg?.kind === 'number') value = Number(value) || 0;
+    try {
+      await answersUpsert([{ key, value, source: 'onboarding' }]);
+      this.easyEditKey = null;
+      await this._loadEasyAnswers();
+    } catch (e) {
+      alert(`Save failed: ${e.message}`);
+    }
+  }
+
+  _renderEasyApplyCard() {
+    const answers = this.easyAnswers;
+    const reg = this.easyRegistry || [];
+    return html`
+      <div class="onboard-card">
+        <h2 class="onboard-card__title">Easy Apply</h2>
+        <p class="onboard__hint">
+          Saved answers used to prefill application forms. Demographic answers are only ever
+          submitted from what you set here; legal checkboxes always require a tap at submit time.
+        </p>
+        <div class="onboard-card__row" style="margin-bottom:var(--space-3);">
+          <button class="btn btn--sm btn--primary"
+                  @click=${() => this.renderRoot.querySelector('#ease-setup-settings')?.launch()}>
+            ${answers && Object.keys(answers).length ? 'Re-run setup' : '⚡ Set up Easy Apply'}
+          </button>
+        </div>
+        ${answers == null ? html`<p class="onboard__hint">Loading…</p>` : nothing}
+        ${answers && Object.keys(answers).length ? html`
+          <div class="eas-settings-list">
+            ${reg.filter(c => answers[c.key] !== undefined).map(c => html`
+              <div class="eas-settings-row">
+                <span class="eas-settings-row__label">${c.label}</span>
+                ${this.easyEditKey === c.key ? html`
+                  <input type="text" .value=${this.easyEditVal}
+                         @input=${(e) => { this.easyEditVal = e.target.value; }}
+                         @keydown=${(e) => { if (e.key === 'Enter') this._saveEasyEdit(c.key); if (e.key === 'Escape') this.easyEditKey = null; }}>
+                  <button class="btn btn--sm btn--accent" @click=${() => this._saveEasyEdit(c.key)}>Save</button>
+                ` : html`
+                  <span class="eas-settings-row__value">${this._easyValueLabel(answers[c.key]?.value)}</span>
+                  <span class="eas-settings-row__source muted">${answers[c.key]?.source}</span>
+                  ${c.kind === 'json' ? nothing : html`
+                    <button class="btn btn--sm" @click=${() => {
+                      this.easyEditKey = c.key;
+                      const v = answers[c.key]?.value;
+                      this.easyEditVal = typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v ?? '');
+                    }}>Edit</button>`}
+                `}
+              </div>
+            `)}
+          </div>
+        ` : nothing}
+        <ladder-easy-apply-setup id="ease-setup-settings"></ladder-easy-apply-setup>
+      </div>
+    `;
   }
 
   async _loadMcpTokens() {
@@ -178,6 +277,8 @@ export class JobSettings extends LitElement {
             </span>
           </div>
         </div>
+
+        ${this._renderEasyApplyCard()}
 
         <div class="onboard-card">
           <h2 class="onboard-card__title">Test the onboarding flow</h2>

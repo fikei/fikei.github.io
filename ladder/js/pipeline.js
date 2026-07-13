@@ -76,6 +76,12 @@ export function applyEaseInfo(r) {
   if (tier === 'essay' && m.required_essays > 0) {
     label = `${m.required_essays} essay${m.required_essays === 1 ? '' : 's'}`;
   }
+  // Coverage stamp (16.2b): every required field covered by the answer bank.
+  if (tier === 'easy' && m.ready === true) {
+    label = 'Ready to submit';
+    title = 'Every required field is covered by your saved Easy Apply answers';
+    return { tier, ready: true, label, title };
+  }
   const bits = [];
   if (m.ats && m.ats !== 'unknown') bits.push(m.ats);
   if (typeof m.questions === 'number') bits.push(`${m.questions} question${m.questions === 1 ? '' : 's'}`);
