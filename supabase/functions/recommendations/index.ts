@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.20.0';
-console.log(`[recommendations] v${VERSION} - below-your-bar drawer honors the role-name filter (universe include + blocked-title exclude); sourceHealth returns source id for gmail-jobs reconnect`);
+const VERSION = '0.21.0';
+console.log(`[recommendations] v${VERSION} - Inbox quality gate keyed on fit_score ONLY (Strength/candidate floor removed for good_fits); default sort is fit_score desc`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -144,10 +144,12 @@ serve(async (req) => {
       const layers: string[] = [];
       sortKeys.forEach((k, i) => {
         const dir = sortDirs[i] === 'asc' ? 'asc' : 'desc';
-        if (k === 'best') layers.push(`${BLENDED_RANK} ${dir} nulls last`);
+        // Default "best" ranking is now fit_score (v0.21.0) — the Inbox
+        // orders by fit, not the old Strength-weighted blend.
+        if (k === 'best') layers.push(`r.fit_score ${dir} nulls last`);
         else if (SORT_COLS[k]) layers.push(`${SORT_COLS[k]} ${dir} nulls last`);
       });
-      if (!layers.length) layers.push(`${BLENDED_RANK} desc nulls last`);
+      if (!layers.length) layers.push(`r.fit_score desc nulls last`);
       const orderBy = (isWildcard ? 'r.candidate_score desc nulls last' : layers.join(', '))
         + ', r.suggested_at desc, r.id desc';
 
@@ -249,14 +251,17 @@ serve(async (req) => {
                 and coalesce(r.role_match_score, 13) >= 13
               when 'exceptional' then coalesce(r.candidate_score, 0) >= ${WILDCARD_MIN_STRENGTH}
               else
+                -- Inbox quality gate is fit-only (v0.21.0): the Strength /
+                -- candidate_score floor was removed so fit_score alone decides.
+                -- Hard deal-breakers still exclude. Ungraded rows (no
+                -- candidate_score) now surface when fit passes.
                 (r.fit_score is null or r.fit_score >= 50)
                 and coalesce(array_length(r.hard_fails, 1), 0) = 0
-                and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
             end)
           -- floor=below: graded AND failing the same gates (keep the case in
           -- sync with the pass-gate above).
           and (${!belowFloor} or (
-            r.candidate_score is not null
+            r.fit_score is not null
             and not (
               case coalesce(w.filter_mode, 'good_fits')
                 when 'all' then true
@@ -267,7 +272,6 @@ serve(async (req) => {
                 else
                   (r.fit_score is null or r.fit_score >= 50)
                   and coalesce(array_length(r.hard_fails, 1), 0) = 0
-                  and (r.candidate_score is not null and r.candidate_score >= ${CANDIDATE_FLOOR})
               end)))
           -- floor=below: also honor the role-name filter so the drawer
           -- stays on-track (in the role universe, not a blocked title).
