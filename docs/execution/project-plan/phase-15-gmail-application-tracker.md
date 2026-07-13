@@ -193,3 +193,13 @@ Design pattern documented in `ladder/DESIGN.md` (Updates queue / Signal chips).
 | Seed offer/rejection/low-confidence events; verify auto_action + prev_state + role mutations | Pending |
 | Undo restores prior status/stage/exit_reason; queue row clears; re-sweep blocked | Pending |
 | Chrome pass: queue on all buckets, chip click highlight, dismissals persist across reload | Pending |
+
+### Story 5.4 — Updates queue → Inbox (Today surface MVP) (v2.32)
+
+| Task | Status |
+|------|--------|
+| Extract queue into standalone `<ladder-updates>` (feed + calendar + closures + easy-apply digest, actions, dismissals) | ✓ |
+| Role closures (liveness `closedDetectedAt`) become queue rows; red closed-banner deleted (markup + CSS) | ✓ |
+| Mount at top of Inbox (/ladder/jobs/recommended/) — Inbox is the MVP "Today" surface | ✓ |
+| Queue removed from Jobs bucket pages; Signal chips stay (click falls through to role page) | ✓ |
+| Mutations dispatch `job:pipeline:refresh` so open tables re-sync | ✓ |

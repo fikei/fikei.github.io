@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.31.1";
-console.log(`[ladder] v${VERSION} - fix: ease chip clipped off long role titles (title now truncates, chip stays)`);
+const VERSION = "2.32.0";
+console.log(`[ladder] v${VERSION} - Updates queue moves to Inbox as the Today surface; role closures join the queue (red closed-banner removed)`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -38,6 +38,7 @@ if (location.pathname.startsWith('/ladder/jobs/drill')) {
   }
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
+  import('./components/ladder-updates.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
   import('./components/ladder-pipeline.js' + V);
 }

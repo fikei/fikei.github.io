@@ -193,6 +193,7 @@ export const UPDATE_KIND_META = {
   // Synthetic digest row built client-side from apply_ease tiers (16.1) —
   // no application_events row behind it.
   easy_apply:          { tint: 'green', icon: ICONS.bolt,     chip: 'Easy apply',      actionLabel: 'Show them' },
+  role_closed:         { tint: 'gray',  icon: ICONS.archive,  chip: 'Closed',          actionLabel: 'Open role' },
 };
 
 export function updateKindMeta(kind) {
