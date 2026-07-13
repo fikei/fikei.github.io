@@ -112,24 +112,39 @@ export class LadderUpdates extends LitElement {
   }
 
   // Role closures — the liveness sweep found the posting gone and already
-  // archived the role; the queue row is the record of that (replaces the
-  // old red closed-banner). Dismiss keys on the closure date, so a role
-  // closed → dismissed → re-opened → re-closed months later re-surfaces.
+  // archived the role; the queue records that (replaces the old red
+  // closed-banner, same since-last-visit + watermark semantics). Liveness
+  // archives in bulk, so 3+ closures collapse into ONE digest row — the
+  // queue must never be a wall of closures.
   _closureRows() {
-    const cutoff = this._lastVisitAt ? Date.parse(this._lastVisitAt) - 7 * 86_400_000 : 0;
+    const cutoff = this._lastVisitAt ? Date.parse(this._lastVisitAt) : 0;
     let seenThrough = 0;
-    try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* legacy watermark */ }
-    return this._roles
-      .filter(r => r.closedDetectedAt
-        && Date.parse(r.closedDetectedAt) > Math.max(cutoff, seenThrough)
-        && Date.now() - Date.parse(r.closedDetectedAt) < 7 * 86_400_000)
-      .map(r => ({
+    try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
+    const closed = this._roles
+      .filter(r => r.closedDetectedAt && Date.parse(r.closedDetectedAt) > Math.max(cutoff, seenThrough))
+      .sort((a, b) => Date.parse(b.closedDetectedAt) - Date.parse(a.closedDetectedAt));
+    if (!closed.length) return [];
+    if (closed.length <= 2) {
+      return closed.map(r => ({
         kind: 'role_closed', action: 'open_role', priority: 4,
         role_slug: r.slug, company: r.company, title: r.title,
         text: `${r.company || r.slug} closed the posting`,
         detail: 'Archived automatically — the role is no longer listed',
         received_at: r.closedDetectedAt,
+        _closureWatermark: Date.parse(r.closedDetectedAt),
       }));
+    }
+    const preview = closed.slice(0, 3).map(r => r.company).filter(Boolean).join(', ');
+    return [{
+      kind: 'role_closed', action: 'open_role', priority: 4,
+      role_slug: 'role-closures',
+      href: '/ladder/jobs/?bucket=archive',
+      actionLabel: 'Open archive',
+      text: `${closed.length} roles closed since your last visit`,
+      detail: `Archived automatically — ${preview}${closed.length > 3 ? ` +${closed.length - 3} more` : ''}`,
+      received_at: closed[0].closedDetectedAt,
+      _closureWatermark: Math.max(...closed.map(r => Date.parse(r.closedDetectedAt) || 0)),
+    }];
   }
 
   // Synthetic "N saved jobs are easy applies" digest (Phase 16.1).
@@ -236,7 +251,7 @@ export class LadderUpdates extends LitElement {
       case 'open_role':
       default: {
         if (it.event_id) { try { await ackEvent(it.event_id); } catch { /* best-effort */ } }
-        window.location.assign(`/ladder/jobs/${it.role_slug}/`);
+        window.location.assign(it.href || `/ladder/jobs/${it.role_slug}/`);
       }
     }
   }
@@ -255,6 +270,12 @@ export class LadderUpdates extends LitElement {
     this.requestUpdate();
     if (it.event_id) {
       try { await dismissUpdate(it.event_id); } catch (e) { console.warn('[ladder-updates] dismiss failed:', e.message); }
+    } else if (it._closureWatermark) {
+      // Closure rows use the legacy watermark: everything closed up to the
+      // dismissed row never resurfaces (matches the old banner behavior).
+      let seenThrough = 0;
+      try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
+      try { localStorage.setItem('job:jobs:closedSeenThrough', String(Math.max(seenThrough, it._closureWatermark))); } catch { /* */ }
     } else {
       this._localDismissed.add(this._updateKey(it));
       try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...this._localDismissed])); } catch { /* */ }
@@ -291,7 +312,7 @@ export class LadderUpdates extends LitElement {
         </div>
         <button class="btn btn--sm updates-row__action" ?disabled=${busy}
                 @click=${() => this._onUpdateAction(it)}>
-          ${busy ? 'Working…' : meta.actionLabel}
+          ${busy ? 'Working…' : (it.actionLabel || meta.actionLabel)}
         </button>
         <button class="updates-row__dismiss" aria-label="Dismiss"
                 @click=${() => this._onDismissUpdate(it)}>×</button>
