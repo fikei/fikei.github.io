@@ -83,6 +83,14 @@ export const CANONICAL_QUESTIONS: CanonicalQuestion[] = [
     match: [/state agency.*procurement|procurement of goods/i] },
   { key: 'sms_consent',     tier: 4, label: 'SMS consent', kind: 'boolean',
     match: [/text messages|sms|message and data rates/i] },
+
+  // ---- Automation policies (Tier 5) — settings, never matched to form
+  // questions (empty match lists), stored in the same bank for one mirror.
+  { key: 'policy_cover_letter', tier: 4, label: 'Cover letter policy', kind: 'select',
+    hint: 'never | when_required | auto_generate', match: [] },
+  { key: 'policy_daily_cap',    tier: 4, label: 'Max submissions per day', kind: 'number', match: [] },
+  { key: 'policy_review_mode',  tier: 4, label: 'Review mode', kind: 'select',
+    hint: 'always (v1 — every submission gets a review screen)', match: [] },
 ];
 
 const BY_KEY = new Map(CANONICAL_QUESTIONS.map(c => [c.key, c]));

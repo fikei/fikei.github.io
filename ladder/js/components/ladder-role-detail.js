@@ -51,6 +51,8 @@ const KIND_BY_TAB = {
 
 const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel,
         resolveEvent: resolveApplicationEvent, undoEvent: undoApplicationEvent } = await import('../applicationEvents.js' + V);
+const { answersCoverage } = await import('../apply.js' + V);
+const { easyApplySetupDone } = await import('./ladder-easy-apply-setup.js' + V);
 // Side-effect import — registers the <ladder-apply> custom element used by the
 // "Apply with /ladder" launch button below.
 await import('./ladder-apply.js' + V);
@@ -92,6 +94,8 @@ export class JobRoleDetail extends LitElement {
     selectionPopover: { state: true },// { visible, x, y, text, savedRange } | null — floating "edit selection" UI
     coverHistory: { state: true },    // [{ id, ts, source, content, label, instruction? }] reverse-chrono
     genTick: { state: true },         // 0..n — drives the rotating-word label inside shimmer indicators
+    // Easy Apply readiness (16.2b): null | 'loading' | Coverage object.
+    easeCoverage:   { state: true },
     // Phase 2.0 — Activity timeline.
     activityState:  { state: true },  // 'idle' | 'loading' | 'loaded' | 'error'
     activityEvents: { state: true },  // EventRow[]
@@ -1912,7 +1916,8 @@ export class JobRoleDetail extends LitElement {
     // <ladder-apply> always renders so the launch button on every state
     // path can reach it. Lit reuses the element across re-renders so
     // its internal state survives state transitions.
-    const takeover = html`<ladder-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></ladder-apply>`;
+    const takeover = html`<ladder-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></ladder-apply>
+      <ladder-easy-apply-setup id="ease-setup"></ladder-easy-apply-setup>`;
 
     if (this.state === 'idle' || this.state === 'loading') {
       // If the user came from the pipeline we already have title/company/tags
@@ -2037,9 +2042,54 @@ export class JobRoleDetail extends LitElement {
       <p class="role-header__apply-req">
         <span class="ease-chip ease-chip--${info.tier}" title=${info.title}>${info.label}</span>
         ${bits.length ? html`<span class="muted">Application asks for: ${bits.join(', ')}.</span>` : nothing}
-        ${info.tier === 'easy' ? html`<span class="muted">~2 min with your saved details.</span>` : nothing}
+        ${this._renderEaseReadiness(r, info)}
       </p>
     `;
+  }
+
+  // Easy-tier roles get a readiness line: setup CTA when the answer bank
+  // hasn't been set up, otherwise a live coverage check against the bank.
+  _renderEaseReadiness(r, info) {
+    if (info.tier !== 'easy' && info.tier !== 'short_answer') return nothing;
+    if (!easyApplySetupDone()) {
+      return html`
+        <button class="btn btn--sm eas-cta" @click=${() => this._launchEaseSetup()}>
+          ⚡ Set up Easy Apply
+        </button>
+      `;
+    }
+    const cov = this.easeCoverage;
+    if (cov == null) {
+      return html`
+        <button class="btn btn--sm" @click=${() => this._checkEaseCoverage()}>Check readiness</button>
+      `;
+    }
+    if (cov === 'loading') return html`<span class="muted">Checking your saved answers…</span>`;
+    if (cov.ready) {
+      return html`<span class="ease-chip ease-chip--ready" title="Every required field is covered by your saved answers">Ready to submit</span>`;
+    }
+    const n = cov.total_required - cov.covered_required;
+    return html`
+      <span class="muted">${cov.pct}% covered — ${n} answer${n === 1 ? '' : 's'} missing.</span>
+      <button class="btn btn--sm" @click=${() => this._launchEaseSetup()}>Fill in</button>
+    `;
+  }
+
+  _launchEaseSetup() {
+    const el = this.renderRoot.querySelector('#ease-setup');
+    if (el) el.launch();
+  }
+
+  async _checkEaseCoverage() {
+    this.easeCoverage = 'loading';
+    try {
+      const res = await answersCoverage(this.slug);
+      this.easeCoverage = res.coverage;
+    } catch (e) {
+      console.warn('[job-role-detail] coverage failed', e.message);
+      this.easeCoverage = null;
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Readiness check failed: ${e.message}` } }));
+    }
   }
 
   _launchApply() {

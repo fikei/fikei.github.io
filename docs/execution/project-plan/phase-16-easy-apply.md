@@ -77,33 +77,33 @@ Simple and direct: classify every role's application form, show one chip.
 ### Epic 16.2-A: Answer bank + prefill backend
 
 **Story: answer bank schema**
-- [ ] Migration: `job.application_answers` (`user_id`, `canonical_key`, `value jsonb`, `source text` — `onboarding | resume_extract | derived | writeback`, `updated_at`), RLS to owner
-- [ ] Canonical key registry (Tier 1/2/3 from the PRD appendix): identity/contact, work-auth pair, links, onsite-by-metro rules, comp expectation + phrasing policy, years-of-experience facts, how-heard default, start date, EEOC set, rare-question defaults (family relationship, non-compete, procurement, SMS consent)
+- [x] Migration 105: `job.application_answers` (`user_id`, `canonical_key`, `value jsonb`, `source text` — `onboarding | resume_extract | derived | writeback`, `updated_at`); access via edge fn (job schema not in PostgREST)
+- [x] Canonical key registry (Tier 1/2/3 from the PRD appendix): identity/contact, work-auth pair, links, onsite-by-metro rules, comp expectation + phrasing policy, years-of-experience facts, how-heard default, start date, EEOC set, rare-question defaults (family relationship, non-compete, procurement, SMS consent)
 
 **Story: prefill from data already on record**
-- [ ] Seeding service: profile/settings → contact; Job History → years-of-PM / years-managing / domain-experience derivations + prior-employer flags; Narratives + base resume → LinkedIn/links; `global_assets` → default resume file; `company_connections` → referral prompts at apply time
-- [ ] Seeded answers marked `source='derived'` and shown as "confirm" not "type" in onboarding
+- [x] Seeding service: profile/settings → contact; Job History → years-of-PM / years-managing / domain-experience derivations + prior-employer flags; Narratives + base resume → LinkedIn/links; `global_assets` → default resume file; `company_connections` → referral prompts at apply time
+- [x] Seeded answers marked `source='derived'` and shown as "confirm" not "type" in onboarding
 
 **Story: resume upload as secondary prefill**
-- [ ] If Tier 1/2 coverage after seeding is below threshold, onboarding offers resume upload ("or upload a resume and I'll fill most of this")
-- [ ] Reuse `pdf-extract` + Haiku to extract name, contact, location, links, employers, dates → seed bank as `source='resume_extract'` for user confirmation
-- [ ] Uploaded file becomes the default application resume in `global_assets` if none exists
+- [x] If Tier 1/2 coverage after seeding is below threshold, onboarding offers resume upload ("or upload a resume and I'll fill most of this")
+- [x] Reuse `pdf-extract` + Haiku to extract name, contact, location, links, employers, dates → seed bank as `source='resume_extract'` for user confirmation
+- [ ] Uploaded file becomes the default application resume in `global_assets` if none exists (deferred to 16.2-C — needs file storage, today's flow extracts text only)
 
 **Story: question matcher**
-- [ ] Edge function: map a form's `custom_questions` → canonical keys (heuristics for the ~6 sponsorship phrasings; Haiku for the tail; cache matches per question hash)
-- [ ] Coverage calculator: % of required fields answerable from the bank → drives "Ready to submit" state
+- [x] Edge function: map a form's `custom_questions` → canonical keys (heuristics for the ~6 sponsorship phrasings; Haiku for the tail; cache matches per question hash)
+- [x] Coverage calculator: % of required fields answerable from the bank → drives "Ready to submit" state
 
 ### Epic 16.2-B: Feature-level onboarding flow
 
 Triggered on first Easy Apply use (badge click / "Set up Easy Apply" card) — not part of account onboarding.
 
-- [ ] Step 1 — confirm what we know: prefilled Tier 1 card (contact, work auth, links) rendered from seeded answers; edit-in-place; Apt-style conversational framing
-- [ ] Step 2 — Tier 2 quick pass: onsite-metros + max days/week, comp number + phrasing policy, start date/notice, how-heard default (~90s)
-- [ ] Step 3 — Tier 3 consent card: saved demographic answers vs decline-everywhere (default decline); shown once, editable in Settings
-- [ ] Step 4 — policies: cover letter (never / when required / auto-generate), review mode (always review in v1), daily cap
-- [ ] Resume-upload branch when seeding coverage is low (see 16.2-A)
-- [ ] Settings → "Easy Apply" section mirroring the whole bank; every Apply-wizard answer writes back (`source='writeback'`)
-- [ ] "Ready to submit" chip state (filled ⚡) when a role's form is 100% covered; Updates queue row upgrades to "Ready to submit — review"
+- [x] Step 1 — confirm what we know: prefilled Tier 1 card (contact, work auth, links) rendered from seeded answers; edit-in-place; Apt-style conversational framing
+- [x] Step 2 — Tier 2 quick pass: onsite-metros + max days/week, comp number + phrasing policy, start date/notice, how-heard default (~90s)
+- [x] Step 3 — Tier 3 consent card: saved demographic answers vs decline-everywhere (default decline); shown once, editable in Settings
+- [x] Step 4 — policies: cover letter (never / when required / auto-generate), review mode (always review in v1), daily cap
+- [x] Resume-upload branch when seeding coverage is low (see 16.2-A)
+- [x] Settings → "Easy Apply" section mirroring the whole bank (wizard write-back lands with the 16.2-C review screen)
+- [x] "Ready to submit" chip state (filled ⚡) when a role's form is 100% covered — stamped by the coverage action (Updates-queue row upgrade lands with 16.2-C)
 
 ### Epic 16.2-C (subphase): API submissions — Greenhouse & Lever
 

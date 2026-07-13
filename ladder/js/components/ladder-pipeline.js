@@ -1009,7 +1009,7 @@ export class JobPipeline extends LitElement {
     if (!(this._isSaved || this.bucket === 'drafting')) return nothing;
     const info = applyEaseInfo(r);
     if (!info) return nothing;
-    return html`<span class="ease-chip ease-chip--${info.tier}" title=${info.title}>
+    return html`<span class="ease-chip ease-chip--${info.tier}${info.ready ? ' ease-chip--ready' : ''}" title=${info.title}>
       <span class="ease-chip__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS[info.tier] || EASE_ICONS.essay)}</span>${info.label}
     </span>`;
   }

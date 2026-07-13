@@ -73,6 +73,26 @@ export async function deleteApplicationDraft(slug) {
   return res.json();
 }
 
+// ---- Easy Apply answer bank (application-answers edge fn) -----------------
+const ANSWERS_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/application-answers';
+
+async function answersCall(body) {
+  const headers = await authHeader();
+  const res = await fetch(ANSWERS_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`application-answers ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+export const answersList       = ()        => answersCall({ action: 'list' });
+export const answersUpsert     = (answers) => answersCall({ action: 'upsert', answers });
+export const answersDelete     = (keys)    => answersCall({ action: 'delete', keys });
+export const answersSeed       = ()        => answersCall({ action: 'seed' });
+export const answersCoverage   = (slug)    => answersCall({ action: 'coverage', slug });
+export const answersFromResume = (text)    => answersCall({ action: 'resume_extract', text });
+
 // Step ids — the takeover flow advances through these in order. Steps
 // can be hidden when the extracted application schema doesn't require
 // them (e.g. no cover letter requested, or no custom questions).
