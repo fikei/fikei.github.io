@@ -91,7 +91,6 @@ export class LadderUpdates extends LitElement {
 
       if (pipeRes.status === 'fulfilled') {
         this._roles = (pipeRes.value.roles || []).slice();
-        items.push(...this._closureRows());
         const digest = this._easyApplyDigest();
         if (digest) items.push(digest);
       }
@@ -110,28 +109,9 @@ export class LadderUpdates extends LitElement {
     }
   }
 
-  // Role closures — the liveness sweep found the posting gone and already
-  // archived the role; the queue records that (replaces the old red
-  // closed-banner). Visibility is EXPLICIT: rows show for 7 days until
-  // dismissed (row × or group ×) — never hidden implicitly by page visits;
-  // the old lastVisitAt semantics made rows flash in and out with
-  // navigation timing. The legacy closedSeenThrough watermark is still
-  // honored as a floor so past banner dismissals stay dismissed.
-  _closureRows() {
-    let seenThrough = 0;
-    try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
-    const recencyFloor = Date.now() - 7 * 86_400_000;
-    return this._roles
-      .filter(r => r.closedDetectedAt
-        && Date.parse(r.closedDetectedAt) > Math.max(recencyFloor, seenThrough))
-      .map(r => ({
-        kind: 'role_closed', action: 'open_role', priority: 4,
-        role_slug: r.slug, company: r.company, title: r.title,
-        text: `${r.company || r.slug} closed the posting`,
-        detail: 'Archived automatically — the role is no longer listed',
-        received_at: r.closedDetectedAt,
-      }));
-  }
+  // (Role closures are server-backed application events now — check-liveness
+  // archives with exit_reason='role_closed' and inserts a role_closed event;
+  // they arrive via the server feed with dismissed_at persistence.)
 
   // Synthetic "N saved jobs are easy applies" digest (Phase 16.1).
   _easyApplyDigest() {

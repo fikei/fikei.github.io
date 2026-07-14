@@ -10,8 +10,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.2.0';
-console.log(`[check-liveness] v${VERSION} - greenhouse dead-job 302 detection`);
+const VERSION = '0.3.0';
+console.log(`[check-liveness] v${VERSION} - closures archive with exit_reason=role_closed + emit a role_closed event (Updates queue)`);
 
 const BATCH = 10;
 const TIMEOUT_MS = 8000;
@@ -87,17 +87,40 @@ async function checkRoles(filter: { slug?: string }): Promise<CheckResult[]> {
     const isLive = status == null ? null : (status >= 200 && status < 400);
 
     if (willClose) {
+      // Capture prev state BEFORE mutating — the event row carries it so
+      // the Updates queue can show what changed (and Undo could restore).
+      const prev = await sql<Array<{ status: string; stage: string | null; exit_reason: string | null; exit_context: string | null }>>`
+        select status, stage, exit_reason, exit_context
+          from job.pipeline_roles where slug = ${r.slug}`;
       await sql`
         update job.pipeline_roles set
           liveness_checked_at = now(),
           liveness_status_code = ${status},
           is_live = false,
           closed_detected_at = coalesce(closed_detected_at, now()),
-          status = 'Closed',
+          status = 'Archive',
+          stage = null,
+          exit_reason = coalesce(exit_reason, 'role_closed'),
           status_changed_at = now(),
           archived_at = coalesce(archived_at, now()),
-          status_history = coalesce(status_history, '[]'::jsonb) || ${sql.json([{ status: 'Closed', at: new Date().toISOString(), by: 'liveness' }])}
+          status_history = coalesce(status_history, '[]'::jsonb) || ${sql.json([{ status: 'Archive', at: new Date().toISOString(), by: 'liveness', reason: 'role_closed' }])}
         where slug = ${r.slug};
+      `;
+      // Server-backed notification: one role_closed event per role (the
+      // synthetic Message-ID is the idempotency key). Feeds the Updates
+      // queue; dismissal persists via dismissed_at across devices.
+      const key = `synthetic:role-closed:${r.slug}`;
+      await sql`
+        insert into job.application_events (
+          role_slug, gmail_message_id, gmail_thread_id, event_type,
+          summary, auto_applied, needs_review, received_at, source,
+          auto_action, prev_state
+        ) values (
+          ${r.slug}, ${key}, ${key}, 'role_closed',
+          'Posting is no longer live — archived automatically',
+          true, false, now(), 'liveness',
+          'archived_closed', ${prev.length ? sql.json(prev[0]) : null}
+        ) on conflict (gmail_message_id) do nothing;
       `;
     } else {
       await sql`
