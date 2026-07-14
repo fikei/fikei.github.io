@@ -271,8 +271,6 @@ export class JobPipeline extends LitElement {
     try {
       const data = await fetchPipeline();
       this.roles = (data.roles || []).slice();
-      // Visit stamp — <ladder-updates> reads this to window closure rows.
-      try { localStorage.setItem('job:jobs:lastVisitAt', new Date().toISOString()); } catch {}
       this.state = 'loaded';
       // Phase 2.0 — load signals after the table renders so the page
       // isn't blocked on Gmail/Calendar fetches. Re-render on completion.
