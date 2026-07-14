@@ -107,11 +107,11 @@ Triggered on first Easy Apply use (badge click / "Set up Easy Apply" card) — n
 
 ### Epic 16.2-C (subphase): API submissions — Greenhouse & Lever
 
-- [ ] `submit-application` edge function: multipart form-POST to the ATS public application endpoint; resume streamed from `global_assets`/`role_assets`; EEOC answers mapped to ATS field ids
-- [ ] Review screen: every field + answer + consent checkboxes itemized; explicit Submit tap; no Undo after submit (copy says so)
-- [ ] Post-submit: stage → applied, application event logged, full snapshot into `application_draft`, confirmation email watched by the existing Gmail tracker
-- [ ] Guardrails: liveness + posting-age check at submit time; per-day cap; failure → wizard fallback with fields still prefilled
-- [ ] Start Greenhouse-only behind a flag; add Lever after N clean submissions
+- [x] `submit-application` edge function: multipart form-POST to the ATS public application endpoint; resume streamed from `global_assets`/`role_assets`; EEOC answers mapped to ATS field ids
+- [x] Review screen: every field + answer + consent checkboxes itemized; explicit Submit tap; no Undo after submit (copy says so)
+- [x] Post-submit: stage → applied, application event logged, full snapshot into `application_draft`, confirmation email watched by the existing Gmail tracker
+- [x] Guardrails: liveness + posting-age check at submit time; per-day cap; failure → wizard fallback with fields still prefilled
+- [x] Start Greenhouse-only behind a flag; add Lever after N clean submissions
 
 ### Epic 16.2-D (subphase): Headless-browser path — Ashby & the long tail
 

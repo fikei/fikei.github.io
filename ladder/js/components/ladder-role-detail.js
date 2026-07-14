@@ -56,6 +56,8 @@ const { easyApplySetupDone } = await import('./ladder-easy-apply-setup.js' + V);
 // Side-effect import — registers the <ladder-apply> custom element used by the
 // "Apply with /ladder" launch button below.
 await import('./ladder-apply.js' + V);
+// Registers <ladder-apply-review> — the Easy Apply review-then-submit takeover.
+await import('./ladder-apply-review.js' + V);
 
 function fmtDate(s) {
   if (!s) return '—';
@@ -1917,7 +1919,8 @@ export class JobRoleDetail extends LitElement {
     // path can reach it. Lit reuses the element across re-renders so
     // its internal state survives state transitions.
     const takeover = html`<ladder-apply id="apply-takeover" @apply:close=${() => this._onApplyClose()}></ladder-apply>
-      <ladder-easy-apply-setup id="ease-setup"></ladder-easy-apply-setup>`;
+      <ladder-easy-apply-setup id="ease-setup"></ladder-easy-apply-setup>
+      <ladder-apply-review id="apply-review"></ladder-apply-review>`;
 
     if (this.state === 'idle' || this.state === 'loading') {
       // If the user came from the pipeline we already have title/company/tags
@@ -2066,18 +2069,29 @@ export class JobRoleDetail extends LitElement {
     }
     if (cov === 'loading') return html`<span class="muted">Checking your saved answers…</span>`;
     if (cov.ready) {
-      return html`<span class="ease-chip ease-chip--ready" title="Every required field is covered by your saved answers">Ready to submit</span>`;
+      return html`
+        <span class="ease-chip ease-chip--ready" title="Every required field is covered by your saved answers">Ready to submit</span>
+        <button class="btn btn--sm btn--accent eas-cta" @click=${() => this._launchApplyReview()}>Review &amp; submit</button>
+      `;
     }
     const n = cov.total_required - cov.covered_required;
     return html`
       <span class="muted">${cov.pct}% covered — ${n} answer${n === 1 ? '' : 's'} missing.</span>
-      <button class="btn btn--sm" @click=${() => this._launchEaseSetup()}>Fill in</button>
+      <button class="btn btn--sm" @click=${() => this._launchApplyReview()}>Review &amp; submit</button>
     `;
   }
 
   _launchEaseSetup() {
     const el = this.renderRoot.querySelector('#ease-setup');
     if (el) el.launch();
+  }
+
+  // Review-then-submit takeover (16.2c). The review screen itemizes every
+  // field and consent; missing answers can be filled inline there too.
+  _launchApplyReview() {
+    try { engageRole(this.slug); } catch { /* silent */ }
+    const el = this.renderRoot.querySelector('#apply-review');
+    if (el) el.launch({ slug: this.slug });
   }
 
   async _checkEaseCoverage() {
