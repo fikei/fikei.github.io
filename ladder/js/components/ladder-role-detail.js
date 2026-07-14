@@ -51,7 +51,6 @@ const KIND_BY_TAB = {
 
 const { listEvents, ackEvent: ackApplicationEvent, eventTypeLabel,
         resolveEvent: resolveApplicationEvent, undoEvent: undoApplicationEvent } = await import('../applicationEvents.js' + V);
-const { answersCoverage } = await import('../apply.js' + V);
 const { easyApplySetupDone } = await import('./ladder-easy-apply-setup.js' + V);
 // Side-effect import — registers the <ladder-apply> custom element used by the
 // "Apply with /ladder" launch button below.
@@ -97,7 +96,6 @@ export class JobRoleDetail extends LitElement {
     coverHistory: { state: true },    // [{ id, ts, source, content, label, instruction? }] reverse-chrono
     genTick: { state: true },         // 0..n — drives the rotating-word label inside shimmer indicators
     // Easy Apply readiness (16.2b): null | 'loading' | Coverage object.
-    easeCoverage:   { state: true },
     // Phase 2.0 — Activity timeline.
     activityState:  { state: true },  // 'idle' | 'loading' | 'loaded' | 'error'
     activityEvents: { state: true },  // EventRow[]
@@ -161,12 +159,17 @@ export class JobRoleDetail extends LitElement {
       if (t) this._switchTab(t);
     };
     window.addEventListener('apply:opentab', this._onApplyOpenTab);
+    // The review overlay offers "Set up Easy Apply to autofill" when the
+    // answer bank is thin; it asks us to open the setup takeover.
+    this._onLaunchSetup = () => this._launchEaseSetup();
+    document.addEventListener('job:easyapply:launch-setup', this._onLaunchSetup);
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);
     document.removeEventListener('job:auth:ready', this._onAuth);
     document.removeEventListener('selectionchange', this._onSelectionChange);
     window.removeEventListener('apply:opentab', this._onApplyOpenTab);
+    document.removeEventListener('job:easyapply:launch-setup', this._onLaunchSetup);
     this._teardownBodyObserver();
     if (this._genTimer) { clearInterval(this._genTimer); this._genTimer = null; }
     // Flush pending autosaves on unmount.
@@ -201,6 +204,11 @@ export class JobRoleDetail extends LitElement {
       // "in progress." Fire-and-forget; the helper is idempotent so
       // re-opens are no-ops on the server.
       if (this.role) engageRole(this.slug);
+      // Deep-link from the Saved row menu ("Review & apply…") auto-opens the
+      // review takeover once the role has loaded.
+      if (this.role && new URLSearchParams(location.search).get('review') === '1') {
+        this.updateComplete.then(() => this._launchApplyReview());
+      }
       // Seed history with the loaded cover letter so the user has a
       // baseline to revert to even before they make any edits.
       if (cover?.content) {
@@ -2028,6 +2036,10 @@ export class JobRoleDetail extends LitElement {
   // "Application requirements" line (Phase 16.1) — the ease tier chip plus a
   // one-line breakdown of what the form actually asks for, so the user knows
   // whether this is a 2-minute submit before opening anything.
+  // One clean line under the title: the ease chip, a plain-language summary of
+  // what the form asks for, and — for auto-fillable tiers — a single
+  // "Review & apply" action. Setup lives on the Saved banner + row menu now,
+  // not here, so the header stays uncluttered.
   _renderApplyRequirements(r) {
     const info = applyEaseInfo(r);
     if (!info) return nothing;
@@ -2041,43 +2053,15 @@ export class JobRoleDetail extends LitElement {
     }
     if (m.short_answers > 0) bits.push(`${m.short_answers} short answer${m.short_answers === 1 ? '' : 's'}`);
     if (m.required_essays > 0) bits.push(`${m.required_essays} essay${m.required_essays === 1 ? '' : 's'}`);
+    const canReview = info.tier === 'easy' || info.tier === 'short_answer';
     return html`
-      <p class="role-header__apply-req">
+      <div class="role-header__apply-req">
         <span class="ease-chip ease-chip--${info.tier}" title=${info.title}>${info.label}</span>
-        ${bits.length ? html`<span class="muted">Application asks for: ${bits.join(', ')}.</span>` : nothing}
-        ${this._renderEaseReadiness(r, info)}
-      </p>
-    `;
-  }
-
-  // Easy-tier roles get a readiness line: setup CTA when the answer bank
-  // hasn't been set up, otherwise a live coverage check against the bank.
-  _renderEaseReadiness(r, info) {
-    if (info.tier !== 'easy' && info.tier !== 'short_answer') return nothing;
-    if (!easyApplySetupDone()) {
-      return html`
-        <button class="btn btn--sm eas-cta" @click=${() => this._launchEaseSetup()}>
-          ⚡ Set up Easy Apply
-        </button>
-      `;
-    }
-    const cov = this.easeCoverage;
-    if (cov == null) {
-      return html`
-        <button class="btn btn--sm" @click=${() => this._checkEaseCoverage()}>Check readiness</button>
-      `;
-    }
-    if (cov === 'loading') return html`<span class="muted">Checking your saved answers…</span>`;
-    if (cov.ready) {
-      return html`
-        <span class="ease-chip ease-chip--ready" title="Every required field is covered by your saved answers">Ready to submit</span>
-        <button class="btn btn--sm btn--accent eas-cta" @click=${() => this._launchApplyReview()}>Review &amp; submit</button>
-      `;
-    }
-    const n = cov.total_required - cov.covered_required;
-    return html`
-      <span class="muted">${cov.pct}% covered — ${n} answer${n === 1 ? '' : 's'} missing.</span>
-      <button class="btn btn--sm" @click=${() => this._launchApplyReview()}>Review &amp; submit</button>
+        ${bits.length ? html`<span class="muted">Asks for ${bits.join(', ')}.</span>` : nothing}
+        ${canReview ? html`
+          <button class="btn btn--sm btn--accent eas-cta" @click=${() => this._launchApplyReview()}>Review &amp; apply</button>
+        ` : nothing}
+      </div>
     `;
   }
 
@@ -2092,18 +2076,6 @@ export class JobRoleDetail extends LitElement {
     try { engageRole(this.slug); } catch { /* silent */ }
     const el = this.renderRoot.querySelector('#apply-review');
     if (el) el.launch({ slug: this.slug });
-  }
-
-  async _checkEaseCoverage() {
-    this.easeCoverage = 'loading';
-    try {
-      const res = await answersCoverage(this.slug);
-      this.easeCoverage = res.coverage;
-    } catch (e) {
-      console.warn('[job-role-detail] coverage failed', e.message);
-      this.easeCoverage = null;
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Readiness check failed: ${e.message}` } }));
-    }
   }
 
   _launchApply() {
