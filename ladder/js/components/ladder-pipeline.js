@@ -122,6 +122,8 @@ export class JobPipeline extends LitElement {
     roleSignals:     { state: true },
     // Hover-card state for the Network column: { conns, x, y } | null.
     hoverConns:      { state: true },
+    // Hover-card state for the ease chip: { info, x, y } | null.
+    hoverEase:       { state: true },
     // "⚡ Easy apply" quick filter (Saved + Drafting). Mirrored in ?ease=easy.
     easeFilter:      { state: true },
   };
@@ -136,6 +138,7 @@ export class JobPipeline extends LitElement {
     this._dragOverSlug = null;
     this.selectedRow = null;
     this.hoverConns = null;
+    this.hoverEase = null;
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
     const stageQ = params.get('stage');
@@ -840,9 +843,52 @@ export class JobPipeline extends LitElement {
     if (!(this._isSaved || this.bucket === 'drafting')) return nothing;
     const info = applyEaseInfo(r);
     if (!info) return nothing;
-    return html`<span class="ease-chip ease-chip--${info.tier}${info.ready ? ' ease-chip--ready' : ''}" title=${info.title}>
+    // When we have the actual question text, a styled hover card replaces the
+    // native title (which can only show counts) and lists the prompts.
+    const hasCard = Array.isArray(info.prompts) && info.prompts.length > 0;
+    return html`<span class="ease-chip ease-chip--${info.tier}${info.ready ? ' ease-chip--ready' : ''}"
+        title=${hasCard ? '' : info.title}
+        tabindex=${hasCard ? '0' : '-1'}
+        @mouseenter=${(e) => hasCard && this._showEaseTip(info, e)}
+        @mouseleave=${() => this._hideEaseTip()}
+        @focus=${(e) => hasCard && this._showEaseTip(info, e)}
+        @blur=${() => this._hideEaseTip()}>
       <span class="ease-chip__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS[info.tier] || EASE_ICONS.essay)}</span>${info.label}
     </span>`;
+  }
+
+  _showEaseTip(info, e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    this.hoverEase = { info, x: rect.left, y: rect.bottom + 6 };
+  }
+  _hideEaseTip() { this.hoverEase = null; }
+
+  _renderEaseTip() {
+    const h = this.hoverEase;
+    if (!h) return nothing;
+    const { info } = h;
+    const m = info.meta || {};
+    const bits = [];
+    if (m.ats && m.ats !== 'unknown') bits.push(m.ats);
+    if (typeof m.questions === 'number') bits.push(`${m.questions} question${m.questions === 1 ? '' : 's'}`);
+    if (m.requires_cover_letter) bits.push('cover letter required');
+    const width = 320;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, h.x));
+    const top = Math.min(window.innerHeight - 20, h.y);
+    const essays = info.prompts.filter(p => p.kind === 'essay');
+    const shorts = info.prompts.filter(p => p.kind === 'short_answer');
+    const group = (heading, items) => items.length ? html`
+      <div class="ease-tip__group">
+        <div class="ease-tip__head">${heading}</div>
+        <ul class="ease-tip__list">${items.map(p => html`<li>${p.text}</li>`)}</ul>
+      </div>` : nothing;
+    return html`
+      <div class="ease-tip" style=${`left:${left}px;top:${top}px;width:${width}px;`}>
+        <div class="ease-tip__title">${info.label}</div>
+        ${bits.length ? html`<div class="ease-tip__meta">${bits.join(' · ')}</div>` : nothing}
+        ${group(essays.length === 1 ? 'Essay question' : 'Essay questions', essays)}
+        ${group(shorts.length === 1 ? 'Short answer' : 'Short answers', shorts)}
+      </div>`;
   }
 
   _toggleEaseFilter() {
@@ -1165,6 +1211,7 @@ export class JobPipeline extends LitElement {
         </table>
       </div>
       ${this._renderConnTip()}
+      ${this._renderEaseTip()}
       ${this._renderArchiveModal()}
 
       ${rows.length === 0 ? html`
