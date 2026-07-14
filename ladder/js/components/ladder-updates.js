@@ -28,6 +28,7 @@ export class LadderUpdates extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
+    state:         { state: true },
     updates:       { state: true },
     updateBusy:    { state: true },
     expandedKinds: { state: true },
@@ -35,6 +36,7 @@ export class LadderUpdates extends LitElement {
 
   constructor() {
     super();
+    this.state = 'idle';
     this.updates = [];
     this.updateBusy = null;
     this.expandedKinds = new Set();
@@ -62,6 +64,7 @@ export class LadderUpdates extends LitElement {
     if (document.body.dataset.authState !== 'in') return;
     if (this._loading) return;
     this._loading = true;
+    if (this.state === 'idle') this.state = 'loading';
     try {
       const [feedRes, calRes, pipeRes] = await Promise.allSettled([
         loadUpdates(),
@@ -106,6 +109,7 @@ export class LadderUpdates extends LitElement {
           || new Date(b.received_at || 0).getTime() - new Date(a.received_at || 0).getTime());
     } finally {
       this._loading = false;
+      this.state = 'loaded';
     }
   }
 
@@ -289,7 +293,31 @@ export class LadderUpdates extends LitElement {
     this.expandedKinds = next;
   }
 
+  // Shimmer placeholder — reserves the queue's slot at the top of the
+  // Inbox so content below never jumps when the feed lands. Collapses to
+  // nothing only once we KNOW the queue is empty.
+  _renderSkeleton() {
+    return html`
+      <section class="updates-queue" aria-hidden="true">
+        <div class="updates-queue__header">
+          <span class="skeleton" style="width:72px;height:16px;display:inline-block;"></span>
+        </div>
+        ${Array.from({ length: 2 }).map(() => html`
+          <div class="updates-row">
+            <span class="skeleton" style="width:32px;height:32px;border-radius:var(--radius-pill);flex-shrink:0;"></span>
+            <div class="updates-row__body">
+              <span class="skeleton" style="width:55%;height:14px;display:inline-block;"></span>
+              <span class="skeleton" style="width:35%;height:11px;display:inline-block;"></span>
+            </div>
+            <span class="skeleton skeleton--pill" style="width:96px;height:32px;"></span>
+          </div>
+        `)}
+      </section>
+    `;
+  }
+
   render() {
+    if (this.state !== 'loaded') return this._renderSkeleton();
     const items = this.updates || [];
     if (!items.length) return nothing;
     const groups = this._grouped(items);

@@ -71,6 +71,7 @@ export class JobRecommendationsTable extends LitElement {
     _hasMore:            { state: true },
     _recentlyExpired:    { state: true },
     _wildcards:          { state: true },
+    _wildcardsState:     { state: true },
     _floorOn:            { state: true },
     _reviewIndex:        { state: true },
     _below:              { state: true },
@@ -102,6 +103,7 @@ export class JobRecommendationsTable extends LitElement {
     this._hasMore = false;
     this._recentlyExpired = 0;
     this._wildcards = [];
+    this._wildcardsState = 'loading';
     // Quality floors (fit >= 50, strength >= 50, no hard fails) apply by
     // default; the ⋯ menu toggle flips to the unfiltered audit view.
     this._floorOn = true;
@@ -403,11 +405,13 @@ export class JobRecommendationsTable extends LitElement {
     // reconnect round-trip) and hasn't finished, resume the draining loader.
     this._resumeDrainingIfPending();
     // Wildcards strip loads after the list — never block or fail the
-    // page over it.
+    // page over it. _wildcardsState drives the shimmer placeholder so the
+    // strip's slot is reserved from first paint (no late pop-in).
     try {
       const wc = await fetchRecommendations({ view: 'wildcard' });
       this._wildcards = Array.isArray(wc?.recommendations) ? wc.recommendations : [];
     } catch { this._wildcards = []; }
+    this._wildcardsState = 'loaded';
     // Below-your-bar rows for the per-day drawers. 200 newest covers the
     // visible date range; older groups simply don't show a drawer.
     try {
@@ -753,6 +757,26 @@ export class JobRecommendationsTable extends LitElement {
   // High candidate-strength / low stated-criteria-fit roles (view=wildcard).
   // Leads with WHY the fit is low — the strip exists to pressure-test the
   // search criteria, not to list more of the same.
+  _renderWildcardsSkeleton() {
+    return html`
+      <section class="rec-wildcards" aria-hidden="true">
+        <header class="rec-shell__head rec-wildcards__head">
+          <span class="skeleton" style="width:110px;height:20px;display:inline-block;"></span>
+        </header>
+        <div class="rec-row rec-row--wildcards" role="presentation">
+          ${Array.from({ length: 3 }).map(() => html`
+            <article class="rec-card rec-card--wildcard">
+              <span class="skeleton" style="width:70%;height:16px;display:block;margin-bottom:8px;"></span>
+              <span class="skeleton" style="width:45%;height:12px;display:block;margin-bottom:12px;"></span>
+              <span class="skeleton" style="width:90%;height:12px;display:block;margin-bottom:16px;"></span>
+              <span class="skeleton skeleton--pill" style="width:84px;height:32px;display:inline-block;"></span>
+            </article>
+          `)}
+        </div>
+      </section>
+    `;
+  }
+
   _wildcardDetailUrl(r) {
     return `/ladder/jobs/${roleSlug(r.company, r.title)}/?rec=${r.id}`;
   }
@@ -797,6 +821,7 @@ export class JobRecommendationsTable extends LitElement {
   }
 
   _renderWildcards() {
+    if (this._wildcardsState !== 'loaded') return this._renderWildcardsSkeleton();
     if (!this._wildcards.length) return nothing;
     return html`
       <section class="rec-wildcards" aria-label="Wildcards">
@@ -833,6 +858,7 @@ export class JobRecommendationsTable extends LitElement {
             `)}
           </ul>
         </section>
+        ${this._renderWildcardsSkeleton()}
       `;
     }
     if (this.state === 'error') {
