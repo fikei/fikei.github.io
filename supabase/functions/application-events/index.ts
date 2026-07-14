@@ -51,8 +51,8 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.6.2';
-console.log(`[application-events] v${VERSION} - undo re-opens the prompt (decision stays on the table); low-confidence copy only below the auto floor`);
+const VERSION = '1.7.0';
+console.log(`[application-events] v${VERSION} - role_closed events in the updates feed (server-backed closure notifications)`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
@@ -503,6 +503,14 @@ async function listUpdates(userEmail: string): Promise<Response> {
         kind: 'no_response_archive', action: 'undo', priority: 4,
         event_id: rec.event_id, role_slug: rec.role_slug, company: rec.company_name, title: rec.title,
         text: `Archived ${rec.company_name} — no response in 30 days`,
+        received_at: rec.received_at,
+      });
+    } else if (rec.auto_action === 'archived_closed') {
+      upsert({
+        kind: 'role_closed', action: 'open_role', priority: 4,
+        event_id: rec.event_id, role_slug: rec.role_slug, company: rec.company_name, title: rec.title,
+        text: `${rec.company_name} closed the posting`,
+        detail: 'Archived automatically — the role is no longer listed',
         received_at: rec.received_at,
       });
     } else if (rec.auto_action === 'stage_advance') {

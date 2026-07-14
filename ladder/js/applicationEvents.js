@@ -211,6 +211,8 @@ export function eventTypeLabel(eventType) {
     case 'follow_up_needed':       return 'Follow-up';
     case 'interview_rescheduled':  return 'Rescheduled';
     case 'informational':          return 'Update';
+    case 'no_response_timeout':    return 'No response';
+    case 'role_closed':            return 'Posting closed';
     default:                       return eventType;
   }
 }

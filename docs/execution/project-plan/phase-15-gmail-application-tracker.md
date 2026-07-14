@@ -212,3 +212,12 @@ Design pattern documented in `ladder/DESIGN.md` (Updates queue / Signal chips).
 | "Show all N" expander → inset drawer of individual rows, each with its own action + × | ✓ |
 | Group × dismisses every instance (server dismiss for event rows, local keys for synthetic) | ✓ |
 | Bespoke closure digest replaced by the generic grouping (closures emit per-role again) | ✓ |
+
+### Story 5.6 — Closures as first-class events (v2.34)
+
+| Task | Status |
+|------|--------|
+| check-liveness v0.3.0: closure → status=Archive + exit_reason=role_closed + role_closed event (prev_state, idempotent per role) | ✓ |
+| Migration 107: role_closed event type, liveness source, archived_closed auto_action; backfill legacy 'Closed' roles + last-7d closure events | ✓ |
+| application-events v1.7.0: archived_closed records in the updates feed | ✓ |
+| Client-side closure synthesis removed — dismissals now server-persisted (cross-device) | ✓ |
