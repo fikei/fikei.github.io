@@ -10,6 +10,7 @@ const { logoSrc, logoInitial } = await import('../logo.js' + V);
 const { renderScoreModal, renderScorePair, scoreClass: sharedScoreClass } = await import('./ladder-fit-modal.js' + V);
 const { loadUpdates, updateKindMeta, roleMatchedEvents } = await import('../applicationEvents.js' + V);
 const { renderLocation } = await import('../format.js' + V);
+const { easyApplySetupDone } = await import('./ladder-easy-apply-setup.js' + V);   // also registers <ladder-easy-apply-setup>
 
 // Bucket taxonomy (STAGES / BUCKETS / BUCKET_LABELS / bucketFor / isVisibleRole)
 // is imported from ../pipeline.js — the single source of truth shared with the
@@ -126,6 +127,8 @@ export class JobPipeline extends LitElement {
     hoverEase:       { state: true },
     // "⚡ Easy apply" quick filter (Saved + Drafting). Mirrored in ?ease=easy.
     easeFilter:      { state: true },
+    // Easy Apply setup banner (Saved page, periodic cadence).
+    easeBannerHidden: { state: true },
   };
 
   constructor() {
@@ -139,6 +142,15 @@ export class JobPipeline extends LitElement {
     this.selectedRow = null;
     this.hoverConns = null;
     this.hoverEase = null;
+    // Setup banner cadence: hidden if setup is done, or dismissed within the
+    // last 7 days. Re-surfaces afterward so it nudges without nagging.
+    this.easeBannerHidden = (() => {
+      try {
+        if (easyApplySetupDone()) return true;
+        const at = Number(localStorage.getItem('job:easeSetupBannerDismissedAt') || 0);
+        return Date.now() - at < 7 * 24 * 3600 * 1000;
+      } catch { return false; }
+    })();
     const params = new URLSearchParams(location.search);
     const b = params.get('bucket');
     const stageQ = params.get('stage');
@@ -199,6 +211,9 @@ export class JobPipeline extends LitElement {
       } catch {}
     };
     document.addEventListener('job:pipeline:refresh', this._onRefresh);
+    // Finishing Easy Apply setup retires the banner immediately.
+    this._onEaseSetupDone = () => { this.easeBannerHidden = true; };
+    document.addEventListener('job:easyapply:setup-done', this._onEaseSetupDone);
     // Surface added jobs (paste-URL, recs, future batch import) via a
     // dismissible banner at the top of the table. Accumulates entries
     // until the user dismisses or navigates away.
@@ -237,6 +252,7 @@ export class JobPipeline extends LitElement {
     document.removeEventListener('keydown', this._onKey);
     document.removeEventListener('click', this._onDocClick);
     document.removeEventListener('job:pipeline:refresh', this._onRefresh);
+    document.removeEventListener('job:easyapply:setup-done', this._onEaseSetupDone);
     document.removeEventListener('job:pipeline:added', this._onAdded);
     window.removeEventListener('popstate', this._onPopState);
     super.disconnectedCallback();
@@ -624,6 +640,12 @@ export class JobPipeline extends LitElement {
                 <span>${BUCKET_LABELS[b]}</span>
               </button>
             `)}
+            ${(r.applyEase === 'easy' || r.applyEase === 'short_answer') ? html`
+              <div class="row-menu__divider" role="separator"></div>
+              ${easyApplySetupDone()
+                ? html`<button role="menuitem" class="row-menu__item" @click=${() => this._openRoleReview(r)}>Review &amp; apply…</button>`
+                : html`<button role="menuitem" class="row-menu__item" @click=${() => this._launchEaseSetup()}>⚡ Set up Easy Apply</button>`}
+            ` : nothing}
             <div class="row-menu__divider" role="separator"></div>
             <button role="menuitem" class="row-menu__item row-menu__item--danger" @click=${() => this._onDelete(r)}>
               Delete…
@@ -891,6 +913,44 @@ export class JobPipeline extends LitElement {
     const qs = new URLSearchParams(location.search);
     if (this.easeFilter) qs.set('ease', 'easy'); else qs.delete('ease');
     history.replaceState(null, '', `${location.pathname}?${qs}`);
+  }
+
+  // Setup nudge: one dismissable banner atop the Saved page when Easy Apply
+  // isn't set up yet and there's at least one easy-tier role to apply to.
+  // Cadence handled in the constructor (re-shows 7 days after dismissal).
+  _renderEaseSetupBanner() {
+    if (!this._isSaved || this.easeBannerHidden) return nothing;
+    const easyCount = this.roles.filter(r => isVisibleRole(r) && r.applyEase === 'easy').length;
+    if (!easyCount) return nothing;
+    return html`
+      <div class="ease-setup-banner" role="status">
+        <span class="ease-setup-banner__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS.easy)}</span>
+        <div class="ease-setup-banner__body">
+          <strong>${easyCount} saved ${easyCount === 1 ? 'role is an easy apply' : 'roles are easy applies'}.</strong>
+          Set up Easy Apply once and Ladder fills these forms from your saved answers.
+        </div>
+        <button class="btn btn--sm btn--accent" @click=${() => this._launchEaseSetup()}>Set up Easy Apply</button>
+        <button class="ease-setup-banner__x" aria-label="Dismiss" @click=${() => this._dismissEaseBanner()}>×</button>
+      </div>
+    `;
+  }
+
+  _launchEaseSetup() {
+    this.openMenuSlug = null;
+    this.renderRoot.querySelector('#ease-setup')?.launch();
+  }
+
+  _dismissEaseBanner() {
+    this.easeBannerHidden = true;
+    try { localStorage.setItem('job:easeSetupBannerDismissedAt', String(Date.now())); } catch { /* */ }
+  }
+
+  // Row-menu "Review & apply" — the review takeover lives on the role page,
+  // so navigate there with a flag that auto-opens it.
+  _openRoleReview(r) {
+    this.openMenuSlug = null;
+    stashRolePrefill(r);
+    window.location.assign(`/ladder/jobs/${r.slug}/?review=1`);
   }
 
   // (The "N saved jobs are easy applies" digest row moved to
@@ -1161,6 +1221,8 @@ export class JobPipeline extends LitElement {
         </div>
       ` : nothing}
 
+      ${this._renderEaseSetupBanner()}
+
       <div class="pipeline-meta">
         <strong>${rows.length}</strong> ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'},
         ${this.sortKey === 'manual'
@@ -1208,6 +1270,7 @@ export class JobPipeline extends LitElement {
       ${this._renderConnTip()}
       ${this._renderEaseTip()}
       ${this._renderArchiveModal()}
+      <ladder-easy-apply-setup id="ease-setup"></ladder-easy-apply-setup>
 
       ${rows.length === 0 ? html`
         <div class="placeholder" style="margin-top:var(--space-4);">

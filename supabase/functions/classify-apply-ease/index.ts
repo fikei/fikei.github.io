@@ -19,7 +19,7 @@ import { db } from '../_shared/job-db.ts';
 import { extractSchema } from '../_shared/apply-extract.ts';
 import { classifyApplyEase, type ApplyEaseTier, type ApplyEaseMeta } from '../_shared/apply-ease.ts';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 console.log(`[classify-apply-ease] v${VERSION} - apply-ease sweep for Saved+Drafting`);
 
 const BATCH = 8;
@@ -107,6 +107,7 @@ async function classifyRole(sql: ReturnType<typeof db>, row: { slug: string; url
     await sql`update job.pipeline_roles set canonical_apply_url = ${applyUrl} where slug = ${row.slug};`;
   }
 
+  let extractedSchema: unknown = null;
   if (applyUrl.startsWith('mailto:')) {
     tier = 'special';
     meta = { reason: 'apply by email', source_url: applyUrl };
@@ -115,13 +116,28 @@ async function classifyRole(sql: ReturnType<typeof db>, row: { slug: string; url
     const c = classifyApplyEase(schema);
     tier = c.tier;
     meta = c.meta;
+    // Only keep the schema when extraction actually produced fields — a bare
+    // fallback (JS-shell page, rate-limited ATS API) yields nothing usable.
+    if ((schema.general?.length || schema.custom_questions?.length)) extractedSchema = schema;
+  }
+
+  // Data integrity: a transient extraction failure (ATS API rate-limited from
+  // the edge) must not overwrite a previously-good classification with
+  // `unknown`. Only downgrade to unknown when there's no prior good tier.
+  if (tier === 'unknown') {
+    const prior = (await sql`select apply_ease from job.pipeline_roles where slug = ${row.slug};`)[0]?.apply_ease;
+    if (prior && prior !== 'unknown') {
+      await sql`update job.pipeline_roles set apply_ease_checked_at = now() where slug = ${row.slug};`;
+      return { slug: row.slug, tier: prior as ApplyEaseTier, applyUrl, reason: 'kept prior (extraction transient-failed)' };
+    }
   }
 
   await sql`
     update job.pipeline_roles set
       apply_ease = ${tier},
       apply_ease_meta = ${sql.json(meta)},
-      apply_ease_checked_at = now()
+      apply_ease_checked_at = now(),
+      apply_schema = ${extractedSchema ? sql.json(extractedSchema) : sql`apply_schema`}
     where slug = ${row.slug};
   `;
   return { slug: row.slug, tier, applyUrl, reason: (meta as ApplyEaseMeta).reason };

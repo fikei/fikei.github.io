@@ -25,7 +25,7 @@ import { db } from '../_shared/job-db.ts';
 import { extractSchema, detectAts, type Schema } from '../_shared/apply-extract.ts';
 import { computeCoverage, canonicalQuestion, type QuestionMapping } from '../_shared/answer-bank.ts';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 console.log(`[submit-application] v${VERSION} - Easy Apply prepare/submit (Greenhouse, flag-gated)`);
 
 const SLUG_RE = /^[a-z0-9_-]+$/;
@@ -85,17 +85,24 @@ type ReviewRow = {
 
 async function buildReview(sql: Sql, userId: string, slug: string) {
   const role = (await sql`
-    select slug, company_name, title, coalesce(canonical_apply_url, url) as apply_url, apply_ease
+    select slug, company_name, title, coalesce(canonical_apply_url, url) as apply_url, apply_ease, apply_schema
     from job.pipeline_roles where slug = ${slug} and deleted_at is null limit 1;
   `)[0];
   if (!role?.apply_url) throw new Error('role has no apply URL');
 
-  // Schema: prefer the persisted draft extraction, refresh otherwise.
+  // Schema precedence: the user's own draft extraction, then the role's
+  // persisted apply_schema (written by classify/extract when the ATS API
+  // last succeeded), then a fresh live extraction as the last resort. Live
+  // extraction is flaky from the edge (ATS rate-limiting), so the persisted
+  // copy is what keeps the review reliable.
   const draft = (await sql`
     select fields, answers from job.application_draft
     where user_id = ${userId} and role_slug = ${slug} limit 1;
   `)[0];
-  let schema: Schema | null = (draft?.fields?.general || draft?.fields?.custom_questions) ? draft.fields as Schema : null;
+  const usable = (o: any) => o && (o.general?.length || o.custom_questions?.length) ? o as Schema : null;
+  let persisted: any = draft?.fields;
+  if (typeof persisted === 'string') { try { persisted = JSON.parse(persisted); } catch { persisted = null; } }
+  let schema: Schema | null = usable(persisted) || usable(role.apply_schema);
   if (!schema) schema = await extractSchema(role.apply_url);
 
   const bankRows = await sql`
@@ -212,8 +219,9 @@ serve(async (req) => {
       await sql`
         insert into job.application_draft (user_id, role_slug, apply_url, ats, fields, answers, current_step, status, extracted_at)
         values (${user.id}, ${slug}, ${review.role.apply_url}, ${review.ats},
-                ${JSON.stringify(review.schema)}::jsonb, ${sql.json(answersById)}, 'review', 'draft', now())
+                ${sql.json(review.schema)}, ${sql.json(answersById)}, 'review', 'draft', now())
         on conflict (user_id, role_slug) do update set
+          fields = ${sql.json(review.schema)},
           answers = ${sql.json(answersById)},
           current_step = 'review',
           updated_at = now();
