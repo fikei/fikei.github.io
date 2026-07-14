@@ -93,6 +93,26 @@ export const answersSeed       = ()        => answersCall({ action: 'seed' });
 export const answersCoverage   = (slug)    => answersCall({ action: 'coverage', slug });
 export const answersFromResume = (text)    => answersCall({ action: 'resume_extract', text });
 
+// ---- Easy Apply submission (submit-application edge fn, Phase 16.2c) -------
+const SUBMIT_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/submit-application';
+
+async function submitCall(body) {
+  const headers = await authHeader();
+  const res = await fetch(SUBMIT_URL, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`submit-application ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+// prepare → assembled review payload (no ATS traffic).
+export const prepareApplication = (slug) => submitCall({ action: 'prepare', slug });
+// submit → { status: 'submitted' | 'assisted_required' | 'consent_required'
+//            | 'incomplete' | 'capped', ... }. confirm is the explicit tap.
+export const submitApplication = (slug, { consents = [], overrides = {} } = {}) =>
+  submitCall({ action: 'submit', slug, confirm: true, consents, overrides });
+
 // Step ids — the takeover flow advances through these in order. Steps
 // can be hidden when the extracted application schema doesn't require
 // them (e.g. no cover letter requested, or no custom questions).
