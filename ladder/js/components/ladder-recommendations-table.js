@@ -842,6 +842,7 @@ export class JobRecommendationsTable extends LitElement {
         <header class="recs-page__head">
           <h1>Inbox</h1>
         </header>
+        <ladder-updates></ladder-updates>
         <section class="inbox-group" aria-hidden="true">
           <header class="inbox-group__head">
             <span class="skeleton" style="width:96px;height:20px;display:inline-block;"></span>
@@ -871,9 +872,6 @@ export class JobRecommendationsTable extends LitElement {
     return html`
       <header class="recs-page__head">
         <h1>Inbox</h1>
-        <span class="muted">${this._total > rows.length
-          ? `${rows.length} of ${this._total} roles`
-          : `${rows.length} ${rows.length === 1 ? 'role' : 'roles'}`}</span>
         ${!this._floorOn ? html`
           <button class="link-subtle recs-page__floor-toggle" @click=${() => this._toggleFloor()}>
             Showing all · apply floors
@@ -882,6 +880,7 @@ export class JobRecommendationsTable extends LitElement {
         ${this._refreshFeedback ? html`<span class="muted recs-page__refresh-status">${this._refreshFeedback}</span>` : nothing}
         ${this._renderHeaderMenu()}
       </header>
+      <ladder-updates></ladder-updates>
       ${this._renderDrainingBanner()}
       ${this._renderHealthBanner()}
       ${rows.length === 0 ? html`
