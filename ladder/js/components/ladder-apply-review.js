@@ -182,6 +182,11 @@ export class LadderApplyReview extends LitElement {
         ${missing.length ? html`
           <div class="ar-group">
             <h3 class="ar-group__title ar-group__title--warn">${missing.length} answer${missing.length === 1 ? '' : 's'} still needed</h3>
+            ${missing.length >= 3 ? html`
+              <p class="ar-setup-hint">
+                Set up Easy Apply once and these autofill from your saved answers next time.
+                <button class="btn btn--sm" @click=${() => document.dispatchEvent(new CustomEvent('job:easyapply:launch-setup'))}>⚡ Set up Easy Apply</button>
+              </p>` : nothing}
             ${missing.map(r => this._renderRow(r))}
           </div>` : nothing}
 

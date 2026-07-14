@@ -4144,7 +4144,7 @@ button.link-subtle {
   padding: 2px var(--space-2);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: var(--bg-elevated);
   color: var(--fg-muted);
   white-space: nowrap;
   max-width: 100%;
@@ -4178,7 +4178,7 @@ button.link-subtle {
   padding: 1px var(--space-2);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: var(--bg-elevated);
   color: var(--fg-muted);
   white-space: nowrap;
   vertical-align: 1px;
@@ -4290,7 +4290,7 @@ button.link-subtle {
   font-size: 26px;
 }
 .eas {
-  background: var(--bg-elev);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg, 12px);
   width: min(680px, 100%);
@@ -4361,10 +4361,40 @@ button.link-subtle {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin: var(--space-1) 0 0;
+  margin: var(--space-2) 0 0;
   font-size: var(--font-size-caption);
 }
 .role-header__apply-req .ease-chip { margin-left: 0; }
+
+/* Easy Apply setup nudge banner (Saved page). */
+.ease-setup-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--success) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+.ease-setup-banner__icon { display: inline-flex; width: 18px; height: 18px; color: var(--success); flex: 0 0 auto; }
+.ease-setup-banner__icon svg { width: 18px; height: 18px; }
+.ease-setup-banner__body { flex: 1; font-size: var(--font-size-small); color: var(--fg-muted); }
+.ease-setup-banner__body strong { color: var(--fg); }
+.ease-setup-banner__x {
+  background: none; border: none; color: var(--fg-subtle);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: var(--radius-pill);
+}
+.ease-setup-banner__x:hover { color: var(--fg); }
+
+/* "Set up Easy Apply to autofill" hint inside the review overlay. */
+.ar-setup-hint {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3);
+  border: 1px dashed color-mix(in srgb, var(--success) 45%, var(--border));
+  border-radius: var(--radius-md); background: color-mix(in srgb, var(--success) 6%, transparent);
+  font-size: var(--font-size-small); color: var(--fg-muted);
+}
 
 /* Updates queue — the single notification surface, top of the Inbox.
    One elevated card, hairline-divided rows (inbox pattern). Each row:
@@ -4513,7 +4543,7 @@ ladder-updates .updates-queue { max-width: 760px; }
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-2);
-  background: var(--bg-elev);
+  background: var(--bg-elevated);
 }
 .activity-event__rail {
   background: var(--border);
