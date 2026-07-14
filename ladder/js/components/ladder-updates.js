@@ -28,14 +28,16 @@ export class LadderUpdates extends LitElement {
   createRenderRoot() { return this; }
 
   static properties = {
-    updates:    { state: true },
-    updateBusy: { state: true },
+    updates:       { state: true },
+    updateBusy:    { state: true },
+    expandedKinds: { state: true },
   };
 
   constructor() {
     super();
     this.updates = [];
     this.updateBusy = null;
+    this.expandedKinds = new Set();
     this._roles = [];
     this._localDismissed = (() => {
       try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); } catch { return new Set(); }
@@ -113,38 +115,21 @@ export class LadderUpdates extends LitElement {
 
   // Role closures — the liveness sweep found the posting gone and already
   // archived the role; the queue records that (replaces the old red
-  // closed-banner, same since-last-visit + watermark semantics). Liveness
-  // archives in bulk, so 3+ closures collapse into ONE digest row — the
-  // queue must never be a wall of closures.
+  // closed-banner, same since-last-visit + watermark semantics). Emitted
+  // per-role — the generic type-grouping layer batches them in render.
   _closureRows() {
     const cutoff = this._lastVisitAt ? Date.parse(this._lastVisitAt) : 0;
     let seenThrough = 0;
     try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
-    const closed = this._roles
+    return this._roles
       .filter(r => r.closedDetectedAt && Date.parse(r.closedDetectedAt) > Math.max(cutoff, seenThrough))
-      .sort((a, b) => Date.parse(b.closedDetectedAt) - Date.parse(a.closedDetectedAt));
-    if (!closed.length) return [];
-    if (closed.length <= 2) {
-      return closed.map(r => ({
+      .map(r => ({
         kind: 'role_closed', action: 'open_role', priority: 4,
         role_slug: r.slug, company: r.company, title: r.title,
         text: `${r.company || r.slug} closed the posting`,
         detail: 'Archived automatically — the role is no longer listed',
         received_at: r.closedDetectedAt,
-        _closureWatermark: Date.parse(r.closedDetectedAt),
       }));
-    }
-    const preview = closed.slice(0, 3).map(r => r.company).filter(Boolean).join(', ');
-    return [{
-      kind: 'role_closed', action: 'open_role', priority: 4,
-      role_slug: 'role-closures',
-      href: '/ladder/jobs/?bucket=archive',
-      actionLabel: 'Open archive',
-      text: `${closed.length} roles closed since your last visit`,
-      detail: `Archived automatically — ${preview}${closed.length > 3 ? ` +${closed.length - 3} more` : ''}`,
-      received_at: closed[0].closedDetectedAt,
-      _closureWatermark: Math.max(...closed.map(r => Date.parse(r.closedDetectedAt) || 0)),
-    }];
   }
 
   // Synthetic "N saved jobs are easy applies" digest (Phase 16.1).
@@ -268,31 +253,109 @@ export class LadderUpdates extends LitElement {
   async _onDismissUpdate(it) {
     this.updates = this.updates.filter(u => u !== it);
     this.requestUpdate();
+    await this._persistDismiss(it);
+  }
+
+  // Group × — acknowledge every instance of the type at once.
+  async _onDismissGroup(group) {
+    this.updates = this.updates.filter(u => u.kind !== group.kind);
+    this.requestUpdate();
+    for (const it of group.items) await this._persistDismiss(it);
+  }
+
+  async _persistDismiss(it) {
     if (it.event_id) {
       try { await dismissUpdate(it.event_id); } catch (e) { console.warn('[ladder-updates] dismiss failed:', e.message); }
-    } else if (it._closureWatermark) {
-      // Closure rows use the legacy watermark: everything closed up to the
-      // dismissed row never resurfaces (matches the old banner behavior).
-      let seenThrough = 0;
-      try { seenThrough = Number(localStorage.getItem('job:jobs:closedSeenThrough') || 0); } catch { /* */ }
-      try { localStorage.setItem('job:jobs:closedSeenThrough', String(Math.max(seenThrough, it._closureWatermark))); } catch { /* */ }
     } else {
       this._localDismissed.add(this._updateKey(it));
       try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...this._localDismissed])); } catch { /* */ }
     }
   }
 
+  // Same-type notifications batch into one group row with a "Show all N"
+  // expander (mirrors the inbox "Show N below your bar" drawer). Groups
+  // preserve the priority order of their highest-priority member; a group
+  // of one renders as a plain row.
+  _grouped(items) {
+    const map = new Map();
+    for (const it of items) {
+      const g = map.get(it.kind) || { kind: it.kind, items: [] };
+      g.items.push(it);
+      map.set(it.kind, g);
+    }
+    return [...map.values()];
+  }
+
+  _groupLabel(kind, n) {
+    switch (kind) {
+      case 'auto_offer':          return `Moved ${n} roles to Offer`;
+      case 'auto_archive':        return `Archived ${n} roles — rejections`;
+      case 'no_response_archive': return `Archived ${n} roles — no response in 30 days`;
+      case 'auto_advance':        return `Moved ${n} roles forward`;
+      case 'prompt_offer':        return `${n} roles look like offers`;
+      case 'prompt_rejection':    return `${n} roles look like rejections`;
+      case 'reply_pending':       return `${n} companies are waiting on you`;
+      case 'stale':               return `${n} roles have gone quiet`;
+      case 'role_closed':         return `${n} roles closed their postings`;
+      case 'calendar_today':      return `${n} interviews coming up`;
+      default:                    return `${n} updates`;
+    }
+  }
+
+  _toggleGroup(kind) {
+    const next = new Set(this.expandedKinds);
+    if (next.has(kind)) next.delete(kind); else next.add(kind);
+    this.expandedKinds = next;
+  }
+
   render() {
     const items = this.updates || [];
     if (!items.length) return nothing;
+    const groups = this._grouped(items);
     return html`
       <section class="updates-queue" aria-label="Updates">
         <div class="updates-queue__header">
           <strong>Updates</strong>
           <span>${items.length} to resolve</span>
         </div>
-        ${items.map(it => this._renderUpdateRow(it))}
+        ${groups.map(g => g.items.length === 1
+          ? this._renderUpdateRow(g.items[0])
+          : this._renderGroup(g))}
       </section>
+    `;
+  }
+
+  _renderGroup(g) {
+    const meta = updateKindMeta(g.kind);
+    const n = g.items.length;
+    const expanded = this.expandedKinds.has(g.kind);
+    const preview = g.items.slice(0, 3).map(i => i.company).filter(Boolean).join(', ');
+    const latest = g.items.reduce((acc, i) =>
+      (!acc || new Date(i.received_at || 0) > new Date(acc)) ? i.received_at : acc, null);
+    return html`
+      <div class="updates-row updates-row--group">
+        <span class="updates-row__icon updates-row__icon--${meta.tint}" aria-hidden="true">
+          ${unsafeHTML(meta.icon)}<span class="updates-row__count">${n}</span>
+        </span>
+        <div class="updates-row__body">
+          <button class="updates-row__text updates-row__text--btn" @click=${() => this._toggleGroup(g.kind)}>
+            <strong>${this._groupLabel(g.kind, n)}</strong>
+            ${latest ? html`<span class="muted"> · ${this._relTime(latest)}</span>` : nothing}
+          </button>
+          ${!expanded && preview ? html`<span class="updates-row__detail muted">${preview}${n > 3 ? ` +${n - 3} more` : ''}</span>` : nothing}
+        </div>
+        <button class="btn btn--sm updates-row__action" aria-expanded=${expanded ? 'true' : 'false'}
+                @click=${() => this._toggleGroup(g.kind)}>
+          ${expanded ? 'Show fewer' : `Show all ${n}`}
+        </button>
+        <button class="updates-row__dismiss" aria-label=${`Dismiss all ${n}`}
+                @click=${() => this._onDismissGroup(g)}>×</button>
+      </div>
+      ${expanded ? html`
+        <div class="updates-group__children">
+          ${g.items.map(it => this._renderUpdateRow(it))}
+        </div>
+      ` : nothing}
     `;
   }
 

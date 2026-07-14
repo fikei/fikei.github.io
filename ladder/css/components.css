@@ -4407,6 +4407,46 @@ ladder-updates .updates-queue { max-width: 760px; }
 }
 .updates-row__dismiss:hover { background: var(--bg-surface); color: var(--fg); }
 
+/* Type groups — same-kind rows batch into one row with a count badge on
+   the icon and a "Show all N" expander; children render as normal rows in
+   an inset drawer (mirrors the inbox below-your-bar drawer). */
+.updates-row--group .updates-row__icon { position: relative; overflow: visible; }
+.updates-row__count {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.updates-row__text--btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.updates-row__text--btn:hover strong { text-decoration: underline; }
+.updates-group__children {
+  margin-left: 44px;
+  border-left: 2px solid var(--border);
+  padding-left: var(--space-3);
+}
+.updates-group__children .updates-row { padding: 8px 0; }
+.updates-group__children .updates-row::after { left: 44px; }
+.updates-group__children .updates-row:last-child { border-bottom: 1px solid var(--border); }
+.updates-group__children .updates-row:last-child::after { display: none; }
+
 /* Activity timeline tab on drill page. */
 .activity-timeline {
   display: grid;
