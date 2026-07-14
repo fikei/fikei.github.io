@@ -80,14 +80,14 @@ export function applyEaseInfo(r) {
   if (tier === 'easy' && m.ready === true) {
     label = 'Ready to submit';
     title = 'Every required field is covered by your saved Easy Apply answers';
-    return { tier, ready: true, label, title };
+    return { tier, ready: true, label, title, meta: m, prompts: [] };
   }
   const bits = [];
   if (m.ats && m.ats !== 'unknown') bits.push(m.ats);
   if (typeof m.questions === 'number') bits.push(`${m.questions} question${m.questions === 1 ? '' : 's'}`);
   if (m.requires_cover_letter) bits.push('cover letter required');
   if (bits.length) title += ` · ${bits.join(' · ')}`;
-  return { tier, label, title };
+  return { tier, label, title, meta: m, prompts: Array.isArray(m.prompts) ? m.prompts : [] };
 }
 
 // Shared visibility filter — drops rows without a URL and Strava postings.

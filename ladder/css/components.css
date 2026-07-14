@@ -6108,6 +6108,52 @@ body[data-auth-state="out"] job-chat { display: none; }
   overflow-y: auto;
   pointer-events: none;
 }
+
+/* Ease-chip hover card — lists the actual essay / short-answer prompts the
+   application requires (Phase 16.1 tooltip). Same shell as .conn-tip. */
+.ease-tip {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  padding: var(--space-3);
+  max-height: 60vh;
+  overflow-y: auto;
+  pointer-events: none;
+}
+.ease-tip__title { font-weight: var(--fw-semibold, 600); font-size: var(--font-size-small); }
+.ease-tip__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+.ease-tip__group { margin-top: var(--space-3); }
+.ease-tip__head {
+  font-size: var(--font-size-caption);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--fg-subtle);
+  margin-bottom: var(--space-2);
+}
+.ease-tip__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ease-tip__list li {
+  position: relative;
+  padding-left: var(--space-3);
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+  color: var(--fg);
+}
+.ease-tip__list li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--fg-subtle);
+}
 .conn-tip__group + .conn-tip__group { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
 .conn-tip__head {
   display: flex;

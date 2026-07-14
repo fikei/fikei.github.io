@@ -24,6 +24,9 @@ export type ApplyEaseMeta = {
   video: boolean;
   email_apply: boolean;
   reason?: string;            // why unknown/special, for the tooltip
+  // The actual required free-response prompts, for the chip hover card.
+  // Capped + trimmed to keep the row payload small.
+  prompts?: Array<{ kind: 'essay' | 'short_answer'; text: string }>;
 };
 
 // Short free-text prompts a saved answer bank can fill without any prose:
@@ -79,6 +82,14 @@ export function classifyApplyEase(schema: Schema): { tier: ApplyEaseTier; meta: 
   const emailApply = /email_apply/i.test(notes);
   const accountGated = /account_gated/i.test(notes);
 
+  // The required free-response prompts, essays first, for the hover card.
+  const clip = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 180);
+  const prompts = [
+    ...custom.filter(q => q.required && q.type === 'long_text' && !CONDITIONAL_RE.test(q.prompt || ''))
+      .map(q => ({ kind: 'essay' as const, text: clip(q.prompt || '') })),
+    ...shortFrees.map(q => ({ kind: 'short_answer' as const, text: clip(q.prompt || '') })),
+  ].filter(p => p.text).slice(0, 8);
+
   const meta: ApplyEaseMeta = {
     ats: schema.ats || 'unknown',
     source_url: schema.source_url || '',
@@ -89,6 +100,7 @@ export function classifyApplyEase(schema: Schema): { tier: ApplyEaseTier; meta: 
     requires_cover_letter: !!schema.requires?.cover_letter,
     video: videoQ,
     email_apply: emailApply,
+    ...(prompts.length ? { prompts } : {}),
   };
 
   let host = '';
