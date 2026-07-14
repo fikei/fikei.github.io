@@ -3410,25 +3410,6 @@ button.link-subtle {
 }
 .nav-sublist .nav-sub__label { min-width: 0; }
 
-/* "In progress" pill — appears on Saved rows that have engagement
-   signal (drill page opened, Apply tapped, or a resume generated). */
-.in-progress-pill {
-  display: inline-flex;
-  align-items: center;
-  margin-left: var(--space-2);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-muted);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: var(--fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.4;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
 /* Tiny count chip next to sub-nav labels (Saved · Active · Recommended). */
 .nav-count {
   display: inline-flex;
@@ -3689,8 +3670,7 @@ button.link-subtle {
   text-overflow: ellipsis;
   min-width: 0;
 }
-.pipeline-table .col-role .role-cell__title .ease-chip,
-.pipeline-table .col-role .role-cell__title .in-progress-pill {
+.pipeline-table .col-role .role-cell__title .ease-chip {
   flex: 0 0 auto;
   margin-left: 0;
 }
