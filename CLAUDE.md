@@ -84,6 +84,7 @@ Personal curation platform — collect, organize, and build on everything that m
 | AI Widgets | `supabase/functions/generate-widget/` | `index.ts` | Product recommendations (Claude Haiku) |
 | Soundscape | `soundscape/` | `PROJECT_PLAN.md` | Audio-reactive visualization |
 | Systemic | `systemic/` | `js/crawler.js` | Design system analyzer |
+| Recruiting | `applications/` | `applications/index.html` | Agape applicant triage — Discord-gated (Recruiting Society channel) |
 
 **Supabase projects:** Boards (`yfhudwakpgzswiylhfbh`), Ops (`ycilriwjnmcelkspmfmg`), Systemic (`atdqdfpdeytfuvvpsasz`)
 
