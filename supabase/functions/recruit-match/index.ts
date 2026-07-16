@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.3.0'
+const VERSION = '1.4.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -149,25 +149,27 @@ async function suggestFor(client: any, applicant: any, listings: any[], rooms: a
   return row
 }
 
-// House reference copy (Notion: "Recruiting Copy" — outreach to applicants).
+// House reference copy (Notion "Recruiting Copy" → "Responding to Agape
+// website's inquiries" — the template for people who applied TO US).
 const REFERENCE_COPY = `Subject line: Hi from Agape! (co-op in the Mission)
 
 Hi [name],
 
-I'm [sender]. I saw your application and wanted to share that my co-op, Agape, is looking for a new [subletter/resident].
+I'm [sender]. I saw your application to Agape and wanted to share details on a room that may be available for [date].
 
 Here are the details:
 1 bedroom is available in a 13 bedroom co-op in the Mission.
-$1435 covers rent, utilities, cleaners for common spaces
+[one concrete line about the room — floor, light, street-facing, etc.]
+$1490 covers rent, utilities, cleaners for common spaces
 +$210 for shared organic groceries
-Room available starting [date].
+Room available starting [date] [for 1-3 months / as a 3-month resident trial].
 
 Come live with a bunch of artists, musicians, academics, and entrepreneurs. We have a weekly vegan gf family dinner meal and often do shared activities together.
 
 agapesf.org
 instagram.com/agapeandfriends
 
-Let me know if you have any questions and if this sounds interesting to you, apply on our website so we have your info on hand! :)
+Let me know if you have any questions and if this sounds interesting to you!
 
 [sender]`
 
@@ -180,12 +182,12 @@ async function draftEmail(applicant: any, listing: any, room: any, flags: any[],
     : 'No specific room right now — we want to keep them warm for future availability (general interest).'
   const conflictLines = (flags || []).map((f) => `- ${f.type}: ${f.message}`).join('\n') || '(none)'
 
-  const prompt = `Draft an outreach email from ${senderName} at Agape (13-bedroom intentional community / co-op in a Victorian near Dolores Park, SF) to a housing applicant we want to move forward with.
+  const prompt = `Draft a reply from ${senderName} at Agape (13-bedroom intentional community / co-op in a Victorian near Dolores Park, SF) to someone who ALREADY APPLIED to live at Agape. We reviewed their application and want to move forward.
 
-REFERENCE COPY — match this voice exactly (warm, casual, concrete, lowercase-friendly, no corporate tone):
+REFERENCE COPY — match this voice and structure closely (warm, casual, concrete; this is the house's standard reply):
 ${REFERENCE_COPY}
 
-APPLICANT
+APPLICANT (they applied to us — we have their full application)
 Name: ${applicant.first_name}
 Pronouns: ${applicant.pronouns || 'unknown'}
 Track they applied for: ${applicant.residency}
@@ -193,17 +195,20 @@ Their move-in words: ${applicant.move_in}
 Their budget words: ${applicant.budget}
 Why they want Agape (their words): ${trim(applicant.why_agape)}
 
-WHAT WE'RE OFFERING
+WHAT WE'RE OFFERING THEM
 ${listingLine}
 
-PRACTICAL WRINKLES TO ADDRESS HONESTLY (gently, in one short line each — don't hide them, don't dwell):
+PRACTICAL WRINKLES TO ADDRESS HONESTLY (one short, matter-of-fact line each):
 ${conflictLines}
 
-Rules:
-- Tailor the middle details block to the listing kind: sublet → emphasize the window and dates; resident trial → explain the 3-month trial then house vote; general interest → say no room right now but we liked their application and will reach out when one opens.
-- Reference one specific thing from their application so it feels personal.
-- Keep the $1435 + $210 groceries structure only if a room is offered; adjust availability date to the listing.
-- Under 180 words. Sign off with ${senderName}.
+Hard rules:
+- This is a RESPONSE to their application, never cold outreach. Open by acknowledging their application to Agape ("thanks for applying", "we read your application", etc.). Do NOT introduce or pitch Agape as if they don't know it — they applied; skip the agapesf.org/instagram links and the "come live with artists..." pitch line entirely.
+- Never say "apply on our website" — they already did. The CTA is the next step: answer questions, and invite them to come by (house dinner or a visit) / hop on a quick chat if the room sounds right.
+- Reference one specific thing they wrote so it reads personally — ideally connect it to house life.
+- Details block: tailor to the listing kind. Sublet → the window and dates matter most. Resident trial → explain plainly: the room starts as a 3-month trial, then the house votes on full residency. General interest → no room right now, we liked their application, we'll reach out when one opens (no details block).
+- Keep the $1435-1490 + $210 groceries structure only when offering a room; set availability from the listing.
+- Address wrinkles in one honest line ("heads up — the room opens Sep 1, a bit after your August timing; let us know if that still works").
+- Under 160 words. Sign off with ${senderName}.
 Return exactly: {"subject": "...", "body": "..."} — body with real newlines, no markdown.`
 
   const text = await callClaudeRaw(OPINION_MODEL, 'You write warm, concise community-house outreach emails. Respond with a single JSON object only.', prompt, 700)
