@@ -11,11 +11,17 @@
 //                     REVERIFY_DAYS.
 //   verify:           force a fresh check against the Discord API.
 //
-// Response: { linked, isMember, discordUsername, verifiedAt }
+// Response: { linked, isMember, isRecruitingMember, discordUsername, verifiedAt }
 //   linked=false means the user has no Discord identity on their account.
+//
+// v1.1.0: also verifies channel-level access to the Recruiting Society
+// channel (RECRUITING_CHANNEL_ID env, else first channel whose name matches
+// /recruit/i) by computing the member's effective permissions from guild
+// roles + channel permission overwrites. Cached as is_recruiting_member and
+// used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.0.0'
-console.log(`[discord-membership] v${VERSION} — Agape guild membership verification`)
+const VERSION = '1.1.0'
+console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -54,31 +60,99 @@ function findDiscordIdentity(user: Record<string, unknown>): DiscordIdentity | n
   return { discordUserId, username: username ? String(username) : null }
 }
 
-async function checkGuildMembership(discordUserId: string): Promise<boolean> {
+function botHeaders() {
   const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
   if (!botToken) throw new Error('DISCORD_BOT_TOKEN not configured')
-  const resp = await fetch(`${DISCORD_API}/guilds/${AGAPE_GUILD_ID}/members/${discordUserId}`, {
-    headers: { 'Authorization': `Bot ${botToken}` },
-  })
-  if (resp.status === 200) return true
-  if (resp.status === 404) return false // unknown member — not in the guild
-  throw new Error(`Discord API ${resp.status}: ${(await resp.text()).slice(0, 200)}`)
+  return { 'Authorization': `Bot ${botToken}` }
+}
+
+async function discordGet(path: string): Promise<Response> {
+  const resp = await fetch(`${DISCORD_API}${path}`, { headers: botHeaders() })
+  if (resp.status !== 200 && resp.status !== 404) {
+    throw new Error(`Discord API ${resp.status} ${path}: ${(await resp.text()).slice(0, 200)}`)
+  }
+  return resp
+}
+
+// Guild member (with roles), or null when not in the guild.
+async function fetchGuildMember(discordUserId: string): Promise<{ roles: string[] } | null> {
+  const resp = await discordGet(`/guilds/${AGAPE_GUILD_ID}/members/${discordUserId}`)
+  if (resp.status === 404) return null
+  return await resp.json()
+}
+
+const VIEW_CHANNEL = 1n << 10n
+const ADMINISTRATOR = 1n << 3n
+
+// Effective-permission check for the Recruiting Society channel: base perms
+// from @everyone + the member's roles, then channel overwrites in Discord's
+// documented order (@everyone → roles → member).
+async function checkRecruitingChannel(discordUserId: string, memberRoles: string[]): Promise<boolean> {
+  const [channelsResp, rolesResp] = await Promise.all([
+    discordGet(`/guilds/${AGAPE_GUILD_ID}/channels`),
+    discordGet(`/guilds/${AGAPE_GUILD_ID}/roles`),
+  ])
+  if (channelsResp.status === 404 || rolesResp.status === 404) return false
+  const channels = await channelsResp.json() as Array<Record<string, unknown>>
+  const roles = await rolesResp.json() as Array<{ id: string; permissions: string }>
+
+  const wantedId = Deno.env.get('RECRUITING_CHANNEL_ID')
+  const channel = wantedId
+    ? channels.find(c => String(c.id) === wantedId)
+    : channels.find(c => /recruit/i.test(String(c.name || '')) && c.type !== 4 /* not a category */)
+  if (!channel) {
+    console.warn('Recruiting channel not found (set RECRUITING_CHANNEL_ID)')
+    return false
+  }
+
+  const roleById = new Map(roles.map(r => [r.id, BigInt(r.permissions)]))
+  let base = roleById.get(AGAPE_GUILD_ID) ?? 0n // @everyone
+  for (const rid of memberRoles) base |= roleById.get(rid) ?? 0n
+  if (base & ADMINISTRATOR) return true
+
+  type Overwrite = { id: string; type: number; allow: string; deny: string }
+  const overwrites = (channel.permission_overwrites || []) as Overwrite[]
+  let perms = base
+  const everyoneOw = overwrites.find(o => o.id === AGAPE_GUILD_ID)
+  if (everyoneOw) { perms &= ~BigInt(everyoneOw.deny); perms |= BigInt(everyoneOw.allow) }
+  let roleAllow = 0n, roleDeny = 0n
+  for (const ow of overwrites) {
+    if (ow.type === 0 && ow.id !== AGAPE_GUILD_ID && memberRoles.includes(ow.id)) {
+      roleAllow |= BigInt(ow.allow); roleDeny |= BigInt(ow.deny)
+    }
+  }
+  perms &= ~roleDeny; perms |= roleAllow
+  const memberOw = overwrites.find(o => o.type === 1 && o.id === discordUserId)
+  if (memberOw) { perms &= ~BigInt(memberOw.deny); perms |= BigInt(memberOw.allow) }
+
+  return (perms & VIEW_CHANNEL) === VIEW_CHANNEL
 }
 
 async function verifyAndCache(userId: string, identity: DiscordIdentity) {
-  const isMember = await checkGuildMembership(identity.discordUserId)
+  const member = await fetchGuildMember(identity.discordUserId)
+  const isMember = member !== null
+  let isRecruiting = false
+  if (member) {
+    try {
+      isRecruiting = await checkRecruitingChannel(identity.discordUserId, member.roles || [])
+    } catch (err) {
+      // Channel check failing must not break the guild gate the events page uses.
+      console.error('Recruiting channel check failed:', (err as Error).message)
+    }
+  }
   const row = {
     user_id: userId,
     discord_user_id: identity.discordUserId,
     discord_username: identity.username,
     is_agape_member: isMember,
+    is_recruiting_member: isRecruiting,
     verified_at: new Date().toISOString(),
   }
   const { error } = await getSupabase()
     .from('user_discord_membership')
     .upsert(row, { onConflict: 'user_id' })
   if (error) throw new Error(`Cache write failed: ${error.message}`)
-  console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember}`)
+  console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember} recruiting=${isRecruiting}`)
   return row
 }
 
@@ -101,14 +175,14 @@ serve(async (req) => {
     if (!identity) {
       // Discord unlinked: drop any stale membership so RLS stops granting access
       await db.from('user_discord_membership').delete().eq('user_id', user.id)
-      return new Response(JSON.stringify({ linked: false, isMember: false, discordUsername: null, verifiedAt: null }), { headers: jsonHeaders })
+      return new Response(JSON.stringify({ linked: false, isMember: false, isRecruitingMember: false, discordUsername: null, verifiedAt: null }), { headers: jsonHeaders })
     }
 
-    let row: { discord_username: string | null; is_agape_member: boolean; verified_at: string } | null = null
+    let row: { discord_username: string | null; is_agape_member: boolean; is_recruiting_member?: boolean; verified_at: string } | null = null
     if (action !== 'verify') {
       const { data } = await db
         .from('user_discord_membership')
-        .select('discord_user_id, discord_username, is_agape_member, verified_at')
+        .select('discord_user_id, discord_username, is_agape_member, is_recruiting_member, verified_at')
         .eq('user_id', user.id)
         .maybeSingle()
       const fresh = data &&
@@ -121,6 +195,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       linked: true,
       isMember: row.is_agape_member,
+      isRecruitingMember: !!row.is_recruiting_member,
       discordUsername: row.discord_username,
       verifiedAt: row.verified_at,
     }), { headers: jsonHeaders })
