@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.37.0";
-console.log(`[ladder] v${VERSION} - Comp check tri-state: ✓ clears floor / ✗ under floor / — not disclosed; verdict now deterministic, not Haiku's`);
+const VERSION = "2.37.1";
+console.log(`[ladder] v${VERSION} - Comp check tri-state; forward agape-gmail OAuth callbacks to /applications/`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -361,6 +361,12 @@ window.CtrlAuth.init({
   const params = new URLSearchParams(location.search);
   const code = params.get('code');
   const state = params.get('state') || '';
+  // The Agape recruiting app shares this OAuth redirect; bounce its
+  // callback over to /applications/ untouched.
+  if (code && state === 'agape-gmail') {
+    location.replace('/applications/?code=' + encodeURIComponent(code) + '&state=agape-gmail');
+    return;
+  }
   if (code && state.startsWith('gmail:')) {
     try { sessionStorage.setItem('job:pendingGmailOAuth', JSON.stringify({ code, state, at: Date.now() })); } catch {}
     const clean = new URL(location.href);
