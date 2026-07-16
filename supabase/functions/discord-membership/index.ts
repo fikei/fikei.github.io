@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.1.0'
+const VERSION = '1.1.2'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -96,10 +96,13 @@ async function checkRecruitingChannel(discordUserId: string, memberRoles: string
   const channels = await channelsResp.json() as Array<Record<string, unknown>>
   const roles = await rolesResp.json() as Array<{ id: string; permissions: string }>
 
+  // The guild has several recruiting-* channels (per-cohort); the gate is the
+  // "Recruiting Society" one, so prefer a society match over the first hit.
   const wantedId = Deno.env.get('RECRUITING_CHANNEL_ID')
+  const named = (rx: RegExp) => channels.find(c => rx.test(String(c.name || '')) && c.type !== 4 /* not a category */)
   const channel = wantedId
     ? channels.find(c => String(c.id) === wantedId)
-    : channels.find(c => /recruit/i.test(String(c.name || '')) && c.type !== 4 /* not a category */)
+    : (named(/recruit.*society|society.*recruit/i) || named(/recruit/i))
   if (!channel) {
     console.warn('Recruiting channel not found (set RECRUITING_CHANNEL_ID)')
     return false

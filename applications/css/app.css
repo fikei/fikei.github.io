@@ -4,16 +4,16 @@
   --bg: #FAFAF9;
   --bg-surface: #F4F4F2;
   --bg-elevated: #FFFFFF;
-  --bg-overlay: rgba(22, 51, 0, 0.08);
+  --bg-overlay: rgba(6, 38, 77, 0.08);
   --fg: #0E0F0C;
   --fg-muted: #454745;
   --fg-subtle: #6A6C6A;
-  --fg-link: #163300;
-  --accent: #163300;
+  --fg-link: #1D4ED8;
+  --accent: #1D4ED8;
   --accent-fg: #FFFFFF;
-  --accent-muted: rgba(159, 232, 112, 0.20);
-  --accent-strong: #9FE870;
-  --accent-strong-fg: #163300;
+  --accent-muted: rgba(92, 178, 255, 0.20);
+  --accent-strong: #5CB2FF;
+  --accent-strong-fg: #06264D;
   --border: rgba(14, 15, 12, 0.12);
   --border-strong: rgba(14, 15, 12, 0.24);
   --success: #2F5711;
@@ -22,8 +22,8 @@
   --hold-tint: rgba(237, 200, 67, 0.22);
   --hold-fg: #6b5310;
   --pass-tint: rgba(14, 15, 12, 0.07);
-  --outreach-tint: rgba(159, 232, 112, 0.28);
-  --outreach-fg: #2F5711;
+  --outreach-tint: rgba(92, 178, 255, 0.25);
+  --outreach-fg: #1D4ED8;
   --shadow-sm: 0 2px 6px rgba(0,0,0,0.05);
   --shadow-md: 0 8px 24px rgba(0,0,0,0.10);
   --shadow-lg: 0 16px 48px rgba(0,0,0,0.16);
@@ -36,11 +36,11 @@
   --fg: #f0f6fc;
   --fg-muted: rgba(240, 246, 252, 0.72);
   --fg-subtle: rgba(240, 246, 252, 0.50);
-  --fg-link: #9FE870;
-  --accent: #9FE870;
+  --fg-link: #5CB2FF;
+  --accent: #5CB2FF;
   --accent-fg: #0d1117;
-  --accent-muted: rgba(159, 232, 112, 0.16);
-  --accent-strong: #9FE870;
+  --accent-muted: rgba(92, 178, 255, 0.16);
+  --accent-strong: #5CB2FF;
   --accent-strong-fg: #0d1117;
   --border: rgba(240, 246, 252, 0.12);
   --border-strong: rgba(240, 246, 252, 0.24);
@@ -50,8 +50,8 @@
   --hold-tint: rgba(255, 235, 105, 0.14);
   --hold-fg: #FFEB69;
   --pass-tint: rgba(240, 246, 252, 0.08);
-  --outreach-tint: rgba(159, 232, 112, 0.16);
-  --outreach-fg: #9FE870;
+  --outreach-tint: rgba(92, 178, 255, 0.18);
+  --outreach-fg: #5CB2FF;
   --shadow-sm: 0 2px 6px rgba(0,0,0,0.30);
   --shadow-md: 0 8px 24px rgba(0,0,0,0.40);
   --shadow-lg: 0 16px 48px rgba(0,0,0,0.55);
@@ -135,13 +135,6 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   font-size: var(--font-size-title-1); letter-spacing: -0.02em;
 }
 .gate__sub { margin: 0; color: var(--fg-muted); font-size: var(--font-size-body); }
-.gate__input {
-  height: 48px; padding: 0 var(--space-4);
-  border-radius: var(--radius-sm); border: 1px solid var(--border);
-  background: var(--bg-surface); color: var(--fg);
-  font: inherit; text-align: center;
-}
-.gate__input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .gate__error { margin: 0; color: var(--error); font-size: var(--font-size-small); min-height: 1.4em; }
 .gate__btn { height: 48px; border-radius: var(--radius-pill); }
 .gate__hint { margin: 0; color: var(--fg-subtle); font-size: var(--font-size-small); }
@@ -274,6 +267,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 
 /* Avatars — initials on a neutral surface (28 list / 56 review). */
 .avatar {
+  position: relative; overflow: hidden;
   flex-shrink: 0; display: grid; place-items: center;
   width: 28px; height: 28px; border-radius: var(--radius-xs);
   background: var(--bg-surface); color: var(--fg-muted);
@@ -461,3 +455,28 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   .review__foot { gap: var(--space-2); }
   .review__btn { padding-inline: var(--space-2); font-size: var(--font-size-small); }
 }
+
+/* Social profile photo layered over the initials; broken loads self-remove. */
+.avatar__img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+/* Link chips carry the platform's official mark instead of its name. */
+.link-chip { gap: 6px; }
+.link-chip__icon { width: 14px; height: 14px; flex-shrink: 0; display: inline-flex; }
+.link-chip__icon svg { width: 100%; height: 100%; fill: currentColor; }
+
+/* Discord-branded primary sign-in (Discord blurple #5865F2, unmodified Clyde). */
+.gate__btn--discord {
+  background: #5865F2; border-color: #5865F2; color: #FFFFFF;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+}
+.gate__btn--discord:hover { background: #4752C4; border-color: #4752C4; }
+.gate__btn--discord svg { width: 22px; height: 22px; fill: currentColor; flex-shrink: 0; }
+.gate__alt {
+  background: none; border: 0; padding: 0;
+  color: var(--fg-subtle); font-size: var(--font-size-small);
+  text-decoration: underline; cursor: pointer;
+}
+.gate__alt:hover { color: var(--fg); }
