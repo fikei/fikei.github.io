@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.4.0'
+const VERSION = '1.5.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -177,8 +177,13 @@ Let me know if you have any questions and if this sounds interesting to you!
 // deno-lint-ignore no-explicit-any
 async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string): Promise<{ subject: string; body: string }> {
   const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
+  const pricing = listing ? [
+    listing.rent_monthly != null ? `$${listing.rent_monthly} rent (covers utilities and cleaners for common spaces)` : null,
+    listing.dues_monthly ? `$${listing.dues_monthly} house dues` : null,
+    listing.groceries_monthly != null ? `$${listing.groceries_monthly} shared organic groceries` : null,
+  ].filter(Boolean).join(' + ') : ''
   const listingLine = listing
-    ? `${room?.name || 'A room'} — ${listing.kind === 'resident' ? '3-month resident trial (full residency track, house vote at the end)' : 'short-term sublet'}, available from ${listing.starts_on}${listing.ends_on ? ` through ${listing.ends_on}` : ''}${listing.notes ? `. Notes: ${listing.notes}` : ''}`
+    ? `${room?.name || 'A room'} — ${listing.kind === 'resident' ? '3-month resident trial (full residency track, house vote at the end)' : 'short-term sublet'}, available from ${listing.starts_on}${listing.ends_on ? ` through ${listing.ends_on}` : ''}${pricing ? `. Pricing: ${pricing}` : ''}${listing.notes ? `. Notes: ${listing.notes}` : ''}`
     : 'No specific room right now — we want to keep them warm for future availability (general interest).'
   const conflictLines = (flags || []).map((f) => `- ${f.type}: ${f.message}`).join('\n') || '(none)'
 
@@ -206,7 +211,7 @@ Hard rules:
 - Never say "apply on our website" — they already did. The CTA is the next step: answer questions, and invite them to come by (house dinner or a visit) / hop on a quick chat if the room sounds right.
 - Reference one specific thing they wrote so it reads personally — ideally connect it to house life.
 - Details block: tailor to the listing kind. Sublet → the window and dates matter most. Resident trial → explain plainly: the room starts as a 3-month trial, then the house votes on full residency. General interest → no room right now, we liked their application, we'll reach out when one opens (no details block).
-- Keep the $1435-1490 + $210 groceries structure only when offering a room; set availability from the listing.
+- Pricing: if the listing carries exact numbers, use them verbatim in the details block; if a room is offered without numbers, keep the reference $1490 + $210 structure but phrase availability/pricing as "roughly" so nobody quotes it as final.
 - Address wrinkles in one honest line ("heads up — the room opens Sep 1, a bit after your August timing; let us know if that still works").
 - Under 160 words. Sign off with ${senderName}.
 Return exactly: {"subject": "...", "body": "..."} — body with real newlines, no markdown.`

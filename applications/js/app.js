@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.13.0';
+const VERSION = '2.13.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -734,7 +734,7 @@ function renderApplicants() {
     const l = listings.find(x => x.id === g.key);
     const room = rooms.find(r => r.id === l?.room_id);
     return `<h2 class="inbox-group__label">${esc(room?.name || 'Listing')}</h2>
-      <span class="inbox-group__count">${l ? `${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}` : ''}</span>
+      <span class="inbox-group__count">${l ? `${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}${listingPricing(l) ? ` · ${listingPricing(l)}` : ''}` : ''}</span>
       <button class="inbox-group__link" data-view-link="listings" title="Open Listings">View listing →</button>`;
   };
 
@@ -1051,6 +1051,14 @@ function fmtDay(d) {
    resident's room (3 months or less) or a 3-month resident trial. */
 let editingListingId = null;   // listing id, 'new', or null
 
+function listingPricing(l) {
+  const parts = [];
+  if (l.rent_monthly != null) parts.push(`$${Number(l.rent_monthly).toLocaleString()} rent`);
+  if (l.dues_monthly != null) parts.push(`$${Number(l.dues_monthly).toLocaleString()} house dues`);
+  if (l.groceries_monthly != null) parts.push(`$${Number(l.groceries_monthly).toLocaleString()} groceries`);
+  return parts.join(' + ');
+}
+
 function listingWindow(l) {
   const len = windowLength(l.starts_on, l.ends_on);
   if (l.kind === 'resident') {
@@ -1079,6 +1087,15 @@ function listingForm(l) {
       </label>
       <label class="listing-form__field">Sublet ends
         <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}">
+      </label>
+      <label class="listing-form__field">Rent / mo
+        <input type="number" name="rent_monthly" class="listing-status" min="0" max="10000" step="5" value="${l.rent_monthly ?? ''}" placeholder="1490">
+      </label>
+      <label class="listing-form__field">House dues / mo
+        <input type="number" name="dues_monthly" class="listing-status" min="0" max="5000" step="5" value="${l.dues_monthly ?? ''}" placeholder="0">
+      </label>
+      <label class="listing-form__field">Groceries / mo
+        <input type="number" name="groceries_monthly" class="listing-status" min="0" max="5000" step="5" value="${l.groceries_monthly ?? ''}" placeholder="210">
       </label>
     </div>
     <label class="listing-form__field">Notes
@@ -1130,6 +1147,7 @@ function renderListings() {
                   <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
                 </span>
                 <span class="inbox-row__sub">${listingWindow(l)}</span>
+                ${listingPricing(l) ? `<span class="inbox-row__sub listing-row__pricing">${listingPricing(l)}</span>` : ''}
                 ${l.notes ? `<span class="inbox-row__sub listing-row__notes">${esc(l.notes)}</span>` : ''}
                 <span class="inbox-row__sub listing-row__source">${SOURCE_LABELS[l.source] || ''}${l.created_by_name ? ` · ${esc(l.created_by_name)}` : ''}</span>
                 ${attached.length ? `<span class="listing-row__people">${attached.map(a =>
@@ -1167,11 +1185,15 @@ async function onListingSubmit(e) {
   const form = e.target;
   const id = form.dataset.listingForm;
   const fd = new FormData(form);
+  const num = k => { const v = fd.get(k); return v === '' || v === null ? null : Math.round(+v); };
   const rec = {
     room_id: +fd.get('room_id'),
     kind: fd.get('kind'),
     starts_on: fd.get('starts_on'),
     ends_on: fd.get('ends_on') || null,
+    rent_monthly: num('rent_monthly'),
+    dues_monthly: num('dues_monthly'),
+    groceries_monthly: num('groceries_monthly'),
     notes: (fd.get('notes') || '').trim(),
   };
   const err = form.querySelector('[data-form-error]');
