@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.1.0'
+const VERSION = '1.2.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -24,29 +24,69 @@ const corsHeaders = {
 const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
 
 const MODEL = 'claude-haiku-4-5-20251001'
+const OPINION_MODEL = 'claude-sonnet-5'
 const FRESH_MS = 7 * 24 * 3600 * 1000
 
 function db() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 }
 
-async function callClaude(prompt: string): Promise<Record<string, unknown>> {
+async function callClaudeRaw(model: string, system: string, prompt: string, maxTokens = 500): Promise<string> {
   const key = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
   if (!key) throw new Error('No Anthropic API key configured')
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 500,
-      system: 'You match housing applicants to room listings for a communal house. Respond with a single JSON object only — no prose, no markdown fences.',
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${(await resp.text()).slice(0, 200)}`)
   const data = await resp.json()
-  const text = (data.content?.[0]?.text || '').trim().replace(/^```json?\s*|\s*```$/g, '')
-  return JSON.parse(text)
+  // models may emit thinking blocks before text — take all text blocks
+  const text = (data.content || []).filter((b: Record<string, unknown>) => b.type === 'text')
+    .map((b: Record<string, unknown>) => b.text).join('').trim()
+  if (!text) throw new Error('Empty completion')
+  return text
+}
+
+async function callClaude(prompt: string): Promise<Record<string, unknown>> {
+  const text = await callClaudeRaw(MODEL,
+    'You match housing applicants to room listings for a communal house. Respond with a single JSON object only — no prose, no markdown fences.',
+    prompt)
+  return JSON.parse(text.replace(/^```json?\s*|\s*```$/g, ''))
+}
+
+// Independent, deeper read on an applicant — posted into the house notes so
+// every recruiting member sees the same second opinion.
+// deno-lint-ignore no-explicit-any
+async function secondOpinion(client: any, applicant: any, notes: any[], userId: string): Promise<string> {
+  const trim = (s: string, n = 1200) => (s || '').replace(/\s+/g, ' ').slice(0, n)
+  const noteLines = notes.map((n) => `- ${n.author_name || 'Housemate'}: ${trim(n.body, 200)}`).join('\n') || '(none yet)'
+  const prompt = `You are giving a communal house (Agape, SF — do-ocracy, creative, emotionally mature, community-first) a second opinion on an applicant. Housemates already formed first impressions; be an independent voice — concise, concrete, and willing to disagree.
+
+APPLICANT
+Name: ${applicant.first_name} ${applicant.last_name}
+Residency sought: ${applicant.residency}
+Move-in: ${applicant.move_in} · Budget: ${applicant.budget}
+About: ${trim(applicant.about)}
+Why Agape: ${trim(applicant.why_agape)}
+Gifts: ${trim(applicant.gifts)}
+Heard from: ${applicant.heard_from}
+
+EXISTING HOUSE NOTES
+${noteLines}
+
+Write a second opinion in under 120 words, three tight parts:
+Strengths: …
+Watch for: …
+Read: … (your one-sentence overall call, including anything the notes above may have missed)
+Plain text, no markdown headers beyond those three labels.`
+  const text = await callClaudeRaw(OPINION_MODEL,
+    'You are a thoughtful, direct housing-committee advisor. Plain text only.', prompt, 400)
+  const { error } = await client.from('recruit_comments').insert({
+    applicant_id: applicant.id, user_id: userId, author_name: 'AI · second opinion', body: text.slice(0, 3900),
+  })
+  if (error) throw new Error(`Note write failed: ${error.message}`)
+  return text
 }
 
 // deno-lint-ignore no-explicit-any
@@ -132,6 +172,15 @@ serve(async (req) => {
       client.from('recruit_settings').select('*'),
     ])
     const openToCouples = (settingsRows || []).find((r) => r.key === 'open_to_couples')?.value !== false
+
+    if (body.action === 'second_opinion' && body.applicantId) {
+      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId)).maybeSingle()
+      if (!applicant) return new Response(JSON.stringify({ error: 'Unknown applicant' }), { status: 404, headers: jsonHeaders })
+      const { data: notes } = await client.from('recruit_comments')
+        .select('author_name, body').eq('applicant_id', applicant.id).neq('author_name', 'AI · second opinion').order('created_at')
+      const text = await secondOpinion(client, applicant, notes || [], userData.user.id)
+      return new Response(JSON.stringify({ opinion: text }), { headers: jsonHeaders })
+    }
 
     let targets: string[] = []
     if (body.applicantId) {

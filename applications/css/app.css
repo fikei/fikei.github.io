@@ -851,3 +851,9 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   font-size: var(--font-size-small); color: var(--fg-muted); cursor: pointer;
 }
 .rail-foot__pref input { accent-color: var(--accent); }
+
+/* The attach select must actually hide for Future fit / Not a fit —
+   [hidden] loses to the display:flex on .listing-form__field. */
+.decision-sheet__attach[hidden] { display: none; }
+.notes__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.notes__head .review__section-title { margin-bottom: 0; }

@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.9.0';
+const VERSION = '2.10.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -434,6 +434,30 @@ function matchBlockHtml(a) {
 function renderReviewMatch(a) {
   const host = document.getElementById('review-ai');
   if (host && queue[qIndex] === a.id) host.innerHTML = matchBlockHtml(a);
+}
+
+/* Independent AI read (Sonnet) posted into the house notes for everyone. */
+async function requestSecondOpinion(applicantId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) throw new Error('No session');
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'second_opinion', applicantId }),
+    });
+    const out = await resp.json();
+    if (out.error) throw new Error(out.error);
+    await loadComments(applicantId);
+    if (queue[qIndex] === applicantId) renderNotes(applicantId);
+    toast('Second opinion added to house notes');
+  } catch (e) {
+    toast(`Second opinion failed: ${e.message}`);
+  } finally {
+    if (btn && document.contains(btn)) { btn.disabled = false; btn.textContent = 'Second opinion'; }
+  }
 }
 
 /* Ask the recruit-match fn to (re)compute one applicant's suggestion. */
@@ -1182,7 +1206,10 @@ function renderReview() {
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
     <section class="review__section notes" id="notes">
-      <h3 class="review__section-title">House notes</h3>
+      <div class="notes__head">
+        <h3 class="review__section-title">House notes</h3>
+        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Second opinion</button>
+      </div>
       <div id="notes-body"><p class="notes__empty">Loading notes…</p></div>
       <form class="notes__form" id="notes-form">
         <textarea class="notes__input" id="notes-input" placeholder="Add an internal note for the house — only Recruiting Society members see these." maxlength="4000"></textarea>
@@ -1577,6 +1604,8 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const so = e.target.closest('[data-second-opinion]');
+    if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
     const useSug = e.target.closest('[data-use-suggestion]');
     if (useSug) {
       const val = useSug.dataset.useSuggestion || '';
