@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.7.0';
+const VERSION = '2.7.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -273,115 +273,40 @@ function avatarSource(a) {
   if (a.email) return `https://unavatar.io/gravatar/${encodeURIComponent(a.email.trim().toLowerCase())}?fallback=false`;
   return null;
 }
-/* unavatar's free tier rate-limits hard (~50 req/min → 429 across 110 rows), so:
-   1. images route through weserv's long-lived proxy cache (one house member
-      warming a photo caches it for everyone),
-   2. unknown avatars load through a paced queue instead of all at once,
-   3. results persist in localStorage — known-good load instantly, known-bad
-      skip retries for a week. */
-const AVATAR_LS = 'agape:avatars';
-let avatarCache = {};
-try { avatarCache = JSON.parse(localStorage.getItem(AVATAR_LS)) || {}; } catch { /* */ }
-function rememberAvatar(key, ok) {
-  avatarCache[key] = { ok, at: Date.now() };
-  try { localStorage.setItem(AVATAR_LS, JSON.stringify(avatarCache)); } catch { /* */ }
-}
-function proxiedAvatar(src, px) {
-  return `https://images.weserv.nl/?url=${encodeURIComponent(src.replace(/^https:\/\//, ''))}&w=${px}&h=${px}&fit=cover`;
-}
-
-const avatarQueue = [];
-let avatarPumping = false;
-function pumpAvatars() {
-  if (avatarPumping) return;
-  avatarPumping = true;
-  (async () => {
-    while (avatarQueue.length) {
-      const { el, src, key } = avatarQueue.shift();
-      if (!document.contains(el)) continue;
-      await new Promise(resolve => {
-        const img = new Image();
-        img.className = 'avatar__img';
-        img.alt = '';
-        img.onload = () => { el.appendChild(img); rememberAvatar(key, true); resolve(); };
-        img.onerror = () => { rememberAvatar(key, false); resolve(); };
-        img.src = src;
-      });
-      await new Promise(r => setTimeout(r, 900)); // stay under upstream rate limits
-    }
-    avatarPumping = false;
-  })();
-}
-
-function hydrateAvatars(root) {
-  (root || document).querySelectorAll('.avatar[data-av]').forEach(el => {
-    const src = el.dataset.av;
-    const key = el.dataset.avkey;
-    el.removeAttribute('data-av');
-    const known = avatarCache[key];
-    // Failures retry after a day — an upstream 429 during first warm-up
-    // shouldn't hide a real photo for long.
-    if (known && !known.ok && Date.now() - known.at < 86400_000) return;
-    if (known?.ok) {
-      const img = new Image();
-      img.className = 'avatar__img'; img.alt = ''; img.loading = 'lazy';
-      img.onerror = () => { img.remove(); rememberAvatar(key, false); };
-      img.src = src;
-      el.appendChild(img);
-    } else {
-      avatarQueue.push({ el, src, key });
-    }
-  });
-  pumpAvatars();
-}
-
+/* Avatars are resolved once, server-side (recruit-avatar fn) from the links
+   we extract, and stored on the applicant. The client just renders the URL,
+   sized + cached through weserv. */
 function avatarHtml(a, large) {
-  const src = avatarSource(a);
   const cls = `avatar ${large ? 'avatar--lg' : ''}`;
-  if (!src) return `<span class="${cls}">${esc(initials(a))}</span>`;
-  const key = src.replace(/^https:\/\/unavatar\.io\//, '');
-  return `<span class="${cls}" data-av="${esc(proxiedAvatar(src, large ? 112 : 56))}" data-avkey="${esc(key)}">${esc(initials(a))}</span>`;
+  if (!a.avatarUrl) return `<span class="${cls}">${esc(initials(a))}</span>`;
+  const px = large ? 112 : 56;
+  const src = `https://images.weserv.nl/?url=${encodeURIComponent(a.avatarUrl.replace(/^https:\/\//, ''))}&w=${px}&h=${px}&fit=cover`;
+  return `<span class="${cls}">${esc(initials(a))}<img class="avatar__img" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
 }
 
-function collectLinks(a) {
-  const found = new Map();
-  const add = url => {
-    if (!url) return;
-    url = url.replace(/[.,;:!?)\]]+$/, '');
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    const key = url.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-    if (!found.has(key)) found.set(key, { url, label: linkLabel(url) });
-  };
-
-  const social = a.social || '';
-  const answers = [a.about, a.why, a.gifts].join('  ');
-  const all = social + '  ' + answers;
-
-  for (const m of all.matchAll(/https?:\/\/[^\s,<>()"']+/gi)) add(m[0]);
-  for (const m of all.matchAll(/(?<![@\w.])((?:[a-z0-9-]+\.)+(?:com|org|net|io|co|ai|me|dev|house|fm|xyz))(\/[^\s,<>()"']*)?/gi)) {
-    if (/@/.test(m[0])) continue;
-    add(m[1] + (m[2] || ''));
-  }
-  if (social && !/^(i don'?t|none|n\/?a|right now)/i.test(social.trim())) {
-    for (const m of social.matchAll(/(?:^|[\s,])(?:(insta(?:gram)?|ig|tiktok|fb|facebook|linkedin|twitter|x)\b[:\s]*)?@([a-z0-9._]{2,30})\b(?:\s*(?:on\s+)?\(?(insta(?:gram)?|ig|tiktok|fb|facebook)\)?)?/gi)) {
-      const hint = (m[1] || m[3] || 'instagram').toLowerCase();
-      const handle = m[2];
-      if (HANDLE_STOPWORDS.test(handle)) continue;
-      const host = /tiktok/.test(hint) ? `tiktok.com/@${handle}`
-        : /fb|facebook/.test(hint) ? `facebook.com/${handle}`
-        : /linkedin/.test(hint) ? `linkedin.com/in/${handle}`
-        : /twitter|^x$/.test(hint) ? `x.com/${handle}`
-        : `instagram.com/${handle}`;
-      add(host);
+/* Kick server-side resolution for anyone not yet checked (fire-and-forget;
+   converges because the fn writes '' for misses). */
+async function resolveAvatars() {
+  if (!applicants.some(a => a.avatarUrl === null || a.avatarUrl === undefined)) return;
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-avatar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ backfill: true }),
+    });
+    const out = await resp.json();
+    if (out.resolved) {
+      const { data: fresh } = await sb.from('recruit_applicants').select('id, avatar_url');
+      for (const row of (fresh || [])) {
+        const a = applicants.find(x => x.id === row.id);
+        if (a) a.avatarUrl = row.avatar_url;
+      }
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
     }
-    for (const m of social.matchAll(/(?:(insta(?:gram)?|ig|fb|facebook)\b[:\s]+([a-z0-9._]{3,30})\b|\b([a-z0-9._]{3,30})\s+on\s+(insta(?:gram)?|ig|fb|facebook)\b)/gi)) {
-      const hint = (m[1] || m[4] || '').toLowerCase();
-      const handle = m[2] || m[3];
-      if (!handle || HANDLE_STOPWORDS.test(handle)) continue;
-      add(/fb|facebook/.test(hint) ? `facebook.com/${handle}` : `instagram.com/${handle}`);
-    }
-  }
-  return [...found.values()];
+  } catch (e) { console.warn('avatar resolution failed', e); }
 }
 
 /* ---------- data ---------- */
@@ -399,7 +324,7 @@ async function loadAll() {
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
-    movein: r.move_in, budget: r.budget,
+    movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -651,7 +576,6 @@ function renderApplicants() {
           </li>`).join('')}
       </ul>
     </section>`).join('');
-  hydrateAvatars(host);
 }
 
 /* ---------- occupancy ---------- */
@@ -1188,7 +1112,6 @@ function renderReview() {
     btn.classList.toggle(`is-active--${d}`, rec?.d === d);
   }
 
-  hydrateAvatars(document.getElementById('review-body'));
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
     if (queue[qIndex] === a.id) renderNotes(a.id);
@@ -1506,6 +1429,7 @@ async function _checkMembershipAndEnter() {
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate' };
     await loadAll();
     loadHouse().then(renderRailCounts); // background — outreach attachments + rail badge need it
+    resolveAvatars(); // background — server resolves any unchecked profile photos
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
