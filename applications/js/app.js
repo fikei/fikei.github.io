@@ -2,17 +2,42 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.3.0';
+const VERSION = '2.4.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
 
-const HOLD_REASONS = [
-  { id: 'fit', label: 'Fit needs review' },
-  { id: 'timing', label: 'Length of timing' },
-  { id: 'needs', label: 'Current Agape needs (e.g. couple)' },
-];
+// Multiple-choice reasons per decision; freeform note rides alongside.
+const DECISION_REASONS = {
+  outreach: [
+    { id: 'community-fit', label: 'Strong community fit' },
+    { id: 'timing', label: 'Timing works' },
+    { id: 'referral', label: 'Referred / known to the house' },
+    { id: 'other', label: 'Other' },
+  ],
+  hold: [
+    { id: 'fit', label: 'Fit needs 2nd review' },
+    { id: 'timing', label: 'Length or timing' },
+    { id: 'needs', label: 'Current Agape needs (e.g. couple)' },
+    { id: 'other', label: 'Other' },
+  ],
+  pass: [
+    { id: 'fit', label: 'Not a fit' },
+    { id: 'budget', label: 'Budget too low' },
+    { id: 'timing', label: 'Timing doesn’t work' },
+    { id: 'short', label: 'Stay too short' },
+    { id: 'other', label: 'Other' },
+  ],
+};
+function reasonLabel(id) {
+  for (const list of Object.values(DECISION_REASONS)) {
+    const hit = list.find(r => r.id === id);
+    if (hit) return hit.label;
+  }
+  return id || '';
+}
+const HOLD_REASONS = DECISION_REASONS.hold; // legacy references
 // DB keeps 'pass'; the surface calls it Archive.
 const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Archive' };
 
@@ -312,13 +337,13 @@ async function loadAll() {
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
-    decisions[d.applicant_id] = { d: d.decision, reason: d.hold_reason, byName: d.decided_by_name, at: d.decided_at };
+    decisions[d.applicant_id] = { d: d.decision, reason: d.reason, note: d.note || '', byName: d.decided_by_name, at: d.decided_at };
   }
   commentCounts = {};
   for (const c of (cRes.data || [])) commentCounts[c.applicant_id] = (commentCounts[c.applicant_id] || 0) + 1;
 }
 
-async function saveDecision(id, d, reason, byName) {
+async function saveDecision(id, d, reason, byName, note) {
   if (d === null) {
     delete decisions[id];
     const { error } = await sb.from('recruit_decisions').delete().eq('applicant_id', id);
@@ -326,9 +351,9 @@ async function saveDecision(id, d, reason, byName) {
     return;
   }
   const name = byName || me.name;
-  decisions[id] = { d, reason: reason || null, byName: name, at: new Date().toISOString() };
+  decisions[id] = { d, reason: reason || null, note: note || '', byName: name, at: new Date().toISOString() };
   const { error } = await sb.from('recruit_decisions').upsert({
-    applicant_id: id, decision: d, hold_reason: reason || null,
+    applicant_id: id, decision: d, reason: reason || null, note: note || '',
     decided_by: me.id, decided_by_name: name,
     decided_at: new Date().toISOString(),
   });
@@ -475,7 +500,7 @@ function renderRailCounts() {
 function decisionChip(id) {
   const rec = decisions[id];
   if (!rec) return '';
-  const reason = rec.reason ? ` — ${HOLD_REASONS.find(r => r.id === rec.reason)?.label || rec.reason}` : '';
+  const reason = rec.reason ? ` — ${reasonLabel(rec.reason)}` : '';
   const by = rec.byName ? ` · ${rec.byName}` : '';
   return `<span class="decision-chip decision-chip--${rec.d}" title="${esc(DECISION_LABELS[rec.d] + reason + by)}">${DECISION_LABELS[rec.d]}</span>`;
 }
@@ -531,50 +556,73 @@ function renderApplicants() {
 /* ---------- occupancy ---------- */
 const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet', candidate: 'Candidate', shared: 'Shared', vacant: 'Open' };
 
+/* Google-Calendar-style lanes: one row per room, continuous colored spans
+   per occupant stretch (not spreadsheet cells), month gridlines + today rule. */
+function occupancySegments(roomId) {
+  const months = [...Array(12)].map((_, i) => `2026-${String(i + 1).padStart(2, '0')}-01`);
+  const byMonth = {};
+  for (const o of occupancy) if (o.room_id === roomId) byMonth[o.month] = o;
+  const segs = [];
+  for (let i = 0; i < 12; i++) {
+    const cell = byMonth[months[i]];
+    const kind = cell?.kind || 'vacant';
+    const label = (cell?.occupant || '').trim();
+    const last = segs[segs.length - 1];
+    if (last && last.kind === kind && last.label === label) last.len++;
+    else segs.push({ start: i, len: 1, kind, label, month: months[i] });
+  }
+  return segs;
+}
+
 function renderOccupancy() {
   const host = document.getElementById('view-root');
   host.className = 'house';
   document.getElementById('page-sub').textContent =
     `${rooms.length} rooms · 2026 · every name is a resident or a subletter`;
 
-  const months = [...Array(12)].map((_, i) => `2026-${String(i + 1).padStart(2, '0')}-01`);
-  const byRoom = {};
-  for (const o of occupancy) (byRoom[o.room_id] ||= {})[o.month] = o;
-  const nowKey = new Date().toISOString().slice(0, 8) + '01';
+  const now = new Date();
+  const nowIdx = now.getFullYear() === 2026 ? now.getMonth() : (now.getFullYear() < 2026 ? -1 : 12);
+  const todayPct = nowIdx >= 0 && nowIdx < 12
+    ? ((nowIdx + (now.getDate() - 1) / 31) / 12) * 100 : null;
+  const nowKey = `2026-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
   host.innerHTML = `
     <div class="occ-legend">
       ${['resident', 'sublet', 'candidate', 'vacant'].map(k =>
         `<span class="occ-legend__item"><span class="occ-swatch occ-swatch--${k}"></span>${KIND_LABELS[k]}</span>`).join('')}
-      <span class="occ-legend__hint">Click an open month to create a listing · residents stay unless marked leaving</span>
+      <span class="occ-legend__hint">Click an open stretch to create a listing · residents stay unless marked leaving</span>
     </div>
-    <div class="occ-scroll">
-      <table class="occ">
-        <thead><tr>
-          <th class="occ__room-head">Room</th>
-          ${months.map(m => `<th class="${m === nowKey ? 'is-now' : ''}">${MONTH_ABBR[+m.slice(5, 7) - 1]}</th>`).join('')}
-        </tr></thead>
-        <tbody>
-          ${rooms.map(r => `
-            <tr>
-              <th class="occ__room">
-                <span class="occ__room-name">${esc(r.name)}</span>
-                <span class="occ__room-sub">${esc(r.floor)}${r.resident ? ` · ${esc(r.resident)}` : ' · open room'}</span>
-                ${r.resident ? `<button class="occ__leaving" data-leaving-room="${r.id}" title="Mark resident as leaving — creates a listing">Mark leaving</button>` : ''}
-              </th>
-              ${months.map(m => {
-                const cell = byRoom[r.id]?.[m];
-                const kind = cell?.kind || 'vacant';
-                const label = cell?.occupant || '';
-                const now = m === nowKey ? ' is-now' : '';
-                if (kind === 'vacant' && m >= nowKey) {
-                  return `<td class="occ__cell occ__cell--vacant is-listable${now}" data-list-room="${r.id}" data-list-month="${m}" title="Open — click to create a listing">${esc(label) || '+'}</td>`;
-                }
-                return `<td class="occ__cell occ__cell--${kind}${now}" title="${esc(label)} (${KIND_LABELS[kind]})">${esc(label)}</td>`;
+    <div class="cal">
+      <div class="cal__head">
+        <div class="cal__room-col"></div>
+        <div class="cal__months">
+          ${MONTH_ABBR.map((m, i) => `<span class="cal__month ${i === nowIdx ? 'is-now' : ''}">${m}</span>`).join('')}
+        </div>
+      </div>
+      <div class="cal__body">
+        ${todayPct !== null ? `<span class="cal__today" style="left: calc(var(--room-col) + (100% - var(--room-col)) * ${todayPct / 100})"></span>` : ''}
+        ${rooms.map(r => `
+          <div class="cal__row">
+            <div class="cal__room-col">
+              <span class="occ__room-name">${esc(r.name)}</span>
+              <span class="occ__room-sub">${esc(r.floor)}${r.resident ? ` · ${esc(r.resident)}` : ' · open room'}</span>
+              ${r.resident ? `<button class="occ__leaving" data-leaving-room="${r.id}">Mark leaving</button>` : ''}
+            </div>
+            <div class="cal__lane">
+              ${occupancySegments(r.id).map(s => {
+                const style = `left: ${(s.start / 12) * 100}%; width: ${(s.len / 12) * 100}%`;
+                const listable = s.kind === 'vacant' && s.month >= nowKey;
+                const title = s.kind === 'vacant'
+                  ? (listable ? 'Open — click to create a listing' : 'Was open')
+                  : `${s.label} · ${KIND_LABELS[s.kind]} · ${MONTH_ABBR[s.start]}${s.len > 1 ? `–${MONTH_ABBR[s.start + s.len - 1]}` : ''}`;
+                return `<span class="cal__event cal__event--${s.kind} ${listable ? 'is-listable' : ''}"
+                  style="${style}" title="${esc(title)}"
+                  ${listable ? `data-list-room="${r.id}" data-list-month="${s.month}"` : ''}>
+                  ${s.kind === 'vacant' ? (listable ? '+ List' : '') : esc(s.label)}</span>`;
               }).join('')}
-            </tr>`).join('')}
-        </tbody>
-      </table>
+            </div>
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 
@@ -616,39 +664,156 @@ function fmtDay(d) {
   return new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/* A listing is a time-bound opening for a room: either a sublet of a
+   resident's room (3 months or less) or a 3-month resident trial. */
+let editingListingId = null;   // listing id, 'new', or null
+
+function listingWindow(l) {
+  const len = windowLength(l.starts_on, l.ends_on);
+  if (l.kind === 'resident') {
+    const trialEnd = new Date(l.starts_on + 'T12:00'); trialEnd.setMonth(trialEnd.getMonth() + 3);
+    return `Trial ${fmtDay(l.starts_on)} – ${fmtDay(trialEnd.toISOString().slice(0, 10))} · 3-month trial, then house vote`;
+  }
+  return (l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)} · end date TBD`) + (len ? ` · ${len}` : '');
+}
+
+function listingForm(l) {
+  const isNew = !l.id;
+  return `<form class="listing-form" data-listing-form="${l.id || 'new'}">
+    <div class="listing-form__grid">
+      <label class="listing-form__field">Room
+        <select name="room_id" class="listing-status">${rooms.map(r =>
+          `<option value="${r.id}" ${+l.room_id === r.id ? 'selected' : ''}>${esc(r.name)}${r.resident ? ` — ${esc(r.resident)}` : ''}</option>`).join('')}</select>
+      </label>
+      <label class="listing-form__field">Type
+        <select name="kind" class="listing-status">
+          <option value="sublet" ${l.kind !== 'resident' ? 'selected' : ''}>Sublet (≤ 3 months)</option>
+          <option value="resident" ${l.kind === 'resident' ? 'selected' : ''}>Resident (3-month trial)</option>
+        </select>
+      </label>
+      <label class="listing-form__field">Opens
+        <input type="date" name="starts_on" class="listing-status" value="${l.starts_on || ''}" required>
+      </label>
+      <label class="listing-form__field">Sublet ends
+        <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}">
+      </label>
+    </div>
+    <label class="listing-form__field">Notes
+      <textarea name="notes" class="notes__input listing-form__notes" rows="2" maxlength="1000">${esc(l.notes || '')}</textarea>
+    </label>
+    <p class="listing-form__error" data-form-error></p>
+    <div class="decision-sheet__actions">
+      ${isNew ? '' : `<button type="button" class="listing-form__delete" data-delete-listing="${l.id}">Delete listing</button>`}
+      <button type="button" class="hold-sheet__cancel" data-cancel-listing>Cancel</button>
+      <button type="submit" class="btn btn--accent btn--sm">${isNew ? 'Create listing' : 'Save changes'}</button>
+    </div>
+  </form>`;
+}
+
 function renderListings() {
   const host = document.getElementById('view-root');
   host.className = 'house';
   const open = listings.filter(l => l.status === 'open').length;
   document.getElementById('page-sub').textContent =
-    `${open} open · a listing is a future opening for a given Agape room`;
+    `${open} open · a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial`;
 
   const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
   const order = { open: 0, filled: 1, closed: 2 };
   const sorted = [...listings].sort((a, b) => (order[a.status] - order[b.status]) || a.starts_on.localeCompare(b.starts_on));
+  const sections = [['open', 'Open'], ['filled', 'Filled'], ['closed', 'Closed']]
+    .map(([s, label]) => [s, label, sorted.filter(l => l.status === s)])
+    .filter(([, , items]) => items.length);
+  const SOURCE_LABELS = { gap: 'from an occupancy gap', leaving: 'resident leaving', manual: 'added by hand' };
 
   host.innerHTML = `
-    ${sorted.length ? `<ul class="inbox-card listing-list">
-      ${sorted.map(l => {
-        const room = roomById[l.room_id];
-        const len = windowLength(l.starts_on, l.ends_on);
-        const window = (l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)}`) + (len ? ` · ${len}` : '');
-        return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
-          <span class="inbox-row__text">
-            <span class="inbox-row__title">${esc(room?.name || 'Room')}
-              <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident' : 'Sublet'}</span>
-            </span>
-            <span class="inbox-row__sub">${window}${l.notes ? ` · ${esc(l.notes)}` : ''}</span>
-          </span>
-          <span class="inbox-row__actions">
-            <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
-              ${['open', 'filled', 'closed'].map(s => `<option value="${s}" ${l.status === s ? 'selected' : ''}>${s[0].toUpperCase()}${s.slice(1)}</option>`).join('')}
-            </select>
-          </span>
-        </li>`;
-      }).join('')}
-    </ul>` : `<p class="inbox-empty">No listings — create one from an open month on the Occupancy grid.</p>`}
-    <p class="listing-hint">New listings come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy grid</a>: click an open month, or mark a resident as leaving.</p>`;
+    <div class="listing-toolbar">
+      <button class="btn btn--sm" id="new-listing">New listing</button>
+    </div>
+    ${editingListingId === 'new' ? listingForm({ kind: 'sublet', room_id: rooms[0]?.id }) : ''}
+    ${sections.length ? sections.map(([s, label, items]) => `
+      <section class="inbox-group">
+        <div class="inbox-group__head">
+          <h2 class="inbox-group__label">${label}</h2>
+          <span class="inbox-group__count">${items.length}</span>
+        </div>
+        <ul class="inbox-card listing-list">
+          ${items.map(l => {
+            const room = roomById[l.room_id];
+            if (editingListingId === l.id) return `<li class="listing-edit-row">${listingForm(l)}</li>`;
+            return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
+              <span class="inbox-row__text">
+                <span class="inbox-row__title">${esc(room?.name || 'Room')}
+                  <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+                </span>
+                <span class="inbox-row__sub">${listingWindow(l)}</span>
+                ${l.notes ? `<span class="inbox-row__sub listing-row__notes">${esc(l.notes)}</span>` : ''}
+                <span class="inbox-row__sub listing-row__source">${SOURCE_LABELS[l.source] || ''}${l.created_by_name ? ` · ${esc(l.created_by_name)}` : ''}</span>
+              </span>
+              <span class="inbox-row__actions">
+                <button class="btn btn--sm inbox-row__review" data-edit-listing="${l.id}">Edit</button>
+                <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
+                  ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
+                </select>
+              </span>
+            </li>`;
+          }).join('')}
+        </ul>
+      </section>`).join('') : `<p class="inbox-empty">No listings yet.</p>`}
+    <p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>`;
+
+  document.getElementById('new-listing').onclick = () => { editingListingId = 'new'; renderListings(); };
+  host.querySelectorAll('[data-listing-form]').forEach(f => f.addEventListener('submit', onListingSubmit));
+}
+
+async function onListingSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const id = form.dataset.listingForm;
+  const fd = new FormData(form);
+  const rec = {
+    room_id: +fd.get('room_id'),
+    kind: fd.get('kind'),
+    starts_on: fd.get('starts_on'),
+    ends_on: fd.get('ends_on') || null,
+    notes: (fd.get('notes') || '').trim(),
+  };
+  const err = form.querySelector('[data-form-error]');
+  if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
+  if (rec.kind === 'resident') rec.ends_on = null; // trial length is fixed at 3 months
+  if (rec.kind === 'sublet' && rec.ends_on) {
+    const days = (new Date(rec.ends_on) - new Date(rec.starts_on)) / 86400000;
+    if (days <= 0) { err.textContent = 'End date must be after the start.'; return; }
+    if (days > 95) { err.textContent = 'A sublet runs 3 months or less — longer stays are a resident trial.'; return; }
+  }
+  if (id === 'new') {
+    const { data, error } = await sb.from('recruit_listings').insert({
+      ...rec, status: 'open', source: 'manual', created_by: me.id, created_by_name: me.name,
+    }).select().single();
+    if (error) { err.textContent = error.message; return; }
+    listings.push(data);
+    toast('Listing created');
+  } else {
+    const { error } = await sb.from('recruit_listings').update(rec).eq('id', id);
+    if (error) { err.textContent = error.message; return; }
+    Object.assign(listings.find(l => l.id === id) || {}, rec);
+    toast('Listing updated');
+  }
+  editingListingId = null;
+  renderListings();
+  renderRailCounts();
+}
+
+async function deleteListing(id) {
+  const l = listings.find(x => x.id === id);
+  const room = rooms.find(r => r.id === l?.room_id);
+  if (!confirm(`Delete the ${l?.kind === 'resident' ? 'resident trial' : 'sublet'} listing for ${room?.name || 'this room'}?`)) return;
+  const { error } = await sb.from('recruit_listings').delete().eq('id', id);
+  if (error) { toast(`Delete failed: ${error.message}`); return; }
+  listings = listings.filter(x => x.id !== id);
+  editingListingId = null;
+  toast('Listing deleted');
+  renderListings();
+  renderRailCounts();
 }
 
 async function updateListingStatus(id, status) {
@@ -720,7 +885,14 @@ function renderReview() {
   const buNorm = normalizeBudget(a.budget);
 
   document.getElementById('review-body').innerHTML = `
-    ${rec ? `<p class="review__decided">Decided: ${DECISION_LABELS[rec.d]}${rec.reason ? ` — ${esc(HOLD_REASONS.find(r => r.id === rec.reason)?.label || rec.reason)}` : ''}${rec.byName ? ` · by ${esc(rec.byName)}` : ''} · <button class="link-clear" data-clear="${a.id}">Undo</button></p>` : ''}
+    ${rec ? `<div class="decision-banner decision-banner--${rec.d}">
+      <div class="decision-banner__text">
+        <span class="decision-banner__label">${DECISION_LABELS[rec.d]}</span>
+        <span class="decision-banner__meta">${rec.reason ? esc(reasonLabel(rec.reason)) : 'No reason recorded'}${rec.byName ? ` · by ${esc(rec.byName)}` : ''}${rec.at ? ` · ${fmtDate(rec.at)}` : ''}</span>
+        ${rec.note ? `<span class="decision-banner__note">“${esc(rec.note)}”</span>` : ''}
+      </div>
+      <button class="decision-banner__undo" data-clear="${a.id}">Undo</button>
+    </div>` : ''}
     <div class="review__card">
       <div class="review__head">
         ${avatarHtml(a, true)}
@@ -818,37 +990,113 @@ function section(title, text) {
   </section>`;
 }
 
-function decide(d, reason) {
+/* ---------- decision sheet ----------
+   Every decision asks for a multiple-choice reason plus an optional freeform
+   note — typed, dictated (Web Speech), or pulled from the house notes. */
+let pendingDecision = null;   // 'outreach' | 'hold' | 'pass' while the sheet is open
+let pendingReason = null;
+let dictation = null;         // active SpeechRecognition instance
+
+function openDecisionSheet(d) {
   const a = applicants.find(x => x.id === queue[qIndex]);
   if (!a) return;
-  saveDecision(a.id, d, reason);
-  toast(`${fullName(a)} → ${DECISION_LABELS[d]}${reason ? ` (${HOLD_REASONS.find(r => r.id === reason)?.label})` : ''}`);
+  pendingDecision = d;
+  const rec = decisions[a.id];
+  pendingReason = (rec?.d === d ? rec.reason : null) || null;
+  document.getElementById('decision-sheet-title').textContent =
+    d === 'outreach' ? 'Why outreach?' : d === 'hold' ? 'Why hold?' : 'Why archive?';
+  renderDecisionOptions();
+  const noteEl = document.getElementById('decision-note');
+  noteEl.value = (rec?.d === d ? rec.note : '') || '';
+  document.getElementById('decision-use-notes').hidden = !comments.length;
+  document.getElementById('decision-mic').hidden =
+    !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+  document.getElementById('decision-sheet').hidden = false;
+  document.getElementById('review-foot').hidden = true;
+}
+
+function renderDecisionOptions() {
+  document.getElementById('decision-options').innerHTML =
+    (DECISION_REASONS[pendingDecision] || []).map(r =>
+      `<button class="hold-sheet__option ${pendingReason === r.id ? 'is-selected' : ''}" data-reason="${r.id}">${r.label}</button>`).join('');
+}
+
+function hideDecisionSheet() {
+  stopDictation();
+  pendingDecision = null;
+  pendingReason = null;
+  document.getElementById('decision-sheet').hidden = true;
+  document.getElementById('review-foot').hidden = false;
+}
+const hideHoldSheet = hideDecisionSheet; // step()/openReview() call this on navigation
+
+function submitDecision() {
+  const a = applicants.find(x => x.id === queue[qIndex]);
+  if (!a || !pendingDecision) return;
+  const d = pendingDecision;
+  const reason = pendingReason;
+  const note = document.getElementById('decision-note').value.trim();
+  if (!reason && d !== 'outreach') { toast('Pick a reason first'); return; }
+  hideDecisionSheet();
+  saveDecision(a.id, d, reason, null, note);
+  toast(`${fullName(a)} → ${DECISION_LABELS[d]}${reason ? ` (${reasonLabel(reason)})` : ''}`);
   if (qIndex === queue.length - 1) closeReview(); else step(1);
 }
 
-function showHoldSheet() {
-  const a = applicants.find(x => x.id === queue[qIndex]);
-  const current = decisions[a?.id]?.reason;
-  document.getElementById('hold-options').innerHTML = HOLD_REASONS.map(r =>
-    `<button class="hold-sheet__option ${current === r.id ? 'is-selected' : ''}" data-reason="${r.id}">${r.label}</button>`).join('');
-  document.getElementById('hold-sheet').hidden = false;
-  document.getElementById('review-foot').hidden = true;
+/* Compact house-notes summary: latest three notes, attributed, trimmed. */
+function summarizeNotesIntoDecision() {
+  const noteEl = document.getElementById('decision-note');
+  const picked = comments.slice(-3).map(c =>
+    `${c.author_name || 'Housemate'}: ${c.body.replace(/\s+/g, ' ').slice(0, 140)}`);
+  const summary = picked.join(' · ');
+  noteEl.value = noteEl.value ? `${noteEl.value}\n${summary}` : summary;
+  noteEl.focus();
 }
-function hideHoldSheet() {
-  document.getElementById('hold-sheet').hidden = true;
-  document.getElementById('review-foot').hidden = false;
+
+function toggleDictation() {
+  if (dictation) { stopDictation(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const noteEl = document.getElementById('decision-note');
+  dictation = new SR();
+  dictation.continuous = true;
+  dictation.interimResults = false;
+  dictation.lang = 'en-US';
+  dictation.onresult = ev => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      if (ev.results[i].isFinal) {
+        const text = ev.results[i][0].transcript.trim();
+        noteEl.value = noteEl.value ? `${noteEl.value} ${text}` : text;
+      }
+    }
+  };
+  dictation.onend = () => stopDictation();
+  dictation.onerror = () => { stopDictation(); toast('Dictation unavailable — check mic permissions'); };
+  dictation.start();
+  document.getElementById('decision-mic').classList.add('is-live');
+  document.getElementById('decision-mic-label').textContent = 'Listening…';
+}
+
+function stopDictation() {
+  if (dictation) { try { dictation.onend = null; dictation.stop(); } catch { /* */ } }
+  dictation = null;
+  const mic = document.getElementById('decision-mic');
+  if (mic) {
+    mic.classList.remove('is-live');
+    document.getElementById('decision-mic-label').textContent = 'Dictate';
+  }
 }
 
 /* ---------- export ---------- */
 function exportCsv() {
   const cols = ['first', 'last', 'email', 'ts_iso', 'residency', 'movein', 'budget', 'source'];
-  const head = [...cols, 'decision', 'hold_reason', 'decided_by', 'decided_at', 'notes'];
+  const head = [...cols, 'decision', 'reason', 'decision_note', 'decided_by', 'decided_at', 'notes'];
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [head.join(',')];
   for (const a of applicants) {
     const rec = decisions[a.id] || {};
     lines.push([...cols.map(c => q(a[c])), q(DECISION_LABELS[rec.d] || ''),
-      q(rec.reason ? (HOLD_REASONS.find(r => r.id === rec.reason)?.label || rec.reason) : ''),
+      q(rec.reason ? reasonLabel(rec.reason) : ''), q(rec.note || ''),
       q(rec.byName || ''), q(rec.at || ''), q(commentCounts[a.id] || 0)].join(','));
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -1016,13 +1264,19 @@ function init() {
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
     const reason = e.target.closest('[data-reason]');
-    if (reason) { hideHoldSheet(); decide('hold', reason.dataset.reason); return; }
+    if (reason) { pendingReason = reason.dataset.reason; renderDecisionOptions(); return; }
     const delNote = e.target.closest('[data-delete-note]');
     if (delNote) { deleteNote(delNote.dataset.deleteNote, queue[qIndex]); return; }
     const listCell = e.target.closest('[data-list-room]');
     if (listCell) { createListingFromCell(+listCell.dataset.listRoom, listCell.dataset.listMonth); return; }
     const leaving = e.target.closest('[data-leaving-room]');
     if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
+    const editL = e.target.closest('[data-edit-listing]');
+    if (editL) { editingListingId = editL.dataset.editListing; renderListings(); return; }
+    const cancelL = e.target.closest('[data-cancel-listing]');
+    if (cancelL) { editingListingId = null; renderListings(); return; }
+    const delL = e.target.closest('[data-delete-listing]');
+    if (delL) { deleteListing(delL.dataset.deleteListing); return; }
     const lstatus = e.target.closest('[data-listing-status]');
     if (lstatus) { return; } // handled by change event on the select
   });
@@ -1056,15 +1310,18 @@ function init() {
   document.getElementById('review-close').onclick = closeReview;
   document.getElementById('review-prev').onclick = () => step(-1);
   document.getElementById('review-next').onclick = () => step(1);
-  document.getElementById('btn-pass').onclick = () => decide('pass');
-  document.getElementById('btn-outreach').onclick = () => decide('outreach');
-  document.getElementById('btn-hold').onclick = showHoldSheet;
-  document.getElementById('hold-cancel').onclick = hideHoldSheet;
+  document.getElementById('btn-pass').onclick = () => openDecisionSheet('pass');
+  document.getElementById('btn-outreach').onclick = () => openDecisionSheet('outreach');
+  document.getElementById('btn-hold').onclick = () => openDecisionSheet('hold');
+  document.getElementById('decision-cancel').onclick = hideDecisionSheet;
+  document.getElementById('decision-submit').onclick = submitDecision;
+  document.getElementById('decision-mic').onclick = toggleDictation;
+  document.getElementById('decision-use-notes').onclick = summarizeNotesIntoDecision;
 
   document.addEventListener('keydown', e => {
     if (document.getElementById('review').hidden) return;
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
-    if (e.key === 'Escape') { if (!document.getElementById('hold-sheet').hidden) hideHoldSheet(); else closeReview(); }
+    if (e.key === 'Escape') { if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet(); else closeReview(); }
     if (e.key === 'ArrowRight') step(1);
     if (e.key === 'ArrowLeft') step(-1);
   });
