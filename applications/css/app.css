@@ -811,3 +811,26 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .occupants__past .inbox-card { margin-top: var(--space-2); }
 .decision-banner__actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
 .listing-kind--trial { background: var(--trial-tint); color: var(--trial-fg); }
+
+/* --- AI match hint + soft flags (v2.7) --- */
+.match-hint {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--accent-muted);
+  font-size: var(--font-size-small);
+}
+.match-hint--empty { background: transparent; color: var(--fg-subtle); padding: var(--space-2) 0; margin: var(--space-2) 0 0; }
+.match-hint__text { flex: 1; min-width: 0; }
+.match-hint__conf { color: var(--fg-subtle); font-size: var(--font-size-caption); margin-left: 4px; }
+.match-hint__why { display: block; color: var(--fg-muted); margin-top: 2px; }
+.match-flag {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--hold-tint); color: var(--hold-fg);
+  font-size: var(--font-size-small);
+}
+.match-flag strong { text-transform: capitalize; }
+.inbox-row__ai { color: var(--fg-subtle); font-style: italic; }

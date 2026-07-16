@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.6.0';
+const VERSION = '2.7.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -62,6 +62,7 @@ let rooms = [];               // recruit_rooms
 let occupancy = [];           // recruit_occupancy rows
 let listings = [];            // recruit_listings rows
 let houseLoaded = false;
+let suggestions = {};         // applicant_id -> recruit_match_suggestions row
 let queue = [];
 let qIndex = 0;
 
@@ -385,11 +386,13 @@ function collectLinks(a) {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes] = await Promise.all([
+  const [aRes, dRes, cRes, sRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id'),
+    sb.from('recruit_match_suggestions').select('*'),
   ]);
+  suggestions = Object.fromEntries((sRes.data || []).map(r => [r.applicant_id, r]));
   if (aRes.error) throw aRes.error;
   applicants = (aRes.data || []).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
@@ -423,6 +426,26 @@ async function saveDecision(id, d, reason, byName, note, listingId) {
     decided_at: new Date().toISOString(),
   });
   if (error) toast(`Save failed: ${error.message}`);
+}
+
+/* Ask the recruit-match fn to (re)compute one applicant's suggestion. */
+async function computeMatch(applicantId) {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return;
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ applicantId }),
+    });
+    const out = await resp.json();
+    const s = out.suggestions?.[0];
+    if (s) suggestions[applicantId] = {
+      applicant_id: applicantId, listing_id: s.listingId, confidence: s.confidence,
+      rationale: s.rationale, flags: s.flags, created_at: new Date().toISOString(),
+    };
+  } catch (e) { console.warn('recruit-match failed', e); }
 }
 
 /* Short label for what an outreach decision is attached to. */
@@ -591,7 +614,7 @@ function renderApplicants() {
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
-  const bar = renderFilterBar(viewList);
+  const bar = view === 'inbox' ? '' : renderFilterBar(viewList); // inbox stays clean
   if (!list.length) {
     host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.')}</p>`;
     return;
@@ -617,6 +640,7 @@ function renderApplicants() {
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
                 <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
                 ${view === 'outreach' && decisions[a.id] ? `<span class="inbox-row__sub inbox-row__attach">→ ${esc(attachmentLabel(decisions[a.id]))}</span>` : ''}
+                ${view === 'outreach' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — Review to apply</span>` : ''}
               </span>
             </button>
             <span class="inbox-row__actions">
@@ -1259,6 +1283,9 @@ async function _openDecisionSheet(d) {
       `<option value="">General interest — future availability</option>` +
       open.map(l => `<option value="${l.id}" ${rec?.listingId === l.id ? 'selected' : ''}>` +
         `${esc(roomById[l.room_id]?.name || 'Room')} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}</option>`).join('');
+    renderMatchHint(a);
+  } else {
+    document.getElementById('decision-ai').innerHTML = '';
   }
   const noteEl = document.getElementById('decision-note');
   noteEl.value = (rec?.d === d ? rec.note : '') || '';
@@ -1267,6 +1294,29 @@ async function _openDecisionSheet(d) {
     !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
   document.getElementById('decision-sheet').hidden = false;
   document.getElementById('review-foot').hidden = true;
+}
+
+function matchListingLabel(sug) {
+  if (!sug?.listing_id) return 'General interest — future availability';
+  const l = listings.find(x => x.id === sug.listing_id);
+  const room = rooms.find(r => r.id === l?.room_id);
+  return l ? `${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}` : 'General interest — future availability';
+}
+
+function renderMatchHint(a) {
+  const host = document.getElementById('decision-ai');
+  const sug = suggestions[a.id];
+  if (!sug) { host.innerHTML = `<p class="match-hint match-hint--empty">AI match runs after you save — reopen Edit to see it.</p>`; return; }
+  const flags = Array.isArray(sug.flags) ? sug.flags : [];
+  host.innerHTML = `
+    <div class="match-hint">
+      <span class="match-hint__text"><strong>AI suggests:</strong> ${esc(matchListingLabel(sug))}
+        ${sug.confidence ? `<span class="match-hint__conf">${Math.round(sug.confidence * 100)}%</span>` : ''}
+        <span class="match-hint__why">${esc(sug.rationale || '')}</span>
+      </span>
+      <button type="button" class="btn btn--sm" data-use-suggestion="${esc(sug.listing_id || '')}">Use</button>
+    </div>
+    ${flags.map(f => `<div class="match-flag"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc(f.message || '')}</div>`).join('')}`;
 }
 
 function renderDecisionOptions() {
@@ -1297,6 +1347,7 @@ function submitDecision() {
   hideDecisionSheet();
   saveDecision(a.id, d, reason, null, note, listingId);
   toast(`${fullName(a)} → ${DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
+  if (d === 'outreach') computeMatch(a.id); // refresh the AI suggestion in the background
   if (editing) { renderReview(); return; }
   if (qIndex === queue.length - 1) closeReview(); else step(1);
 }
@@ -1522,6 +1573,8 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const useSug = e.target.closest('[data-use-suggestion]');
+    if (useSug) { document.getElementById('decision-listing').value = useSug.dataset.useSuggestion || ''; return; }
     const editDec = e.target.closest('[data-edit-decision]');
     if (editDec) {
       const rec = decisions[editDec.dataset.editDecision];
