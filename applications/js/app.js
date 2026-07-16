@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.8.1';
+const VERSION = '2.8.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1467,7 +1467,12 @@ async function _checkMembershipAndEnter() {
     const user = window.CtrlAuth.getUser();
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate' };
     await loadAll();
-    loadHouse().then(renderRailCounts); // background — outreach attachments + rail badge need it
+    // background — outreach attachment labels + rail badges need house data;
+    // re-render the open view once it lands so labels don't show stale fallbacks
+    loadHouse().then(() => {
+      renderRailCounts();
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    });
     resolveAvatars(); // background — server resolves any unchecked profile photos
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
