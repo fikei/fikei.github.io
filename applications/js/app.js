@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.4.0';
+const VERSION = '2.5.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -272,11 +272,74 @@ function avatarSource(a) {
   if (a.email) return `https://unavatar.io/gravatar/${encodeURIComponent(a.email.trim().toLowerCase())}?fallback=false`;
   return null;
 }
+/* unavatar's free tier rate-limits hard (~50 req/min → 429 across 110 rows), so:
+   1. images route through weserv's long-lived proxy cache (one house member
+      warming a photo caches it for everyone),
+   2. unknown avatars load through a paced queue instead of all at once,
+   3. results persist in localStorage — known-good load instantly, known-bad
+      skip retries for a week. */
+const AVATAR_LS = 'agape:avatars';
+let avatarCache = {};
+try { avatarCache = JSON.parse(localStorage.getItem(AVATAR_LS)) || {}; } catch { /* */ }
+function rememberAvatar(key, ok) {
+  avatarCache[key] = { ok, at: Date.now() };
+  try { localStorage.setItem(AVATAR_LS, JSON.stringify(avatarCache)); } catch { /* */ }
+}
+function proxiedAvatar(src, px) {
+  return `https://images.weserv.nl/?url=${encodeURIComponent(src.replace(/^https:\/\//, ''))}&w=${px}&h=${px}&fit=cover`;
+}
+
+const avatarQueue = [];
+let avatarPumping = false;
+function pumpAvatars() {
+  if (avatarPumping) return;
+  avatarPumping = true;
+  (async () => {
+    while (avatarQueue.length) {
+      const { el, src, key } = avatarQueue.shift();
+      if (!document.contains(el)) continue;
+      await new Promise(resolve => {
+        const img = new Image();
+        img.className = 'avatar__img';
+        img.alt = '';
+        img.onload = () => { el.appendChild(img); rememberAvatar(key, true); resolve(); };
+        img.onerror = () => { rememberAvatar(key, false); resolve(); };
+        img.src = src;
+      });
+      await new Promise(r => setTimeout(r, 900)); // stay under upstream rate limits
+    }
+    avatarPumping = false;
+  })();
+}
+
+function hydrateAvatars(root) {
+  (root || document).querySelectorAll('.avatar[data-av]').forEach(el => {
+    const src = el.dataset.av;
+    const key = el.dataset.avkey;
+    el.removeAttribute('data-av');
+    const known = avatarCache[key];
+    // Failures retry after a day — an upstream 429 during first warm-up
+    // shouldn't hide a real photo for long.
+    if (known && !known.ok && Date.now() - known.at < 86400_000) return;
+    if (known?.ok) {
+      const img = new Image();
+      img.className = 'avatar__img'; img.alt = ''; img.loading = 'lazy';
+      img.onerror = () => { img.remove(); rememberAvatar(key, false); };
+      img.src = src;
+      el.appendChild(img);
+    } else {
+      avatarQueue.push({ el, src, key });
+    }
+  });
+  pumpAvatars();
+}
+
 function avatarHtml(a, large) {
   const src = avatarSource(a);
-  return `<span class="avatar ${large ? 'avatar--lg' : ''}">${esc(initials(a))}` +
-    (src ? `<img class="avatar__img" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : '') +
-    `</span>`;
+  const cls = `avatar ${large ? 'avatar--lg' : ''}`;
+  if (!src) return `<span class="${cls}">${esc(initials(a))}</span>`;
+  const key = src.replace(/^https:\/\/unavatar\.io\//, '');
+  return `<span class="${cls}" data-av="${esc(proxiedAvatar(src, large ? 112 : 56))}" data-avkey="${esc(key)}">${esc(initials(a))}</span>`;
 }
 
 function collectLinks(a) {
@@ -337,13 +400,13 @@ async function loadAll() {
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
-    decisions[d.applicant_id] = { d: d.decision, reason: d.reason, note: d.note || '', byName: d.decided_by_name, at: d.decided_at };
+    decisions[d.applicant_id] = { d: d.decision, reason: d.reason, note: d.note || '', listingId: d.listing_id || null, byName: d.decided_by_name, at: d.decided_at };
   }
   commentCounts = {};
   for (const c of (cRes.data || [])) commentCounts[c.applicant_id] = (commentCounts[c.applicant_id] || 0) + 1;
 }
 
-async function saveDecision(id, d, reason, byName, note) {
+async function saveDecision(id, d, reason, byName, note, listingId) {
   if (d === null) {
     delete decisions[id];
     const { error } = await sb.from('recruit_decisions').delete().eq('applicant_id', id);
@@ -351,13 +414,25 @@ async function saveDecision(id, d, reason, byName, note) {
     return;
   }
   const name = byName || me.name;
-  decisions[id] = { d, reason: reason || null, note: note || '', byName: name, at: new Date().toISOString() };
+  const lid = d === 'outreach' ? (listingId || null) : null;
+  decisions[id] = { d, reason: reason || null, note: note || '', listingId: lid, byName: name, at: new Date().toISOString() };
   const { error } = await sb.from('recruit_decisions').upsert({
     applicant_id: id, decision: d, reason: reason || null, note: note || '',
+    listing_id: lid,
     decided_by: me.id, decided_by_name: name,
     decided_at: new Date().toISOString(),
   });
   if (error) toast(`Save failed: ${error.message}`);
+}
+
+/* Short label for what an outreach decision is attached to. */
+function attachmentLabel(rec) {
+  if (!rec || rec.d !== 'outreach') return '';
+  if (!rec.listingId) return 'General interest — future availability';
+  const l = listings.find(x => x.id === rec.listingId);
+  if (!l) return 'General interest — future availability';
+  const room = rooms.find(r => r.id === l.room_id);
+  return `${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}`;
 }
 
 /* House rule: a stated budget ceiling under $1,500/mo is an automatic pass.
@@ -541,6 +616,7 @@ function renderApplicants() {
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
                 <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
+                ${view === 'outreach' && decisions[a.id] ? `<span class="inbox-row__sub inbox-row__attach">→ ${esc(attachmentLabel(decisions[a.id]))}</span>` : ''}
               </span>
             </button>
             <span class="inbox-row__actions">
@@ -551,6 +627,7 @@ function renderApplicants() {
           </li>`).join('')}
       </ul>
     </section>`).join('');
+  hydrateAvatars(host);
 }
 
 /* ---------- occupancy ---------- */
@@ -740,6 +817,7 @@ function renderListings() {
           ${items.map(l => {
             const room = roomById[l.room_id];
             if (editingListingId === l.id) return `<li class="listing-edit-row">${listingForm(l)}</li>`;
+            const attached = applicants.filter(a => decisions[a.id]?.d === 'outreach' && decisions[a.id]?.listingId === l.id);
             return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(room?.name || 'Room')}
@@ -748,6 +826,8 @@ function renderListings() {
                 <span class="inbox-row__sub">${listingWindow(l)}</span>
                 ${l.notes ? `<span class="inbox-row__sub listing-row__notes">${esc(l.notes)}</span>` : ''}
                 <span class="inbox-row__sub listing-row__source">${SOURCE_LABELS[l.source] || ''}${l.created_by_name ? ` · ${esc(l.created_by_name)}` : ''}</span>
+                ${attached.length ? `<span class="listing-row__people">${attached.map(a =>
+                  `<button class="link-chip" data-review="${a.id}">${esc(fullName(a))}</button>`).join('')}</span>` : ''}
               </span>
               <span class="inbox-row__actions">
                 <button class="btn btn--sm inbox-row__review" data-edit-listing="${l.id}">Edit</button>
@@ -759,6 +839,17 @@ function renderListings() {
           }).join('')}
         </ul>
       </section>`).join('') : `<p class="inbox-empty">No listings yet.</p>`}
+    ${(() => {
+      const general = applicants.filter(a => decisions[a.id]?.d === 'outreach' && !decisions[a.id]?.listingId);
+      return general.length ? `<section class="inbox-group">
+        <div class="inbox-group__head">
+          <h2 class="inbox-group__label">General interest</h2>
+          <span class="inbox-group__count">${general.length} in outreach, waiting on future availability</span>
+        </div>
+        <div class="listing-general">${general.map(a =>
+          `<button class="link-chip" data-review="${a.id}">${esc(fullName(a))}</button>`).join('')}</div>
+      </section>` : '';
+    })()}
     <p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>`;
 
   document.getElementById('new-listing').onclick = () => { editingListingId = 'new'; renderListings(); };
@@ -889,6 +980,7 @@ function renderReview() {
       <div class="decision-banner__text">
         <span class="decision-banner__label">${DECISION_LABELS[rec.d]}</span>
         <span class="decision-banner__meta">${rec.reason ? esc(reasonLabel(rec.reason)) : 'No reason recorded'}${rec.byName ? ` · by ${esc(rec.byName)}` : ''}${rec.at ? ` · ${fmtDate(rec.at)}` : ''}</span>
+        ${rec.d === 'outreach' ? `<span class="decision-banner__meta">→ ${esc(attachmentLabel(rec))}</span>` : ''}
         ${rec.note ? `<span class="decision-banner__note">“${esc(rec.note)}”</span>` : ''}
       </div>
       <button class="decision-banner__undo" data-clear="${a.id}">Undo</button>
@@ -930,6 +1022,7 @@ function renderReview() {
     btn.classList.toggle(`is-active--${d}`, rec?.d === d);
   }
 
+  hydrateAvatars(document.getElementById('review-body'));
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
     if (queue[qIndex] === a.id) renderNotes(a.id);
@@ -997,7 +1090,7 @@ let pendingDecision = null;   // 'outreach' | 'hold' | 'pass' while the sheet is
 let pendingReason = null;
 let dictation = null;         // active SpeechRecognition instance
 
-function openDecisionSheet(d) {
+async function openDecisionSheet(d) {
   const a = applicants.find(x => x.id === queue[qIndex]);
   if (!a) return;
   pendingDecision = d;
@@ -1006,6 +1099,19 @@ function openDecisionSheet(d) {
   document.getElementById('decision-sheet-title').textContent =
     d === 'outreach' ? 'Why outreach?' : d === 'hold' ? 'Why hold?' : 'Why archive?';
   renderDecisionOptions();
+
+  // Outreach targets a specific open listing, or General interest.
+  const attachWrap = document.getElementById('decision-attach-wrap');
+  attachWrap.hidden = d !== 'outreach';
+  if (d === 'outreach') {
+    if (!houseLoaded) await loadHouse();
+    const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
+    const open = listings.filter(l => l.status === 'open');
+    document.getElementById('decision-listing').innerHTML =
+      `<option value="">General interest — future availability</option>` +
+      open.map(l => `<option value="${l.id}" ${rec?.listingId === l.id ? 'selected' : ''}>` +
+        `${esc(roomById[l.room_id]?.name || 'Room')} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}</option>`).join('');
+  }
   const noteEl = document.getElementById('decision-note');
   noteEl.value = (rec?.d === d ? rec.note : '') || '';
   document.getElementById('decision-use-notes').hidden = !comments.length;
@@ -1036,10 +1142,11 @@ function submitDecision() {
   const d = pendingDecision;
   const reason = pendingReason;
   const note = document.getElementById('decision-note').value.trim();
+  const listingId = d === 'outreach' ? (document.getElementById('decision-listing').value || null) : null;
   if (!reason && d !== 'outreach') { toast('Pick a reason first'); return; }
   hideDecisionSheet();
-  saveDecision(a.id, d, reason, null, note);
-  toast(`${fullName(a)} → ${DECISION_LABELS[d]}${reason ? ` (${reasonLabel(reason)})` : ''}`);
+  saveDecision(a.id, d, reason, null, note, listingId);
+  toast(`${fullName(a)} → ${DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
   if (qIndex === queue.length - 1) closeReview(); else step(1);
 }
 
@@ -1196,6 +1303,7 @@ async function _checkMembershipAndEnter() {
     const user = window.CtrlAuth.getUser();
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate' };
     await loadAll();
+    loadHouse().then(renderRailCounts); // background — outreach attachments + rail badge need it
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;

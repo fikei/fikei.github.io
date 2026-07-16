@@ -775,3 +775,12 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   background: none; border: 0; padding: 0;
   color: var(--error); font-size: var(--font-size-small); text-decoration: underline; cursor: pointer;
 }
+
+/* --- Outreach ↔ listing attachments --- */
+.inbox-row__attach { color: var(--outreach-fg); }
+.decision-sheet__attach { margin-top: var(--space-3); }
+.decision-sheet__attach .listing-status { height: 40px; }
+.listing-row__people { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+.listing-row__people .link-chip { height: 24px; font-size: var(--font-size-caption); border: 0; cursor: pointer; }
+.listing-general { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.listing-general .link-chip { border: 0; cursor: pointer; }
