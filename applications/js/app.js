@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.1.1';
+const VERSION = '2.2.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -13,7 +13,17 @@ const HOLD_REASONS = [
   { id: 'timing', label: 'Length of timing' },
   { id: 'needs', label: 'Current Agape needs (e.g. couple)' },
 ];
-const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Pass' };
+// DB keeps 'pass'; the surface calls it Archive.
+const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Archive' };
+
+const VIEWS = {
+  inbox: { title: 'Inbox', kind: 'applicants' },
+  outreach: { title: 'Outreach', kind: 'applicants' },
+  hold: { title: 'Hold', kind: 'applicants' },
+  archive: { title: 'Archive', kind: 'applicants' },
+  occupancy: { title: 'Occupancy', kind: 'house' },
+  listings: { title: 'Listings', kind: 'house' },
+};
 
 let sb = null;                // supabase client (from CtrlAuth)
 let me = null;                // { id, name }
@@ -21,7 +31,11 @@ let applicants = [];          // newest first
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let commentCounts = {};       // applicant_id -> n
 let comments = [];            // comments for the applicant open in review
-let filter = 'all';
+let view = 'inbox';           // current rail view
+let rooms = [];               // recruit_rooms
+let occupancy = [];           // recruit_occupancy rows
+let listings = [];            // recruit_listings rows
+let houseLoaded = false;
 let queue = [];
 let qIndex = 0;
 
@@ -303,21 +317,79 @@ async function loadComments(applicantId) {
   comments = error ? [] : (data || []);
 }
 
-/* ---------- inbox render ---------- */
-function matchesFilter(a) {
+/* ---------- house data ---------- */
+async function loadHouse() {
+  const [rRes, oRes, lRes] = await Promise.all([
+    sb.from('recruit_rooms').select('*').order('sort'),
+    sb.from('recruit_occupancy').select('*').order('month'),
+    sb.from('recruit_listings').select('*').order('starts_on'),
+  ]);
+  rooms = rRes.data || [];
+  occupancy = oRes.data || [];
+  listings = lRes.data || [];
+  houseLoaded = true;
+}
+
+/* ---------- router ---------- */
+function setView(next, push = true) {
+  if (!VIEWS[next]) next = 'inbox';
+  view = next;
+  if (push) {
+    const url = new URL(location);
+    url.searchParams.set('view', view);
+    url.searchParams.delete('a');
+    history.pushState(null, '', url);
+  }
+  document.getElementById('rail').classList.remove('is-open');
+  document.getElementById('rail-scrim').hidden = true;
+  render();
+}
+
+async function render() {
+  const def = VIEWS[view];
+  document.getElementById('page-title').textContent = def.title;
+  document.getElementById('mobile-title').textContent = def.title;
+  document.querySelectorAll('[data-view-link]').forEach(el =>
+    el.classList.toggle('is-current', el.dataset.viewLink === view && el.classList.contains('rail-nav__row')));
+  renderRailCounts();
+
+  const root = document.getElementById('view-root');
+  if (def.kind === 'house' && !houseLoaded) {
+    root.innerHTML = `<p class="inbox-empty">Loading…</p>`;
+    await loadHouse();
+    if (VIEWS[view].kind !== 'house') return; // navigated away meanwhile
+  }
+  if (def.kind === 'applicants') renderApplicants();
+  else if (view === 'occupancy') renderOccupancy();
+  else if (view === 'listings') renderListings();
+}
+
+/* ---------- applicants render ---------- */
+function matchesView(a) {
   const rec = decisions[a.id];
-  if (filter === 'all') return true;
-  if (filter === 'undecided') return !rec;
-  return rec?.d === filter;
+  if (view === 'inbox') return !rec;
+  if (view === 'archive') return rec?.d === 'pass';
+  return rec?.d === view;
 }
 
 function counts() {
-  const c = { all: applicants.length, undecided: 0, outreach: 0, hold: 0, pass: 0 };
+  const c = { inbox: 0, outreach: 0, hold: 0, archive: 0 };
   for (const a of applicants) {
     const rec = decisions[a.id];
-    if (!rec) c.undecided++; else c[rec.d]++;
+    if (!rec) c.inbox++;
+    else if (rec.d === 'pass') c.archive++;
+    else c[rec.d]++;
   }
+  c.listings = listings.filter(l => l.status === 'open').length;
   return c;
+}
+
+function renderRailCounts() {
+  const c = counts();
+  for (const key of ['inbox', 'outreach', 'hold', 'archive', 'listings']) {
+    const el = document.getElementById(`count-${key}`);
+    if (el) el.textContent = (key === 'listings' && !houseLoaded) ? '' : (c[key] || '');
+  }
 }
 
 function decisionChip(id) {
@@ -328,26 +400,17 @@ function decisionChip(id) {
   return `<span class="decision-chip decision-chip--${rec.d}" title="${esc(DECISION_LABELS[rec.d] + reason + by)}">${DECISION_LABELS[rec.d]}</span>`;
 }
 
-function renderFilters() {
-  const c = counts();
-  const defs = [
-    ['all', 'All'], ['undecided', 'Needs review'],
-    ['outreach', 'Outreach'], ['hold', 'Hold'], ['pass', 'Pass'],
-  ];
-  document.getElementById('filters').innerHTML = defs.map(([id, label]) =>
-    `<button class="chip ${filter === id ? 'is-on' : ''}" data-filter="${id}">${label} <span class="chip__count">${c[id]}</span></button>`
-  ).join('');
-}
-
-function renderInbox() {
-  renderFilters();
-  const list = applicants.filter(matchesFilter);
+function renderApplicants() {
+  const list = applicants.filter(matchesView);
   document.getElementById('page-sub').textContent =
-    `${applicants.length} applicants · ${counts().undecided} to review`;
+    view === 'inbox'
+      ? `${list.length} applicant${list.length === 1 ? '' : 's'} to review`
+      : `${list.length} applicant${list.length === 1 ? '' : 's'}`;
 
-  const host = document.getElementById('inbox');
+  const host = document.getElementById('view-root');
+  host.className = 'inbox';
   if (!list.length) {
-    host.innerHTML = `<p class="inbox-empty">Nothing here — every applicant in this view is decided.</p>`;
+    host.innerHTML = `<p class="inbox-empty">${view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.'}</p>`;
     return;
   }
   const groups = [];
@@ -382,9 +445,142 @@ function renderInbox() {
     </section>`).join('');
 }
 
+/* ---------- occupancy ---------- */
+const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet', candidate: 'Candidate', shared: 'Shared', vacant: 'Open' };
+
+function renderOccupancy() {
+  const host = document.getElementById('view-root');
+  host.className = 'house';
+  document.getElementById('page-sub').textContent =
+    `${rooms.length} rooms · 2026 · every name is a resident or a subletter`;
+
+  const months = [...Array(12)].map((_, i) => `2026-${String(i + 1).padStart(2, '0')}-01`);
+  const byRoom = {};
+  for (const o of occupancy) (byRoom[o.room_id] ||= {})[o.month] = o;
+  const nowKey = new Date().toISOString().slice(0, 8) + '01';
+
+  host.innerHTML = `
+    <div class="occ-legend">
+      ${['resident', 'sublet', 'candidate', 'vacant'].map(k =>
+        `<span class="occ-legend__item"><span class="occ-swatch occ-swatch--${k}"></span>${KIND_LABELS[k]}</span>`).join('')}
+      <span class="occ-legend__hint">Click an open month to create a listing · residents stay unless marked leaving</span>
+    </div>
+    <div class="occ-scroll">
+      <table class="occ">
+        <thead><tr>
+          <th class="occ__room-head">Room</th>
+          ${months.map(m => `<th class="${m === nowKey ? 'is-now' : ''}">${MONTH_ABBR[+m.slice(5, 7) - 1]}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${rooms.map(r => `
+            <tr>
+              <th class="occ__room">
+                <span class="occ__room-name">${esc(r.name)}</span>
+                <span class="occ__room-sub">${esc(r.floor)}${r.resident ? ` · ${esc(r.resident)}` : ' · open room'}</span>
+                ${r.resident ? `<button class="occ__leaving" data-leaving-room="${r.id}" title="Mark resident as leaving — creates a listing">Mark leaving</button>` : ''}
+              </th>
+              ${months.map(m => {
+                const cell = byRoom[r.id]?.[m];
+                const kind = cell?.kind || 'vacant';
+                const label = cell?.occupant || '';
+                const now = m === nowKey ? ' is-now' : '';
+                if (kind === 'vacant' && m >= nowKey) {
+                  return `<td class="occ__cell occ__cell--vacant is-listable${now}" data-list-room="${r.id}" data-list-month="${m}" title="Open — click to create a listing">${esc(label) || '+'}</td>`;
+                }
+                return `<td class="occ__cell occ__cell--${kind}${now}" title="${esc(label)} (${KIND_LABELS[kind]})">${esc(label)}</td>`;
+              }).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function createListingFromCell(roomId, month) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  const pretty = new Date(month + 'T12:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  if (!confirm(`Create a sublet listing for ${room.name} starting ${pretty}?`)) return;
+  const { data, error } = await sb.from('recruit_listings').insert({
+    room_id: roomId, kind: 'sublet', starts_on: month, status: 'open',
+    source: 'gap', notes: `Created from the occupancy grid (${pretty} open).`,
+    created_by: me.id, created_by_name: me.name,
+  }).select().single();
+  if (error) { toast(`Listing failed: ${error.message}`); return; }
+  listings.push(data);
+  toast(`Listing created — ${room.name}, ${pretty}`);
+  renderRailCounts();
+}
+
+async function markLeaving(roomId) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  const when = prompt(`Mark ${room.resident} as leaving ${room.name}.\nRoom opens from (YYYY-MM-DD):`,
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10));
+  if (!when || !/^\d{4}-\d{2}-\d{2}$/.test(when)) return;
+  const { data, error } = await sb.from('recruit_listings').insert({
+    room_id: roomId, kind: 'resident', starts_on: when, status: 'open',
+    source: 'leaving', notes: `${room.resident} marked as leaving.`,
+    created_by: me.id, created_by_name: me.name,
+  }).select().single();
+  if (error) { toast(`Listing failed: ${error.message}`); return; }
+  listings.push(data);
+  toast(`${room.resident} marked leaving — resident listing created for ${room.name}`);
+  setView('listings');
+}
+
+/* ---------- listings ---------- */
+function fmtDay(d) {
+  return new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderListings() {
+  const host = document.getElementById('view-root');
+  host.className = 'house';
+  const open = listings.filter(l => l.status === 'open').length;
+  document.getElementById('page-sub').textContent =
+    `${open} open · a listing is a future opening for a given Agape room`;
+
+  const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
+  const order = { open: 0, filled: 1, closed: 2 };
+  const sorted = [...listings].sort((a, b) => (order[a.status] - order[b.status]) || a.starts_on.localeCompare(b.starts_on));
+
+  host.innerHTML = `
+    ${sorted.length ? `<ul class="inbox-card listing-list">
+      ${sorted.map(l => {
+        const room = roomById[l.room_id];
+        const window = l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)}`;
+        return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
+          <span class="inbox-row__text">
+            <span class="inbox-row__title">${esc(room?.name || 'Room')}
+              <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident' : 'Sublet'}</span>
+            </span>
+            <span class="inbox-row__sub">${window}${l.notes ? ` · ${esc(l.notes)}` : ''}</span>
+          </span>
+          <span class="inbox-row__actions">
+            <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
+              ${['open', 'filled', 'closed'].map(s => `<option value="${s}" ${l.status === s ? 'selected' : ''}>${s[0].toUpperCase()}${s.slice(1)}</option>`).join('')}
+            </select>
+          </span>
+        </li>`;
+      }).join('')}
+    </ul>` : `<p class="inbox-empty">No listings — create one from an open month on the Occupancy grid.</p>`}
+    <p class="listing-hint">New listings come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy grid</a>: click an open month, or mark a resident as leaving.</p>`;
+}
+
+async function updateListingStatus(id, status) {
+  const l = listings.find(x => x.id === id);
+  if (!l) return;
+  const prev = l.status;
+  l.status = status;
+  const { error } = await sb.from('recruit_listings').update({ status }).eq('id', id);
+  if (error) { l.status = prev; toast(`Update failed: ${error.message}`); }
+  renderListings();
+  renderRailCounts();
+}
+
 /* ---------- review overlay ---------- */
 function openReview(id) {
-  queue = applicants.filter(matchesFilter).map(a => a.id);
+  queue = applicants.filter(matchesView).map(a => a.id);
   if (!queue.includes(id)) queue = applicants.map(a => a.id);
   qIndex = Math.max(0, queue.indexOf(id));
   document.getElementById('review').hidden = false;
@@ -399,7 +595,7 @@ function closeReview() {
   document.body.style.overflow = '';
   const url = new URL(location); url.searchParams.delete('a');
   history.replaceState(null, '', url);
-  renderInbox();
+  render();
 }
 
 function step(delta) {
@@ -671,8 +867,11 @@ async function _checkMembershipAndEnter() {
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
-    renderInbox();
-    if (autoPassed) toast(`${autoPassed} applicant${autoPassed === 1 ? '' : 's'} auto-passed (budget under $1,500)`);
+    document.getElementById('rail-user').textContent = me.name;
+    view = new URLSearchParams(location.search).get('view') || 'inbox';
+    if (!VIEWS[view]) view = 'inbox';
+    render();
+    if (autoPassed) toast(`${autoPassed} applicant${autoPassed === 1 ? '' : 's'} auto-archived (budget under $1,500)`);
     const deep = new URLSearchParams(location.search).get('a');
     if (deep && applicants.some(x => x.id === deep)) openReview(deep);
   } catch (e) {
@@ -718,29 +917,49 @@ function init() {
 
   // delegation
   document.addEventListener('click', e => {
+    const navLink = e.target.closest('[data-view-link]');
+    if (navLink) { e.preventDefault(); setView(navLink.dataset.viewLink); return; }
     const review = e.target.closest('[data-review]');
     if (review) { openReview(review.dataset.review); return; }
-    const fil = e.target.closest('[data-filter]');
-    if (fil) { filter = fil.dataset.filter; renderInbox(); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
     const reason = e.target.closest('[data-reason]');
     if (reason) { hideHoldSheet(); decide('hold', reason.dataset.reason); return; }
     const delNote = e.target.closest('[data-delete-note]');
     if (delNote) { deleteNote(delNote.dataset.deleteNote, queue[qIndex]); return; }
-    if (!e.target.closest('.page-menu')) document.getElementById('menu-list')?.classList.remove('is-open');
+    const listCell = e.target.closest('[data-list-room]');
+    if (listCell) { createListingFromCell(+listCell.dataset.listRoom, listCell.dataset.listMonth); return; }
+    const leaving = e.target.closest('[data-leaving-room]');
+    if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
+    const lstatus = e.target.closest('[data-listing-status]');
+    if (lstatus) { return; } // handled by change event on the select
   });
 
-  document.getElementById('menu-trigger').onclick = () =>
-    document.getElementById('menu-list').classList.toggle('is-open');
-  document.getElementById('menu-export').onclick = () => { exportCsv(); document.getElementById('menu-list').classList.remove('is-open'); };
-  document.getElementById('menu-theme').onclick = () => {
-    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-    document.getElementById('menu-list').classList.remove('is-open');
+  document.addEventListener('change', e => {
+    const sel = e.target.closest('[data-listing-status]');
+    if (sel) updateListingStatus(sel.dataset.listingStatus, sel.value);
+  });
+
+  window.addEventListener('popstate', () => {
+    const v = new URLSearchParams(location.search).get('view') || 'inbox';
+    setView(v, false);
+  });
+
+  // mobile drawer
+  document.getElementById('mobile-menu').onclick = () => {
+    const rail = document.getElementById('rail');
+    const open = rail.classList.toggle('is-open');
+    document.getElementById('rail-scrim').hidden = !open;
   };
+  document.getElementById('rail-scrim').onclick = () => {
+    document.getElementById('rail').classList.remove('is-open');
+    document.getElementById('rail-scrim').hidden = true;
+  };
+
+  document.getElementById('menu-export').onclick = exportCsv;
+  document.getElementById('menu-theme').onclick = () =>
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
-  document.getElementById('menu-sheet').onclick = () =>
-    window.open('https://docs.google.com/spreadsheets/d/1dyDpPv7LhFSjL2Nz2E_2GMBIR-qGZg4qW4TjEkt7Epg/edit', '_blank');
 
   document.getElementById('review-close').onclick = closeReview;
   document.getElementById('review-prev').onclick = () => step(-1);
