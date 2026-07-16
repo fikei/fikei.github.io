@@ -909,3 +909,8 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .email-row--in .email-row__dir { color: var(--success); }
 .email-row .inbox-row__sub { white-space: normal; }
 .rail-foot__edit { display: inline; color: var(--fg-subtle); font-size: var(--font-size-caption); text-decoration: underline; }
+
+/* --- v2.13: row-level reordering inside outreach groups --- */
+.inbox-row[draggable="true"] { cursor: default; }
+.inbox-row__grip { flex-shrink: 0; cursor: grab; color: var(--fg-subtle); font-size: 13px; user-select: none; }
+.inbox-row.is-dragging { opacity: 0.45; }

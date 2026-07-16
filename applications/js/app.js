@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.12.0';
+const VERSION = '2.13.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -711,7 +711,15 @@ function renderApplicants() {
       const ix = order.indexOf(x), iy = order.indexOf(y);
       return (ix === -1 ? 1e9 : ix) - (iy === -1 ? 1e9 : iy); // unknown groups sink to the bottom
     });
-    for (const key of keys) groups.push({ key, items: byKey.get(key) });
+    const rowOrder = (settings.outreach_row_order && typeof settings.outreach_row_order === 'object') ? settings.outreach_row_order : {};
+    for (const key of keys) {
+      const saved = Array.isArray(rowOrder[key]) ? rowOrder[key] : [];
+      const items = byKey.get(key).slice().sort((x, y) => {
+        const ix = saved.indexOf(x.id), iy = saved.indexOf(y.id);
+        return (ix === -1 ? 1e9 : ix) - (iy === -1 ? 1e9 : iy); // new applicants go to the bottom
+      });
+      groups.push({ key, items });
+    }
   } else {
     for (const a of list) {
       const k = monthKey(a.ts_iso);
@@ -732,14 +740,14 @@ function renderApplicants() {
 
   host.innerHTML = bar + groups.map(g => `
     <section class="inbox-group" ${view === 'outreach' ? `data-group-key="${esc(g.key)}"` : ''}>
-      <div class="inbox-group__head" ${view === 'outreach' ? 'draggable="true"' : ''}>
-        ${view === 'outreach' ? '<span class="inbox-group__grip" title="Drag to reorder">⠿</span>' : ''}
+      <div class="inbox-group__head">
         ${groupHead(g)}
         <span class="inbox-group__count">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
       </div>
       <ul class="inbox-card">
         ${g.items.map(a => `
-          <li class="inbox-row">
+          <li class="inbox-row" ${view === 'outreach' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
+            ${view === 'outreach' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
               <span class="inbox-row__text">
@@ -755,30 +763,33 @@ function renderApplicants() {
           </li>`).join('')}
       </ul>
     </section>`).join('');
-  if (view === 'outreach') wireGroupDrag(host);
+  if (view === 'outreach') wireRowDrag(host);
 }
 
-/* Drag-to-reorder the outreach listing groups; order is shared house state. */
-let dragKey = null;
-function wireGroupDrag(host) {
-  host.querySelectorAll('.inbox-group[data-group-key]').forEach(sec => {
-    const head = sec.querySelector('.inbox-group__head');
-    head.addEventListener('dragstart', e => {
-      dragKey = sec.dataset.groupKey;
-      sec.classList.add('is-dragging');
+/* Drag-to-reorder applicants inside each listing group; shared house state. */
+let dragRow = null; // { id, group }
+function wireRowDrag(host) {
+  host.querySelectorAll('.inbox-row[data-row-id]').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragRow = { id: row.dataset.rowId, group: row.dataset.rowGroup };
+      row.classList.add('is-dragging');
       e.dataTransfer.effectAllowed = 'move';
     });
-    head.addEventListener('dragend', () => { sec.classList.remove('is-dragging'); dragKey = null; });
-    sec.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-    sec.addEventListener('drop', e => {
+    row.addEventListener('dragend', () => { row.classList.remove('is-dragging'); dragRow = null; });
+    row.addEventListener('dragover', e => {
+      if (dragRow && row.dataset.rowGroup === dragRow.group) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    });
+    row.addEventListener('drop', e => {
       e.preventDefault();
-      const targetKey = sec.dataset.groupKey;
-      if (!dragKey || dragKey === targetKey) return;
-      const keys = [...host.querySelectorAll('.inbox-group[data-group-key]')].map(x => x.dataset.groupKey);
-      keys.splice(keys.indexOf(targetKey), 0, keys.splice(keys.indexOf(dragKey), 1)[0]);
-      settings.outreach_group_order = keys;
+      if (!dragRow || row.dataset.rowGroup !== dragRow.group || row.dataset.rowId === dragRow.id) return;
+      const group = dragRow.group;
+      const ids = [...host.querySelectorAll(`.inbox-row[data-row-group="${CSS.escape(group)}"]`)].map(x => x.dataset.rowId);
+      ids.splice(ids.indexOf(row.dataset.rowId), 0, ids.splice(ids.indexOf(dragRow.id), 1)[0]);
+      const rowOrder = (settings.outreach_row_order && typeof settings.outreach_row_order === 'object') ? settings.outreach_row_order : {};
+      rowOrder[group] = ids;
+      settings.outreach_row_order = rowOrder;
       sb.from('recruit_settings').upsert({
-        key: 'outreach_group_order', value: keys,
+        key: 'outreach_row_order', value: rowOrder,
         updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
       }).then(({ error }) => { if (error) toast(`Order save failed: ${error.message}`); });
       renderApplicants();
