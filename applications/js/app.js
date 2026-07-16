@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.7.1';
+const VERSION = '2.8.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -17,13 +17,14 @@ const DECISION_REASONS = {
     { id: 'other', label: 'Other' },
   ],
   hold: [
-    { id: 'fit', label: 'Fit needs 2nd review' },
-    { id: 'timing', label: 'Length or timing' },
+    { id: 'no-room', label: 'No room open for them yet' },
+    { id: 'timing', label: 'Timing — revisit later' },
+    { id: 'fit', label: 'Fit needs a 2nd review' },
     { id: 'needs', label: 'Current Agape needs (e.g. couple)' },
     { id: 'other', label: 'Other' },
   ],
   pass: [
-    { id: 'fit', label: 'Not a fit' },
+    { id: 'fit', label: 'Not a community fit' },
     { id: 'budget', label: 'Budget too low' },
     { id: 'timing', label: 'Timing doesn’t work' },
     { id: 'short', label: 'Stay too short' },
@@ -63,6 +64,7 @@ let occupancy = [];           // recruit_occupancy rows
 let listings = [];            // recruit_listings rows
 let houseLoaded = false;
 let suggestions = {};         // applicant_id -> recruit_match_suggestions row
+let settings = { open_to_couples: true };
 let queue = [];
 let qIndex = 0;
 
@@ -260,19 +262,47 @@ function linkChip(l) {
     `<span class="link-chip__icon" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="${icon}"/></svg></span>${esc(label)}</a>`;
 }
 
-/* ---------- avatars ---------- */
-/* Social profile photo via unavatar.io when a linked account exists;
-   falls back to initials when the lookup 404s or is rate-limited. */
-const AVATAR_PROVIDERS = ['github', 'x', 'instagram', 'tiktok', 'facebook', 'youtube', 'soundcloud'];
-function avatarSource(a) {
-  const metas = collectLinks(a).map(l => linkMeta(l.url));
-  for (const p of AVATAR_PROVIDERS) {
-    const m = metas.find(x => x.platform === p && x.label && x.label !== p);
-    if (m) return `https://unavatar.io/${p === 'x' ? 'twitter' : p}/${encodeURIComponent(m.label)}?fallback=false`;
+function collectLinks(a) {
+  const found = new Map();
+  const add = url => {
+    if (!url) return;
+    url = url.replace(/[.,;:!?)\]]+$/, '');
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const key = url.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+    if (!found.has(key)) found.set(key, { url, label: linkLabel(url) });
+  };
+
+  const social = a.social || '';
+  const answers = [a.about, a.why, a.gifts].join('  ');
+  const all = social + '  ' + answers;
+
+  for (const m of all.matchAll(/https?:\/\/[^\s,<>()"']+/gi)) add(m[0]);
+  for (const m of all.matchAll(/(?<![@\w.])((?:[a-z0-9-]+\.)+(?:com|org|net|io|co|ai|me|dev|house|fm|xyz))(\/[^\s,<>()"']*)?/gi)) {
+    if (/@/.test(m[0])) continue;
+    add(m[1] + (m[2] || ''));
   }
-  if (a.email) return `https://unavatar.io/gravatar/${encodeURIComponent(a.email.trim().toLowerCase())}?fallback=false`;
-  return null;
+  if (social && !/^(i don'?t|none|n\/?a|right now)/i.test(social.trim())) {
+    for (const m of social.matchAll(/(?:^|[\s,])(?:(insta(?:gram)?|ig|tiktok|fb|facebook|linkedin|twitter|x)\b[:\s]*)?@([a-z0-9._]{2,30})\b(?:\s*(?:on\s+)?\(?(insta(?:gram)?|ig|tiktok|fb|facebook)\)?)?/gi)) {
+      const hint = (m[1] || m[3] || 'instagram').toLowerCase();
+      const handle = m[2];
+      if (HANDLE_STOPWORDS.test(handle)) continue;
+      const host = /tiktok/.test(hint) ? `tiktok.com/@${handle}`
+        : /fb|facebook/.test(hint) ? `facebook.com/${handle}`
+        : /linkedin/.test(hint) ? `linkedin.com/in/${handle}`
+        : /twitter|^x$/.test(hint) ? `x.com/${handle}`
+        : `instagram.com/${handle}`;
+      add(host);
+    }
+    for (const m of social.matchAll(/(?:(insta(?:gram)?|ig|fb|facebook)\b[:\s]+([a-z0-9._]{3,30})\b|\b([a-z0-9._]{3,30})\s+on\s+(insta(?:gram)?|ig|fb|facebook)\b)/gi)) {
+      const hint = (m[1] || m[4] || '').toLowerCase();
+      const handle = m[2] || m[3];
+      if (!handle || HANDLE_STOPWORDS.test(handle)) continue;
+      add(/fb|facebook/.test(hint) ? `facebook.com/${handle}` : `instagram.com/${handle}`);
+    }
+  }
+  return [...found.values()];
 }
+
 /* Avatars are resolved once, server-side (recruit-avatar fn) from the links
    we extract, and stored on the applicant. The client just renders the URL,
    sized + cached through weserv. */
@@ -318,6 +348,11 @@ async function loadAll() {
     sb.from('recruit_match_suggestions').select('*'),
   ]);
   suggestions = Object.fromEntries((sRes.data || []).map(r => [r.applicant_id, r]));
+  sb.from('recruit_settings').select('*').then(({ data }) => {
+    for (const row of (data || [])) settings[row.key] = row.value;
+    const box = document.getElementById('pref-couples');
+    if (box) box.checked = settings.open_to_couples !== false;
+  });
   if (aRes.error) throw aRes.error;
   applicants = (aRes.data || []).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
@@ -1192,7 +1227,7 @@ async function _openDecisionSheet(d) {
   const rec = decisions[a.id];
   pendingReason = (rec?.d === d ? rec.reason : null) || null;
   document.getElementById('decision-sheet-title').textContent =
-    d === 'outreach' ? 'Why outreach?' : d === 'hold' ? 'Why hold?' : 'Why archive?';
+    d === 'outreach' ? 'Add to a listing' : d === 'hold' ? 'Future fit — why not now?' : 'Not a fit — why?';
   renderDecisionOptions();
 
   // Outreach targets a specific open listing, or General interest.
@@ -1239,7 +1274,11 @@ function renderMatchHint(a) {
       </span>
       <button type="button" class="btn btn--sm" data-use-suggestion="${esc(sug.listing_id || '')}">Use</button>
     </div>
-    ${flags.map(f => `<div class="match-flag"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc(f.message || '')}</div>`).join('')}`;
+    ${flags.map(f => {
+      const pref = f.type === 'couple' && settings.open_to_couples === false
+        ? ' House preference: not open to couples right now.' : '';
+      return `<div class="match-flag ${pref ? 'match-flag--strong' : ''}"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc((f.message || '') + pref)}</div>`;
+    }).join('')}`;
 }
 
 function renderDecisionOptions() {
@@ -1565,6 +1604,15 @@ function init() {
   document.getElementById('menu-theme').onclick = () =>
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
+  document.getElementById('pref-couples').onchange = async (e) => {
+    const value = e.target.checked;
+    settings.open_to_couples = value;
+    const { error } = await sb.from('recruit_settings').upsert({
+      key: 'open_to_couples', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+    });
+    if (error) { toast(`Preference save failed: ${error.message}`); e.target.checked = !value; settings.open_to_couples = !value; }
+    else toast(value ? 'House preference: open to couples' : 'House preference: not open to couples');
+  };
 
   document.getElementById('review-close').onclick = closeReview;
   document.getElementById('review-prev').onclick = () => step(-1);
