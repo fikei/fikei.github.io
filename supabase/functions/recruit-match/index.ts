@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -50,7 +50,7 @@ async function callClaude(prompt: string): Promise<Record<string, unknown>> {
 }
 
 // deno-lint-ignore no-explicit-any
-function buildPrompt(a: any, listings: any[], rooms: any[]) {
+function buildPrompt(a: any, listings: any[], rooms: any[], openToCouples: boolean) {
   const roomById = Object.fromEntries(rooms.map((r) => [r.id, r]))
   const listingLines = listings.map((l) => {
     const room = roomById[l.room_id]
@@ -78,6 +78,7 @@ Rules of thumb:
 - "Short (1 month or less)" or an explicitly bounded stay → sublet listings only; full-time applicants → resident-trial listings (a sublet is acceptable as a bridge only if their timing matches).
 - Timing must genuinely overlap the listing window.
 - Rooms are single-occupancy unless notes say otherwise; couples ("we", partner mentioned) usually need a large room — flag them.
+- ${openToCouples ? 'The house is currently open to couples, but still flag them so the room choice accounts for it.' : 'HOUSE PREFERENCE: the house is NOT open to couples right now — flag any couple prominently and lean toward listing_id null for them.'}
 - Budget under $1500/mo is impractical for this house — flag it.
 - If nothing fits well, return listing_id null (they stay in General interest for future availability).
 
@@ -86,8 +87,8 @@ flags must be [] when there is no practical concern.`
 }
 
 // deno-lint-ignore no-explicit-any
-async function suggestFor(client: any, applicant: any, listings: any[], rooms: any[]) {
-  const raw = await callClaude(buildPrompt(applicant, listings, rooms))
+async function suggestFor(client: any, applicant: any, listings: any[], rooms: any[], openToCouples: boolean) {
+  const raw = await callClaude(buildPrompt(applicant, listings, rooms, openToCouples))
   const listingId = typeof raw.listing_id === 'string' && raw.listing_id !== 'null' &&
     listings.some((l) => l.id === raw.listing_id) ? raw.listing_id : null
   const row = {
@@ -125,10 +126,12 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}))
-    const [{ data: listings }, { data: rooms }] = await Promise.all([
+    const [{ data: listings }, { data: rooms }, { data: settingsRows }] = await Promise.all([
       client.from('recruit_listings').select('*').eq('status', 'open'),
       client.from('recruit_rooms').select('*'),
+      client.from('recruit_settings').select('*'),
     ])
+    const openToCouples = (settingsRows || []).find((r) => r.key === 'open_to_couples')?.value !== false
 
     let targets: string[] = []
     if (body.applicantId) {
@@ -151,7 +154,7 @@ serve(async (req) => {
       const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', id).maybeSingle()
       if (!applicant) continue
       try {
-        const s = await suggestFor(client, applicant, listings || [], rooms || [])
+        const s = await suggestFor(client, applicant, listings || [], rooms || [], openToCouples)
         suggestions.push({ applicantId: id, listingId: s.listing_id, confidence: s.confidence, rationale: s.rationale, flags: s.flags })
       } catch (err) {
         console.error(`Match failed for ${id}:`, (err as Error).message)
