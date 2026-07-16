@@ -9,7 +9,7 @@
 //       { backfill: true }        resolve up to 25 unchecked applicants
 // Response: { resolved: n, remaining: n }
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 console.log(`[recruit-avatar] v${VERSION} — server-side avatar resolution`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -20,8 +20,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
-const BATCH = 25
-const PACE_MS = 1200
+const BATCH = 15
+const PACE_MS = 2500
 
 function db() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -36,7 +36,10 @@ function avatarCandidates(a: any): string[] {
   const out: Array<[number, string]> = []
   const push = (prio: number, provider: string, handle: string) => {
     if (!handle || /^(https?|www|and|but|not|the)$/i.test(handle)) return
-    out.push([prio, `https://unavatar.io/${provider}/${encodeURIComponent(handle)}?fallback=false`])
+    // direct endpoints where they exist — unavatar only for the rest
+    if (provider === 'github') out.push([prio, `https://github.com/${encodeURIComponent(handle)}.png?size=200`])
+    else if (provider === 'gravatar') out.push([prio, `GRAVATAR:${handle}`])
+    else out.push([prio, `https://unavatar.io/${provider}/${encodeURIComponent(handle)}?fallback=false`])
   }
   for (const m of all.matchAll(/github\.com\/([A-Za-z0-9-]{2,40})/g)) push(0, 'github', m[1])
   for (const m of all.matchAll(/(?:twitter|x)\.com\/([A-Za-z0-9_]{2,20})/g)) push(1, 'twitter', m[1])
@@ -55,8 +58,18 @@ function avatarCandidates(a: any): string[] {
   return [...new Set(out.sort((x, y) => x[0] - y[0]).map(x => x[1]))].slice(0, 4)
 }
 
+async function md5Hex(input: string): Promise<string> {
+  // gravatar addresses are md5-hashed; Deno's webcrypto lacks MD5, so use a
+  // tiny JS implementation via the js-md5 ESM build
+  const { default: md5 } = await import('https://esm.sh/js-md5@0.8.3')
+  return md5(input)
+}
+
 async function resolveOne(client: ReturnType<typeof db>, applicant: Record<string, unknown>): Promise<string> {
-  for (const url of avatarCandidates(applicant)) {
+  for (let url of avatarCandidates(applicant)) {
+    if (url.startsWith('GRAVATAR:')) {
+      url = `https://gravatar.com/avatar/${await md5Hex(url.slice(9))}?s=200&d=404`
+    }
     try {
       const resp = await fetch(url, { redirect: 'follow' })
       // read a little to confirm it's an image, then discard
