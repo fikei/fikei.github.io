@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.10.0';
+const VERSION = '2.11.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -89,7 +89,9 @@ const relTime = iso => {
 /* Row subline stays clean: track + move-in (+ stay length for sublets).
    Budget lives on the review page. */
 function subLine(a) {
-  const bits = [trackLabel(a)];
+  const bits = [];
+  if (a.pronouns) bits.push(a.pronouns.toLowerCase());
+  bits.push(trackLabel(a));
   const mi = normalizeMoveIn(a);
   if (mi) bits.push(mi);
   if (isSublet(a)) {
@@ -436,6 +438,47 @@ function renderReviewMatch(a) {
   if (host && queue[qIndex] === a.id) host.innerHTML = matchBlockHtml(a);
 }
 
+/* ---------- outreach email drafts ---------- */
+let emailApplicantId = null;
+
+async function openEmailModal(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  emailApplicantId = applicantId;
+  document.getElementById('email-title').textContent = `Email ${fullName(a)}`;
+  document.getElementById('email-subject').value = '';
+  document.getElementById('email-body').value = '';
+  document.getElementById('email-status').textContent = 'Drafting from their application, the listing, and any flags…';
+  document.getElementById('email-modal').hidden = false;
+  await generateEmail(applicantId);
+}
+
+async function generateEmail(applicantId) {
+  document.getElementById('email-status').textContent = 'Drafting…';
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'draft_email', applicantId }),
+    });
+    const out = await resp.json();
+    if (out.error) throw new Error(out.error);
+    if (emailApplicantId !== applicantId) return; // closed / switched meanwhile
+    document.getElementById('email-subject').value = out.subject || '';
+    document.getElementById('email-body').value = out.body || '';
+    document.getElementById('email-status').textContent = 'Edit freely, then copy.';
+  } catch (e) {
+    document.getElementById('email-status').textContent = `Draft failed: ${e.message}`;
+  }
+}
+
+function closeEmailModal() {
+  emailApplicantId = null;
+  document.getElementById('email-modal').hidden = true;
+}
+
 /* Independent AI read (Sonnet) posted into the house notes for everyone. */
 async function requestSecondOpinion(applicantId, btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
@@ -651,16 +694,44 @@ function renderApplicants() {
     host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.')}</p>`;
     return;
   }
+  // Outreach groups by listing (custom-orderable); other views group by month.
   const groups = [];
-  for (const a of list) {
-    const k = monthKey(a.ts_iso);
-    if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
-    groups[groups.length - 1].items.push(a);
+  if (view === 'outreach') {
+    const byKey = new Map();
+    for (const a of list) {
+      const key = decisions[a.id]?.listingId || 'general';
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(a);
+    }
+    const order = Array.isArray(settings.outreach_group_order) ? settings.outreach_group_order : [];
+    const keys = [...byKey.keys()].sort((x, y) => {
+      const ix = order.indexOf(x), iy = order.indexOf(y);
+      return (ix === -1 ? 1e9 : ix) - (iy === -1 ? 1e9 : iy); // unknown groups sink to the bottom
+    });
+    for (const key of keys) groups.push({ key, items: byKey.get(key) });
+  } else {
+    for (const a of list) {
+      const k = monthKey(a.ts_iso);
+      if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
+      groups[groups.length - 1].items.push(a);
+    }
   }
+
+  const groupHead = g => {
+    if (view !== 'outreach') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
+    if (g.key === 'general') return `<h2 class="inbox-group__label">General interest</h2>`;
+    const l = listings.find(x => x.id === g.key);
+    const room = rooms.find(r => r.id === l?.room_id);
+    return `<h2 class="inbox-group__label">${esc(room?.name || 'Listing')}</h2>
+      <span class="inbox-group__count">${l ? `${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}` : ''}</span>
+      <button class="inbox-group__link" data-view-link="listings" title="Open Listings">View listing →</button>`;
+  };
+
   host.innerHTML = bar + groups.map(g => `
-    <section class="inbox-group">
-      <div class="inbox-group__head">
-        <h2 class="inbox-group__label">${monthLabel(g.key)}</h2>
+    <section class="inbox-group" ${view === 'outreach' ? `data-group-key="${esc(g.key)}"` : ''}>
+      <div class="inbox-group__head" ${view === 'outreach' ? 'draggable="true"' : ''}>
+        ${view === 'outreach' ? '<span class="inbox-group__grip" title="Drag to reorder">⠿</span>' : ''}
+        ${groupHead(g)}
         <span class="inbox-group__count">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
       </div>
       <ul class="inbox-card">
@@ -671,18 +742,45 @@ function renderApplicants() {
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
                 <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
-                ${view === 'outreach' && decisions[a.id] ? `<span class="inbox-row__sub inbox-row__attach">→ ${esc(attachmentLabel(decisions[a.id]))}</span>` : ''}
-                ${view === 'outreach' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — Review to apply</span>` : ''}
+                ${view === 'outreach' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — open to apply</span>` : ''}
               </span>
             </button>
             <span class="inbox-row__actions">
               ${commentCounts[a.id] ? `<span class="note-count" title="${commentCounts[a.id]} house note${commentCounts[a.id] === 1 ? '' : 's'}">✎ ${commentCounts[a.id]}</span>` : ''}
-              ${decisionChip(a.id)}
-              <button class="btn inbox-row__review" data-review="${a.id}">Review</button>
+              ${view === 'outreach' ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${decisionChip(a.id)}<button class="btn inbox-row__review" data-review="${a.id}">Review</button>`}
             </span>
           </li>`).join('')}
       </ul>
     </section>`).join('');
+  if (view === 'outreach') wireGroupDrag(host);
+}
+
+/* Drag-to-reorder the outreach listing groups; order is shared house state. */
+let dragKey = null;
+function wireGroupDrag(host) {
+  host.querySelectorAll('.inbox-group[data-group-key]').forEach(sec => {
+    const head = sec.querySelector('.inbox-group__head');
+    head.addEventListener('dragstart', e => {
+      dragKey = sec.dataset.groupKey;
+      sec.classList.add('is-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    head.addEventListener('dragend', () => { sec.classList.remove('is-dragging'); dragKey = null; });
+    sec.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    sec.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetKey = sec.dataset.groupKey;
+      if (!dragKey || dragKey === targetKey) return;
+      const keys = [...host.querySelectorAll('.inbox-group[data-group-key]')].map(x => x.dataset.groupKey);
+      keys.splice(keys.indexOf(targetKey), 0, keys.splice(keys.indexOf(dragKey), 1)[0]);
+      settings.outreach_group_order = keys;
+      sb.from('recruit_settings').upsert({
+        key: 'outreach_group_order', value: keys,
+        updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+      }).then(({ error }) => { if (error) toast(`Order save failed: ${error.message}`); });
+      renderApplicants();
+    });
+  });
 }
 
 /* ---------- occupancy ---------- */
@@ -1604,6 +1702,8 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const em = e.target.closest('[data-email]');
+    if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
     const useSug = e.target.closest('[data-use-suggestion]');
@@ -1692,6 +1792,18 @@ function init() {
     else toast(value ? 'House preference: open to couples' : 'House preference: not open to couples');
   };
 
+  document.getElementById('email-close').onclick = closeEmailModal;
+  document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
+  document.getElementById('email-copy').onclick = async () => {
+    const text = `Subject: ${document.getElementById('email-subject').value}\n\n${document.getElementById('email-body').value}`;
+    try { await navigator.clipboard.writeText(text); toast('Email copied'); }
+    catch { toast('Copy failed — select and copy manually'); }
+  };
+  document.getElementById('email-mailto').onclick = () => {
+    const a = applicants.find(x => x.id === emailApplicantId);
+    const url = `mailto:${encodeURIComponent(a?.email || '')}?subject=${encodeURIComponent(document.getElementById('email-subject').value)}&body=${encodeURIComponent(document.getElementById('email-body').value)}`;
+    window.open(url, '_blank');
+  };
   document.getElementById('review-close').onclick = closeReview;
   document.getElementById('review-prev').onclick = () => step(-1);
   document.getElementById('review-next').onclick = () => step(1);
@@ -1707,6 +1819,9 @@ function init() {
     if (document.getElementById('review').hidden) return;
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
     if (e.key === 'Escape') { if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet(); else closeReview(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !document.getElementById('email-modal').hidden) closeEmailModal();
     if (e.key === 'ArrowRight') step(1);
     if (e.key === 'ArrowLeft') step(-1);
   });
