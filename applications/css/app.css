@@ -889,3 +889,23 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .email-modal__status { margin: 0; color: var(--fg-subtle); font-size: var(--font-size-small); min-height: 1.3em; }
 .email-modal__subject { width: 100%; height: 40px; }
 .email-modal__body { min-height: 260px; font-size: var(--font-size-small); line-height: 1.55; }
+
+/* --- v2.12: review tabs + emails --- */
+.review-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
+.review-tabs__tab {
+  background: none; border: 0; padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted); font-size: var(--font-size-body); font-weight: var(--fw-medium);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.review-tabs__tab:hover { color: var(--fg); }
+.review-tabs__tab.is-on { color: var(--fg); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
+.emails-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.email-list { padding-inline: var(--space-4); }
+.email-row { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; position: relative; }
+.email-row::after { content: ''; position: absolute; left: 28px; right: 0; bottom: 0; border-bottom: 1px solid var(--border); }
+.email-row:last-child::after { display: none; }
+.email-row__dir { flex-shrink: 0; width: 20px; text-align: center; font-weight: var(--fw-bold); }
+.email-row--out .email-row__dir { color: var(--outreach-fg); }
+.email-row--in .email-row__dir { color: var(--success); }
+.email-row .inbox-row__sub { white-space: normal; }
+.rail-foot__edit { display: inline; color: var(--fg-subtle); font-size: var(--font-size-caption); text-decoration: underline; }

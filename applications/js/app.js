@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.11.0';
+const VERSION = '2.12.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -65,6 +65,9 @@ let listings = [];            // recruit_listings rows
 let houseLoaded = false;
 let suggestions = {};         // applicant_id -> recruit_match_suggestions row
 let settings = { open_to_couples: true };
+let gmailStatus = { connected: false };
+let reviewTab = 'profile';   // 'profile' | 'emails'
+let emailsCache = {};        // applicant_id -> rows
 let queue = [];
 let qIndex = 0;
 
@@ -1215,6 +1218,7 @@ function openReview(id) {
   queue = applicants.filter(a => matchesView(a) && matchesFilters(a)).map(a => a.id);
   if (!queue.includes(id)) queue = applicants.map(a => a.id);
   qIndex = Math.max(0, queue.indexOf(id));
+  reviewTab = 'profile';
   document.getElementById('review').hidden = false;
   document.body.style.overflow = 'hidden';
   hideHoldSheet();
@@ -1299,6 +1303,11 @@ function renderReview() {
         </div>
       </div>
     </div>
+    <div class="review-tabs">
+      <button class="review-tabs__tab ${reviewTab === 'profile' ? 'is-on' : ''}" data-review-tab="profile">Profile</button>
+      <button class="review-tabs__tab ${reviewTab === 'emails' ? 'is-on' : ''}" data-review-tab="emails">Emails${(emailsCache[a.id] || []).length ? ` (${emailsCache[a.id].length})` : ''}</button>
+    </div>
+    ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : `
     <div id="review-ai">${matchBlockHtml(a)}</div>
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
@@ -1313,7 +1322,7 @@ function renderReview() {
         <textarea class="notes__input" id="notes-input" placeholder="Add an internal note for the house — only Recruiting Society members see these." maxlength="4000"></textarea>
         <button class="btn btn--accent btn--sm notes__submit" type="submit">Add note</button>
       </form>
-    </section>
+    </section>`}
   `;
 
   for (const d of ['pass', 'hold', 'outreach']) {
@@ -1321,13 +1330,14 @@ function renderReview() {
     btn.classList.toggle(`is-active--${d}`, rec?.d === d);
   }
 
+  if (reviewTab === 'emails') loadEmailsPanel(a);
   if (houseLoaded) ensureMatch(a);
   else loadHouse().then(() => { houseLoaded = true; ensureMatch(a); renderReviewMatch(a); });
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
     if (queue[qIndex] === a.id) renderNotes(a.id);
   });
-  document.getElementById('notes-form').addEventListener('submit', e => {
+  document.getElementById('notes-form')?.addEventListener('submit', e => {
     e.preventDefault();
     postNote(a.id);
   });
@@ -1381,6 +1391,50 @@ function section(title, text) {
     <h3 class="review__section-title">${title}</h3>
     <p class="review__prose">${esc(text)}</p>
   </section>`;
+}
+
+/* ---------- emails panel ---------- */
+function emailRow(m) {
+  const arrow = m.direction === 'out' ? '↗' : '↙';
+  const who = m.direction === 'out' ? `Agape${m.sent_by_name ? ` (${esc(m.sent_by_name)})` : ''}` : esc(m.from_email.replace(/<.*>/, '').trim() || m.from_email);
+  return `<li class="email-row email-row--${m.direction}">
+    <span class="email-row__dir" title="${m.direction === 'out' ? 'Sent by the house' : 'Received'}">${arrow}</span>
+    <span class="inbox-row__text">
+      <span class="inbox-row__title">${esc(m.subject || '(no subject)')}</span>
+      <span class="inbox-row__sub">${who} · ${new Date(m.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${m.snippet ? ` — ${esc(m.snippet.slice(0, 110))}` : ''}</span>
+    </span>
+  </li>`;
+}
+
+async function loadEmailsPanel(a) {
+  const host = () => document.getElementById('emails-panel');
+  if (!host()) return;
+  if (!gmailStatus.connected) {
+    host().innerHTML = `
+      <div class="match-hint">
+        <span class="match-hint__text"><strong>Shared inbox not connected.</strong>
+          <span class="match-hint__why">All applicant email runs through live.at.agapesf@gmail.com. Connect it once (you must be signed into that Google account in this browser).</span>
+        </span>
+        <button type="button" class="btn btn--sm" id="gmail-connect">Connect</button>
+      </div>`;
+    document.getElementById('gmail-connect').onclick = connectSharedGmail;
+    return;
+  }
+  host().innerHTML = `<p class="notes__empty">Syncing with the shared inbox…</p>`;
+  try {
+    const out = await gmailCall({ action: 'sync', applicantId: a.id });
+    emailsCache[a.id] = out.emails || [];
+    if (queue[qIndex] !== a.id || reviewTab !== 'emails' || !host()) return;
+    host().innerHTML = `
+      <div class="emails-toolbar">
+        <span class="notes__empty">${emailsCache[a.id].length} message${emailsCache[a.id].length === 1 ? '' : 's'} with ${esc(a.email)}</span>
+        <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
+      </div>
+      ${emailsCache[a.id].length ? `<ul class="inbox-card email-list">${emailsCache[a.id].map(emailRow).join('')}</ul>`
+        : `<p class="inbox-empty">No emails yet — Compose starts the thread through the shared account.</p>`}`;
+  } catch (e) {
+    if (host()) host().innerHTML = `<p class="notes__empty">Email sync failed: ${esc(e.message)}</p>`;
+  }
 }
 
 /* ---------- decision sheet ----------
@@ -1556,6 +1610,58 @@ function applyTheme(t) {
   localStorage.setItem('agape:theme', t);
 }
 
+/* ---------- display name + shared gmail ---------- */
+function renderRailUser() {
+  const el = document.getElementById('rail-user');
+  el.innerHTML = `${esc(me.name)} <button class="rail-foot__link rail-foot__edit" id="edit-name" title="Set display name">edit</button>`;
+  el.querySelector('#edit-name').onclick = async () => {
+    const name = prompt('Display name (shown on decisions, notes, and emails):', me.name);
+    if (!name || !name.trim()) return;
+    const clean = name.trim().slice(0, 60);
+    const { error } = await sb.from('recruit_profiles').upsert({
+      user_id: me.id, display_name: clean, updated_at: new Date().toISOString(),
+    });
+    if (error) { toast(`Save failed: ${error.message}`); return; }
+    me.name = clean;
+    renderRailUser();
+    toast(`Display name set to ${clean}`);
+  };
+}
+
+async function gmailCall(payload) {
+  const { data } = await sb.auth.getSession();
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-gmail`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data?.session?.access_token}` },
+    body: JSON.stringify(payload),
+  });
+  const out = await resp.json();
+  if (out.error) throw new Error(out.error);
+  return out;
+}
+
+/* OAuth callback (state=agape-gmail, forwarded from /ladder/). */
+async function handleGmailCallback() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('state') !== 'agape-gmail' || !params.get('code')) return;
+  const code = params.get('code');
+  const clean = new URL(location.href);
+  clean.searchParams.delete('code'); clean.searchParams.delete('state'); clean.searchParams.delete('scope');
+  history.replaceState(null, '', clean);
+  try {
+    const out = await gmailCall({ action: 'connect', code });
+    gmailStatus = { connected: true, email: out.email };
+    toast(`Shared Gmail connected: ${out.email}`);
+  } catch (e) { toast(`Gmail connect failed: ${e.message}`); }
+}
+
+async function connectSharedGmail() {
+  try {
+    const { url } = await gmailCall({ action: 'auth-url' });
+    location.href = url;
+  } catch (e) { toast(`Couldn't start Gmail connect: ${e.message}`); }
+}
+
 /* ---------- auth + boot ---------- */
 /* Direct Discord OAuth — the gate's primary action goes straight to Discord
    rather than through the multi-provider modal. */
@@ -1627,6 +1733,13 @@ async function _checkMembershipAndEnter() {
     // in — identify self, load data, render
     const user = window.CtrlAuth.getUser();
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate' };
+    sb.from('recruit_profiles').select('display_name').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.display_name) { me.name = data.display_name; renderRailUser(); } });
+    fetch(`${SUPABASE_URL}/functions/v1/recruit-gmail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
+      body: JSON.stringify({ action: 'status' }),
+    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; }).catch(() => {});
     await loadAll();
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
@@ -1638,7 +1751,8 @@ async function _checkMembershipAndEnter() {
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
-    document.getElementById('rail-user').textContent = me.name;
+    renderRailUser();
+    handleGmailCallback();
     view = new URLSearchParams(location.search).get('view') || 'inbox';
     if (!VIEWS[view]) view = 'inbox';
     render();
@@ -1702,6 +1816,8 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const rtab = e.target.closest('[data-review-tab]');
+    if (rtab) { reviewTab = rtab.dataset.reviewTab; renderReview(); return; }
     const em = e.target.closest('[data-email]');
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
@@ -1794,6 +1910,22 @@ function init() {
 
   document.getElementById('email-close').onclick = closeEmailModal;
   document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
+  document.getElementById('email-send').onclick = async () => {
+    if (!gmailStatus.connected) { toast('Connect the shared Gmail first (Emails tab)'); return; }
+    const btn = document.getElementById('email-send');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await gmailCall({
+        action: 'send', applicantId: emailApplicantId,
+        subject: document.getElementById('email-subject').value,
+        body: document.getElementById('email-body').value,
+      });
+      toast('Sent from live.at.agapesf@gmail.com');
+      delete emailsCache[emailApplicantId];
+      closeEmailModal();
+    } catch (e) { toast(`Send failed: ${e.message}`); }
+    btn.disabled = false; btn.textContent = 'Send via Agape Gmail';
+  };
   document.getElementById('email-copy').onclick = async () => {
     const text = `Subject: ${document.getElementById('email-subject').value}\n\n${document.getElementById('email-body').value}`;
     try { await navigator.clipboard.writeText(text); toast('Email copied'); }
