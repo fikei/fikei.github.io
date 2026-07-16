@@ -10,12 +10,13 @@ import { db } from '../_shared/job-db.ts';
 import { parseSectorTags } from '../_shared/sector-tags.ts';
 import { computeFit } from '../jobs-pipe/fit.ts';
 import { scoreOne } from '../_shared/job-fit-haiku.ts';
+import { compClears } from '../_shared/comp.ts';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
-console.log(`[add-role] v${VERSION} - Haiku extracts location from JD when JSON-LD/rec have none`);
+console.log(`[add-role] v${VERSION} - comp_acceptable computed deterministically from the salary range (compClears)`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -575,7 +576,7 @@ serve(async (req) => {
                candidate_breakdown  = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.breakdown) : null}::jsonb,
                candidate_rationales = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.rationales) : null}::jsonb,
                candidate_summary    = ${fitOut.candidate?.summary ?? null},
-               comp_acceptable      = ${fitOut.candidate?.compAcceptable ?? null}
+               comp_acceptable      = ${compClears(sal.range) ?? fitOut.candidate?.compAcceptable ?? null}
          where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }

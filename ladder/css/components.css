@@ -627,8 +627,9 @@ button.link-subtle {
   font-size: 13px; font-weight: var(--fw-semibold);
   line-height: 1;
 }
-.fit-breakdown__check--met   { background: rgba(47,157,77,0.15); color: var(--success, #2f9d4d); }
-.fit-breakdown__check--unmet { background: rgba(196,56,42,0.15); color: var(--error,   #c4382a); }
+.fit-breakdown__check--met     { background: rgba(47,157,77,0.15);   color: var(--success, #2f9d4d); }
+.fit-breakdown__check--unmet   { background: rgba(196,56,42,0.15);   color: var(--error,   #c4382a); }
+.fit-breakdown__check--unknown { background: rgba(255,255,255,0.06); color: var(--fg-subtle); }
 
 /* Score pair — Fit pill on top, Candidate pill below, used everywhere
    a row appears in a list. Each is independently clickable. */
