@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -149,6 +149,68 @@ async function suggestFor(client: any, applicant: any, listings: any[], rooms: a
   return row
 }
 
+// House reference copy (Notion: "Recruiting Copy" — outreach to applicants).
+const REFERENCE_COPY = `Subject line: Hi from Agape! (co-op in the Mission)
+
+Hi [name],
+
+I'm [sender]. I saw your application and wanted to share that my co-op, Agape, is looking for a new [subletter/resident].
+
+Here are the details:
+1 bedroom is available in a 13 bedroom co-op in the Mission.
+$1435 covers rent, utilities, cleaners for common spaces
++$210 for shared organic groceries
+Room available starting [date].
+
+Come live with a bunch of artists, musicians, academics, and entrepreneurs. We have a weekly vegan gf family dinner meal and often do shared activities together.
+
+agapesf.org
+instagram.com/agapeandfriends
+
+Let me know if you have any questions and if this sounds interesting to you, apply on our website so we have your info on hand! :)
+
+[sender]`
+
+// Draft a tailored outreach email for an applicant + their listing.
+// deno-lint-ignore no-explicit-any
+async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string): Promise<{ subject: string; body: string }> {
+  const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
+  const listingLine = listing
+    ? `${room?.name || 'A room'} — ${listing.kind === 'resident' ? '3-month resident trial (full residency track, house vote at the end)' : 'short-term sublet'}, available from ${listing.starts_on}${listing.ends_on ? ` through ${listing.ends_on}` : ''}${listing.notes ? `. Notes: ${listing.notes}` : ''}`
+    : 'No specific room right now — we want to keep them warm for future availability (general interest).'
+  const conflictLines = (flags || []).map((f) => `- ${f.type}: ${f.message}`).join('\n') || '(none)'
+
+  const prompt = `Draft an outreach email from ${senderName} at Agape (13-bedroom intentional community / co-op in a Victorian near Dolores Park, SF) to a housing applicant we want to move forward with.
+
+REFERENCE COPY — match this voice exactly (warm, casual, concrete, lowercase-friendly, no corporate tone):
+${REFERENCE_COPY}
+
+APPLICANT
+Name: ${applicant.first_name}
+Pronouns: ${applicant.pronouns || 'unknown'}
+Track they applied for: ${applicant.residency}
+Their move-in words: ${applicant.move_in}
+Their budget words: ${applicant.budget}
+Why they want Agape (their words): ${trim(applicant.why_agape)}
+
+WHAT WE'RE OFFERING
+${listingLine}
+
+PRACTICAL WRINKLES TO ADDRESS HONESTLY (gently, in one short line each — don't hide them, don't dwell):
+${conflictLines}
+
+Rules:
+- Tailor the middle details block to the listing kind: sublet → emphasize the window and dates; resident trial → explain the 3-month trial then house vote; general interest → say no room right now but we liked their application and will reach out when one opens.
+- Reference one specific thing from their application so it feels personal.
+- Keep the $1435 + $210 groceries structure only if a room is offered; adjust availability date to the listing.
+- Under 180 words. Sign off with ${senderName}.
+Return exactly: {"subject": "...", "body": "..."} — body with real newlines, no markdown.`
+
+  const text = await callClaudeRaw(OPINION_MODEL, 'You write warm, concise community-house outreach emails. Respond with a single JSON object only.', prompt, 700)
+  const parsed = JSON.parse(text.replace(/^```json?\s*|\s*```$/g, ''))
+  return { subject: String(parsed.subject || 'Hi from Agape!').slice(0, 150), body: String(parsed.body || '').slice(0, 3000) }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -172,6 +234,19 @@ serve(async (req) => {
       client.from('recruit_settings').select('*'),
     ])
     const openToCouples = (settingsRows || []).find((r) => r.key === 'open_to_couples')?.value !== false
+
+    if (body.action === 'draft_email' && body.applicantId) {
+      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId)).maybeSingle()
+      if (!applicant) return new Response(JSON.stringify({ error: 'Unknown applicant' }), { status: 404, headers: jsonHeaders })
+      const { data: decision } = await client.from('recruit_decisions').select('listing_id').eq('applicant_id', applicant.id).maybeSingle()
+      const { data: sug } = await client.from('recruit_match_suggestions').select('flags').eq('applicant_id', applicant.id).maybeSingle()
+      const listing = decision?.listing_id ? (listings || []).find((l) => l.id === decision.listing_id) ||
+        (await client.from('recruit_listings').select('*').eq('id', decision.listing_id).maybeSingle()).data : null
+      const room = listing ? (rooms || []).find((r) => r.id === listing.room_id) : null
+      const { data: prof } = await client.from('user_discord_membership').select('discord_username').eq('user_id', userData.user.id).maybeSingle()
+      const draft = await draftEmail(applicant, listing, room, sug?.flags || [], prof?.discord_username || 'a housemate')
+      return new Response(JSON.stringify(draft), { headers: jsonHeaders })
+    }
 
     if (body.action === 'second_opinion' && body.applicantId) {
       const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId)).maybeSingle()
