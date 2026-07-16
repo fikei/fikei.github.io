@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.8.2';
+const VERSION = '2.9.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -386,6 +386,54 @@ async function saveDecision(id, d, reason, byName, note, listingId) {
     decided_at: new Date().toISOString(),
   });
   if (error) toast(`Save failed: ${error.message}`);
+}
+
+const matchInFlight = new Set();
+
+/* Fire the matcher as soon as a reviewer lands on an applicant, so the
+   suggestion is on screen before any decision is tapped. */
+function ensureMatch(a) {
+  const sug = suggestions[a.id];
+  const fresh = sug && Date.now() - new Date(sug.created_at || 0).getTime() < 7 * 86400_000;
+  if (fresh || matchInFlight.has(a.id)) return;
+  matchInFlight.add(a.id);
+  computeMatch(a.id).finally(() => {
+    matchInFlight.delete(a.id);
+    // refresh whichever surface is showing this applicant
+    if (queue[qIndex] === a.id) {
+      renderReviewMatch(a);
+      if (pendingDecision === 'outreach') renderMatchHint(a);
+    }
+  });
+}
+
+/* One shared block: suggestion + soft flags. */
+function matchBlockHtml(a) {
+  const sug = suggestions[a.id];
+  if (!sug) {
+    return matchInFlight.has(a.id)
+      ? `<p class="match-hint match-hint--empty">Sizing up the open listings…</p>`
+      : '';
+  }
+  const flags = Array.isArray(sug.flags) ? sug.flags : [];
+  return `
+    <div class="match-hint">
+      <span class="match-hint__text"><strong>AI suggests:</strong> ${esc(matchListingLabel(sug))}
+        ${sug.confidence ? `<span class="match-hint__conf">${Math.round(sug.confidence * 100)}%</span>` : ''}
+        <span class="match-hint__why">${esc(sug.rationale || '')}</span>
+      </span>
+      <button type="button" class="btn btn--sm" data-use-suggestion="${esc(sug.listing_id || '')}" data-open-outreach>Use</button>
+    </div>
+    ${flags.map(f => {
+      const pref = f.type === 'couple' && settings.open_to_couples === false
+        ? ' House preference: not open to couples right now.' : '';
+      return `<div class="match-flag ${pref ? 'match-flag--strong' : ''}"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc((f.message || '') + pref)}</div>`;
+    }).join('')}`;
+}
+
+function renderReviewMatch(a) {
+  const host = document.getElementById('review-ai');
+  if (host && queue[qIndex] === a.id) host.innerHTML = matchBlockHtml(a);
 }
 
 /* Ask the recruit-match fn to (re)compute one applicant's suggestion. */
@@ -1129,6 +1177,7 @@ function renderReview() {
         </div>
       </div>
     </div>
+    <div id="review-ai">${matchBlockHtml(a)}</div>
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
@@ -1147,6 +1196,8 @@ function renderReview() {
     btn.classList.toggle(`is-active--${d}`, rec?.d === d);
   }
 
+  if (houseLoaded) ensureMatch(a);
+  else loadHouse().then(() => { houseLoaded = true; ensureMatch(a); renderReviewMatch(a); });
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
     if (queue[qIndex] === a.id) renderNotes(a.id);
@@ -1262,23 +1313,8 @@ function matchListingLabel(sug) {
 }
 
 function renderMatchHint(a) {
-  const host = document.getElementById('decision-ai');
-  const sug = suggestions[a.id];
-  if (!sug) { host.innerHTML = `<p class="match-hint match-hint--empty">AI match runs after you save — reopen Edit to see it.</p>`; return; }
-  const flags = Array.isArray(sug.flags) ? sug.flags : [];
-  host.innerHTML = `
-    <div class="match-hint">
-      <span class="match-hint__text"><strong>AI suggests:</strong> ${esc(matchListingLabel(sug))}
-        ${sug.confidence ? `<span class="match-hint__conf">${Math.round(sug.confidence * 100)}%</span>` : ''}
-        <span class="match-hint__why">${esc(sug.rationale || '')}</span>
-      </span>
-      <button type="button" class="btn btn--sm" data-use-suggestion="${esc(sug.listing_id || '')}">Use</button>
-    </div>
-    ${flags.map(f => {
-      const pref = f.type === 'couple' && settings.open_to_couples === false
-        ? ' House preference: not open to couples right now.' : '';
-      return `<div class="match-flag ${pref ? 'match-flag--strong' : ''}"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc((f.message || '') + pref)}</div>`;
-    }).join('')}`;
+  document.getElementById('decision-ai').innerHTML =
+    matchBlockHtml(a) || `<p class="match-hint match-hint--empty">Sizing up the open listings…</p>`;
 }
 
 function renderDecisionOptions() {
@@ -1542,7 +1578,15 @@ function init() {
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
     const useSug = e.target.closest('[data-use-suggestion]');
-    if (useSug) { document.getElementById('decision-listing').value = useSug.dataset.useSuggestion || ''; return; }
+    if (useSug) {
+      const val = useSug.dataset.useSuggestion || '';
+      if (useSug.hasAttribute('data-open-outreach') && document.getElementById('decision-sheet').hidden) {
+        openDecisionSheet('outreach').then(() => { document.getElementById('decision-listing').value = val; });
+      } else {
+        document.getElementById('decision-listing').value = val;
+      }
+      return;
+    }
     const editDec = e.target.closest('[data-edit-decision]');
     if (editDec) {
       const rec = decisions[editDec.dataset.editDecision];
