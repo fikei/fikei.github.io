@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.2.0';
+const VERSION = '2.3.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -32,6 +32,7 @@ let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let commentCounts = {};       // applicant_id -> n
 let comments = [];            // comments for the applicant open in review
 let view = 'inbox';           // current rail view
+let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
 let rooms = [];               // recruit_rooms
 let occupancy = [];           // recruit_occupancy rows
 let listings = [];            // recruit_listings rows
@@ -57,11 +58,16 @@ const relTime = iso => {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-/* Row subline stays clean: track + move-in. Budget lives on the review page. */
+/* Row subline stays clean: track + move-in (+ stay length for sublets).
+   Budget lives on the review page. */
 function subLine(a) {
   const bits = [trackLabel(a)];
   const mi = normalizeMoveIn(a);
   if (mi) bits.push(mi);
+  if (isSublet(a)) {
+    const len = stayLength(a);
+    if (len) bits.push(len);
+  }
   return bits.join(' · ');
 }
 
@@ -76,7 +82,8 @@ function normalizeMoveIn(a) {
   if (/asap|as soon as/i.test(raw)) return 'ASAP' + (flexible ? ' · flexible' : '');
 
   const found = [];
-  const rx = new RegExp(`\\b(${MONTHS.join('|')}|${MONTH_ABBR.join('|')})\\b`, 'gi');
+  // Abbreviations tolerate suffixes ("Sept", "Aug.") — match on the 3-letter stem.
+  const rx = new RegExp(`\\b(${MONTH_ABBR.join('|')})[a-z]*\\b`, 'gi');
   let m;
   while ((m = rx.exec(raw))) {
     let idx = MONTHS.findIndex(x => x.startsWith(m[1].slice(0, 3).toLowerCase()));
@@ -85,7 +92,7 @@ function normalizeMoveIn(a) {
   if (!found.length) return flexible ? 'Flexible' : '';
 
   const first = found[0];
-  const monthName = `(?:${MONTHS[first]}|${MONTH_ABBR[first]})`;
+  const monthName = `(?:${MONTHS[first]}|${MONTH_ABBR[first]}[a-z]*)`;
   const day = raw.match(new RegExp(`${monthName}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'i'))
     || raw.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${monthName}`, 'i'));
 
@@ -137,6 +144,34 @@ function normalizeBudget(raw) {
   else if (plus) label = `${fmt(hi)}+`;
   else label = fmt(hi);
   return label + '/mo';
+}
+
+/* Day-level stay length for sublets, when the move-in text carries two dates
+   ("July 28 - Aug 29", "June 21st - Sept 4th"). Null when not parseable. */
+function stayLength(a) {
+  const raw = (a.movein || '');
+  const rx = new RegExp(`\\b(${MONTH_ABBR.join('|')})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi');
+  const dates = [];
+  let m;
+  while ((m = rx.exec(raw)) && dates.length < 2) {
+    const idx = MONTH_ABBR.findIndex(x => x.toLowerCase() === m[1].slice(0, 3).toLowerCase());
+    if (idx >= 0) dates.push(new Date(2026, idx, +m[2]));
+  }
+  if (dates.length < 2) return null;
+  if (dates[1] < dates[0]) dates[1].setFullYear(dates[1].getFullYear() + 1);
+  const days = Math.round((dates[1] - dates[0]) / 86400000);
+  if (days <= 0 || days > 366) return null;
+  return days < 21 ? `${days}-day stay` : `${Math.round(days / 7)}-week stay`;
+}
+
+/* Human length of a listing window. */
+function windowLength(starts, ends) {
+  if (!ends) return null;
+  const days = Math.round((new Date(ends) - new Date(starts)) / 86400000);
+  if (days <= 0) return null;
+  if (days < 21) return `${days} days`;
+  if (days < 75) return `${Math.round(days / 7)} weeks`;
+  return `${Math.round(days / 30.4)} months`;
 }
 
 function infoDot(raw, normalized) {
@@ -372,6 +407,51 @@ function matchesView(a) {
   return rec?.d === view;
 }
 
+/* Shared filters — applied on top of whichever applicant view is open. */
+function moveInBucket(a) {
+  const norm = normalizeMoveIn(a);
+  if (!norm) return 'unknown';
+  if (/^(ASAP|Flexible)/.test(norm)) return 'flex';
+  const m = norm.match(/^([A-Z][a-z]{2})/);
+  return m ? m[1] : 'unknown';
+}
+
+function budgetBucket(a) {
+  const max = budgetMax(a.budget);
+  if (max === null) return 'unknown';
+  if (max < 2000) return 'lt2000';
+  if (max <= 2500) return 'mid';
+  return 'gt2500';
+}
+
+function matchesFilters(a) {
+  if (filters.track === 'fulltime' && isSublet(a)) return false;
+  if (filters.track === 'sublet' && !isSublet(a)) return false;
+  if (filters.month !== 'any' && moveInBucket(a) !== filters.month) return false;
+  if (filters.budget !== 'any' && budgetBucket(a) !== filters.budget) return false;
+  return true;
+}
+
+function renderFilterBar(viewList) {
+  // Move-in month chips reflect what's actually in the current view.
+  const monthsPresent = [...new Set(viewList.map(moveInBucket))].filter(b => /^[A-Z]/.test(b));
+  monthsPresent.sort((x, y) => MONTH_ABBR.indexOf(x) - MONTH_ABBR.indexOf(y));
+  const monthDefs = [['any', 'Any move-in'], ...monthsPresent.map(m => [m, m]), ['flex', 'Flexible']];
+  const groups = [
+    ['track', [['all', 'Everyone'], ['fulltime', 'Full-time'], ['sublet', 'Sublet']]],
+    ['month', monthDefs],
+    ['budget', [['any', 'Any budget'], ['lt2000', 'Under $2k'], ['mid', '$2k–2.5k'], ['gt2500', '$2.5k+']]],
+  ];
+  const active = filters.track !== 'all' || filters.month !== 'any' || filters.budget !== 'any';
+  return `<div class="filters">
+    ${groups.map(([key, defs]) => `<span class="filters__group">
+      ${defs.map(([id, label]) =>
+        `<button class="chip ${filters[key] === id ? 'is-on' : ''}" data-fkey="${key}" data-fval="${id}">${label}</button>`).join('')}
+    </span>`).join('<span class="filters__sep"></span>')}
+    ${active ? `<button class="chip chip--clear" data-fclear>Clear</button>` : ''}
+  </div>`;
+}
+
 function counts() {
   const c = { inbox: 0, outreach: 0, hold: 0, archive: 0 };
   for (const a of applicants) {
@@ -401,16 +481,19 @@ function decisionChip(id) {
 }
 
 function renderApplicants() {
-  const list = applicants.filter(matchesView);
+  const viewList = applicants.filter(matchesView);
+  const list = viewList.filter(matchesFilters);
+  const filtered = list.length !== viewList.length;
   document.getElementById('page-sub').textContent =
-    view === 'inbox'
-      ? `${list.length} applicant${list.length === 1 ? '' : 's'} to review`
-      : `${list.length} applicant${list.length === 1 ? '' : 's'}`;
+    (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
+    ` applicant${(filtered ? viewList.length : list.length) === 1 ? '' : 's'}` +
+    (view === 'inbox' ? ' to review' : '');
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
+  const bar = renderFilterBar(viewList);
   if (!list.length) {
-    host.innerHTML = `<p class="inbox-empty">${view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.'}</p>`;
+    host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.')}</p>`;
     return;
   }
   const groups = [];
@@ -419,7 +502,7 @@ function renderApplicants() {
     if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
     groups[groups.length - 1].items.push(a);
   }
-  host.innerHTML = groups.map(g => `
+  host.innerHTML = bar + groups.map(g => `
     <section class="inbox-group">
       <div class="inbox-group__head">
         <h2 class="inbox-group__label">${monthLabel(g.key)}</h2>
@@ -548,7 +631,8 @@ function renderListings() {
     ${sorted.length ? `<ul class="inbox-card listing-list">
       ${sorted.map(l => {
         const room = roomById[l.room_id];
-        const window = l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)}`;
+        const len = windowLength(l.starts_on, l.ends_on);
+        const window = (l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)}`) + (len ? ` · ${len}` : '');
         return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
           <span class="inbox-row__text">
             <span class="inbox-row__title">${esc(room?.name || 'Room')}
@@ -580,7 +664,7 @@ async function updateListingStatus(id, status) {
 
 /* ---------- review overlay ---------- */
 function openReview(id) {
-  queue = applicants.filter(matchesView).map(a => a.id);
+  queue = applicants.filter(a => matchesView(a) && matchesFilters(a)).map(a => a.id);
   if (!queue.includes(id)) queue = applicants.map(a => a.id);
   qIndex = Math.max(0, queue.indexOf(id));
   document.getElementById('review').hidden = false;
@@ -648,7 +732,7 @@ function renderReview() {
             ${a.source ? `<span class="review__badge" title="How they heard about Agape">${esc(a.source)}</span>` : ''}
           </div>
           <div class="review__facts">
-            <div class="review__fact"><span class="review__fact-label">Move-in</span><span class="review__fact-value">${esc(miNorm || a.movein || '—')} ${infoDot(a.movein, miNorm)}</span></div>
+            <div class="review__fact"><span class="review__fact-label">Move-in</span><span class="review__fact-value">${esc(miNorm || a.movein || '—')}${isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : ''} ${infoDot(a.movein, miNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
@@ -919,6 +1003,14 @@ function init() {
   document.addEventListener('click', e => {
     const navLink = e.target.closest('[data-view-link]');
     if (navLink) { e.preventDefault(); setView(navLink.dataset.viewLink); return; }
+    const fchip = e.target.closest('[data-fkey]');
+    if (fchip) {
+      filters[fchip.dataset.fkey] = fchip.dataset.fval;
+      renderApplicants();
+      return;
+    }
+    const fclear = e.target.closest('[data-fclear]');
+    if (fclear) { filters = { track: 'all', month: 'any', budget: 'any' }; renderApplicants(); return; }
     const review = e.target.closest('[data-review]');
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
