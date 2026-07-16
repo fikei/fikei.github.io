@@ -25,7 +25,7 @@ export const CANDIDATE_DIM_LABELS = {
   domain:  { label: 'Domain familiarity',  max: 15, hint: 'Worked in their sector before or domain on-ramp.' },
   stretch: { label: 'Stretch level',       max: 15, hint: 'Healthy stretch vs. comfort zone vs. risky reach.' },
   reach:   { label: 'Reach factors',       max: 10, hint: 'Specific things a hiring manager could push on — missing specialty, gaps, overqualification.' },
-  comp:    { label: 'Compensation',        max: 1,  hint: 'No money-mismatch risk — range clears your floor.', binary: true },
+  comp:    { label: 'Compensation',        max: 1,  hint: 'Posted range top clears your $200k floor. "—" means the posting doesn\'t disclose comp.', binary: true },
 };
 
 // The 1-2 fit dimensions dragging a rec's score down, as
@@ -151,7 +151,9 @@ const VIEWS = {
     breakdownOf: (row) => row.candidateBreakdown || {},
     rationalesOf:(row) => row.candidateRationales || {},
     hardFailsOf: (_row) => [],
-    binaryOf:    (row, k) => k === 'comp' ? Boolean(row.compAcceptable) : null,
+    // Tri-state: true / false / null ("comp not disclosed"). null must NOT
+    // collapse to ✗ — undisclosed is unknown, not a mismatch.
+    binaryOf:    (row, k) => k === 'comp' ? (row.compAcceptable ?? null) : null,
   },
 };
 
@@ -219,15 +221,20 @@ export function renderBreakdown(row, which = 'fit') {
         const meta = dims[k];
         const v = (breakdown && breakdown[k]) || 0;
         const binary = meta.binary === true;
-        const binaryMet = binary ? Boolean(view.binaryOf(row, k)) : null;
+        // Tri-state: true = met, false = not met, null = unknown (e.g. comp
+        // not disclosed). Unknown renders as a neutral "—", never as ✗.
+        const binaryMet = binary ? view.binaryOf(row, k) : null;
         const pct = Math.max(0, Math.min(100, (v / meta.max) * 100));
         if (binary) {
+          const state = binaryMet === null ? 'unknown' : binaryMet ? 'met' : 'unmet';
+          const glyph = { met: '✓', unmet: '✗', unknown: '—' }[state];
+          const label = { met: 'Met', unmet: 'Not met', unknown: 'Not disclosed' }[state];
           return html`
             <li class="fit-breakdown__row fit-breakdown__row--binary">
               <div class="fit-breakdown__head">
                 <span class="fit-breakdown__label">${meta.label}</span>
-                <span class=${'fit-breakdown__check ' + (binaryMet ? 'fit-breakdown__check--met' : 'fit-breakdown__check--unmet')}
-                      aria-label=${binaryMet ? 'Met' : 'Not met'}>${binaryMet ? '✓' : '✗'}</span>
+                <span class=${'fit-breakdown__check fit-breakdown__check--' + state}
+                      aria-label=${label} title=${label}>${glyph}</span>
               </div>
               <p class="fit-breakdown__hint">${rationales[k] || meta.hint}</p>
             </li>

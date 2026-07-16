@@ -17,6 +17,28 @@ const NOT_COMP_WORDS = /(budget|revenue|\bARR\b|\bGMV\b|funding|raised|savings|v
 const MIN_SALARY = 30_000;
 const MAX_SALARY = 2_000_000;
 
+// The candidate's stated base-salary floor. Also hardcoded in the Haiku
+// grading prompt (job-fit-haiku.ts) and scoreComp's reasons (fit.ts).
+export const COMP_FLOOR = 200_000;
+
+// Deterministic comp verdict: does the top of a stored salary string clear
+// the floor? Pure arithmetic — comp_acceptable must never come from an LLM
+// guess. Returns null when there's no salary or nothing parses as an annual
+// figure ("not disclosed"), which the UI renders as unknown, not a mismatch.
+export function compClears(salary: string | null | undefined, floor = COMP_FLOOR): boolean | null {
+  if (!salary) return null;
+  const txt = salary.toLowerCase().replace(/[,$\s]/g, '');
+  const nums = Array.from(txt.matchAll(/(\d+(?:\.\d+)?)(k)?/g))
+    .map(m => (m[2] === 'k' ? parseFloat(m[1]) * 1000 : parseFloat(m[1])))
+    .filter(n => Number.isFinite(n));
+  if (!nums.length) return null;
+  const top = Math.max(...nums);
+  // Sub-10k tops are percentages / hourly rates, not a base — same guard
+  // as scoreComp. Unknown, not a fail.
+  if (top < 10_000) return null;
+  return top >= floor;
+}
+
 // "$207,000", "$207000", "$185K", "148,000 USD", "148000 USD"
 const AMOUNT_RE = /(?:\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?\s?[kK]\b|\d{5,7})|(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{5,7})\s?USD\b)/g;
 

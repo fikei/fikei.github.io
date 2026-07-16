@@ -3,6 +3,7 @@
 // add-role (user-saved rows) so all entry points walk the same v3 path.
 import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { loadVisionFields } from './job-vision.ts';
+import { compClears } from './comp.ts';
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -141,9 +142,9 @@ Output JSON only:
       "domain":  "<one short sentence: sector overlap with their past work>",
       "stretch": "<one short sentence: is this a stretch up, sideways, or down>",
       "reach":   "<one short sentence: what would a hiring manager push on>",
-      "comp":    "<one short sentence: is the offered comp range likely to clear their floor>"
+      "comp":    "<one short sentence, strictly factual: state the posted range and whether its TOP clears the candidate's $200k base floor. Top ≥ $200k = clears, full stop — do NOT speculate about buffers, negotiation room, or what the candidate 'likely expects'. If no comp is disclosed, say exactly that>"
     },
-    "compAcceptable": <boolean: true if the JD-listed comp range top clears the candidate's stated comp floor of $200k base, or null when no comp is disclosed>,
+    "compAcceptable": <boolean: true if and only if the top of the disclosed comp range is ≥ the candidate's $200k base floor — a range topping at exactly $200k or above is true, no matter how small the margin. null when no comp is disclosed>,
     "summary": "<2-4 sentence prose, max 100 words. From a hiring manager's lens: can this person do the job? where are they strong? where are they reaching? Be honest about competition. Speak about the candidate in third person.>"
   }
 }
@@ -303,7 +304,10 @@ No prose outside the JSON.`;
           reach:   trim(r.reach),
           comp:    trim(r.comp),
         },
-        compAcceptable: typeof parsed.candidate.compAcceptable === 'boolean' ? parsed.candidate.compAcceptable : null,
+        // Deterministic first: comp is arithmetic, and the model editorializes
+        // ("clears the floor but only by $10k → false"). Fall back to the
+        // model's boolean only when no salary string exists to check.
+        compAcceptable: compClears(r.salary) ?? (typeof parsed.candidate.compAcceptable === 'boolean' ? parsed.candidate.compAcceptable : null),
         summary: String(parsed.candidate.summary || '').slice(0, 1200),
       };
     }

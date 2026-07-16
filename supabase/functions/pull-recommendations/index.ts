@@ -20,12 +20,12 @@ import { computeFit, type RoleRow, type UserContext as FitUserContext } from '..
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
-import { extractCompensation } from '../_shared/comp.ts';
+import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.26.1';
-console.log(`[pull-recommendations] v${VERSION} - Haiku grader also emits company_description (factual 1-2 sentence blurb) persisted on recs`);
+const VERSION = '0.27.0';
+console.log(`[pull-recommendations] v${VERSION} - comp_acceptable computed deterministically from salary (compClears), not the Haiku boolean`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -223,7 +223,7 @@ serve(async (req) => {
                candidate_breakdown  = coalesce(${candidate ? sql.json(candidate.breakdown) : null}, candidate_breakdown),
                candidate_rationales = coalesce(${candidate ? sql.json(candidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${candidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = coalesce(${candidate?.compAcceptable ?? null}, comp_acceptable)
+               comp_acceptable      = ${compClears(r.salary || extractedComp) ?? candidate?.compAcceptable ?? null}
          where id = ${r.id}
       `;
       updated++;
@@ -277,7 +277,7 @@ serve(async (req) => {
                candidate_breakdown  = coalesce(${pipeCandidate ? sql.json(pipeCandidate.breakdown) : null}, candidate_breakdown),
                candidate_rationales = coalesce(${pipeCandidate ? sql.json(pipeCandidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${pipeCandidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = coalesce(${pipeCandidate?.compAcceptable ?? null}, comp_acceptable)
+               comp_acceptable      = ${compClears(r.salary_range || pipeExtractedComp) ?? pipeCandidate?.compAcceptable ?? null}
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
@@ -834,7 +834,7 @@ async function enrichAndScoreNewRows(
              candidate_breakdown  = ${candidate ? sql.json(candidate.breakdown) : null},
              candidate_rationales = ${candidate ? sql.json(candidate.rationales) : null},
              candidate_summary    = ${candidate?.summary ?? null},
-             comp_acceptable      = ${candidate?.compAcceptable ?? null}
+             comp_acceptable      = ${compClears(salary) ?? candidate?.compAcceptable ?? null}
        where id = ${r.id}::uuid`;
   }
 }
