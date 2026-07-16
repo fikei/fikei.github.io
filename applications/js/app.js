@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.5.0';
+const VERSION = '2.6.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -631,7 +631,7 @@ function renderApplicants() {
 }
 
 /* ---------- occupancy ---------- */
-const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet', candidate: 'Candidate', shared: 'Shared', vacant: 'Open' };
+const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet (short-term)', candidate: 'Trial candidate', shared: 'Shared', vacant: 'Open' };
 
 /* Google-Calendar-style lanes: one row per room, continuous colored spans
    per occupant stretch (not spreadsheet cells), month gridlines + today rule. */
@@ -651,6 +651,8 @@ function occupancySegments(roomId) {
   return segs;
 }
 
+let editingSegment = null;   // { roomId, start, len, kind, label } while the editor is open
+
 function renderOccupancy() {
   const host = document.getElementById('view-root');
   host.className = 'house';
@@ -661,13 +663,12 @@ function renderOccupancy() {
   const nowIdx = now.getFullYear() === 2026 ? now.getMonth() : (now.getFullYear() < 2026 ? -1 : 12);
   const todayPct = nowIdx >= 0 && nowIdx < 12
     ? ((nowIdx + (now.getDate() - 1) / 31) / 12) * 100 : null;
-  const nowKey = `2026-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
   host.innerHTML = `
     <div class="occ-legend">
       ${['resident', 'sublet', 'candidate', 'vacant'].map(k =>
         `<span class="occ-legend__item"><span class="occ-swatch occ-swatch--${k}"></span>${KIND_LABELS[k]}</span>`).join('')}
-      <span class="occ-legend__hint">Click an open stretch to create a listing · residents stay unless marked leaving</span>
+      <span class="occ-legend__hint">Click any bar to adjust dates, change who's in the room, or mark a resident as leaving</span>
     </div>
     <div class="cal">
       <div class="cal__head">
@@ -683,24 +684,160 @@ function renderOccupancy() {
             <div class="cal__room-col">
               <span class="occ__room-name">${esc(r.name)}</span>
               <span class="occ__room-sub">${esc(r.floor)}${r.resident ? ` · ${esc(r.resident)}` : ' · open room'}</span>
-              ${r.resident ? `<button class="occ__leaving" data-leaving-room="${r.id}">Mark leaving</button>` : ''}
             </div>
             <div class="cal__lane">
               ${occupancySegments(r.id).map(s => {
                 const style = `left: ${(s.start / 12) * 100}%; width: ${(s.len / 12) * 100}%`;
-                const listable = s.kind === 'vacant' && s.month >= nowKey;
                 const title = s.kind === 'vacant'
-                  ? (listable ? 'Open — click to create a listing' : 'Was open')
-                  : `${s.label} · ${KIND_LABELS[s.kind]} · ${MONTH_ABBR[s.start]}${s.len > 1 ? `–${MONTH_ABBR[s.start + s.len - 1]}` : ''}`;
-                return `<span class="cal__event cal__event--${s.kind} ${listable ? 'is-listable' : ''}"
+                  ? 'Open — click to edit or list'
+                  : `${s.label} · ${KIND_LABELS[s.kind]} · ${MONTH_ABBR[s.start]}${s.len > 1 ? `–${MONTH_ABBR[s.start + s.len - 1]}` : ''} · click to edit`;
+                const active = editingSegment && editingSegment.roomId === r.id && editingSegment.start === s.start;
+                return `<button type="button" class="cal__event cal__event--${s.kind} ${active ? 'is-editing' : ''}"
                   style="${style}" title="${esc(title)}"
-                  ${listable ? `data-list-room="${r.id}" data-list-month="${s.month}"` : ''}>
-                  ${s.kind === 'vacant' ? (listable ? '+ List' : '') : esc(s.label)}</span>`;
+                  data-seg-room="${r.id}" data-seg-start="${s.start}" data-seg-len="${s.len}">
+                  ${s.kind === 'vacant' ? 'Open' : esc(s.label)}</button>`;
               }).join('')}
             </div>
           </div>`).join('')}
       </div>
-    </div>`;
+    </div>
+    <div id="seg-editor">${editingSegment ? segmentEditorHtml() : ''}</div>
+    ${occupantsHtml()}`;
+
+  const segForm = host.querySelector('[data-seg-form]');
+  if (segForm) {
+    segForm.addEventListener('submit', onSegmentSave);
+    segForm.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+/* --- segment editor: adjust who is in the room and for which months --- */
+function segmentEditorHtml() {
+  const { roomId, start, len, kind, label } = editingSegment;
+  const room = rooms.find(r => r.id === roomId);
+  const monthOpts = sel => MONTH_ABBR.map((m, i) =>
+    `<option value="${i}" ${i === sel ? 'selected' : ''}>${m} 2026</option>`).join('');
+  return `<form class="listing-form seg-form" data-seg-form>
+    <div class="seg-form__head">
+      <strong>${esc(room?.name || 'Room')}</strong>
+      <span class="occ__room-sub">${MONTH_ABBR[start]}–${MONTH_ABBR[start + len - 1]} 2026</span>
+    </div>
+    <div class="listing-form__grid">
+      <label class="listing-form__field">Who
+        <input type="text" name="occupant" class="listing-status" value="${esc(kind === 'vacant' ? '' : label)}" placeholder="Empty = open">
+      </label>
+      <label class="listing-form__field">Type
+        <select name="kind" class="listing-status">
+          ${['resident', 'sublet', 'candidate', 'shared', 'vacant'].map(k =>
+            `<option value="${k}" ${kind === k ? 'selected' : ''}>${KIND_LABELS[k]}</option>`).join('')}
+        </select>
+      </label>
+      <label class="listing-form__field">From
+        <select name="from" class="listing-status">${monthOpts(start)}</select>
+      </label>
+      <label class="listing-form__field">Through
+        <select name="to" class="listing-status">${monthOpts(start + len - 1)}</select>
+      </label>
+    </div>
+    <p class="listing-form__error" data-form-error></p>
+    <div class="decision-sheet__actions seg-form__actions">
+      ${kind === 'resident' ? `<button type="button" class="listing-form__delete" data-seg-leaving="${roomId}" data-seg-month="${start}">Mark leaving — list this room</button>` : ''}
+      ${kind === 'vacant' ? `<button type="button" class="listing-form__delete seg-form__list" data-list-room="${roomId}" data-list-month="2026-${String(start + 1).padStart(2, '0')}-01">Create listing for this stretch</button>` : ''}
+      <button type="button" class="hold-sheet__cancel" data-seg-cancel>Cancel</button>
+      <button type="submit" class="btn btn--accent btn--sm">Save months</button>
+    </div>
+  </form>`;
+}
+
+async function onSegmentSave(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const seg = editingSegment;
+  const from = +fd.get('from'), to = +fd.get('to');
+  const err = e.target.querySelector('[data-form-error]');
+  if (to < from) { err.textContent = '"Through" must be at or after "From".'; return; }
+  const occupant = (fd.get('occupant') || '').trim();
+  let kind = fd.get('kind');
+  if (!occupant && kind !== 'shared') kind = 'vacant';
+  if (occupant && kind === 'vacant') kind = 'sublet';
+
+  // months inside the new range take the values; months freed up become open
+  const monthKeyOf = i => `2026-${String(i + 1).padStart(2, '0')}-01`;
+  const rows = [];
+  for (let i = Math.min(from, seg.start); i <= Math.max(to, seg.start + seg.len - 1); i++) {
+    const inNew = i >= from && i <= to;
+    rows.push({
+      room_id: seg.roomId, month: monthKeyOf(i),
+      occupant: inNew ? occupant : '',
+      kind: inNew ? kind : 'vacant',
+    });
+  }
+  const { error } = await sb.from('recruit_occupancy').upsert(rows, { onConflict: 'room_id,month' });
+  if (error) { err.textContent = error.message; return; }
+  for (const row of rows) {
+    const existing = occupancy.find(o => o.room_id === row.room_id && o.month === row.month);
+    if (existing) Object.assign(existing, row); else occupancy.push(row);
+  }
+  editingSegment = null;
+  toast('Occupancy updated');
+  renderOccupancy();
+}
+
+/* --- current + past occupants --- */
+function occupantsHtml() {
+  const now = new Date();
+  const nowKey = `2026-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
+  const current = occupancy
+    .filter(o => o.month === nowKey && o.kind !== 'vacant' && o.occupant)
+    .sort((a, b) => (roomById[a.room_id]?.sort || 0) - (roomById[b.room_id]?.sort || 0));
+
+  const currentNames = new Set(current.map(o => o.occupant.toLowerCase()));
+  const pastMap = new Map(); // occupant label -> { rooms:Set, last:monthIdx }
+  for (const o of occupancy) {
+    if (o.month >= nowKey || o.kind === 'vacant' || o.kind === 'shared' || !o.occupant) continue;
+    if (currentNames.has(o.occupant.toLowerCase())) continue;
+    const rec = pastMap.get(o.occupant) || { rooms: new Set(), last: 0 };
+    rec.rooms.add(roomById[o.room_id]?.name || '');
+    rec.last = Math.max(rec.last, +o.month.slice(5, 7) - 1);
+    pastMap.set(o.occupant, rec);
+  }
+  const past = [...pastMap.entries()].sort((a, b) => b[1].last - a[1].last);
+
+  return `
+    <section class="inbox-group occupants">
+      <div class="inbox-group__head">
+        <h2 class="inbox-group__label">Current occupants</h2>
+        <span class="inbox-group__count">${current.length} this month</span>
+      </div>
+      <ul class="inbox-card">
+        ${current.map(o => {
+          const room = roomById[o.room_id];
+          return `<li class="inbox-row">
+            <span class="avatar">${esc((o.occupant[0] || '?').toUpperCase())}</span>
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(o.occupant)}</span>
+              <span class="inbox-row__sub">${esc(room?.name || '')} · ${esc(room?.floor || '')}</span>
+            </span>
+            <span class="inbox-row__actions">
+              <span class="listing-kind listing-kind--${o.kind === 'candidate' ? 'trial' : (o.kind === 'resident' ? 'resident' : 'sublet')}">${KIND_LABELS[o.kind]}</span>
+            </span>
+          </li>`;
+        }).join('')}
+      </ul>
+      ${past.length ? `<details class="occupants__past">
+        <summary>Past occupants this year (${past.length})</summary>
+        <ul class="inbox-card">
+          ${past.map(([name, rec]) => `<li class="inbox-row">
+            <span class="avatar">${esc((name[0] || '?').toUpperCase())}</span>
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(name)}</span>
+              <span class="inbox-row__sub">${esc([...rec.rooms].filter(Boolean).join(', '))} · through ${MONTH_ABBR[rec.last]} 2026</span>
+            </span>
+          </li>`).join('')}
+        </ul>
+      </details>` : ''}
+    </section>`;
 }
 
 async function createListingFromCell(roomId, month) {
@@ -710,29 +847,31 @@ async function createListingFromCell(roomId, month) {
   if (!confirm(`Create a sublet listing for ${room.name} starting ${pretty}?`)) return;
   const { data, error } = await sb.from('recruit_listings').insert({
     room_id: roomId, kind: 'sublet', starts_on: month, status: 'open',
-    source: 'gap', notes: `Created from the occupancy grid (${pretty} open).`,
+    source: 'gap', notes: `Created from the occupancy calendar (${pretty} open).`,
     created_by: me.id, created_by_name: me.name,
   }).select().single();
   if (error) { toast(`Listing failed: ${error.message}`); return; }
   listings.push(data);
   toast(`Listing created — ${room.name}, ${pretty}`);
+  editingSegment = null;
+  renderOccupancy();
   renderRailCounts();
 }
 
-async function markLeaving(roomId) {
+async function markLeaving(roomId, defaultDate) {
   const room = rooms.find(r => r.id === roomId);
   if (!room) return;
-  const when = prompt(`Mark ${room.resident} as leaving ${room.name}.\nRoom opens from (YYYY-MM-DD):`,
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10));
+  const when = prompt(`Mark ${room.resident || 'the resident'} as leaving ${room.name}.\nRoom opens from (YYYY-MM-DD):`,
+    defaultDate || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10));
   if (!when || !/^\d{4}-\d{2}-\d{2}$/.test(when)) return;
   const { data, error } = await sb.from('recruit_listings').insert({
     room_id: roomId, kind: 'resident', starts_on: when, status: 'open',
-    source: 'leaving', notes: `${room.resident} marked as leaving.`,
+    source: 'leaving', notes: `${room.resident || 'Resident'} marked as leaving.`,
     created_by: me.id, created_by_name: me.name,
   }).select().single();
   if (error) { toast(`Listing failed: ${error.message}`); return; }
   listings.push(data);
-  toast(`${room.resident} marked leaving — resident listing created for ${room.name}`);
+  toast(`${room.resident || 'Resident'} marked leaving — resident listing created for ${room.name}`);
   setView('listings');
 }
 
@@ -983,7 +1122,10 @@ function renderReview() {
         ${rec.d === 'outreach' ? `<span class="decision-banner__meta">→ ${esc(attachmentLabel(rec))}</span>` : ''}
         ${rec.note ? `<span class="decision-banner__note">“${esc(rec.note)}”</span>` : ''}
       </div>
-      <button class="decision-banner__undo" data-clear="${a.id}">Undo</button>
+      <span class="decision-banner__actions">
+        <button class="decision-banner__undo" data-edit-decision="${a.id}">Edit</button>
+        <button class="decision-banner__undo" data-clear="${a.id}">Undo</button>
+      </span>
     </div>` : ''}
     <div class="review__card">
       <div class="review__head">
@@ -1088,9 +1230,15 @@ function section(title, text) {
    note — typed, dictated (Web Speech), or pulled from the house notes. */
 let pendingDecision = null;   // 'outreach' | 'hold' | 'pass' while the sheet is open
 let pendingReason = null;
+let sheetMode = 'decide';     // 'decide' advances the queue on save; 'edit' stays put
 let dictation = null;         // active SpeechRecognition instance
 
-async function openDecisionSheet(d) {
+async function openDecisionSheet(d, mode = 'decide') {
+  sheetMode = mode;
+  return _openDecisionSheet(d);
+}
+
+async function _openDecisionSheet(d) {
   const a = applicants.find(x => x.id === queue[qIndex]);
   if (!a) return;
   pendingDecision = d;
@@ -1131,6 +1279,7 @@ function hideDecisionSheet() {
   stopDictation();
   pendingDecision = null;
   pendingReason = null;
+  sheetMode = 'decide';
   document.getElementById('decision-sheet').hidden = true;
   document.getElementById('review-foot').hidden = false;
 }
@@ -1144,9 +1293,11 @@ function submitDecision() {
   const note = document.getElementById('decision-note').value.trim();
   const listingId = d === 'outreach' ? (document.getElementById('decision-listing').value || null) : null;
   if (!reason && d !== 'outreach') { toast('Pick a reason first'); return; }
+  const editing = sheetMode === 'edit';
   hideDecisionSheet();
   saveDecision(a.id, d, reason, null, note, listingId);
   toast(`${fullName(a)} → ${DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
+  if (editing) { renderReview(); return; }
   if (qIndex === queue.length - 1) closeReview(); else step(1);
 }
 
@@ -1371,12 +1522,35 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const editDec = e.target.closest('[data-edit-decision]');
+    if (editDec) {
+      const rec = decisions[editDec.dataset.editDecision];
+      if (rec) openDecisionSheet(rec.d, 'edit');
+      return;
+    }
     const reason = e.target.closest('[data-reason]');
     if (reason) { pendingReason = reason.dataset.reason; renderDecisionOptions(); return; }
     const delNote = e.target.closest('[data-delete-note]');
     if (delNote) { deleteNote(delNote.dataset.deleteNote, queue[qIndex]); return; }
     const listCell = e.target.closest('[data-list-room]');
     if (listCell) { createListingFromCell(+listCell.dataset.listRoom, listCell.dataset.listMonth); return; }
+    const segLeaving = e.target.closest('[data-seg-leaving]');
+    if (segLeaving) {
+      const m = +segLeaving.dataset.segMonth;
+      markLeaving(+segLeaving.dataset.segLeaving, `2026-${String(m + 1).padStart(2, '0')}-01`);
+      return;
+    }
+    const seg = e.target.closest('[data-seg-room]');
+    if (seg) {
+      const roomId = +seg.dataset.segRoom, start = +seg.dataset.segStart;
+      const match = occupancySegments(roomId).find(x => x.start === start);
+      const already = editingSegment && editingSegment.roomId === roomId && editingSegment.start === start;
+      editingSegment = (match && !already) ? { roomId, ...match } : null;
+      renderOccupancy();
+      return;
+    }
+    const segCancel = e.target.closest('[data-seg-cancel]');
+    if (segCancel) { editingSegment = null; renderOccupancy(); return; }
     const leaving = e.target.closest('[data-leaving-room]');
     if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
     const editL = e.target.closest('[data-edit-listing]');
