@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.1.0';
+const VERSION = '2.1.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -620,7 +620,18 @@ function setGate(sub, btnLabel, hint) {
     'Access is limited to members of the Recruiting Society channel on the Agape server.';
 }
 
+let _entering = false;
 async function checkMembershipAndEnter() {
+  // CtrlAuth can dispatch signedin twice (fast-restore + auth event); the
+  // enter sequence (load + auto-pass + toast) must only run once.
+  if (_entering) return;
+  _entering = true;
+  try { await _checkMembershipAndEnter(); } finally {
+    if (document.getElementById('app').hidden) _entering = false; // gate paths may retry
+  }
+}
+
+async function _checkMembershipAndEnter() {
   const session = await sb.auth.getSession();
   const token = session?.data?.session?.access_token;
   if (!token) return;
