@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.14.0';
+const VERSION = '2.14.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -366,7 +366,7 @@ async function loadAll() {
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
-    movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url,
+    movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url, scheduleToken: r.schedule_token,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -1466,7 +1466,10 @@ async function loadEmailsPanel(a) {
       ${schedulingHtml(a)}
       <div class="emails-toolbar">
         <span class="notes__empty">${emailsCache[a.id].length} message${emailsCache[a.id].length === 1 ? '' : 's'} with ${esc(a.email)}</span>
-        <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
+        <span class="emails-toolbar__actions">
+          ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
+          <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
+        </span>
       </div>
       ${emailsCache[a.id].length ? `<ul class="inbox-card email-list">${emailsCache[a.id].map(emailRow).join('')}</ul>`
         : `<p class="inbox-empty">No emails yet — Compose starts the thread through the shared account.</p>`}`;
@@ -1913,6 +1916,13 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const cps = e.target.closest('[data-copy-schedule]');
+    if (cps) {
+      const a = applicants.find(x => x.id === cps.dataset.copySchedule);
+      navigator.clipboard.writeText(`https://ctrl.rodeo/applications/schedule/?t=${a?.scheduleToken}`)
+        .then(() => toast('Availability link copied'));
+      return;
+    }
     const slot = e.target.closest('[data-slot]');
     if (slot) { scheduleSlot(slot.dataset.slotApplicant, slot.dataset.slot, slot); return; }
     const rtab = e.target.closest('[data-review-tab]');
