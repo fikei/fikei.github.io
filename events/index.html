@@ -2091,8 +2091,8 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.43.0';
-  console.log(`[events] v${VERSION} - filter button stays inline-left of the chip slider in every state (no mobile top-right pin)`);
+  const VERSION = '1.43.1';
+  console.log(`[events] v${VERSION} - cloud-synced users also auto-add new stock sources (Curiosity Guild)`);
 
   // ============================================
   // Stock Sources Catalog
@@ -2486,14 +2486,24 @@ body {
       state.sources = [{ ...def, enabled: true }];
     }
 
-    // Auto-add new Bay Area stock sources for existing users. New venues used
-    // to require a manual visit to Settings, so their events were invisible
-    // (bit us three times: Bottom of the Hill, Frontier Tower, Ticketmaster
-    // venues). Tombstoned sources — ones the user removed — stay removed.
+    autoAddNewStockSources();
+
+    saveSources();
+    log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
+  }
+
+  // Auto-add new Bay Area stock sources for existing users. New venues used
+  // to require a manual visit to Settings, so their events were invisible
+  // (bit us three times: Bottom of the Hill, Frontier Tower, Ticketmaster
+  // venues). Tombstoned sources — ones the user removed — stay removed.
+  // Runs in BOTH source-loading paths: localStorage (loadSources) and cloud
+  // (loadSourcesCloud) — the cloud row is the source of truth for signed-in
+  // users, so reconciling only localStorage left them without new sources.
+  function autoAddNewStockSources() {
+    let autoAdded = 0;
     try {
       const removed = new Set(JSON.parse(localStorage.getItem('ctrl-rodeo-removed-sources') || '[]'));
       const have = new Set(state.sources.map(s => s.id));
-      let autoAdded = 0;
       for (const stock of STOCK_SOURCES) {
         if (stock.region !== 'bay-area') continue;
         if (have.has(stock.id) || removed.has(stock.id)) continue;
@@ -2502,9 +2512,7 @@ body {
       }
       if (autoAdded > 0) log(`Auto-added ${autoAdded} new stock source(s)`);
     } catch (e) { /* ignore */ }
-
-    saveSources();
-    log('Active sources:', state.sources.filter(s => s.enabled).map(s => `${s.name} (${s.type})`));
+    return autoAdded;
   }
 
   function saveSources() {
@@ -2608,6 +2616,10 @@ body {
 
       // Use cloud sources as the source of truth
       state.sources = cloudSources;
+      // Reconcile new stock sources into the cloud list too — otherwise
+      // signed-in users never pick up newly registered sources (the cloud
+      // row overrides the localStorage list where auto-add already ran)
+      autoAddNewStockSources();
       state.onboarded = data.onboarded ?? true;
       if (data.settings?.view) state.view = data.settings.view;
       if (data.settings?.sort) state.sort = data.settings.sort;
