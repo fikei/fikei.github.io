@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.6.0'
+const VERSION = '1.7.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -178,6 +178,7 @@ Let me know if you have any questions!
 // Draft a tailored outreach email for an applicant + their listing.
 // deno-lint-ignore no-explicit-any
 async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string): Promise<{ subject: string; body: string }> {
+  const scheduleUrl = applicant.schedule_token ? `https://ctrl.rodeo/applications/schedule/?t=${applicant.schedule_token}` : null
   const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
   const pricing = listing ? [
     listing.rent_monthly != null ? `$${listing.rent_monthly} rent (covers utilities and cleaners for common spaces)` : null,
@@ -211,7 +212,7 @@ ${conflictLines}
 Hard rules:
 - This is a RESPONSE to their application, never cold outreach. Open by acknowledging their application to Agape ("thanks for applying", "we read your application", etc.). Do NOT introduce or pitch Agape as if they don't know it — they applied; skip the agapesf.org/instagram links and the "come live with artists..." pitch line entirely.
 - Never say "apply on our website" — they already did.
-- The CTA is ALWAYS to set up an initial screening call with a housemate: ask them to either share a Calendly (or similar scheduling) link, OR reply with 3 days where they have at least a couple hours of availability, so we can match them with a housemate for a get-to-know-you call. This is the single ask — don't offer dinners/visits as the first step.
+- The CTA is ALWAYS to set up an initial screening call with a housemate. ${scheduleUrl ? `Primary ask: pick your availability at ${scheduleUrl} (takes a minute) — include this exact URL on its own line. Secondary: or just reply with 3 days where you have a couple hours free.` : 'Ask them to reply with 3 days where they have at least a couple hours of availability.'} This is the single ask — don't offer dinners/visits as the first step.
 - Reference one specific thing they wrote so it reads personally — ideally connect it to house life.
 - Details block: tailor to the listing kind. Sublet → the window and dates matter most. Resident trial → explain plainly: the room starts as a 3-month trial, then the house votes on full residency. General interest → no room right now, we liked their application, we'll reach out when one opens (no details block).
 - Pricing: if the listing carries exact numbers, use them verbatim in the details block; if a room is offered without numbers, keep the reference $1490 + $210 structure but phrase availability/pricing as "roughly" so nobody quotes it as final.

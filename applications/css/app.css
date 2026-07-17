@@ -928,3 +928,4 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .avail-card__slots { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .avail-card__slots .chip { height: 28px; }
 .screening-card { margin-bottom: var(--space-4); background: var(--outreach-tint); }
+.emails-toolbar__actions { display: inline-flex; gap: var(--space-2); }

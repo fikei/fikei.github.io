@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Share your availability — Agape</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FAFAF9; --bg-surface: #F4F4F2; --bg-elevated: #FFFFFF;
+      --fg: #0E0F0C; --fg-muted: #454745; --fg-subtle: #6A6C6A;
+      --accent: #1D4ED8; --accent-strong: #5CB2FF; --accent-strong-fg: #06264D;
+      --border: rgba(14,15,12,0.12); --border-strong: rgba(14,15,12,0.24);
+      --error: #A8200D; --ok: #2F5711;
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117; --bg-surface: #161b22; --bg-elevated: #1f2630;
+        --fg: #f0f6fc; --fg-muted: rgba(240,246,252,0.72); --fg-subtle: rgba(240,246,252,0.5);
+        --accent: #5CB2FF; --accent-strong: #5CB2FF; --accent-strong-fg: #06264D;
+        --border: rgba(240,246,252,0.12); --border-strong: rgba(240,246,252,0.24);
+        --error: #FF7A6E; --ok: #9FE870;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 15px/1.5 'Inter', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: grid; place-items: start center; min-height: 100vh; padding: 24px 16px 64px;
+    }
+    .card {
+      width: 100%; max-width: 560px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px 24px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+    p { margin: 0; color: var(--fg-muted); }
+    .muted { color: var(--fg-subtle); font-size: 13px; }
+    .window {
+      display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 8px; align-items: end;
+    }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--fg-subtle); }
+    input, select {
+      height: 40px; padding: 0 10px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg-surface); color: var(--fg); font: inherit;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    .remove {
+      height: 40px; width: 40px; border: 0; border-radius: 999px;
+      background: transparent; color: var(--fg-subtle); font-size: 16px; cursor: pointer;
+    }
+    .remove:hover { color: var(--error); background: var(--bg-surface); }
+    .add {
+      align-self: flex-start; background: none; border: 1px dashed var(--border-strong);
+      border-radius: 999px; padding: 8px 16px; color: var(--fg-muted); font: inherit; cursor: pointer;
+    }
+    .add:hover { color: var(--fg); }
+    .submit {
+      height: 48px; border: 0; border-radius: 999px;
+      background: var(--accent-strong); color: var(--accent-strong-fg);
+      font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+    }
+    .submit:disabled { opacity: 0.6; cursor: default; }
+    .status { min-height: 1.4em; font-size: 13px; }
+    .status.err { color: var(--error); }
+    .status.ok { color: var(--ok); }
+    .done { text-align: center; padding: 24px 0; }
+    .done h2 { margin: 0 0 8px; }
+    @media (max-width: 480px) { .window { grid-template-columns: 1fr 1fr; } .window label:first-child { grid-column: 1 / -1; } }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>Share your availability</h1>
+    <p id="intro">Pick a few windows over the next couple of weeks when you're free for a 30-minute call with an Agape housemate. We'll send a calendar invite once someone books a time.</p>
+    <div id="windows"></div>
+    <button class="add" id="add" type="button">+ Add another window</button>
+    <p class="muted">Times are Pacific (San Francisco). 2–3 windows of a couple hours each is perfect.</p>
+    <p class="status" id="status"></p>
+    <button class="submit" id="submit" type="button">Share availability</button>
+  </div>
+
+  <script>
+    const FN = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recruit-availability';
+    const token = new URLSearchParams(location.search).get('t') || '';
+    const windowsEl = document.getElementById('windows');
+    const statusEl = document.getElementById('status');
+
+    function timeOptions(sel) {
+      let out = '';
+      for (let h = 7; h <= 21; h++) for (const m of ['00', '30']) {
+        const v = `${String(h).padStart(2, '0')}:${m}`;
+        const label = new Date(`2000-01-01T${v}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        out += `<option value="${v}" ${v === sel ? 'selected' : ''}>${label}</option>`;
+      }
+      return out;
+    }
+
+    function addRow(w) {
+      const div = document.createElement('div');
+      div.className = 'window';
+      const today = new Date();
+      const min = today.toISOString().slice(0, 10);
+      const max = new Date(today.getTime() + 21 * 86400000).toISOString().slice(0, 10);
+      div.innerHTML = `
+        <label>Day <input type="date" name="date" min="${min}" max="${max}" value="${w?.date || ''}" required></label>
+        <label>From <select name="start">${timeOptions(w?.start || '17:00')}</select></label>
+        <label>Until <select name="end">${timeOptions(w?.end || '19:00')}</select></label>
+        <button class="remove" type="button" title="Remove">✕</button>`;
+      div.querySelector('.remove').onclick = () => { div.remove(); };
+      windowsEl.appendChild(div);
+    }
+
+    document.getElementById('add').onclick = () => addRow();
+
+    document.getElementById('submit').onclick = async () => {
+      const rows = [...windowsEl.querySelectorAll('.window')];
+      const windows = rows.map(r => ({
+        date: r.querySelector('[name=date]').value,
+        start: r.querySelector('[name=start]').value,
+        end: r.querySelector('[name=end]').value,
+      })).filter(w => w.date && w.start < w.end);
+      statusEl.className = 'status';
+      if (!windows.length) { statusEl.className = 'status err'; statusEl.textContent = 'Add at least one window (and make sure "Until" is after "From").'; return; }
+      const btn = document.getElementById('submit');
+      btn.disabled = true; btn.textContent = 'Sharing…';
+      try {
+        const resp = await fetch(FN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, windows }),
+        });
+        const out = await resp.json();
+        if (out.error) throw new Error(out.error);
+        document.getElementById('card').innerHTML = `
+          <div class="done">
+            <h2>Got it — thank you!</h2>
+            <p>A housemate will pick a time from your windows and you'll get a calendar invite with a video link. You can reopen this page anytime to update your availability.</p>
+          </div>`;
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = e.message || 'Something went wrong — try again.';
+        btn.disabled = false; btn.textContent = 'Share availability';
+      }
+    };
+
+    (async () => {
+      if (!token) {
+        document.getElementById('card').innerHTML = '<div class="done"><h2>Invalid link</h2><p>Check the link in your email from Agape, or just reply to the email with your availability.</p></div>';
+        return;
+      }
+      try {
+        const resp = await fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+        const out = await resp.json();
+        if (out.error) throw new Error(out.error);
+        if (out.firstName) document.getElementById('intro').textContent =
+          `Hi ${out.firstName} — pick a few windows over the next couple of weeks when you're free for a 30-minute call with an Agape housemate. We'll send a calendar invite once someone books a time.`;
+        (out.windows?.length ? out.windows : [null, null]).forEach(w => addRow(w));
+      } catch (e) {
+        document.getElementById('card').innerHTML = `<div class="done"><h2>Invalid link</h2><p>Check the link in your email from Agape, or just reply to the email with your availability.</p></div>`;
+      }
+    })();
+  </script>
+</body>
+</html>
