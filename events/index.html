@@ -2091,7 +2091,7 @@ body {
 (function() {
   'use strict';
 
-  const VERSION = '1.42.1';
+  const VERSION = '1.43.0';
   console.log(`[events] v${VERSION} - filter button stays inline-left of the chip slider in every state (no mobile top-right pin)`);
 
   // ============================================
@@ -2151,6 +2151,7 @@ body {
     { id: 'eb-thecentersf', name: 'The Center SF', category: 'wellness', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/the-center-sf-3493443113', region: 'bay-area', description: 'Community & wellness' },
     { id: 'eb-envelop', name: 'Envelop SF', category: 'music', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/envelop-17478025710', region: 'bay-area', description: 'Spatial audio venue' },
     { id: 'eb-fluxvertical', name: 'Flux Vertical Theatre', category: 'theater', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/16887986144', region: 'bay-area', description: 'Vertical theater & circus' },
+    { id: 'eb-curiosityguild', name: 'Curiosity Guild', category: 'talks', type: 'eventbrite-org', url: 'https://www.eventbrite.com/o/curiosity-guild-120760437937', region: 'bay-area', description: 'History storytelling talks' },
     // New York — Tech & Networking
     { id: 'garysguide-nyc', name: "Gary's Guide NYC", category: 'tech', type: 'garysguide', url: 'https://www.garysguide.com/events?region=nyc', region: 'new-york', description: 'Tech & startup events' },
   ];
@@ -2230,15 +2231,16 @@ body {
     'tech': 'tech',
     'social': 'social',
     'art': 'art', 'exhibition': 'art', 'design': 'art',
+    'talk': 'talks', 'talks': 'talks',
     'literary': 'literary',
     'wellness': 'wellness',
   };
   const CATEGORY_LABELS = {
     'music': 'Music', 'film': 'Film & Cinema', 'art': 'Art & Design', 'comedy': 'Comedy',
-    'theater': 'Theater', 'tech': 'Tech & Startups', 'social': 'Social',
+    'theater': 'Theater', 'tech': 'Tech & Startups', 'talks': 'Talks & Lectures', 'social': 'Social',
     'literary': 'Literary', 'wellness': 'Wellness', 'other': 'Other',
   };
-  const CATEGORY_ORDER = ['music', 'film', 'art', 'comedy', 'theater', 'tech', 'social', 'literary', 'wellness', 'other'];
+  const CATEGORY_ORDER = ['music', 'film', 'art', 'comedy', 'theater', 'tech', 'talks', 'social', 'literary', 'wellness', 'other'];
   // Fixed hues per category for the pulse strip, so a color always means the
   // same thing (unlike per-source hash colors)
   const CATEGORY_COLORS = {
@@ -2248,6 +2250,7 @@ body {
     'comedy': 'hsl(48, 90%, 56%)',
     'theater': 'hsl(18, 80%, 60%)',
     'tech': 'hsl(258, 65%, 66%)',
+    'talks': 'hsl(0, 65%, 62%)',
     'social': 'hsl(178, 55%, 52%)',
     'literary': 'hsl(288, 45%, 62%)',
     'wellness': 'hsl(140, 40%, 55%)',
@@ -2951,7 +2954,8 @@ body {
     { type: 'tech',       tags: ['Networking'], re: /\b(meetup|networking|hackathon|roundtable|panel|summit|forum|breakfast|mixer\s+for)\b/i },
     { type: 'art',        tags: ['Art'],      re: /\b(gallery|exhibition|art\s*walk|opening\s*reception|museum|installation|sculpture|mural|vernissage)\b/i },
     { type: 'art',        tags: ['Design'],   re: /\b(design|architecture|\bux\b|creative\s*direction|portfolio|typography|graphic\s*design)\b/i },
-    { type: 'literary',   tags: ['Literary'], re: /\b(reading|author|book\s*launch|poetry|literary|zine|book\s*signing|bookstore|lecture|speaker)\b/i },
+    { type: 'talk',       tags: ['Talk'],     re: /\b(lecture|speaker\s*series|storytell(?:ing|ers?)?|fireside\s*chat|keynote|symposium|public\s*talk)\b/i },
+    { type: 'literary',   tags: ['Literary'], re: /\b(reading|author|book\s*launch|poetry|literary|zine|book\s*signing|bookstore|speaker)\b/i },
     { type: 'wellness',   tags: ['Wellness'], re: /\b(yoga|meditation|wellness|mindfulness|breathwork|healing|sound\s*bath)\b/i },
     { type: 'social',     tags: ['Social'],   re: /\b(happy\s*hour|brunch|picnic|party|gathering|community|social\b)\b/i },
   ];
