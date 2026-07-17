@@ -71,6 +71,10 @@ const DEFAULT_ALLOW_SENDERS = [
   // Jack & Jill — AI recruiter that emails curated, comp-included, pre-
   // matched roles in conversational prose (multi-role digests). High signal.
   '@jackandjill.ai',
+  // Kimble Group — recruiter digest ("Recommended Jobs With X, Y and Z"),
+  // plain company/title/location listings with tracking links. Mixed
+  // relevance; downstream fit scoring filters the noise.
+  '@kimblegroup.com',
 ];
 
 // Subjects/senders that are almost always multi-role digests. We log
@@ -86,6 +90,7 @@ const DIGEST_HINTS = [
   'job digest',
   'jobs digest',
   'more matches',                  // Wellfound: "New job: X at Y, and 24 more matches"
+  'recommended jobs',              // Kimble Group: "Recommended Jobs With X, Y and Z"
 ];
 
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -596,6 +601,9 @@ function looksLikeDigest(subject: string, sender: string): boolean {
   // per-role job-view links the link-counter would catch. Force the
   // multi-extractor so we don't grab just the first role.
   if (/@jackandjill\.ai/i.test(sender)) return true;
+  // Kimble Group digests list many roles behind tracking links the
+  // link-counter can't see — force the multi-extractor.
+  if (/@kimblegroup\.com/i.test(sender)) return true;
   return false;
 }
 
