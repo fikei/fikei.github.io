@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.13.1';
+const VERSION = '2.14.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -68,6 +68,8 @@ let settings = { open_to_couples: true };
 let gmailStatus = { connected: false };
 let reviewTab = 'profile';   // 'profile' | 'emails'
 let emailsCache = {};        // applicant_id -> rows
+let availCache = {};         // applicant_id -> { windows, updated_at }
+let screeningsCache = {};    // applicant_id -> rows
 let queue = [];
 let qIndex = 0;
 
@@ -1457,8 +1459,11 @@ async function loadEmailsPanel(a) {
   try {
     const out = await gmailCall({ action: 'sync', applicantId: a.id });
     emailsCache[a.id] = out.emails || [];
+    availCache[a.id] = out.availability || null;
+    screeningsCache[a.id] = out.screenings || [];
     if (queue[qIndex] !== a.id || reviewTab !== 'emails' || !host()) return;
     host().innerHTML = `
+      ${schedulingHtml(a)}
       <div class="emails-toolbar">
         <span class="notes__empty">${emailsCache[a.id].length} message${emailsCache[a.id].length === 1 ? '' : 's'} with ${esc(a.email)}</span>
         <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
@@ -1467,6 +1472,65 @@ async function loadEmailsPanel(a) {
         : `<p class="inbox-empty">No emails yet — Compose starts the thread through the shared account.</p>`}`;
   } catch (e) {
     if (host()) host().innerHTML = `<p class="notes__empty">Email sync failed: ${esc(e.message)}</p>`;
+  }
+}
+
+/* ---------- screening scheduler ---------- */
+function fmtSlot(iso) {
+  return new Date(iso).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function windowSlots(w) {
+  // 30-min start times within the offered window (last start 30m before end)
+  const slots = [];
+  const start = new Date(`${w.date}T${w.start}:00`);
+  const end = new Date(`${w.date}T${w.end}:00`);
+  for (let t = start.getTime(); t + 30 * 60000 <= end.getTime(); t += 30 * 60000) {
+    if (t > Date.now()) slots.push(new Date(t));
+  }
+  return slots.slice(0, 16);
+}
+
+function schedulingHtml(a) {
+  const screenings = (screeningsCache[a.id] || []).filter(x => x.status === 'scheduled');
+  const avail = availCache[a.id];
+  const parts = [];
+  for (const sc of screenings) {
+    parts.push(`<div class="match-hint screening-card">
+      <span class="match-hint__text"><strong>Screening call scheduled</strong>
+        <span class="match-hint__why">${fmtSlot(sc.starts_at)} with ${esc(sc.housemate_name || 'a housemate')} · invites sent to both${sc.meet_link ? ` · <a href="${esc(sc.meet_link)}" target="_blank" rel="noopener">Meet link</a>` : ''}</span>
+      </span>
+    </div>`);
+  }
+  if (!screenings.length && avail?.windows?.length) {
+    parts.push(`<div class="avail-card">
+      <p class="avail-card__title">They offered availability — pick a time and both get a calendar invite:</p>
+      ${avail.windows.map((w, i) => `
+        <div class="avail-card__window">
+          <span class="avail-card__range">${new Date(w.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${w.start}–${w.end}</span>
+          <span class="avail-card__slots">${windowSlots(w).map(d =>
+            `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${a.id}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
+        </div>`).join('')}
+    </div>`);
+  } else if (!screenings.length) {
+    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.</p>`);
+  }
+  return parts.join('');
+}
+
+async function scheduleSlot(applicantId, iso, btn) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  if (!confirm(`Book the screening call for ${fmtSlot(iso)} (30 min)?\nCalendar invites go to ${a.email} and you.`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
+  try {
+    const out = await gmailCall({ action: 'schedule', applicantId, startsAt: iso, minutes: 30 });
+    (screeningsCache[applicantId] ||= []).unshift(out.screening);
+    toast('Screening call booked — invites sent to both');
+    if (queue[qIndex] === applicantId && reviewTab === 'emails') loadEmailsPanel(a);
+  } catch (e) {
+    toast(`Booking failed: ${e.message}`);
+    if (btn) { btn.disabled = false; }
   }
 }
 
@@ -1849,6 +1913,8 @@ function init() {
     if (review) { openReview(review.dataset.review); return; }
     const clear = e.target.closest('[data-clear]');
     if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    const slot = e.target.closest('[data-slot]');
+    if (slot) { scheduleSlot(slot.dataset.slotApplicant, slot.dataset.slot, slot); return; }
     const rtab = e.target.closest('[data-review-tab]');
     if (rtab) { reviewTab = rtab.dataset.reviewTab; renderReview(); return; }
     const em = e.target.closest('[data-email]');

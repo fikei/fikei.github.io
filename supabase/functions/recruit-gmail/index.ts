@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.0.0'
+const VERSION = '1.2.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -38,7 +38,9 @@ const SHARED_EMAIL = Deno.env.get('AGAPE_GMAIL_ADDRESS') || 'live.at.agapesf@gma
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/calendar.events', // screening-call invites
 ]
+const TZ = 'America/Los_Angeles' 
 
 function db() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -62,6 +64,34 @@ async function accessToken(client: ReturnType<typeof db>): Promise<string> {
 
 function b64url(s: string): string {
   return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+// Extract availability windows from an applicant's reply (Haiku).
+async function extractAvailability(text: string): Promise<Array<{ date: string; start: string; end: string }>> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
+  if (!key || !text.trim()) return []
+  const prompt = `Today is ${new Date().toLocaleDateString('en-CA', { timeZone: TZ })} (${TZ}).
+Extract every availability window this person offers for a call. Resolve relative days ("next Tuesday") to dates. Assume ${TZ} unless stated. If they give a day with no hours, use 09:00-18:00. Ignore anything that is not availability.
+EMAIL START
+${text.slice(0, 3000)}
+EMAIL END
+Return exactly: [{"date":"YYYY-MM-DD","start":"HH:MM","end":"HH:MM"}] — [] if none.`
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+      system: 'You extract meeting availability from emails. Respond with a JSON array only.',
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  })
+  if (!resp.ok) return []
+  const data = await resp.json()
+  const out = (data.content || []).filter((b: Record<string, unknown>) => b.type === 'text').map((b: Record<string, unknown>) => b.text).join('')
+  try {
+    const arr = JSON.parse(out.trim().replace(/^```json?\s*|\s*```$/g, ''))
+    return Array.isArray(arr) ? arr.filter((w) => /^\d{4}-\d{2}-\d{2}$/.test(w.date) && /^\d{2}:\d{2}$/.test(w.start) && /^\d{2}:\d{2}$/.test(w.end)).slice(0, 10) : []
+  } catch { return [] }
 }
 
 function header(headers: Array<{ name: string; value: string }>, name: string): string {
@@ -183,24 +213,96 @@ serve(async (req) => {
       for (const m of (list.messages || [])) {
         const { data: existing } = await client.from('recruit_emails').select('id').eq('gmail_id', m.id).maybeSingle()
         if (existing) continue
-        const msg = await (await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`, {
+        const msg = await (await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`, {
           headers: { Authorization: `Bearer ${at}` },
         })).json()
         const hs = msg.payload?.headers || []
         const from = header(hs, 'From')
         const direction = from.toLowerCase().includes(SHARED_EMAIL) ? 'out' : 'in'
+        // best-effort plain-text body (availability extraction needs it)
+        let bodyText = ''
+        // deno-lint-ignore no-explicit-any
+        const walk = (part: any) => {
+          if (!part) return
+          if (part.mimeType === 'text/plain' && part.body?.data) {
+            try { bodyText += atob(String(part.body.data).replace(/-/g, '+').replace(/_/g, '/')) } catch { /* */ }
+          }
+          for (const sub of (part.parts || [])) walk(sub)
+        }
+        walk(msg.payload || {})
         await client.from('recruit_emails').upsert({
           applicant_id: applicant.id, gmail_id: msg.id, thread_id: msg.threadId,
           direction, subject: header(hs, 'Subject').slice(0, 300),
           snippet: (msg.snippet || '').slice(0, 300),
+          body_text: bodyText.slice(0, 8000),
           from_email: from.slice(0, 200), to_email: header(hs, 'To').slice(0, 200),
           sent_at: new Date(Number(msg.internalDate) || Date.now()).toISOString(),
         }, { onConflict: 'gmail_id' })
         added++
+        if (direction === 'in' && bodyText.trim()) {
+          const { data: existingAv } = await client.from('recruit_availability')
+            .select('source_gmail_id').eq('applicant_id', applicant.id).maybeSingle()
+          if (existingAv?.source_gmail_id !== msg.id) {
+            const windows = await extractAvailability(bodyText)
+            if (windows.length) {
+              await client.from('recruit_availability').upsert({
+                applicant_id: applicant.id, windows, source_gmail_id: msg.id,
+                updated_at: new Date().toISOString(),
+              })
+            }
+          }
+        }
       }
-      const { data: rows } = await client.from('recruit_emails')
-        .select('*').eq('applicant_id', applicant.id).order('sent_at', { ascending: false }).limit(50)
-      return json({ synced: added, emails: rows || [] })
+      const [{ data: rows }, { data: avail }, { data: screenings }] = await Promise.all([
+        client.from('recruit_emails').select('*').eq('applicant_id', applicant.id).order('sent_at', { ascending: false }).limit(50),
+        client.from('recruit_availability').select('*').eq('applicant_id', applicant.id).maybeSingle(),
+        client.from('recruit_screenings').select('*').eq('applicant_id', applicant.id).order('starts_at', { ascending: false }),
+      ])
+      return json({ synced: added, emails: rows || [], availability: avail || null, screenings: screenings || [] })
+    }
+
+    if (action === 'schedule') {
+      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
+      if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
+      const startsAt = new Date(String(body.startsAt || ''))
+      if (isNaN(startsAt.getTime()) || startsAt < new Date()) return json({ error: 'Pick a future start time' }, 400)
+      const endsAt = new Date(startsAt.getTime() + (Number(body.minutes) || 30) * 60000)
+
+      const { data: rp } = await client.from('recruit_profiles').select('display_name').eq('user_id', userData.user.id).maybeSingle()
+      const housemateName = rp?.display_name || membership.discord_username || 'an Agape housemate'
+      const housemateEmail = (userData.user.email || '').toLowerCase()
+
+      const at = await accessToken(client)
+      const event = {
+        summary: `Agape screening call — ${applicant.first_name} ${applicant.last_name} × ${housemateName}`,
+        description: `Get-to-know-you call with ${applicant.first_name} (Agape application), scheduled from their offered availability.`,
+        start: { dateTime: startsAt.toISOString(), timeZone: TZ },
+        end: { dateTime: endsAt.toISOString(), timeZone: TZ },
+        attendees: [
+          { email: applicant.email },
+          ...(housemateEmail.includes('@') ? [{ email: housemateEmail }] : []),
+        ],
+        conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
+        reminders: { useDefault: true },
+      }
+      const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      })
+      const created = await resp.json()
+      if (!resp.ok) return json({ error: `Calendar failed: ${JSON.stringify(created).slice(0, 200)} — if this mentions scopes, reconnect the shared Gmail to grant calendar access` }, 500)
+      // deno-lint-ignore no-explicit-any
+      const meet = created.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || created.hangoutLink || null
+      const { data: row, error } = await client.from('recruit_screenings').insert({
+        applicant_id: applicant.id, housemate_user_id: userData.user.id,
+        housemate_name: housemateName, housemate_email: housemateEmail,
+        starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
+        gcal_event_id: created.id, meet_link: meet, status: 'scheduled',
+      }).select().single()
+      if (error) return json({ error: error.message }, 500)
+      console.log(`screening ${applicant.id} x ${housemateName} @ ${startsAt.toISOString()}`)
+      return json({ scheduled: true, screening: row })
     }
 
     return json({ error: 'Unknown action' }, 400)

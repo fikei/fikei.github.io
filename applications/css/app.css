@@ -914,3 +914,17 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .inbox-row[draggable="true"] { cursor: default; }
 .inbox-row__grip { flex-shrink: 0; cursor: grab; color: var(--fg-subtle); font-size: 13px; user-select: none; }
 .inbox-row.is-dragging { opacity: 0.45; }
+
+/* --- v2.14: availability + screening scheduler --- */
+.avail-card {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.avail-card__title { margin: 0; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.avail-card__window { display: flex; flex-direction: column; gap: var(--space-1); }
+.avail-card__range { font-size: var(--font-size-small); color: var(--fg-muted); font-weight: var(--fw-medium); }
+.avail-card__slots { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.avail-card__slots .chip { height: 28px; }
+.screening-card { margin-bottom: var(--space-4); background: var(--outreach-tint); }
