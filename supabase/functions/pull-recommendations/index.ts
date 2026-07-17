@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.28.0';
-console.log(`[pull-recommendations] v${VERSION} - gmail-jobs: Kimble Group digests allowlisted + forced through the multi-role extractor`);
+const VERSION = '0.28.1';
+console.log(`[pull-recommendations] v${VERSION} - dedup: query-keyed digest links (kimblegroup.com/job?payload=…) no longer collapse to one URL key`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -875,7 +875,17 @@ function normalizeJobUrl(u: string): string {
   if (li) return `linkedin.com/jobs/view/${li[1]}`;
   try {
     const url = new URL(u);
-    return (url.host + url.pathname).toLowerCase().replace(/\/+$/, '');
+    const base = (url.host + url.pathname).toLowerCase().replace(/\/+$/, '');
+    // When the path carries no job-identifying segment (no digits, no long
+    // id), the identity lives in the query — kimblegroup.com/job?payload=…
+    // Keep the query for those, else every role in such a digest collapses
+    // to one dedup key and all but the first gets dropped as a duplicate.
+    // Paths with an id (wellfound.com/jobs/12345, lever/ashby uuids) still
+    // strip the query so tracking params don't defeat dedup.
+    if (url.search && !/\d|[0-9a-f-]{8,}/i.test(url.pathname)) {
+      return base + url.search.toLowerCase();
+    }
+    return base;
   } catch {
     return u.toLowerCase().trim();
   }
