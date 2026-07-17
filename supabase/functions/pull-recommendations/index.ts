@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.27.0';
-console.log(`[pull-recommendations] v${VERSION} - comp_acceptable computed deterministically from salary (compClears), not the Haiku boolean`);
+const VERSION = '0.28.0';
+console.log(`[pull-recommendations] v${VERSION} - gmail-jobs: Kimble Group digests allowlisted + forced through the multi-role extractor`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
