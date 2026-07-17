@@ -46,7 +46,7 @@ export async function scrapeCommonwealth(source: EventSource): Promise<ScrapedEv
         venue,
         city: 'San Francisco',
         url,
-        contentType: 'literary',
+        contentType: 'talk',
       })
     } catch (_e) { /* skip broken node */ }
   })

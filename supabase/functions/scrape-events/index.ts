@@ -9,8 +9,8 @@
 //   POST { action: "refresh", sourceId: "..." }   → scrape single source
 //   POST { action: "status" }                     → return last run info
 
-const VERSION = '1.11.2'
-console.log(`[scrape-events] v${VERSION} - surface cache-events partial-failure errors; reconciliation skips on any`)
+const VERSION = '1.12.0'
+console.log(`[scrape-events] v${VERSION} - commonwealth events are 'talk' content_type (new Talks & Lectures category)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'

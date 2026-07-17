@@ -6,8 +6,8 @@
 // Body: { eventIds: string[] }   (batch up to 10)
 // Returns: { processed, succeeded, failed, results }
 
-const VERSION = '1.4.0'
-console.log(`[enrich-event] v${VERSION} - film genre/era/director tags; descriptive activity tags for social/art; no source/title/category echoes`)
+const VERSION = '1.5.0'
+console.log(`[enrich-event] v${VERSION} - add 'talk' content_type (Talks & Lectures category)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -83,7 +83,7 @@ interface EnrichResult {
   error?: string
 }
 
-const VALID_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival', 'film', 'comedy', 'theater', 'tech', 'social', 'art', 'design', 'literary', 'wellness', 'other']
+const VALID_CONTENT_TYPES = ['music', 'dj-set', 'live-music', 'festival', 'film', 'comedy', 'theater', 'tech', 'talk', 'social', 'art', 'design', 'literary', 'wellness', 'other']
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
@@ -215,7 +215,7 @@ async function classifyWithAI(event: {
 
 1. "genre" — up to 3 comma-separated descriptive tags. For music: the specific genre ("Techno", "Indie Rock", "Jazz"). For social events: the activity ("Networking", "Dinner Party", "Rooftop Party", "Book Club", "Run Club", "Trivia"). For art/design: the form ("Gallery Opening", "Immersive Art", "Ceramics Workshop", "Figure Drawing", "Screen Printing", "Photography"). For film: the genre ("Horror", "Documentary", "Noir", "Sci-Fi", "Comedy"), era or movement ("French New Wave", "70s", "Silent", "Pre-Code"), and the director when notable ("Kubrick", "Varda"). Never use source names (Eventbrite, Luma), the event title, or bare category words (music/art/social/event/film). Return "" if truly unknown.
 
-2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, tech, social, art, design, literary, wellness, other
+2. "content_type" — one of: music, dj-set, live-music, festival, film, comedy, theater, tech, talk, social, art, design, literary, wellness, other. Use "talk" for lectures, speaker series, storytelling shows, panels, and idea/history talks.
 
 3. "music_type" — ONLY for music events, one of: electronic, rock, pop, hiphop, jazz, folk, world, other-music. Use the dominant style (electronic = techno/house/DJ/club; rock = rock/indie/punk/metal; folk = folk/country/americana/tribute; world = latin/reggae/afro). null for non-music events.
 
