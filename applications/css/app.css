@@ -714,7 +714,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .cal__head { display: flex; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
 .cal__head .cal__room-col { padding: var(--space-2) var(--space-3); }
 .cal__room-col { flex: 0 0 var(--room-col); width: var(--room-col); min-width: var(--room-col); }
-.cal__months { flex: 1; display: grid; grid-template-columns: repeat(12, 1fr); }
+.cal__months { flex: 1; display: grid; grid-template-columns: repeat(var(--occ-months, 12), 1fr); }
 .cal__month {
   padding: var(--space-2) 0; text-align: center;
   font-size: var(--font-size-caption); font-weight: var(--fw-semibold); color: var(--fg-subtle);
@@ -733,7 +733,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   position: relative; flex: 1;
   /* month gridlines */
   background-image: repeating-linear-gradient(to right,
-    var(--border) 0 1px, transparent 1px calc(100% / 12));
+    var(--border) 0 1px, transparent 1px calc(100% / var(--occ-months, 12)));
 }
 .cal__event {
   position: absolute; top: 10px; bottom: 10px;
@@ -995,3 +995,12 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .occ-drawer__note { margin: 0; color: var(--fg-muted); font-size: var(--font-size-small); }
 .occ-drawer__list-btn { align-self: flex-start; }
 @media (max-width: 720px) { .occ-drawer { width: 100vw; border-left: 0; } }
+
+/* --- v2.16.1: phone-sized timeline (3 months at a time) --- */
+@media (max-width: 720px) {
+  .cal { --room-col: 112px; }
+  .occ-legend { gap: var(--space-2); }
+  .occ-legend__hint { display: none; }
+  .cal-nav { margin-left: auto; }
+  .cal__row { min-height: 48px; }
+}
