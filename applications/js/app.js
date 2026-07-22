@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.14.1';
+const VERSION = '2.15.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -48,7 +48,6 @@ const VIEWS = {
   hold: { title: 'Hold', kind: 'applicants' },
   archive: { title: 'Archive', kind: 'applicants' },
   occupancy: { title: 'Occupancy', kind: 'house' },
-  listings: { title: 'Listings', kind: 'house' },
 };
 
 let sb = null;                // supabase client (from CtrlAuth)
@@ -70,6 +69,7 @@ let reviewTab = 'profile';   // 'profile' | 'emails'
 let emailsCache = {};        // applicant_id -> rows
 let availCache = {};         // applicant_id -> { windows, updated_at }
 let screeningsCache = {};    // applicant_id -> rows
+let emailState = {};         // applicant_id -> { lastDir, lastAt, replies }
 let queue = [];
 let qIndex = 0;
 
@@ -348,12 +348,19 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, sRes] = await Promise.all([
+  const [aRes, dRes, cRes, sRes, eRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id'),
     sb.from('recruit_match_suggestions').select('*'),
+    sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at'),
   ]);
+  emailState = {};
+  for (const e of (eRes.data || [])) {
+    const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, replies: 0 });
+    st.lastDir = e.direction; st.lastAt = e.sent_at;
+    if (e.direction === 'in') st.replies++;
+  }
   suggestions = Object.fromEntries((sRes.data || []).map(r => [r.applicant_id, r]));
   sb.from('recruit_settings').select('*').then(({ data }) => {
     for (const row of (data || [])) settings[row.key] = row.value;
@@ -570,6 +577,7 @@ async function loadHouse() {
 
 /* ---------- router ---------- */
 function setView(next, push = true) {
+  if (next === 'listings') next = 'outreach'; // merged in v2.15
   if (!VIEWS[next]) next = 'inbox';
   view = next;
   if (push) {
@@ -592,14 +600,13 @@ async function render() {
   renderRailCounts();
 
   const root = document.getElementById('view-root');
-  if (def.kind === 'house' && !houseLoaded) {
+  if ((def.kind === 'house' || view === 'outreach') && !houseLoaded) {
     root.innerHTML = `<p class="inbox-empty">Loading…</p>`;
     await loadHouse();
     if (VIEWS[view].kind !== 'house') return; // navigated away meanwhile
   }
   if (def.kind === 'applicants') renderApplicants();
   else if (view === 'occupancy') renderOccupancy();
-  else if (view === 'listings') renderListings();
 }
 
 /* ---------- applicants render ---------- */
@@ -663,15 +670,14 @@ function counts() {
     else if (rec.d === 'pass') c.archive++;
     else c[rec.d]++;
   }
-  c.listings = listings.filter(l => l.status === 'open').length;
   return c;
 }
 
 function renderRailCounts() {
   const c = counts();
-  for (const key of ['inbox', 'outreach', 'hold', 'archive', 'listings']) {
+  for (const key of ['inbox', 'outreach', 'hold', 'archive']) {
     const el = document.getElementById(`count-${key}`);
-    if (el) el.textContent = (key === 'listings' && !houseLoaded) ? '' : (c[key] || '');
+    if (el) el.textContent = c[key] || '';
   }
 }
 
@@ -703,6 +709,7 @@ function renderApplicants() {
   const groups = [];
   if (view === 'outreach') {
     const byKey = new Map();
+    for (const l of listings.filter(x => x.status === 'open')) byKey.set(l.id, []);
     for (const a of list) {
       const key = decisions[a.id]?.listingId || 'general';
       if (!byKey.has(key)) byKey.set(key, []);
@@ -732,21 +739,65 @@ function renderApplicants() {
 
   const groupHead = g => {
     if (view !== 'outreach') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
-    if (g.key === 'general') return `<h2 class="inbox-group__label">General interest</h2>`;
+    if (g.key === 'general') return `<div class="listing-head__text"><h2 class="inbox-group__label">General interest</h2>
+      <span class="inbox-group__count">no room yet — kept warm for future availability</span></div>`;
     const l = listings.find(x => x.id === g.key);
-    const room = rooms.find(r => r.id === l?.room_id);
-    return `<h2 class="inbox-group__label">${esc(room?.name || 'Listing')}</h2>
-      <span class="inbox-group__count">${l ? `${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}${listingPricing(l) ? ` · ${listingPricing(l)}` : ''}` : ''}</span>
-      <button class="inbox-group__link" data-view-link="listings" title="Open Listings">View listing →</button>`;
+    if (!l) return `<h2 class="inbox-group__label">Listing removed</h2>`;
+    const room = rooms.find(r => r.id === l.room_id);
+    return `<div class="listing-head__text">
+        <h2 class="inbox-group__label">${esc(room?.name || 'Room')}
+          <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+        </h2>
+        <span class="inbox-group__count">${listingWindow(l)}</span>
+        ${listingPricing(l) ? `<span class="inbox-group__count listing-row__pricing">${listingPricing(l)}</span>` : ''}
+        ${l.notes ? `<span class="inbox-group__count">${esc(l.notes)}</span>` : ''}
+      </div>
+      <span class="listing-head__actions">
+        <button class="btn btn--sm" data-edit-listing="${l.id}">Edit</button>
+        <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
+          ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
+        </select>
+      </span>`;
   };
 
-  host.innerHTML = bar + groups.map(g => `
-    <section class="inbox-group" ${view === 'outreach' ? `data-group-key="${esc(g.key)}"` : ''}>
-      <div class="inbox-group__head">
+  const outreachChrome = view === 'outreach' ? `
+    <div class="listing-toolbar">
+      <span class="notes__empty">Each open listing is a ranked shortlist — drag rows to reorder.</span>
+      <button class="btn btn--sm" data-new-listing>New listing</button>
+    </div>` : '';
+  const doneListings = view === 'outreach' ? listings.filter(l => l.status !== 'open') : [];
+  const doneDrawer = doneListings.length ? `
+    <details class="occupants__past">
+      <summary>Filled & closed listings (${doneListings.length})</summary>
+      <ul class="inbox-card listing-list">
+        ${doneListings.map(l => {
+          const room = rooms.find(r => r.id === l.room_id);
+          return `<li class="inbox-row listing-row is-done">
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(room?.name || 'Room')}
+                <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+              </span>
+              <span class="inbox-row__sub">${listingWindow(l)}</span>
+            </span>
+            <span class="inbox-row__actions">
+              <button class="btn btn--sm inbox-row__review" data-edit-listing="${l.id}">Edit</button>
+              <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
+                ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
+              </select>
+            </span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </details>` : '';
+  const outreachHint = view === 'outreach' ? `<p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>` : '';
+
+  host.innerHTML = bar + outreachChrome + groups.map(g => `
+    <section class="inbox-group ${view === 'outreach' && g.key !== 'general' ? 'listing-group' : ''}" ${view === 'outreach' ? `data-group-key="${esc(g.key)}"` : ''}>
+      <div class="inbox-group__head ${view === 'outreach' ? 'listing-head' : ''}">
         ${groupHead(g)}
-        <span class="inbox-group__count">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
+        <span class="inbox-group__count listing-head__n">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
       </div>
-      <ul class="inbox-card">
+      ${view === 'outreach' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No one attached yet — add applicants via Review → Add to listing.</p>` : `<ul class="inbox-card">
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'outreach' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${view === 'outreach' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
@@ -759,12 +810,13 @@ function renderApplicants() {
               </span>
             </button>
             <span class="inbox-row__actions">
+              ${emailState[a.id]?.lastDir === 'in' ? `<span class="decision-chip decision-chip--replied" title="They replied — last message ${relTime(emailState[a.id].lastAt)}">↙ Replied</span>` : (view === 'outreach' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : '')}
               ${commentCounts[a.id] ? `<span class="note-count" title="${commentCounts[a.id]} house note${commentCounts[a.id] === 1 ? '' : 's'}">✎ ${commentCounts[a.id]}</span>` : ''}
               ${view === 'outreach' ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${decisionChip(a.id)}<button class="btn inbox-row__review" data-review="${a.id}">Review</button>`}
             </span>
           </li>`).join('')}
-      </ul>
-    </section>`).join('');
+      </ul>`}
+    </section>`).join('') + doneDrawer + outreachHint;
   if (view === 'outreach') wireRowDrag(host);
 }
 
@@ -1041,7 +1093,7 @@ async function markLeaving(roomId, defaultDate) {
   if (error) { toast(`Listing failed: ${error.message}`); return; }
   listings.push(data);
   toast(`${room.resident || 'Resident'} marked leaving — resident listing created for ${room.name}`);
-  setView('listings');
+  setView('outreach');
 }
 
 /* ---------- listings ---------- */
@@ -1112,74 +1164,33 @@ function listingForm(l) {
   </form>`;
 }
 
-function renderListings() {
-  const host = document.getElementById('view-root');
-  host.className = 'house';
-  const open = listings.filter(l => l.status === 'open').length;
-  document.getElementById('page-sub').textContent =
-    `${open} open · a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial`;
-
-  const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
-  const order = { open: 0, filled: 1, closed: 2 };
-  const sorted = [...listings].sort((a, b) => (order[a.status] - order[b.status]) || a.starts_on.localeCompare(b.starts_on));
-  const sections = [['open', 'Open'], ['filled', 'Filled'], ['closed', 'Closed']]
-    .map(([s, label]) => [s, label, sorted.filter(l => l.status === s)])
-    .filter(([, , items]) => items.length);
-  const SOURCE_LABELS = { gap: 'from an occupancy gap', leaving: 'resident leaving', manual: 'added by hand' };
-
-  host.innerHTML = `
-    <div class="listing-toolbar">
-      <button class="btn btn--sm" id="new-listing">New listing</button>
+function openListingModal(idOrNew) {
+  editingListingId = idOrNew;
+  const l = idOrNew === 'new'
+    ? { kind: 'sublet', room_id: rooms[0]?.id }
+    : listings.find(x => x.id === idOrNew) || {};
+  const body = document.getElementById('listing-modal-body');
+  body.innerHTML = `
+    <div class="email-modal__head">
+      <h3 class="email-modal__title">${idOrNew === 'new' ? 'New listing' : 'Edit listing'}</h3>
+      <button class="review__close email-modal__close" data-cancel-listing aria-label="Close">✕</button>
     </div>
-    ${editingListingId === 'new' ? listingForm({ kind: 'sublet', room_id: rooms[0]?.id }) : ''}
-    ${sections.length ? sections.map(([s, label, items]) => `
-      <section class="inbox-group">
-        <div class="inbox-group__head">
-          <h2 class="inbox-group__label">${label}</h2>
-          <span class="inbox-group__count">${items.length}</span>
-        </div>
-        <ul class="inbox-card listing-list">
-          ${items.map(l => {
-            const room = roomById[l.room_id];
-            if (editingListingId === l.id) return `<li class="listing-edit-row">${listingForm(l)}</li>`;
-            const attached = applicants.filter(a => decisions[a.id]?.d === 'outreach' && decisions[a.id]?.listingId === l.id);
-            return `<li class="inbox-row listing-row ${l.status !== 'open' ? 'is-done' : ''}">
-              <span class="inbox-row__text">
-                <span class="inbox-row__title">${esc(room?.name || 'Room')}
-                  <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
-                </span>
-                <span class="inbox-row__sub">${listingWindow(l)}</span>
-                ${listingPricing(l) ? `<span class="inbox-row__sub listing-row__pricing">${listingPricing(l)}</span>` : ''}
-                ${l.notes ? `<span class="inbox-row__sub listing-row__notes">${esc(l.notes)}</span>` : ''}
-                <span class="inbox-row__sub listing-row__source">${SOURCE_LABELS[l.source] || ''}${l.created_by_name ? ` · ${esc(l.created_by_name)}` : ''}</span>
-                ${attached.length ? `<span class="listing-row__people">${attached.map(a =>
-                  `<button class="link-chip" data-review="${a.id}">${esc(fullName(a))}</button>`).join('')}</span>` : ''}
-              </span>
-              <span class="inbox-row__actions">
-                <button class="btn btn--sm inbox-row__review" data-edit-listing="${l.id}">Edit</button>
-                <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
-                  ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
-                </select>
-              </span>
-            </li>`;
-          }).join('')}
-        </ul>
-      </section>`).join('') : `<p class="inbox-empty">No listings yet.</p>`}
-    ${(() => {
-      const general = applicants.filter(a => decisions[a.id]?.d === 'outreach' && !decisions[a.id]?.listingId);
-      return general.length ? `<section class="inbox-group">
-        <div class="inbox-group__head">
-          <h2 class="inbox-group__label">General interest</h2>
-          <span class="inbox-group__count">${general.length} in outreach, waiting on future availability</span>
-        </div>
-        <div class="listing-general">${general.map(a =>
-          `<button class="link-chip" data-review="${a.id}">${esc(fullName(a))}</button>`).join('')}</div>
-      </section>` : '';
-    })()}
-    <p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>`;
+    <p class="notes__empty">A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial.</p>
+    ${listingForm(l)}`;
+  document.getElementById('listing-modal').hidden = false;
+  body.querySelector('[data-listing-form]').addEventListener('submit', onListingSubmit);
+}
 
-  document.getElementById('new-listing').onclick = () => { editingListingId = 'new'; renderListings(); };
-  host.querySelectorAll('[data-listing-form]').forEach(f => f.addEventListener('submit', onListingSubmit));
+function closeListingModal() {
+  editingListingId = null;
+  document.getElementById('listing-modal').hidden = true;
+}
+
+function rerenderAfterListingChange() {
+  closeListingModal();
+  renderRailCounts();
+  if (view === 'outreach') renderApplicants();
+  else if (view === 'occupancy') renderOccupancy();
 }
 
 async function onListingSubmit(e) {
@@ -1219,9 +1230,7 @@ async function onListingSubmit(e) {
     Object.assign(listings.find(l => l.id === id) || {}, rec);
     toast('Listing updated');
   }
-  editingListingId = null;
-  renderListings();
-  renderRailCounts();
+  rerenderAfterListingChange();
 }
 
 async function deleteListing(id) {
@@ -1231,10 +1240,8 @@ async function deleteListing(id) {
   const { error } = await sb.from('recruit_listings').delete().eq('id', id);
   if (error) { toast(`Delete failed: ${error.message}`); return; }
   listings = listings.filter(x => x.id !== id);
-  editingListingId = null;
   toast('Listing deleted');
-  renderListings();
-  renderRailCounts();
+  rerenderAfterListingChange();
 }
 
 async function updateListingStatus(id, status) {
@@ -1244,8 +1251,7 @@ async function updateListingStatus(id, status) {
   l.status = status;
   const { error } = await sb.from('recruit_listings').update({ status }).eq('id', id);
   if (error) { l.status = prev; toast(`Update failed: ${error.message}`); }
-  renderListings();
-  renderRailCounts();
+  rerenderAfterListingChange();
 }
 
 /* ---------- review overlay ---------- */
@@ -1740,6 +1746,29 @@ async function gmailCall(payload) {
   return out;
 }
 
+/* Throttled inbox-wide sweep: matches recent shared-inbox mail to
+   applicants so outreach rows can badge replies. */
+async function scanInbox() {
+  if (!gmailStatus.connected) return;
+  const last = +localStorage.getItem('agape:lastScan') || 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  localStorage.setItem('agape:lastScan', String(Date.now()));
+  try {
+    const out = await gmailCall({ action: 'scan' });
+    if (out.matched) {
+      const { data } = await sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at');
+      emailState = {};
+      for (const e of (data || [])) {
+        const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, replies: 0 });
+        st.lastDir = e.direction; st.lastAt = e.sent_at;
+        if (e.direction === 'in') st.replies++;
+      }
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+      if (out.replied?.length) toast(`${out.replied.length} applicant${out.replied.length === 1 ? '' : 's'} replied`);
+    }
+  } catch (e) { console.warn('inbox scan failed', e); }
+}
+
 /* OAuth callback (state=agape-gmail, forwarded from /ladder/). */
 async function handleGmailCallback() {
   const params = new URLSearchParams(location.search);
@@ -1848,6 +1877,7 @@ async function _checkMembershipAndEnter() {
       if (VIEWS[view]?.kind === 'applicants') renderApplicants();
     });
     resolveAvatars(); // background — server resolves any unchecked profile photos
+    scanInbox();      // background — badge replies without opening each thread
     const autoPassed = await applyAutoPass();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
@@ -1973,9 +2003,11 @@ function init() {
     const leaving = e.target.closest('[data-leaving-room]');
     if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
     const editL = e.target.closest('[data-edit-listing]');
-    if (editL) { editingListingId = editL.dataset.editListing; renderListings(); return; }
+    if (editL) { openListingModal(editL.dataset.editListing); return; }
+    const newL = e.target.closest('[data-new-listing]');
+    if (newL) { openListingModal('new'); return; }
     const cancelL = e.target.closest('[data-cancel-listing]');
-    if (cancelL) { editingListingId = null; renderListings(); return; }
+    if (cancelL) { closeListingModal(); return; }
     const delL = e.target.closest('[data-delete-listing]');
     if (delL) { deleteListing(delL.dataset.deleteListing); return; }
     const lstatus = e.target.closest('[data-listing-status]');
