@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.15.0';
+const VERSION = '2.15.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1746,6 +1746,22 @@ async function gmailCall(payload) {
   return out;
 }
 
+/* Global shared-account connection row (rail footer). Set once, house-wide. */
+function renderGmailStatus() {
+  const el = document.getElementById('gmail-conn');
+  if (!el) return;
+  if (gmailStatus.connected) {
+    el.textContent = `✓ ${gmailStatus.email || 'shared Gmail'} connected`;
+    el.title = `House email + calendar run through this account${gmailStatus.connected_by_name ? ` · connected by ${gmailStatus.connected_by_name}` : ''}${gmailStatus.connected_at ? ` · ${new Date(gmailStatus.connected_at).toLocaleDateString()}` : ''}. Click to reconnect (e.g. after a scope change).`;
+  } else {
+    el.textContent = 'Connect shared Gmail (house-wide, one time)';
+    el.title = 'All applicant email + screening invites run through live.at.agapesf@gmail.com. Sign into that Google account in this browser first.';
+  }
+  el.onclick = () => {
+    if (!gmailStatus.connected || confirm('Reconnect the shared Google account? Only needed after scope changes or if sending breaks.')) connectSharedGmail();
+  };
+}
+
 /* Throttled inbox-wide sweep: matches recent shared-inbox mail to
    applicants so outreach rows can badge replies. */
 async function scanInbox() {
@@ -1779,7 +1795,8 @@ async function handleGmailCallback() {
   history.replaceState(null, '', clean);
   try {
     const out = await gmailCall({ action: 'connect', code });
-    gmailStatus = { connected: true, email: out.email };
+    gmailStatus = { connected: true, email: out.email, connected_by_name: me?.name };
+    renderGmailStatus();
     toast(`Shared Gmail connected: ${out.email}`);
   } catch (e) { toast(`Gmail connect failed: ${e.message}`); }
 }
@@ -1868,7 +1885,7 @@ async function _checkMembershipAndEnter() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
       body: JSON.stringify({ action: 'status' }),
-    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; }).catch(() => {});
+    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; renderGmailStatus(); }).catch(() => {});
     await loadAll();
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
