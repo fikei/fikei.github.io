@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.15.2';
+const VERSION = '2.16.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -59,7 +59,7 @@ let comments = [];            // comments for the applicant open in review
 let view = 'inbox';           // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
 let rooms = [];               // recruit_rooms
-let occupancy = [];           // recruit_occupancy rows
+let stays = [];               // recruit_stays rows (date-based tenures)
 let listings = [];            // recruit_listings rows
 let houseLoaded = false;
 let suggestions = {};         // applicant_id -> recruit_match_suggestions row
@@ -564,13 +564,13 @@ async function loadComments(applicantId) {
 
 /* ---------- house data ---------- */
 async function loadHouse() {
-  const [rRes, oRes, lRes] = await Promise.all([
+  const [rRes, sRes, lRes] = await Promise.all([
     sb.from('recruit_rooms').select('*').order('sort'),
-    sb.from('recruit_occupancy').select('*').order('month'),
+    sb.from('recruit_stays').select('*').order('starts_on'),
     sb.from('recruit_listings').select('*').order('starts_on'),
   ]);
   rooms = rRes.data || [];
-  occupancy = oRes.data || [];
+  stays = sRes.data || [];
   listings = lRes.data || [];
   houseLoaded = true;
 }
@@ -854,206 +854,355 @@ function wireRowDrag(host) {
 /* ---------- occupancy ---------- */
 const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet (short-term)', candidate: 'Trial candidate', shared: 'Shared', vacant: 'Open' };
 
-/* Google-Calendar-style lanes: one row per room, continuous colored spans
-   per occupant stretch (not spreadsheet cells), month gridlines + today rule. */
-function occupancySegments(roomId) {
-  const months = [...Array(12)].map((_, i) => `2026-${String(i + 1).padStart(2, '0')}-01`);
-  const byMonth = {};
-  for (const o of occupancy) if (o.room_id === roomId) byMonth[o.month] = o;
-  const segs = [];
-  for (let i = 0; i < 12; i++) {
-    const cell = byMonth[months[i]];
-    const kind = cell?.kind || 'vacant';
-    const label = (cell?.occupant || '').trim();
-    const last = segs[segs.length - 1];
-    if (last && last.kind === kind && last.label === label) last.len++;
-    else segs.push({ start: i, len: 1, kind, label, month: months[i] });
-  }
-  return segs;
+/* Google-Calendar-style lanes over a rolling window of months. Stays are
+   date-based (recruit_stays, ends_on NULL = open-ended), so the timeline
+   pages forward indefinitely — ◀ ▶ shift the window, Today recenters it. */
+const OCC_WINDOW = 12;       // months visible at once
+let occStart = null;         // 'YYYY-MM-01' — left edge of the window
+let occDrawer = null;        // { type:'stay'|'gap'|'room', ..., pinned } | null
+
+function firstOfMonth(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+function addMonthsIso(iso, n) {
+  const d = new Date(iso + 'T12:00');
+  d.setMonth(d.getMonth() + n);
+  return firstOfMonth(d);
+}
+function isoAddDays(iso, n) {
+  const d = new Date(iso + 'T12:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function defaultOccStart() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);       // one month of history for context
+  return firstOfMonth(d);
+}
+function occMonths() {
+  return [...Array(OCC_WINDOW)].map((_, i) => addMonthsIso(occStart, i));
+}
+/* Fractional x-position of a date inside the window: months are equal-width
+   (matching the header grid), days interpolate within their month. */
+function occPos(iso) {
+  const months = occMonths();
+  const end = addMonthsIso(occStart, OCC_WINDOW);
+  if (iso <= occStart) return 0;
+  if (iso >= end) return 1;
+  const key = iso.slice(0, 7) + '-01';
+  const idx = months.indexOf(key);
+  if (idx === -1) return iso < occStart ? 0 : 1;
+  const dim = new Date(+iso.slice(0, 4), +iso.slice(5, 7), 0).getDate();
+  return (idx + (+iso.slice(8, 10) - 1) / dim) / OCC_WINDOW;
+}
+function fmtShort(iso) {
+  return new Date(iso + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-let editingSegment = null;   // { roomId, start, len, kind, label } while the editor is open
+function roomStays(roomId) {
+  return stays.filter(s => s.room_id === roomId)
+    .slice().sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+}
+
+/* Uncovered stretches (≥ 7 days) inside the visible window for one room. */
+function roomGaps(roomId) {
+  const winStart = occStart;
+  const winEnd = isoAddDays(addMonthsIso(occStart, OCC_WINDOW), -1); // inclusive
+  const covered = roomStays(roomId)
+    .map(s => [s.starts_on, s.ends_on || '9999-12-31'])
+    .filter(([a, b]) => a <= winEnd && b >= winStart)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const gaps = [];
+  let cursor = winStart;
+  for (const [a, b] of covered) {
+    if (a > cursor) gaps.push([cursor, isoAddDays(a, -1)]);
+    if (b >= cursor) cursor = isoAddDays(b, 1);
+    if (cursor > winEnd) break;
+  }
+  if (cursor <= winEnd) gaps.push([cursor, winEnd]);
+  return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= 7);
+}
 
 function renderOccupancy() {
+  if (!occStart) occStart = defaultOccStart();
   const host = document.getElementById('view-root');
   host.className = 'house';
-  document.getElementById('page-sub').textContent =
-    `${rooms.length} rooms · 2026 · every name is a resident or a subletter`;
+  const months = occMonths();
+  const rangeLabel = `${monthLabel(months[0].slice(0, 7))} – ${monthLabel(months[OCC_WINDOW - 1].slice(0, 7))}`;
+  document.getElementById('page-sub').textContent = `${rooms.length} rooms · ${rangeLabel}`;
 
-  const now = new Date();
-  const nowIdx = now.getFullYear() === 2026 ? now.getMonth() : (now.getFullYear() < 2026 ? -1 : 12);
-  const todayPct = nowIdx >= 0 && nowIdx < 12
-    ? ((nowIdx + (now.getDate() - 1) / 31) / 12) * 100 : null;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayPct = todayIso >= occStart && occPos(todayIso) < 1 ? occPos(todayIso) * 100 : null;
+
+  const barsFor = r => {
+    const winEndExcl = addMonthsIso(occStart, OCC_WINDOW);
+    const bars = [];
+    for (const s of roomStays(r.id)) {
+      const endExcl = s.ends_on ? isoAddDays(s.ends_on, 1) : winEndExcl;
+      if (s.starts_on >= winEndExcl || endExcl <= occStart) continue;
+      const left = occPos(s.starts_on) * 100;
+      const width = (s.ends_on ? occPos(endExcl) : 1) * 100 - left;
+      const range = `${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
+      const active = occDrawer?.type === 'stay' && occDrawer.id === s.id;
+      bars.push(`<button type="button" class="cal__event cal__event--${s.kind} ${!s.ends_on ? 'is-open-ended' : ''} ${active ? 'is-editing' : ''}"
+        style="left: ${left}%; width: ${Math.max(width, 0.8)}%" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
+        data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
+    }
+    for (const [a, b] of roomGaps(r.id)) {
+      const left = occPos(a) * 100;
+      const width = occPos(isoAddDays(b, 1)) * 100 - left;
+      const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
+      bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
+        style="left: ${left}%; width: ${width}%" title="Open ${fmtShort(a)} – ${fmtShort(b)} — click to fill or list"
+        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}">Open</button>`);
+    }
+    return bars.join('');
+  };
 
   host.innerHTML = `
     <div class="occ-legend">
       ${['resident', 'sublet', 'candidate', 'vacant'].map(k =>
         `<span class="occ-legend__item"><span class="occ-swatch occ-swatch--${k}"></span>${KIND_LABELS[k]}</span>`).join('')}
-      <span class="occ-legend__hint">Click any bar to adjust dates, change who's in the room, or mark a resident as leaving</span>
+      <span class="occ-legend__hint">Tap a room for its details; tap any bar to edit who's in it and their exact dates</span>
+      <span class="cal-nav">
+        <button type="button" class="btn btn--sm" data-cal-nav="-6" title="6 months earlier">◀</button>
+        <button type="button" class="btn btn--sm" data-cal-nav="today">Today</button>
+        <button type="button" class="btn btn--sm" data-cal-nav="6" title="6 months later">▶</button>
+      </span>
     </div>
     <div class="cal">
       <div class="cal__head">
         <div class="cal__room-col"></div>
         <div class="cal__months">
-          ${MONTH_ABBR.map((m, i) => `<span class="cal__month ${i === nowIdx ? 'is-now' : ''}">${m}</span>`).join('')}
+          ${months.map(m => {
+            const isNow = m === firstOfMonth(new Date());
+            const lbl = MONTH_ABBR[+m.slice(5, 7) - 1] + (m.slice(5, 7) === '01' || m === months[0] ? ` ’${m.slice(2, 4)}` : '');
+            return `<span class="cal__month ${isNow ? 'is-now' : ''}">${lbl}</span>`;
+          }).join('')}
         </div>
       </div>
       <div class="cal__body">
         ${todayPct !== null ? `<span class="cal__today" style="left: calc(var(--room-col) + (100% - var(--room-col)) * ${todayPct / 100})"></span>` : ''}
         ${rooms.map(r => `
           <div class="cal__row">
-            <div class="cal__room-col">
+            <button type="button" class="cal__room-col cal__room-btn ${occDrawer?.type === 'room' && occDrawer.roomId === r.id ? 'is-editing' : ''}" data-room-info="${r.id}" title="Room details">
               <span class="occ__room-name">${esc(r.name)}</span>
-              <span class="occ__room-sub">${esc(r.floor)}${r.resident ? ` · ${esc(r.resident)}` : ' · open room'}</span>
-            </div>
-            <div class="cal__lane">
-              ${occupancySegments(r.id).map(s => {
-                const style = `left: ${(s.start / 12) * 100}%; width: ${(s.len / 12) * 100}%`;
-                const title = s.kind === 'vacant'
-                  ? 'Open — click to edit or list'
-                  : `${s.label} · ${KIND_LABELS[s.kind]} · ${MONTH_ABBR[s.start]}${s.len > 1 ? `–${MONTH_ABBR[s.start + s.len - 1]}` : ''} · click to edit`;
-                const active = editingSegment && editingSegment.roomId === r.id && editingSegment.start === s.start;
-                return `<button type="button" class="cal__event cal__event--${s.kind} ${active ? 'is-editing' : ''}"
-                  style="${style}" title="${esc(title)}"
-                  data-seg-room="${r.id}" data-seg-start="${s.start}" data-seg-len="${s.len}">
-                  ${s.kind === 'vacant' ? 'Open' : esc(s.label)}</button>`;
-              }).join('')}
-            </div>
+              <span class="occ__room-sub">${esc(r.floor)}${r.total_sqft ? ` · ${r.total_sqft} sq ft` : ''}</span>
+            </button>
+            <div class="cal__lane">${barsFor(r)}</div>
           </div>`).join('')}
       </div>
     </div>
-    <div id="seg-editor">${editingSegment ? segmentEditorHtml() : ''}</div>
-    ${occupantsHtml()}`;
-
-  const segForm = host.querySelector('[data-seg-form]');
-  if (segForm) {
-    segForm.addEventListener('submit', onSegmentSave);
-    segForm.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
+    ${occupantsHtml()}
+    <div id="occ-drawer-host"></div>`;
+  renderOccDrawer();
 }
 
-/* --- segment editor: adjust who is in the room and for which months --- */
-function segmentEditorHtml() {
-  const { roomId, start, len, kind, label } = editingSegment;
-  const room = rooms.find(r => r.id === roomId);
-  const monthOpts = sel => MONTH_ABBR.map((m, i) =>
-    `<option value="${i}" ${i === sel ? 'selected' : ''}>${m} 2026</option>`).join('');
-  return `<form class="listing-form seg-form" data-seg-form>
-    <div class="seg-form__head">
-      <strong>${esc(room?.name || 'Room')}</strong>
-      <span class="occ__room-sub">${MONTH_ABBR[start]}–${MONTH_ABBR[start + len - 1]} 2026</span>
-    </div>
-    <div class="listing-form__grid">
-      <label class="listing-form__field">Who
-        <input type="text" name="occupant" class="listing-status" value="${esc(kind === 'vacant' ? '' : label)}" placeholder="Empty = open">
-      </label>
-      <label class="listing-form__field">Type
-        <select name="kind" class="listing-status">
-          ${['resident', 'sublet', 'candidate', 'shared', 'vacant'].map(k =>
-            `<option value="${k}" ${kind === k ? 'selected' : ''}>${KIND_LABELS[k]}</option>`).join('')}
-        </select>
-      </label>
+/* --- right-hand drawer: stay editor, gap actions, or room details --- */
+function openOccDrawer(next) {
+  occDrawer = next;
+  document.querySelectorAll('.cal__event.is-editing, .cal__room-btn.is-editing').forEach(el => el.classList.remove('is-editing'));
+  if (next?.type === 'stay') document.querySelector(`[data-stay="${next.id}"]`)?.classList.add('is-editing');
+  if (next?.type === 'gap') document.querySelector(`[data-gap-room="${next.roomId}"][data-gap-start="${next.start}"]`)?.classList.add('is-editing');
+  if (next?.type === 'room') document.querySelector(`[data-room-info="${next.roomId}"]`)?.classList.add('is-editing');
+  renderOccDrawer();
+}
+
+function stayFormHtml(s, roomId) {
+  const isNew = !s.id;
+  return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
+    <label class="listing-form__field">Who
+      <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" ${occDrawer.pinned ? 'autofocus' : ''}>
+    </label>
+    <label class="listing-form__field">Type
+      <select name="kind" class="listing-status">
+        ${['resident', 'sublet', 'candidate', 'shared'].map(k =>
+          `<option value="${k}" ${(s.kind || 'sublet') === k ? 'selected' : ''}>${KIND_LABELS[k]}</option>`).join('')}
+      </select>
+    </label>
+    <div class="occ-drawer__dates">
       <label class="listing-form__field">From
-        <select name="from" class="listing-status">${monthOpts(start)}</select>
+        <input type="date" name="starts_on" class="listing-status" value="${s.starts_on || ''}" required>
       </label>
       <label class="listing-form__field">Through
-        <select name="to" class="listing-status">${monthOpts(start + len - 1)}</select>
+        <input type="date" name="ends_on" class="listing-status" value="${s.ends_on || ''}" ${s.id && !s.ends_on ? 'disabled' : ''}>
       </label>
     </div>
+    <label class="occ-drawer__ongoing"><input type="checkbox" name="ongoing" ${s.id && !s.ends_on ? 'checked' : ''}> Ongoing — no move-out date yet</label>
     <p class="listing-form__error" data-form-error></p>
     <div class="decision-sheet__actions seg-form__actions">
-      ${kind === 'resident' ? `<button type="button" class="listing-form__delete" data-seg-leaving="${roomId}" data-seg-month="${start}">Mark leaving — list this room</button>` : ''}
-      ${kind === 'vacant' ? `<button type="button" class="listing-form__delete seg-form__list" data-list-room="${roomId}" data-list-month="2026-${String(start + 1).padStart(2, '0')}-01">Create listing for this stretch</button>` : ''}
-      <button type="button" class="hold-sheet__cancel" data-seg-cancel>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">Save months</button>
+      ${!isNew ? `<button type="button" class="listing-form__delete" data-stay-delete="${s.id}">Remove stay</button>` : ''}
+      ${!isNew && s.kind === 'resident' ? `<button type="button" class="listing-form__delete" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">Mark leaving — list room</button>` : ''}
+      <button type="button" class="hold-sheet__cancel" data-drawer-close>Cancel</button>
+      <button type="submit" class="btn btn--accent btn--sm">${isNew ? 'Add stay' : 'Save'}</button>
     </div>
   </form>`;
 }
 
-async function onSegmentSave(e) {
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const seg = editingSegment;
-  const from = +fd.get('from'), to = +fd.get('to');
-  const err = e.target.querySelector('[data-form-error]');
-  if (to < from) { err.textContent = '"Through" must be at or after "From".'; return; }
-  const occupant = (fd.get('occupant') || '').trim();
-  let kind = fd.get('kind');
-  if (!occupant && kind !== 'shared') kind = 'vacant';
-  if (occupant && kind === 'vacant') kind = 'sublet';
+function roomDetailsHtml(r) {
+  const facts = [
+    ['Floor', r.floor],
+    ['Room', r.sqft ? `${r.sqft} sq ft` : null],
+    ['Closet', r.closet_sqft != null ? `${r.closet_sqft} sq ft` : null],
+    ['Total', r.total_sqft ? `${r.total_sqft} sq ft` : null],
+    ['Ceiling', r.ceiling_ft ? `${(+r.ceiling_ft).toFixed(r.ceiling_ft % 1 ? 2 : 0)} ft` : null],
+    ['Volume', r.cubic_ft ? `${Number(r.cubic_ft).toLocaleString()} cu ft` : null],
+    ['Share of private space', r.pct_private ? `${(+r.pct_private).toFixed(2)}%` : null],
+  ].filter(([, v]) => v);
+  const open = listings.filter(l => l.room_id === r.id && l.status === 'open');
+  return `
+    <dl class="occ-drawer__facts">
+      ${facts.map(([k, v]) => `<div class="occ-drawer__fact"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('')}
+    </dl>
+    ${r.details_notes ? `<p class="occ-drawer__note">${esc(r.details_notes)}</p>` : ''}
+    ${open.length ? `<div class="occ-drawer__listings">
+      ${open.map(l => `<p class="occ-drawer__note">Open listing: ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}
+        <button class="btn btn--sm" data-edit-listing="${l.id}">Edit</button></p>`).join('')}
+    </div>` : ''}`;
+}
 
-  // months inside the new range take the values; months freed up become open
-  const monthKeyOf = i => `2026-${String(i + 1).padStart(2, '0')}-01`;
-  const rows = [];
-  for (let i = Math.min(from, seg.start); i <= Math.max(to, seg.start + seg.len - 1); i++) {
-    const inNew = i >= from && i <= to;
-    rows.push({
-      room_id: seg.roomId, month: monthKeyOf(i),
-      occupant: inNew ? occupant : '',
-      kind: inNew ? kind : 'vacant',
-    });
+function renderOccDrawer() {
+  const hostWrap = document.getElementById('occ-drawer-host');
+  if (!hostWrap) return;
+  if (!occDrawer) { hostWrap.innerHTML = ''; return; }
+  let title = '', sub = '', body = '';
+  if (occDrawer.type === 'stay') {
+    const s = stays.find(x => x.id === occDrawer.id);
+    if (!s) { occDrawer = null; hostWrap.innerHTML = ''; return; }
+    const room = rooms.find(r => r.id === s.room_id);
+    title = s.occupant || KIND_LABELS[s.kind];
+    sub = `${room?.name || 'Room'} · ${KIND_LABELS[s.kind]} · ${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
+    body = stayFormHtml(s, s.room_id);
+  } else if (occDrawer.type === 'gap') {
+    const room = rooms.find(r => r.id === occDrawer.roomId);
+    title = `${room?.name || 'Room'} — open`;
+    sub = `${fmtShort(occDrawer.start)} – ${fmtShort(occDrawer.end)}`;
+    body = `
+      <button class="btn btn--sm occ-drawer__list-btn" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">Create listing for this stretch</button>
+      <p class="occ-drawer__note">…or record who's moving in:</p>
+      ${stayFormHtml({ kind: 'sublet', starts_on: occDrawer.start, ends_on: occDrawer.end }, occDrawer.roomId)}`;
+  } else if (occDrawer.type === 'room') {
+    const r = rooms.find(x => x.id === occDrawer.roomId);
+    if (!r) { occDrawer = null; hostWrap.innerHTML = ''; return; }
+    title = r.name;
+    sub = 'Room details';
+    body = roomDetailsHtml(r);
   }
-  const { error } = await sb.from('recruit_occupancy').upsert(rows, { onConflict: 'room_id,month' });
-  if (error) { err.textContent = error.message; return; }
-  for (const row of rows) {
-    const existing = occupancy.find(o => o.room_id === row.room_id && o.month === row.month);
-    if (existing) Object.assign(existing, row); else occupancy.push(row);
+  hostWrap.innerHTML = `
+    <aside class="occ-drawer ${occDrawer.pinned ? 'is-pinned' : ''}">
+      <div class="occ-drawer__head">
+        <div>
+          <h3 class="occ-drawer__title">${esc(title)}</h3>
+          <p class="occ-drawer__sub">${esc(sub)}</p>
+        </div>
+        <button class="review__close" data-drawer-close aria-label="Close">✕</button>
+      </div>
+      <div class="occ-drawer__body">${body}</div>
+    </aside>`;
+  hostWrap.querySelector('[data-stay-form]')?.addEventListener('submit', onStaySave);
+  const ongoing = hostWrap.querySelector('input[name="ongoing"]');
+  if (ongoing) ongoing.addEventListener('change', e => {
+    const ends = hostWrap.querySelector('input[name="ends_on"]');
+    ends.disabled = e.target.checked;
+    if (e.target.checked) ends.value = '';
+  });
+}
+
+async function onStaySave(e) {
+  e.preventDefault();
+  const form = e.target;
+  const fd = new FormData(form);
+  const id = form.dataset.stayForm;
+  const err = form.querySelector('[data-form-error]');
+  const rec = {
+    room_id: +form.dataset.stayRoom,
+    occupant: (fd.get('occupant') || '').trim(),
+    kind: fd.get('kind'),
+    starts_on: fd.get('starts_on'),
+    ends_on: fd.get('ongoing') ? null : (fd.get('ends_on') || null),
+  };
+  if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
+  if (rec.ends_on && rec.ends_on < rec.starts_on) { err.textContent = '"Through" must be at or after "From".'; return; }
+  if (!rec.occupant && rec.kind !== 'shared') { err.textContent = 'Add a name (or delete the stay to leave the room open).'; return; }
+  if (!rec.ends_on && !fd.get('ongoing')) {
+    if (rec.kind === 'resident' || rec.kind === 'shared') rec.ends_on = null; // residents default open-ended
+    else { err.textContent = 'Sublets and trials need an end date (or tick "Ongoing").'; return; }
   }
-  editingSegment = null;
+  if (id === 'new') {
+    const { data, error } = await sb.from('recruit_stays').insert(rec).select().single();
+    if (error) { err.textContent = error.message; return; }
+    stays.push(data);
+  } else {
+    const { error } = await sb.from('recruit_stays').update({ ...rec, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { err.textContent = error.message; return; }
+    Object.assign(stays.find(s => s.id === id) || {}, rec);
+  }
+  occDrawer = null;
   toast('Occupancy updated');
+  renderOccupancy();
+}
+
+async function deleteStay(id) {
+  const s = stays.find(x => x.id === id);
+  const room = rooms.find(r => r.id === s?.room_id);
+  if (!confirm(`Remove ${s?.occupant || 'this stay'} from ${room?.name || 'the room'}? The stretch becomes open.`)) return;
+  const { error } = await sb.from('recruit_stays').delete().eq('id', id);
+  if (error) { toast(`Delete failed: ${error.message}`); return; }
+  stays = stays.filter(x => x.id !== id);
+  occDrawer = null;
+  toast('Stay removed');
   renderOccupancy();
 }
 
 /* --- current + past occupants --- */
 function occupantsHtml() {
-  const now = new Date();
-  const nowKey = `2026-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const todayIso = new Date().toISOString().slice(0, 10);
   const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
-  const current = occupancy
-    .filter(o => o.month === nowKey && o.kind !== 'vacant' && o.occupant)
+  const current = stays
+    .filter(s => s.occupant && s.starts_on <= todayIso && (!s.ends_on || s.ends_on >= todayIso))
     .sort((a, b) => (roomById[a.room_id]?.sort || 0) - (roomById[b.room_id]?.sort || 0));
 
-  const currentNames = new Set(current.map(o => o.occupant.toLowerCase()));
-  const pastMap = new Map(); // occupant label -> { rooms:Set, last:monthIdx }
-  for (const o of occupancy) {
-    if (o.month >= nowKey || o.kind === 'vacant' || o.kind === 'shared' || !o.occupant) continue;
-    if (currentNames.has(o.occupant.toLowerCase())) continue;
-    const rec = pastMap.get(o.occupant) || { rooms: new Set(), last: 0 };
-    rec.rooms.add(roomById[o.room_id]?.name || '');
-    rec.last = Math.max(rec.last, +o.month.slice(5, 7) - 1);
-    pastMap.set(o.occupant, rec);
+  const currentNames = new Set(current.map(s => s.occupant.toLowerCase()));
+  const pastMap = new Map(); // occupant -> { rooms:Set, last:iso }
+  for (const s of stays) {
+    if (!s.occupant || !s.ends_on || s.ends_on >= todayIso || s.kind === 'shared') continue;
+    if (currentNames.has(s.occupant.toLowerCase())) continue;
+    const rec = pastMap.get(s.occupant) || { rooms: new Set(), last: '' };
+    rec.rooms.add(roomById[s.room_id]?.name || '');
+    if (s.ends_on > rec.last) rec.last = s.ends_on;
+    pastMap.set(s.occupant, rec);
   }
-  const past = [...pastMap.entries()].sort((a, b) => b[1].last - a[1].last);
+  const past = [...pastMap.entries()].sort((a, b) => b[1].last.localeCompare(a[1].last));
 
   return `
     <section class="inbox-group occupants">
       <div class="inbox-group__head">
         <h2 class="inbox-group__label">Current occupants</h2>
-        <span class="inbox-group__count">${current.length} this month</span>
+        <span class="inbox-group__count">${current.length} right now</span>
       </div>
       <ul class="inbox-card">
-        ${current.map(o => {
-          const room = roomById[o.room_id];
+        ${current.map(s => {
+          const room = roomById[s.room_id];
           return `<li class="inbox-row">
-            <span class="avatar">${esc((o.occupant[0] || '?').toUpperCase())}</span>
+            <span class="avatar">${esc((s.occupant[0] || '?').toUpperCase())}</span>
             <span class="inbox-row__text">
-              <span class="inbox-row__title">${esc(o.occupant)}</span>
-              <span class="inbox-row__sub">${esc(room?.name || '')} · ${esc(room?.floor || '')}</span>
+              <span class="inbox-row__title">${esc(s.occupant)}</span>
+              <span class="inbox-row__sub">${esc(room?.name || '')} · ${esc(room?.floor || '')} · ${s.ends_on ? `through ${fmtShort(s.ends_on)}` : 'ongoing'}</span>
             </span>
             <span class="inbox-row__actions">
-              <span class="listing-kind listing-kind--${o.kind === 'candidate' ? 'trial' : (o.kind === 'resident' ? 'resident' : 'sublet')}">${KIND_LABELS[o.kind]}</span>
+              <span class="listing-kind listing-kind--${s.kind === 'candidate' ? 'trial' : (s.kind === 'resident' ? 'resident' : 'sublet')}">${KIND_LABELS[s.kind]}</span>
             </span>
           </li>`;
         }).join('')}
       </ul>
       ${past.length ? `<details class="occupants__past">
-        <summary>Past occupants this year (${past.length})</summary>
+        <summary>Past occupants (${past.length})</summary>
         <ul class="inbox-card">
           ${past.map(([name, rec]) => `<li class="inbox-row">
             <span class="avatar">${esc((name[0] || '?').toUpperCase())}</span>
             <span class="inbox-row__text">
               <span class="inbox-row__title">${esc(name)}</span>
-              <span class="inbox-row__sub">${esc([...rec.rooms].filter(Boolean).join(', '))} · through ${MONTH_ABBR[rec.last]} 2026</span>
+              <span class="inbox-row__sub">${esc([...rec.rooms].filter(Boolean).join(', '))} · through ${fmtShort(rec.last)}</span>
             </span>
           </li>`).join('')}
         </ul>
@@ -1061,20 +1210,20 @@ function occupantsHtml() {
     </section>`;
 }
 
-async function createListingFromCell(roomId, month) {
+async function createListingFromGap(roomId, startIso) {
   const room = rooms.find(r => r.id === roomId);
   if (!room) return;
-  const pretty = new Date(month + 'T12:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const pretty = fmtShort(startIso);
   if (!confirm(`Create a sublet listing for ${room.name} starting ${pretty}?`)) return;
   const { data, error } = await sb.from('recruit_listings').insert({
-    room_id: roomId, kind: 'sublet', starts_on: month, status: 'open',
-    source: 'gap', notes: `Created from the occupancy calendar (${pretty} open).`,
+    room_id: roomId, kind: 'sublet', starts_on: startIso, status: 'open',
+    source: 'gap', notes: `Created from the occupancy calendar (open from ${pretty}).`,
     created_by: me.id, created_by_name: me.name,
   }).select().single();
   if (error) { toast(`Listing failed: ${error.message}`); return; }
   listings.push(data);
-  toast(`Listing created — ${room.name}, ${pretty}`);
-  editingSegment = null;
+  toast(`Listing created — ${room.name}, from ${pretty}`);
+  occDrawer = null;
   renderOccupancy();
   renderRailCounts();
 }
@@ -2007,25 +2156,38 @@ function init() {
     if (reason) { pendingReason = reason.dataset.reason; renderDecisionOptions(); return; }
     const delNote = e.target.closest('[data-delete-note]');
     if (delNote) { deleteNote(delNote.dataset.deleteNote, queue[qIndex]); return; }
-    const listCell = e.target.closest('[data-list-room]');
-    if (listCell) { createListingFromCell(+listCell.dataset.listRoom, listCell.dataset.listMonth); return; }
-    const segLeaving = e.target.closest('[data-seg-leaving]');
-    if (segLeaving) {
-      const m = +segLeaving.dataset.segMonth;
-      markLeaving(+segLeaving.dataset.segLeaving, `2026-${String(m + 1).padStart(2, '0')}-01`);
-      return;
-    }
-    const seg = e.target.closest('[data-seg-room]');
-    if (seg) {
-      const roomId = +seg.dataset.segRoom, start = +seg.dataset.segStart;
-      const match = occupancySegments(roomId).find(x => x.start === start);
-      const already = editingSegment && editingSegment.roomId === roomId && editingSegment.start === start;
-      editingSegment = (match && !already) ? { roomId, ...match } : null;
+    if (occDrawer && e.target.closest('.occ-drawer')) occDrawer.pinned = true; // interacting pins a hover-preview
+    const calNav = e.target.closest('[data-cal-nav]');
+    if (calNav) {
+      occStart = calNav.dataset.calNav === 'today' ? defaultOccStart() : addMonthsIso(occStart, +calNav.dataset.calNav);
       renderOccupancy();
       return;
     }
-    const segCancel = e.target.closest('[data-seg-cancel]');
-    if (segCancel) { editingSegment = null; renderOccupancy(); return; }
+    const listCell = e.target.closest('[data-list-room]');
+    if (listCell) { createListingFromGap(+listCell.dataset.listRoom, listCell.dataset.listStart); return; }
+    const stayLeaving = e.target.closest('[data-stay-leaving]');
+    if (stayLeaving) { markLeaving(+stayLeaving.dataset.stayLeaving, stayLeaving.dataset.stayLeavingDate || null); return; }
+    const stayDel = e.target.closest('[data-stay-delete]');
+    if (stayDel) { deleteStay(stayDel.dataset.stayDelete); return; }
+    const stayBar = e.target.closest('[data-stay]');
+    if (stayBar) {
+      const already = occDrawer?.type === 'stay' && occDrawer.id === stayBar.dataset.stay && occDrawer.pinned;
+      openOccDrawer(already ? null : { type: 'stay', id: stayBar.dataset.stay, pinned: true });
+      return;
+    }
+    const gapBar = e.target.closest('[data-gap-room]');
+    if (gapBar) {
+      openOccDrawer({ type: 'gap', roomId: +gapBar.dataset.gapRoom, start: gapBar.dataset.gapStart, end: gapBar.dataset.gapEnd, pinned: true });
+      return;
+    }
+    const roomBtn = e.target.closest('[data-room-info]');
+    if (roomBtn) {
+      const already = occDrawer?.type === 'room' && occDrawer.roomId === +roomBtn.dataset.roomInfo;
+      openOccDrawer(already ? null : { type: 'room', roomId: +roomBtn.dataset.roomInfo, pinned: true });
+      return;
+    }
+    const drawerClose = e.target.closest('[data-drawer-close]');
+    if (drawerClose) { openOccDrawer(null); return; }
     const leaving = e.target.closest('[data-leaving-room]');
     if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
     const editL = e.target.closest('[data-edit-listing]');
@@ -2043,6 +2205,30 @@ function init() {
   document.addEventListener('change', e => {
     const sel = e.target.closest('[data-listing-status]');
     if (sel) updateListingStatus(sel.dataset.listingStatus, sel.value);
+  });
+
+  // Hovering a name on the occupancy calendar previews it in the drawer;
+  // clicking (or touching any control inside) pins it open.
+  let occHoverTimer = null, occHoverClose = null;
+  document.addEventListener('mouseover', e => {
+    if (view !== 'occupancy') return;
+    if (e.target.closest('.occ-drawer')) { clearTimeout(occHoverClose); return; }
+    const bar = e.target.closest('[data-stay]');
+    if (!bar) return;
+    clearTimeout(occHoverClose);
+    if (occDrawer?.pinned) return;
+    clearTimeout(occHoverTimer);
+    const id = bar.dataset.stay;
+    if (occDrawer?.type === 'stay' && occDrawer.id === id) return;
+    occHoverTimer = setTimeout(() => openOccDrawer({ type: 'stay', id, pinned: false }), 250);
+  });
+  document.addEventListener('mouseout', e => {
+    if (view !== 'occupancy') return;
+    clearTimeout(occHoverTimer);
+    if (!occDrawer || occDrawer.pinned) return;
+    const to = e.relatedTarget;
+    if (to && (to.closest?.('.occ-drawer') || to.closest?.('[data-stay]'))) return;
+    occHoverClose = setTimeout(() => { if (occDrawer && !occDrawer.pinned) openOccDrawer(null); }, 350);
   });
 
   window.addEventListener('popstate', () => {
@@ -2129,6 +2315,7 @@ function init() {
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !document.getElementById('email-modal').hidden) closeEmailModal();
+    if (e.key === 'Escape' && occDrawer && view === 'occupancy') { openOccDrawer(null); return; }
     if (e.key === 'ArrowRight') step(1);
     if (e.key === 'ArrowLeft') step(-1);
   });
