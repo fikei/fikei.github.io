@@ -929,3 +929,30 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .avail-card__slots .chip { height: 28px; }
 .screening-card { margin-bottom: var(--space-4); background: var(--outreach-tint); }
 .emails-toolbar__actions { display: inline-flex; gap: var(--space-2); }
+
+/* --- v2.15: merged Outreach+Listings, reply badges --- */
+.decision-chip--replied { background: rgba(47, 87, 17, 0.18); color: var(--success); }
+[data-theme="dark"] .decision-chip--replied { background: rgba(159, 232, 112, 0.14); }
+.listing-group .inbox-group__head.listing-head {
+  align-items: flex-start;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom: 0;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: 0;
+}
+.listing-group .inbox-card, .listing-group .inbox-empty--group {
+  border-top-left-radius: 0; border-top-right-radius: 0;
+  margin-top: 0;
+}
+.listing-group { gap: 0; display: flex; flex-direction: column; margin-bottom: var(--space-6); }
+.inbox-group__head.listing-head { display: flex; gap: var(--space-3); }
+.listing-head__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.listing-head__text .inbox-group__count { display: block; }
+.listing-head__actions { display: inline-flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.listing-head__n { flex-shrink: 0; align-self: flex-start; padding-top: 4px; }
+.inbox-empty--group {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: var(--space-4); text-align: left; margin: 0;
+}

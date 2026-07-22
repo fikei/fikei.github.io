@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -303,6 +303,68 @@ serve(async (req) => {
       if (error) return json({ error: error.message }, 500)
       console.log(`screening ${applicant.id} x ${housemateName} @ ${startsAt.toISOString()}`)
       return json({ scheduled: true, screening: row })
+    }
+
+    if (action === 'scan') {
+      // Inbox-wide sweep: match recent inbound mail to applicants so the app
+      // can badge replies without opening each Emails tab.
+      const at = await accessToken(client)
+      const { data: allApplicants } = await client.from('recruit_applicants').select('id, email')
+      const byEmail = new Map((allApplicants || [])
+        .filter((a) => a.email?.includes('@'))
+        .map((a) => [a.email.toLowerCase(), a.id]))
+      const list = await (await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent('newer_than:14d') + '&maxResults=60', {
+        headers: { Authorization: `Bearer ${at}` },
+      })).json()
+      let matched = 0
+      const replied = new Set<string>()
+      for (const m of (list.messages || [])) {
+        const { data: existing } = await client.from('recruit_emails').select('id').eq('gmail_id', m.id).maybeSingle()
+        if (existing) continue
+        const msg = await (await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`, {
+          headers: { Authorization: `Bearer ${at}` },
+        })).json()
+        const hs = msg.payload?.headers || []
+        const from = header(hs, 'From')
+        const to = header(hs, 'To')
+        const direction = from.toLowerCase().includes(SHARED_EMAIL) ? 'out' : 'in'
+        const counterpart = (direction === 'in' ? from : to).toLowerCase()
+        const applicantId = [...byEmail.entries()].find(([em]) => counterpart.includes(em))?.[1]
+        if (!applicantId) continue
+        let bodyText = ''
+        // deno-lint-ignore no-explicit-any
+        const walk = (part: any) => {
+          if (!part) return
+          if (part.mimeType === 'text/plain' && part.body?.data) {
+            try { bodyText += atob(String(part.body.data).replace(/-/g, '+').replace(/_/g, '/')) } catch { /* */ }
+          }
+          for (const sub of (part.parts || [])) walk(sub)
+        }
+        walk(msg.payload || {})
+        await client.from('recruit_emails').upsert({
+          applicant_id: applicantId, gmail_id: msg.id, thread_id: msg.threadId,
+          direction, subject: header(hs, 'Subject').slice(0, 300),
+          snippet: (msg.snippet || '').slice(0, 300),
+          body_text: bodyText.slice(0, 8000),
+          from_email: from.slice(0, 200), to_email: to.slice(0, 200),
+          sent_at: new Date(Number(msg.internalDate) || Date.now()).toISOString(),
+        }, { onConflict: 'gmail_id' })
+        matched++
+        if (direction === 'in') {
+          replied.add(applicantId)
+          if (bodyText.trim()) {
+            const windows = await extractAvailability(bodyText)
+            if (windows.length) {
+              await client.from('recruit_availability').upsert({
+                applicant_id: applicantId, windows, source_gmail_id: msg.id,
+                updated_at: new Date().toISOString(),
+              })
+            }
+          }
+        }
+      }
+      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied`)
+      return json({ matched, replied: [...replied] })
     }
 
     return json({ error: 'Unknown action' }, 400)

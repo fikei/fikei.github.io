@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=2.14.1">
+  <link rel="stylesheet" href="css/app.css?v=2.15.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -51,7 +51,6 @@
         <a class="rail-nav__row" href="?view=archive" data-view-link="archive">Archive <span class="rail-nav__count" id="count-archive"></span></a>
         <div class="rail-nav__group">House</div>
         <a class="rail-nav__row" href="?view=occupancy" data-view-link="occupancy">Occupancy</a>
-        <a class="rail-nav__row" href="?view=listings" data-view-link="listings">Listings <span class="rail-nav__count" id="count-listings"></span></a>
       </nav>
       <div class="rail-foot">
         <span class="rail-foot__user" id="rail-user"></span>
@@ -115,6 +114,10 @@
   </div>
 
   <!-- AI outreach email draft -->
+  <div class="email-modal" id="listing-modal" hidden>
+    <div class="email-modal__card" id="listing-modal-body"></div>
+  </div>
+
   <div class="email-modal" id="email-modal" hidden>
     <div class="email-modal__card">
       <div class="email-modal__head">
@@ -139,6 +142,6 @@
 
   <div class="toast-host" id="toast-host"></div>
 
-  <script src="js/app.js?v=2.14.1"></script>
+  <script src="js/app.js?v=2.15.0"></script>
 </body>
 </html>
