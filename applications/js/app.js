@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.16.0';
+const VERSION = '2.16.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -857,7 +857,8 @@ const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet (short-term)', candi
 /* Google-Calendar-style lanes over a rolling window of months. Stays are
    date-based (recruit_stays, ends_on NULL = open-ended), so the timeline
    pages forward indefinitely — ◀ ▶ shift the window, Today recenters it. */
-const OCC_WINDOW = 12;       // months visible at once
+let OCC_WINDOW = 12;         // months visible at once (3 on phones — set per render)
+const occMq = window.matchMedia('(max-width: 720px)');
 let occStart = null;         // 'YYYY-MM-01' — left edge of the window
 let occDrawer = null;        // { type:'stay'|'gap'|'room', ..., pinned } | null
 
@@ -876,7 +877,7 @@ function isoAddDays(iso, n) {
 }
 function defaultOccStart() {
   const d = new Date();
-  d.setMonth(d.getMonth() - 1);       // one month of history for context
+  if (!occMq.matches) d.setMonth(d.getMonth() - 1); // desktop: a month of history; phones: today at the left edge
   return firstOfMonth(d);
 }
 function occMonths() {
@@ -924,6 +925,7 @@ function roomGaps(roomId) {
 }
 
 function renderOccupancy() {
+  OCC_WINDOW = occMq.matches ? 3 : 12;
   if (!occStart) occStart = defaultOccStart();
   const host = document.getElementById('view-root');
   host.className = 'house';
@@ -965,12 +967,12 @@ function renderOccupancy() {
         `<span class="occ-legend__item"><span class="occ-swatch occ-swatch--${k}"></span>${KIND_LABELS[k]}</span>`).join('')}
       <span class="occ-legend__hint">Tap a room for its details; tap any bar to edit who's in it and their exact dates</span>
       <span class="cal-nav">
-        <button type="button" class="btn btn--sm" data-cal-nav="-6" title="6 months earlier">◀</button>
+        <button type="button" class="btn btn--sm" data-cal-nav="prev" title="Earlier">◀</button>
         <button type="button" class="btn btn--sm" data-cal-nav="today">Today</button>
-        <button type="button" class="btn btn--sm" data-cal-nav="6" title="6 months later">▶</button>
+        <button type="button" class="btn btn--sm" data-cal-nav="next" title="Later">▶</button>
       </span>
     </div>
-    <div class="cal">
+    <div class="cal" style="--occ-months: ${OCC_WINDOW}">
       <div class="cal__head">
         <div class="cal__room-col"></div>
         <div class="cal__months">
@@ -2159,7 +2161,9 @@ function init() {
     if (occDrawer && e.target.closest('.occ-drawer')) occDrawer.pinned = true; // interacting pins a hover-preview
     const calNav = e.target.closest('[data-cal-nav]');
     if (calNav) {
-      occStart = calNav.dataset.calNav === 'today' ? defaultOccStart() : addMonthsIso(occStart, +calNav.dataset.calNav);
+      const dir = calNav.dataset.calNav;
+      const stepMonths = Math.max(1, Math.round(OCC_WINDOW / 2));
+      occStart = dir === 'today' ? defaultOccStart() : addMonthsIso(occStart, dir === 'next' ? stepMonths : -stepMonths);
       renderOccupancy();
       return;
     }
@@ -2205,6 +2209,11 @@ function init() {
   document.addEventListener('change', e => {
     const sel = e.target.closest('[data-listing-status]');
     if (sel) updateListingStatus(sel.dataset.listingStatus, sel.value);
+  });
+
+  // Re-fit the timeline when the viewport crosses the phone breakpoint.
+  occMq.addEventListener('change', () => {
+    if (view === 'occupancy' && houseLoaded) renderOccupancy();
   });
 
   // Hovering a name on the occupancy calendar previews it in the drawer;
