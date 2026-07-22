@@ -9,8 +9,8 @@
   <title>/ladder — ctrl.rodeo</title>
   <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="/ladder/css/base.css?v=2.37.1">
-  <script src="/ladder/js/theme.js?v=2.37.1"></script>
+  <link rel="stylesheet" href="/ladder/css/base.css?v=2.37.2">
+  <script src="/ladder/js/theme.js?v=2.37.2"></script>
 
 
 
@@ -36,6 +36,12 @@
         // looks "disconnected"). Let app.js handle the callback on this page.
         var _sp = new URLSearchParams(location.search);
         if (_sp.get('code') && (_sp.get('state') || '').indexOf('gmail:') === 0) {
+          return;
+        }
+        // Agape recruiting shares this OAuth redirect — hand its callback to
+        // /applications/ before any pre-route can strip the ?code.
+        if (_sp.get('code') && _sp.get('state') === 'agape-gmail') {
+          location.replace('/applications/?code=' + encodeURIComponent(_sp.get('code')) + '&state=agape-gmail');
           return;
         }
         var raw = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
@@ -75,7 +81,7 @@
     </main>
   </div>
 
-  <script type="module" src="/ladder/js/app.js?v=2.37.1"></script>
+  <script type="module" src="/ladder/js/app.js?v=2.37.2"></script>
 
 
 
