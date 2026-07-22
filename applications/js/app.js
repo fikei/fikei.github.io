@@ -2,7 +2,7 @@
    Discord-gated (Recruiting Society channel on the Agape server, verified by
    the discord-membership edge fn). Applicants, shared decisions, and house
    notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.15.1';
+const VERSION = '2.15.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1255,8 +1255,17 @@ async function updateListingStatus(id, status) {
 }
 
 /* ---------- review overlay ---------- */
+/* The review queue mirrors whatever order is on screen — listing groups,
+   manual drag order, filters — falling back to data order off-list. */
+function renderedQueue() {
+  const ids = [...document.querySelectorAll('#view-root .inbox-row__main[data-review]')].map(b => b.dataset.review);
+  return [...new Set(ids)];
+}
+
 function openReview(id) {
-  queue = applicants.filter(a => matchesView(a) && matchesFilters(a)).map(a => a.id);
+  const domOrder = VIEWS[view]?.kind === 'applicants' ? renderedQueue() : [];
+  queue = domOrder.includes(id) ? domOrder
+    : applicants.filter(a => matchesView(a) && matchesFilters(a)).map(a => a.id);
   if (!queue.includes(id)) queue = applicants.map(a => a.id);
   qIndex = Math.max(0, queue.indexOf(id));
   reviewTab = 'profile';
@@ -2106,9 +2115,17 @@ function init() {
   document.getElementById('decision-use-notes').onclick = summarizeNotesIntoDecision;
 
   document.addEventListener('keydown', e => {
-    if (document.getElementById('review').hidden) return;
+    const reviewOpen = !document.getElementById('review').hidden;
+    const modalOpen = !document.getElementById('email-modal').hidden || !document.getElementById('listing-modal').hidden;
+    if (!reviewOpen && !modalOpen) return;
+    if (!reviewOpen && e.key !== 'Escape') return;
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
-    if (e.key === 'Escape') { if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet(); else closeReview(); }
+    if (e.key === 'Escape') {
+      if (!document.getElementById('email-modal').hidden) closeEmailModal();
+      else if (!document.getElementById('listing-modal').hidden) closeListingModal();
+      else if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet();
+      else closeReview();
+    }
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !document.getElementById('email-modal').hidden) closeEmailModal();
