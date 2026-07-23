@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.3.2'
+const VERSION = '1.4.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -102,10 +102,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     })
 
     const applicantName = `${applicant.first_name} ${applicant.last_name || ''}`.trim()
-    await editClaimMessageClaimed(
-      claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId,
-      applicantName, applicantId, slotWhen(startsAt),
-    )
+    await editClaimMessageClaimed(claimPost, opts.discordUserId, applicantName, applicantId, slotWhen(startsAt))
 
     const platform = claimPost.platform as { kind?: string; handle?: string } | null
     const platformLine = platform?.kind
@@ -125,7 +122,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     // Never reopen the post (avoids double-booking) — flag it and tell the claimer.
     console.error(`[recruit-discord] claim finish failed for ${applicantId}: ${(err as Error).message}`)
     try {
-      await editClaimMessageFailed(claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId, applicantId, slotWhen(startsAt))
+      await editClaimMessageFailed(claimPost, opts.discordUserId, applicantId, slotWhen(startsAt))
     } catch { /* best effort */ }
     try {
       await dmUser(opts.discordUserId,

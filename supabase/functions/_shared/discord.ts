@@ -151,7 +151,26 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
   }
 }
 
-// Post (or edit, per the one-open-post-per-applicant rule) the claim message.
+// PATCH an existing message, falling back to a fresh POST when it was deleted
+// (404) or never existed. Returns the live message.
+async function postOrPatch(channelId: string, messageId: string | null, payload: Record<string, unknown>): Promise<any> {
+  if (messageId) {
+    try {
+      return await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
+        method: 'PATCH', body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      if ((err as any).status !== 404) throw err
+    }
+  }
+  return await discordFetch(`/channels/${channelId}/messages`, {
+    method: 'POST', body: JSON.stringify(payload),
+  })
+}
+
+// Post (or edit, per the one-open-post-per-applicant rule) the claim message —
+// in BOTH #recruiting-interviews and #recruiting-society. Either copy is
+// claimable; both carry the same custom_ids so the claim handler is agnostic.
 // Returns the recruit_claim_posts row, or null when posting was skipped.
 export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promise<any | null> {
   const { data: existing } = await db.from('recruit_claim_posts')
@@ -164,28 +183,23 @@ export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promis
   const slots = input.needsHuman ? [] : deriveSlots(input.windows)
   const payload = buildMessage(input, slots)
   const status = (input.needsHuman || !slots.length) ? 'manual' : 'open'
+  const live = existing && existing.status !== 'expired' ? existing : null
 
-  let message: any = null
-  if (existing && existing.status !== 'expired') {
-    try {
-      message = await discordFetch(`/channels/${existing.discord_channel_id}/messages/${existing.discord_message_id}`, {
-        method: 'PATCH', body: JSON.stringify(payload),
-      })
-    } catch (err) {
-      if ((err as any).status !== 404) throw err
-      // message was deleted in Discord — fall through to a fresh post
-    }
-  }
-  if (!message) {
-    message = await discordFetch(`/channels/${CLAIMS_CHANNEL_ID}/messages`, {
-      method: 'POST', body: JSON.stringify(payload),
-    })
+  const message = await postOrPatch(CLAIMS_CHANNEL_ID, live?.discord_message_id || null, payload)
+  // Mirror copy is best-effort: missing channel perms must not kill the post.
+  let mirror: any = null
+  try {
+    mirror = await postOrPatch(NOTES_CHANNEL_ID, live?.mirror_message_id || null, payload)
+  } catch (err) {
+    console.warn(`[discord] mirror post failed for ${input.applicantId}: ${(err as Error).message}`)
   }
 
   const { data: row, error } = await db.from('recruit_claim_posts').upsert({
     applicant_id: input.applicantId,
     discord_message_id: message.id,
     discord_channel_id: message.channel_id || CLAIMS_CHANNEL_ID,
+    mirror_message_id: mirror?.id || null,
+    mirror_channel_id: mirror ? (mirror.channel_id || NOTES_CHANNEL_ID) : null,
     slots, platform: input.platform, timezone_note: input.timezoneNote,
     needs_human: input.needsHuman, status,
     posted_at: existing?.posted_at || new Date().toISOString(),
@@ -193,41 +207,60 @@ export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promis
     updated_at: new Date().toISOString(),
   }).select().single()
   if (error) throw new Error(`claim post upsert failed: ${error.message}`)
-  console.log(`[discord] claim post ${existing ? 'updated' : 'created'} for ${input.applicantId} (${slots.length} slots, ${status})`)
+  console.log(`[discord] claim post ${existing ? 'updated' : 'created'} for ${input.applicantId} (${slots.length} slots, ${status}, mirror=${Boolean(mirror)})`)
   return row
 }
 
-// Close a claimed post: strip buttons, green interview announcement.
+// A claim post row's message targets: primary + mirror when present.
+// deno-lint-ignore no-explicit-any
+function postTargets(post: any): Array<{ channelId: string; messageId: string }> {
+  const targets = [{ channelId: post.discord_channel_id, messageId: post.discord_message_id }]
+  if (post.mirror_message_id && post.mirror_channel_id) {
+    targets.push({ channelId: post.mirror_channel_id, messageId: post.mirror_message_id })
+  }
+  return targets
+}
+
+// deno-lint-ignore no-explicit-any
+async function editClaimPostEverywhere(post: any, payload: Record<string, unknown>): Promise<void> {
+  for (const t of postTargets(post)) {
+    try {
+      await discordFetch(`/channels/${t.channelId}/messages/${t.messageId}`, {
+        method: 'PATCH', body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      console.warn(`[discord] edit failed in ${t.channelId}: ${(err as Error).message}`)
+    }
+  }
+}
+
+// Close a claimed post (both copies): strip buttons, green announcement.
+// deno-lint-ignore no-explicit-any
 export async function editClaimMessageClaimed(
-  channelId: string, messageId: string, claimerDiscordId: string,
+  post: any, claimerDiscordId: string,
   applicantName: string, applicantId: string, when: string,
 ): Promise<void> {
-  await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      embeds: [{
-        description: `✅ <@${claimerDiscordId}> will be interviewing **${applicantName}** on ${when} — [see the candidate background here](${appLink(applicantId)}).`,
-        color: 0x2ecc71,
-      }],
-      components: [],
-    }),
+  await editClaimPostEverywhere(post, {
+    embeds: [{
+      description: `✅ <@${claimerDiscordId}> will be interviewing **${applicantName}** on ${when} — [see the candidate background here](${appLink(applicantId)}).`,
+      color: 0x2ecc71,
+    }],
+    components: [],
   })
 }
 
-// Mark a claimed post that hit an error downstream (calendar etc.).
+// Mark a claimed post (both copies) that hit an error downstream.
+// deno-lint-ignore no-explicit-any
 export async function editClaimMessageFailed(
-  channelId: string, messageId: string, claimerDiscordId: string,
+  post: any, claimerDiscordId: string,
   applicantId: string, when: string,
 ): Promise<void> {
-  await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      embeds: [{
-        description: `⚠️ <@${claimerDiscordId}> claimed this interview (${when}) but the calendar invite failed — [book manually in the app](${appLink(applicantId)}).`,
-        color: 0xe74c3c,
-      }],
-      components: [],
-    }),
+  await editClaimPostEverywhere(post, {
+    embeds: [{
+      description: `⚠️ <@${claimerDiscordId}> claimed this interview (${when}) but the calendar invite failed — [book manually in the app](${appLink(applicantId)}).`,
+      color: 0xe74c3c,
+    }],
+    components: [],
   })
 }
 

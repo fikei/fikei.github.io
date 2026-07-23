@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.8.2'
+const VERSION = '1.9.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -346,13 +346,13 @@ serve(async (req) => {
             claimed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
           })
           .eq('applicant_id', applicantId).in('status', ['open', 'manual'])
-          .select('discord_channel_id, discord_message_id').maybeSingle()
+          .select('discord_channel_id, discord_message_id, mirror_channel_id, mirror_message_id').maybeSingle()
         if (post) {
           const { data: dm } = await client.from('user_discord_membership')
             .select('discord_user_id').eq('user_id', userData.user.id).maybeSingle()
           if (dm?.discord_user_id) {
             const applicantName = `${result.applicant.first_name} ${result.applicant.last_name || ''}`.trim()
-            await editClaimMessageClaimed(post.discord_channel_id, post.discord_message_id, dm.discord_user_id, applicantName, applicantId, slotWhen(startsAt))
+            await editClaimMessageClaimed(post, dm.discord_user_id, applicantName, applicantId, slotWhen(startsAt))
           }
         }
       } catch (err) {
