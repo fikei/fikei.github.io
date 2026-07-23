@@ -226,7 +226,9 @@ Accessed via `Deno.env.get('KEY')`:
 
 | Variable | Required By |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | enrich-link, generate-widget, categorize, agent-handler |
+| `ANTHROPIC_API_KEY` | enrich-link, generate-widget, categorize, agent-handler (shared fallback; console key `taste-graph`) |
+| `EVENTS_ANTHROPIC_API_KEY` | enrich-event, scrape-discord-events, recommend-events, add-event (console key `events-pipeline`; falls back to `ANTHROPIC_API_KEY` if unset) |
+| `LADDER_ANTHROPIC_API_KEY` | Ladder functions (console key `ladder-jobs`; falls back to `ANTHROPIC_API_KEY` if unset) |
 | `OPENAI_API_KEY` | generate-widget (fallback) |
 | `SUPABASE_URL` | All functions (auto-set by Supabase) |
 | `SUPABASE_SERVICE_ROLE_KEY` | enrich-link, notion-sync (bypasses RLS) |
@@ -241,7 +243,7 @@ Set in repository Settings → Secrets:
 | `SUPABASE_URL` | notion-sync job |
 | `SUPABASE_SERVICE_KEY` | notion-sync job |
 | `NOTION_API_KEY` | notion-sync job |
-| `ANTHROPIC_API_KEY` | agent jobs |
+| `ANTHROPIC_API_KEY` | agent jobs (console key `agents-automation`) |
 
 ### Client-Side
 

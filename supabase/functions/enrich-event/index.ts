@@ -204,7 +204,7 @@ async function classifyWithAI(event: {
   name: string, venue: string, genre: string, content_type: string,
   description: string, tags: string[]
 }): Promise<{ genre: string, content_type: string, music_type: string | null } | null> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const apiKey = Deno.env.get('EVENTS_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.log('[enrich-event] ANTHROPIC_API_KEY not set, skipping AI classification')
     return null

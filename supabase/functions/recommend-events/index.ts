@@ -10,7 +10,7 @@
 // Body: { profile: { categories, artists, genres, keywords, domains, contentTypes, tasteContext? }, filters? }
 // Returns: { events: [...], meta: { eventsScanned, profileSignals, algorithm } }
 
-const VERSION = '1.2.0'
+const VERSION = '1.2.1'
 console.log(`[recommend-events] v${VERSION} — taste-engine DB context`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -300,7 +300,7 @@ async function rankEventsWithAI(
   profile: EventProfile,
   maxResults: number
 ): Promise<{ rankings: Array<{ event_index: number; score: number; reasons: string[] }>, confidence: number }> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const apiKey = Deno.env.get('EVENTS_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     console.warn('[recommend-events] No ANTHROPIC_API_KEY, falling back to keyword-only')
     return { rankings: [], confidence: 0 }

@@ -13,7 +13,7 @@
 // Body: { url: string }
 // Returns: { event, visibility, merged: boolean }
 
-const VERSION = '1.0.1'
+const VERSION = '1.0.2'
 console.log(`[add-event] v${VERSION} - PT-local date anchor + Z-timestamp handling`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -184,7 +184,7 @@ serve(async (req: Request) => {
     let extracted = extractJsonLd(html)
     let method = 'json-ld'
     if (!extracted) {
-      const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+      const apiKey = Deno.env.get('EVENTS_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY')
       if (!apiKey) return json({ error: 'No structured event data found on page' }, 422)
       extracted = await extractWithAI(html, url, apiKey)
       method = 'ai'

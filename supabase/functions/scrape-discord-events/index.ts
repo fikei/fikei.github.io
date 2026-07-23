@@ -517,7 +517,7 @@ async function scrapeAndCache(
 ): Promise<{ events: ExtractedEvent[]; meta: Record<string, unknown> }> {
   const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
   if (!botToken) throw new Error('DISCORD_BOT_TOKEN not configured')
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const apiKey = Deno.env.get('EVENTS_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
   console.log(`Scraping channel ${channelId} (${lookbackDays}d lookback)`)
