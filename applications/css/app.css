@@ -483,9 +483,9 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 }
 .review__decided .link-clear { background: none; border: 0; padding: 0; color: var(--fg-link); font-size: inherit; text-decoration: underline; }
 
-/* Footer — three decisions pinned at the bottom. */
+/* Footer — contextual: vote bar in review, recruiter actions for candidates. */
 .review__foot {
-  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
@@ -494,7 +494,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 }
 .review__foot[hidden] { display: none; }
 @media (min-width: 721px) { .review__foot { max-width: 760px; width: 100%; margin-inline: auto; border-inline: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; } }
-.review__btn { width: 100%; height: 48px; border-radius: var(--radius-pill); }
+.review__btn { flex: 1; height: 48px; border-radius: var(--radius-pill); }
 .review__btn--pass, .review__btn--hold { background: var(--bg-surface); border: 0; }
 .review__btn--pass:hover, .review__btn--hold:hover { background: var(--bg-overlay); }
 .review__btn.is-active--pass { background: var(--pass-tint); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
@@ -1004,3 +1004,42 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   .cal-nav { margin-left: auto; }
   .cal__row { min-height: 48px; }
 }
+
+/* --- v3.0.0: collective review — vote bar, tally, chips --- */
+.vote-bar {
+  flex: 1;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.vote-bar__q { font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.vote-bar__scores { display: inline-flex; gap: var(--space-2); }
+.vote-bar__score {
+  width: 44px; height: 44px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: var(--bg-surface);
+  font-size: var(--font-size-body); font-weight: var(--fw-semibold);
+  color: var(--fg); cursor: pointer;
+}
+.vote-bar__score:hover { background: var(--bg-overlay); }
+.vote-bar__score.is-on { background: #9FE870; border-color: #9FE870; color: #163300; }
+.vote-bar__veto {
+  height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
+  border: 1px solid rgba(168, 32, 13, 0.35); background: none;
+  color: var(--error); font-size: var(--font-size-small); font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.vote-bar__veto:hover { background: rgba(168, 32, 13, 0.10); }
+.vote-bar__veto.is-on { background: rgba(168, 32, 13, 0.16); box-shadow: inset 0 0 0 1.5px var(--error); }
+.vote-bar__note { flex: 1 1 180px; min-width: 0; height: 44px; }
+.vote-bar__cast { height: 44px; border-radius: var(--radius-pill); }
+@media (max-width: 720px) {
+  .vote-bar__q { flex-basis: 100%; }
+  .vote-bar__scores { flex: 1; justify-content: space-between; }
+  .vote-bar__score { width: 40px; height: 40px; }
+  .vote-bar__note { flex-basis: 100%; order: 5; }
+  .vote-bar__cast { flex: 1; order: 6; }
+}
+
+.decision-chip--vote { background: var(--bg-surface); color: var(--fg-muted); }
+.vote-summary { margin: 0 0 var(--space-3); font-size: var(--font-size-small); font-weight: var(--fw-semibold); color: var(--fg-muted); }
+.vote-score { font-weight: var(--fw-semibold); color: var(--fg); }
+.vote-score--veto { color: var(--error); }

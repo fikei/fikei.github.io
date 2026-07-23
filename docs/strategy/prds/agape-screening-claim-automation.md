@@ -4,6 +4,11 @@
 
 This is the "claim" model from the recruiting pipeline doc (first-to-claim runs the interview — no rotation, no paid round-robin), wired to plumbing that already exists in `/applications`.
 
+> Funnel context: this is step 4 of the staged pipeline in
+> [agape-recruiting-funnel.md](./agape-recruiting-funnel.md) (v3 funnel, migration 120).
+> The `recruit-discord` fn proposed below is shared infrastructure — the funnel's
+> Phase B new-application ping will post through the same function.
+
 ---
 
 ## What already exists (build on, don't rebuild)
