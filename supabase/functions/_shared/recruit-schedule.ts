@@ -63,6 +63,9 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
     attendees: [
       { email: applicant.email },
       ...(opts.housemateEmail.includes('@') ? [{ email: opts.housemateEmail }] : []),
+      // Recording bot's own Google account: invited attendees join Meets
+      // directly, so the bot never has to knock (RECALL_BOT_EMAIL, optional).
+      ...(Deno.env.get('RECALL_BOT_EMAIL')?.includes('@') ? [{ email: Deno.env.get('RECALL_BOT_EMAIL') }] : []),
     ],
     conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
     reminders: { useDefault: true },
