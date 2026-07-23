@@ -51,8 +51,8 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.7.0';
-console.log(`[application-events] v${VERSION} - role_closed events in the updates feed (server-backed closure notifications)`);
+const VERSION = '1.8.0';
+console.log(`[application-events] v${VERSION} - role_created Updates kind (auto-created roles from unmatched application receipts)`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
@@ -376,7 +376,7 @@ const EXIT_REASON_LABELS: Record<string, string> = {
 interface UpdateItem {
   kind:      'auto_offer' | 'auto_archive' | 'auto_advance' | 'no_response_archive'
            | 'prompt_offer' | 'prompt_rejection' | 'prompt_other'
-           | 'reply_pending' | 'stale';
+           | 'reply_pending' | 'stale' | 'role_closed' | 'role_created';
   action:    'undo' | 'open_role' | 'stage_offer' | 'archive' | 'open_gmail' | 'follow_up';
   priority:  number;
   event_id?: string;
@@ -519,6 +519,14 @@ async function listUpdates(userEmail: string): Promise<Response> {
         kind: 'auto_advance', action: 'open_role', priority: 5,
         event_id: rec.event_id, role_slug: rec.role_slug, company: rec.company_name, title: rec.title,
         text: `Moved ${rec.company_name} to ${stageLabel}`, detail: rec.summary || undefined,
+        received_at: rec.received_at,
+      });
+    } else if (rec.auto_action === 'role_created') {
+      upsert({
+        kind: 'role_created', action: 'open_role', priority: 3,
+        event_id: rec.event_id, role_slug: rec.role_slug, company: rec.company_name, title: rec.title,
+        text: `Added ${rec.company_name} — application detected in Gmail`,
+        detail: rec.summary || undefined,
         received_at: rec.received_at,
       });
     }

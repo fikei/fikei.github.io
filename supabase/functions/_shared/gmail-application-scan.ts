@@ -27,9 +27,11 @@ import {
 const LADDER_LABEL = 'Ladder';
 import {
   classifyApplicationMessage,
+  extractUnmatchedApplication,
   type ApplicationEventType,
   type ClassifiedApplicationEvent,
   ATS_PLATFORM_DOMAINS,
+  AUTO_CREATE_CONFIDENCE_FLOOR,
   AUTO_RESOLVE,
   FORWARD_AUTO_ADVANCE,
   PERSIST_CONFIDENCE_FLOOR,
@@ -37,6 +39,7 @@ import {
   shouldNeedReview,
   stageForEventType,
 } from './gmail-application-classifier.ts';
+import { roleSlug as buildRoleSlug } from './job-auth.ts';
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
@@ -72,6 +75,7 @@ export interface ApplicationScanResult {
   autoResolved:  number;        // offers/rejections the scan acted on (undo-able)
   needsReview:   number;        // events flagged for user attention
   skippedNoMatch:number;        // messages where no role could be matched
+  rolesCreated:  number;        // pipeline roles auto-created from unmatched receipts
 }
 
 export async function scanApplicationResponses(args: {
@@ -104,6 +108,7 @@ export async function scanApplicationResponses(args: {
 
   const out: ApplicationScanResult = {
     classified: 0, inserted: 0, autoAdvanced: 0, autoResolved: 0, needsReview: 0, skippedNoMatch: 0,
+    rolesCreated: 0,
   };
   // Gmail API ids of every message that produced at least one event row,
   // collected so we can stamp the Ladder label in one batchModify call
@@ -137,7 +142,10 @@ export async function scanApplicationResponses(args: {
        coalesce(r.engaged_at, r.applied_at) desc nulls last,
        r.created_at desc
   `;
-  if (!roles.length) return out;
+  // An empty pipeline only short-circuits role-scoped backfills. The
+  // general scan still runs pass 1 (ATS-platform senders) so unmatched
+  // application receipts can auto-create the first pipeline rows.
+  if (!roles.length && args.roleSlug) return out;
 
   // Build domain → role lookup. Multiple roles may share a domain
   // (same company, multiple openings) — keep all candidates so the
@@ -296,7 +304,26 @@ export async function scanApplicationResponses(args: {
       else if (hits.length > 1) matchedRole = pickByTitleOverlap(hits, subject, body);
     }
 
-    if (!matchedRole) { out.skippedNoMatch++; continue; }
+    // Step 3.5 — no pipeline role matched. If the message looks like an
+    // application receipt (the user applied outside Ladder, directly on
+    // an ATS careers page), auto-create the pipeline role from it.
+    // Everything else is a true no-match.
+    if (!matchedRole) {
+      const created = await maybeCreateRoleFromReceipt(sql, {
+        userEmail: args.userEmail,
+        msg, messageId, sender, senderDomain, subject, body,
+        eventSource: mode === 'backfill' ? 'gmail-backfill' : 'gmail-scan',
+      });
+      if (created) {
+        out.classified++;
+        out.inserted++;
+        out.rolesCreated++;
+        labelTargets.push(msg.id);
+      } else {
+        out.skippedNoMatch++;
+      }
+      continue;
+    }
 
     // Step 4 — classify with Haiku.
     out.classified++;
@@ -474,6 +501,94 @@ export async function scanApplicationResponses(args: {
 }
 
 // ---------- helpers ----------
+
+// Cheap pre-gate before spending a Haiku call on an unmatched message.
+// Receipts overwhelmingly come from ATS platform senders; the subject
+// regex covers company-domain senders ("careers@acme.com").
+const RECEIPT_SUBJECT_RE = /\b(applicat|thank you for (applying|your interest)|we('|’)?( ha)?ve received|application received)/i;
+
+// Auto-create a pipeline role from an application receipt that matched
+// no existing role. Gate → Haiku extraction → blocked-company check →
+// insert role (stage 'applied') + applied_confirmation event with
+// auto_action='role_created' so it surfaces in the Updates feed.
+// Returns true when a role + event landed.
+async function maybeCreateRoleFromReceipt(
+  sql: ReturnType<typeof db>,
+  args: {
+    userEmail: string;
+    msg: GmailMessage;
+    messageId: string;
+    sender: string;
+    senderDomain: string | null;
+    subject: string;
+    body: string;
+    eventSource: string;
+  },
+): Promise<boolean> {
+  const atsSender = !!args.senderDomain && isAtsPlatformDomain(args.senderDomain);
+  if (!atsSender && !RECEIPT_SUBJECT_RE.test(args.subject)) return false;
+
+  let extracted;
+  try {
+    extracted = await extractUnmatchedApplication({
+      subject: args.subject, sender: args.sender, body: args.body,
+    });
+  } catch (e) {
+    console.warn(`[gmail-app-scan] unmatched-extract failed: ${(e as Error).message}`);
+    return false;
+  }
+  if (!extracted || !extracted.is_application_receipt) return false;
+  if (extracted.confidence < AUTO_CREATE_CONFIDENCE_FLOOR) return false;
+  if (!extracted.company || isUnknownCompanyName(extracted.company)) return false;
+
+  // Respect the user's block list.
+  const blocked = await sql<{ ok: number }[]>`
+    select 1 as ok from job.blocked_companies
+     where user_email = ${args.userEmail}
+       and company_norm = ${extracted.company.trim().toLowerCase()}
+     limit 1`;
+  if (blocked.length) return false;
+
+  const slug = buildRoleSlug(extracted.company, extracted.title || 'application');
+  const receivedAt = args.msg.internalDate
+    ? new Date(Number(args.msg.internalDate)).toISOString()
+    : new Date().toISOString();
+
+  // Create the role. If the slug already exists (e.g. an Archived row the
+  // scan's Active/Saved load didn't see), leave it untouched — the event
+  // below still attaches, and the user can resurrect from the role page.
+  const createdRows = await sql<{ slug: string }[]>`
+    insert into job.pipeline_roles (
+      slug, company_slug, company_name, title, url, source, status, stage,
+      applied_at, last_activity_at, status_changed_at, gmail_thread_ids
+    ) values (
+      ${slug}, null, ${extracted.company}, ${extracted.title || '(unknown title)'},
+      null, 'Gmail Auto-detected', 'Active', 'applied',
+      ${receivedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
+    )
+    on conflict (slug) do nothing
+    returning slug`;
+
+  const inserted = await sql<{ id: string }[]>`
+    insert into job.application_events (
+      role_slug, gmail_message_id, gmail_thread_id, gmail_api_id,
+      sender, subject, event_type, detected_stage,
+      summary, confidence, auto_applied, needs_review, received_at, source,
+      auto_action, prev_state
+    ) values (
+      ${slug}, ${args.messageId}, ${args.msg.threadId}, ${args.msg.id},
+      ${args.sender}, ${args.subject}, 'applied_confirmation', 'applied',
+      ${extracted.summary || `Application received at ${extracted.company}`},
+      ${extracted.confidence}, true, false, ${receivedAt}, ${args.eventSource},
+      'role_created', null
+    )
+    on conflict (gmail_message_id) do nothing
+    returning id`;
+  if (!inserted.length) return false;
+
+  console.log(`[gmail-app-scan] auto-created role ${slug} from receipt (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
+  return true;
+}
 
 // Rejection → exit_reason mapping for the auto-archive. Where in the
 // process the role died decides the funnel bucket:

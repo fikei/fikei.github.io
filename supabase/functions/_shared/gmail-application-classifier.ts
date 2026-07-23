@@ -179,6 +179,95 @@ export async function classifyApplicationMessage(args: {
   };
 }
 
+// ── Unmatched-application extraction ───────────────────────────────────
+// Second classifier used ONLY for messages that matched no pipeline role.
+// Where classifyApplicationMessage is told the company/role and asked
+// "what happened?", this one is asked "is this a receipt for an
+// application we don't know about — and for what company/role?". The
+// scan uses it to auto-create the pipeline row when the user applied
+// outside Ladder (directly on an ATS careers page).
+
+export interface ExtractedUnmatchedApplication {
+  is_application_receipt: boolean;
+  company: string;
+  title: string;
+  summary: string;
+  confidence: number;
+}
+
+// Floor to auto-create a pipeline role from an unmatched receipt. Higher
+// than PERSIST_CONFIDENCE_FLOOR because a wrong create pollutes the
+// pipeline, not just a timeline.
+export const AUTO_CREATE_CONFIDENCE_FLOOR = 0.8;
+
+const EXTRACT_UNMATCHED_SYSTEM = `You look at a single Gmail message and decide whether it is an automated "we received your application" receipt for a job application (from an ATS like Greenhouse / Lever / Ashby / Workday, or directly from a company).
+
+Return STRICT JSON, no prose:
+{
+  "is_application_receipt": true | false,
+  "company": "the hiring company's name, exactly as the email presents it",
+  "title": "the job title applied to, exactly as stated",
+  "summary": "one short sentence (≤140 chars) — what this email says",
+  "confidence": 0.0–1.0
+}
+
+Rules:
+- TRUE only for receipts confirming the candidate's OWN submitted application ("we received your application for X").
+- FALSE for job alerts, recruiter cold outreach, newsletters, interview scheduling, rejections, offers, and anything that is not an application receipt.
+- company/title must come from the email text. If either is not stated, use "" and lower confidence.
+- NEVER fabricate. Empty / false > guess.
+- The body may be truncated. Trust what you see; do not extrapolate.`;
+
+export async function extractUnmatchedApplication(args: {
+  subject: string;
+  sender: string;
+  body: string;
+}): Promise<ExtractedUnmatchedApplication | null> {
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
+  if (!apiKey) {
+    console.warn('[gmail-app-classifier] ANTHROPIC_API_KEY missing');
+    return null;
+  }
+
+  const trimmed = args.body.slice(0, 6000);
+  const userPrompt = [
+    `Subject: ${args.subject}`,
+    `From: ${args.sender}`,
+    `---`,
+    trimmed,
+  ].join('\n');
+
+  const r = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 300,
+      system: EXTRACT_UNMATCHED_SYSTEM,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const data = await r.json() as { content: Array<{ type: string; text: string }> };
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+  const parsed = extractFirstJsonObject(text) as Partial<ExtractedUnmatchedApplication> | null;
+  if (!parsed) {
+    console.warn(`[gmail-app-classifier] bad JSON (unmatched): ${text.slice(0, 120)}`);
+    return null;
+  }
+  return {
+    is_application_receipt: parsed.is_application_receipt === true,
+    company:    String(parsed.company || '').trim().slice(0, 120),
+    title:      String(parsed.title || '').trim().slice(0, 200),
+    summary:    String(parsed.summary || '').trim().slice(0, 180),
+    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+  };
+}
+
 // Tolerant JSON extractor — mirrors the pattern in gmail-jobs.ts. Haiku
 // occasionally appends commentary or wraps in fences; this absorbs that.
 function extractFirstJsonObject(text: string): unknown {

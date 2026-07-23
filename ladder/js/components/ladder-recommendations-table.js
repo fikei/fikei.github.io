@@ -193,6 +193,11 @@ export class JobRecommendationsTable extends LitElement {
     if (!issues.length) return nothing;
     if (this._healthSnoozed(issues)) return nothing;
     const gmailDead = issues.find(s => s.type === 'gmail-jobs' && s.needsReauth);
+    // Anthropic account out of credits: every AI stage (email extraction,
+    // fit scoring, application classification) silently degrades together,
+    // so this gets its own banner with a direct path to top up.
+    const creditsOut = issues.find(s =>
+      /credit balance is too low|AI extraction temporarily unavailable/i.test(s.lastError || ''));
     return html`
       <div class="recs-health-banner" role="alert">
         ${gmailDead ? html`
@@ -203,6 +208,13 @@ export class JobRecommendationsTable extends LitElement {
                   @click=${() => this._onReconnectGmail()}>
             ${this._reconnecting ? 'Opening…' : 'Reconnect Gmail'}
           </button>
+        ` : creditsOut ? html`
+          <span class="recs-health-banner__msg">
+            <strong>AI extraction is paused</strong> — the Anthropic account is out of credits,
+            so new emails aren't being read. Scans retry automatically once credits are back.
+          </span>
+          <a class="btn btn--sm btn--accent" href="https://console.anthropic.com/settings/billing"
+             target="_blank" rel="noopener">Add credits</a>
         ` : html`
           <span class="recs-health-banner__msg">
             <strong>Source issue:</strong>
