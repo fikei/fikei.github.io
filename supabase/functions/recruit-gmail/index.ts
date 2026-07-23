@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.5.0'
+const VERSION = '1.6.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -432,9 +432,54 @@ serve(async (req) => {
           }
         }
       }
+      // Manual-scheduling pickup: a human who jumps in and sends a calendar
+      // invite from the shared account bypasses the app's schedule action.
+      // Sweep upcoming events; any attendee matching an applicant — by their
+      // application address OR any address they've written from — becomes a
+      // screenings row (deduped by event id, so app-booked calls are skipped).
+      let manualPickups = 0
+      try {
+        const { data: altRows } = await client.from('recruit_emails').select('applicant_id, from_email').eq('direction', 'in')
+        const altByEmail = new Map<string, string>()
+        for (const r of (altRows || [])) {
+          const m = String(r.from_email || '').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+/)
+          if (m) altByEmail.set(m[0], r.applicant_id)
+        }
+        const timeMin = new Date().toISOString()
+        const timeMax = new Date(Date.now() + 45 * 86400000).toISOString()
+        const cal = await (await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&maxResults=100`, {
+          headers: { Authorization: `Bearer ${at}` },
+        })).json()
+        for (const ev of (cal.items || [])) {
+          if (!ev.attendees?.length || !ev.start?.dateTime) continue
+          let aid: string | null = null
+          for (const att of ev.attendees) {
+            const em = String(att.email || '').toLowerCase()
+            aid = byEmail.get(em) || altByEmail.get(em) || null
+            if (aid) break
+          }
+          if (!aid) continue
+          const { data: existingEv } = await client.from('recruit_screenings').select('id').eq('gcal_event_id', ev.id).maybeSingle()
+          if (existingEv) continue
+          await client.from('recruit_screenings').insert({
+            applicant_id: aid,
+            starts_at: ev.start.dateTime,
+            ends_at: ev.end?.dateTime || ev.start.dateTime,
+            gcal_event_id: ev.id,
+            meet_link: ev.hangoutLink || null,
+            housemate_name: ev.organizer?.displayName || (ev.organizer?.email === SHARED_EMAIL ? 'the house' : ev.organizer?.email) || 'scheduled manually',
+            status: 'scheduled',
+          })
+          manualPickups++
+          console.log(`manual screening picked up: ${aid} @ ${ev.start.dateTime}`)
+        }
+      } catch (err) {
+        console.warn(`calendar sweep failed: ${(err as Error).message}`)
+      }
+
       await remindStuckPosts(client)
-      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied`)
-      return json({ matched, replied: [...replied] })
+      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up`)
+      return json({ matched, replied: [...replied], manualPickups })
     }
 
     return json({ error: 'Unknown action' }, 400)

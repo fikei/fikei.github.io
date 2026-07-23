@@ -1,6 +1,6 @@
 # Recruiting app — row states & subcopy reference
 
-Design documentation for `/applications` list rows (v3.6.0). One row = one applicant; every visual state derives from four inputs: `stage` (server-owned), `placements`, `email state`, and `your vote`. Nothing else may add chrome to a row.
+Design documentation for `/applications` list rows (v3.8.0). One row = one applicant; every visual state derives from four inputs: `stage` (server-owned), `placements`, `email state`, and `your vote`. Nothing else may add chrome to a row.
 
 ## Shared row anatomy
 
@@ -10,7 +10,7 @@ Design documentation for `/applications` list rows (v3.6.0). One row = one appli
 
 - **Row tap always opens the review overlay.** There is never an "Open" button; the only row-level action buttons are verbs that do something else (Vote, Send email, Add).
 - **Response dot** — 8px blue (`--accent`) dot in the row's left gutter, vertically centered, *beside* the avatar (never on top of it). Meaning: their last email to the house is unanswered-by-us / newest. Tooltip carries recency ("They replied — 3h ago"). Replaces the old "↙ Replied" chip in every view.
-- **Note bubble** — filled square speech bubble (rounded rect, tail centered on the bottom edge), accent-colored, with the note count inside in knockout text. Tooltip: "N house notes". Replaces the old "✎ N" text count.
+- **Note bubble** — filled square speech bubble (rounded rect, tail centered on the bottom edge), accent-colored, with the note count inside in knockout text. Hover shows a styled tooltip (same mechanics as the info-dot): "N house notes · latest — Author: 'first 140 chars…'". Replaces the old "✎ N" text count.
 - **Chips** are pills, 24px tall. Color taxonomy: gray = informational (vote progress), blue = placement, green = positive/confirmed, red/amber reserved for Archive states.
 
 ## Inbox (`stage = 'review'`)
@@ -43,9 +43,10 @@ Every row carries grip ⠿ + rank, **one contextual CTA**, and **✕** at the fa
 |---|---|---|
 | Nothing sent yet | **Reach out** (primary) — opens the AI email draft | no email either direction |
 | Waiting on them | muted `sent 3h ago` + **Follow up** | last email direction = out |
+| Invite promised | gray chip `Invite promised` + **Follow up** | last outbound reads like manual scheduling ("I'll send an invite", "let's chat tomorrow") — regex on the snippet |
 | They replied | blue response dot + **Reply** — opens the Emails tab to read first | last email direction = in, no availability parsed |
 | Availability in hand | **Pick a time** (accent) — opens the Emails tab slot picker | `recruit_availability` has windows, no screening booked |
-| Call booked | slot chip `Fri, Jul 25, 9:00 AM` + **Join call** when a Meet link exists | scheduled row in `recruit_screenings` |
+| Call booked | slot chip `Fri, Jul 25, 9:00 AM` + **Join call** when a Meet link exists | scheduled row in `recruit_screenings` — booked in-app **or picked up from the shared calendar**: the scan sweeps upcoming events and matches attendees to applicants (application address or any address they've replied from), so manually-sent invites become screening rows automatically |
 
 **✕** removes from *this* listing only — tombstones the placement so the auto-sweep never re-adds; tooltip says so.
 
@@ -89,5 +90,4 @@ There is no stay-length segment — sublet durations read as move-in → move-ou
 ## Known gaps (accepted for now)
 
 1. Waiting candidates don't say *why* nothing fits (dates vs budget vs no open listing).
-2. Openings rows don't surface a booked screening — that lives only in the Screening view.
 3. Auto vs manual placements are visually identical.
