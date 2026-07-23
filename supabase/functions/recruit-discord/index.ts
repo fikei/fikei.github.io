@@ -13,13 +13,13 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.0.0'
-console.log(`[recruit-discord] v${VERSION} — screening-claim interactions endpoint`)
+const VERSION = '1.1.0'
+console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendApplicantConfirmation } from '../_shared/recruit-schedule.ts'
-import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel } from '../_shared/discord.ts'
+import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -100,14 +100,18 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
       applicantId, startsAt, housemateUserId: opts.userId, housemateName, housemateEmail,
     })
 
-    await editClaimMessageClaimed(claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId, label)
+    const applicantName = `${applicant.first_name} ${applicant.last_name || ''}`.trim()
+    await editClaimMessageClaimed(
+      claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId,
+      applicantName, applicantId, slotWhen(startsAt),
+    )
 
     const platform = claimPost.platform as { kind?: string; handle?: string } | null
     const platformLine = platform?.kind
       ? `\nHeads up: they asked for ${platform.kind}${platform.handle ? ` (@${platform.handle})` : ''} — default is the Meet link, but feel free to DM them about it.`
       : ''
     await dmUser(opts.discordUserId,
-      `✅ You claimed **${applicant.first_name}**'s screening call — ${label}.\n` +
+      `✅ You claimed **${applicantName}**'s screening call — ${slotWhen(startsAt)}.\n` +
       `Calendar invites are out to you both. Meet: ${meetLink || '(see calendar invite)'}${platformLine}`)
 
     try {
@@ -120,7 +124,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     // Never reopen the post (avoids double-booking) — flag it and tell the claimer.
     console.error(`[recruit-discord] claim finish failed for ${applicantId}: ${(err as Error).message}`)
     try {
-      await editClaimMessageFailed(claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId, label)
+      await editClaimMessageFailed(claimPost.discord_channel_id, claimPost.discord_message_id, opts.discordUserId, applicantId, slotWhen(startsAt))
     } catch { /* best effort */ }
     try {
       await dmUser(opts.discordUserId,
@@ -176,8 +180,50 @@ async function handleClaim(interaction: Record<string, any>): Promise<Response> 
   return json(DEFERRED_UPDATE)
 }
 
+// DM each claimer ~an hour before their interview. Invoked by pg_cron every
+// 15 min via POST /recruit-discord/remind with X-Cron-Secret (migration 122).
+async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
+  const now = Date.now()
+  const { data: upcoming } = await client.from('recruit_screenings')
+    .select('id, applicant_id, housemate_user_id, starts_at, meet_link')
+    .eq('status', 'scheduled').is('reminder_sent_at', null)
+    .gte('starts_at', new Date(now).toISOString())
+    .lte('starts_at', new Date(now + 65 * 60000).toISOString())
+  let sent = 0
+  for (const s of (upcoming || [])) {
+    try {
+      const [{ data: applicant }, { data: dm }] = await Promise.all([
+        client.from('recruit_applicants').select('first_name, last_name').eq('id', s.applicant_id).maybeSingle(),
+        client.from('user_discord_membership').select('discord_user_id').eq('user_id', s.housemate_user_id).maybeSingle(),
+      ])
+      if (dm?.discord_user_id && applicant) {
+        const name = `${applicant.first_name} ${applicant.last_name || ''}`.trim()
+        await dmUser(dm.discord_user_id,
+          `⏰ Coming up: you're interviewing **${name}** at ${slotWhen(new Date(s.starts_at))} PT.\n` +
+          `Meet: ${s.meet_link || '(see calendar invite)'}\n` +
+          `Background: https://ctrl.rodeo/applications/?id=${encodeURIComponent(s.applicant_id)}`)
+        sent++
+      }
+      // Stamp even without a Discord id so we don't retry forever.
+      await client.from('recruit_screenings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', s.id)
+    } catch (err) {
+      console.warn(`[recruit-discord] reminder failed for screening ${s.id}: ${(err as Error).message}`)
+    }
+  }
+  return sent
+}
+
 serve(async (req) => {
   try {
+    // Cron path: interview reminders (header auth, not Discord-signed).
+    if (new URL(req.url).pathname.endsWith('/remind')) {
+      const secret = Deno.env.get('CRON_SECRET')
+      if (!secret || req.headers.get('x-cron-secret') !== secret) return json({ error: 'unauthorized' }, 401)
+      const sent = await remindUpcoming(db())
+      console.log(`[recruit-discord] reminder sweep: ${sent} DM(s) sent`)
+      return json({ reminded: sent })
+    }
+
     const body = await req.text()
     if (!(await verifySignature(req, body))) {
       return json({ error: 'invalid request signature' }, 401)

@@ -57,6 +57,11 @@ export function slotLabel(d: Date): string {
   return `${day} · ${time}`
 }
 
+// Prose variant for sentences: "Thu, Jul 23 at 9:30a"
+export function slotWhen(d: Date): string {
+  return slotLabel(d).replace(' · ', ' at ')
+}
+
 export interface Slot { start: string; label: string }
 
 // Windows → up to 8 concrete 30-min slots. Round-robin across windows so one
@@ -188,14 +193,18 @@ export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promis
   return row
 }
 
-// Close a claimed post: strip buttons, green "claimed" embed.
+// Close a claimed post: strip buttons, green interview announcement.
 export async function editClaimMessageClaimed(
-  channelId: string, messageId: string, claimerDiscordId: string, label: string,
+  channelId: string, messageId: string, claimerDiscordId: string,
+  applicantName: string, applicantId: string, when: string,
 ): Promise<void> {
   await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
     method: 'PATCH',
     body: JSON.stringify({
-      embeds: [{ description: `✅ **Claimed by <@${claimerDiscordId}>** — ${label} · invite sent`, color: 0x2ecc71 }],
+      embeds: [{
+        description: `✅ <@${claimerDiscordId}> will be interviewing **${applicantName}** on ${when} — [see the candidate background here](${appLink(applicantId)}).`,
+        color: 0x2ecc71,
+      }],
       components: [],
     }),
   })
@@ -203,12 +212,16 @@ export async function editClaimMessageClaimed(
 
 // Mark a claimed post that hit an error downstream (calendar etc.).
 export async function editClaimMessageFailed(
-  channelId: string, messageId: string, claimerDiscordId: string, label: string,
+  channelId: string, messageId: string, claimerDiscordId: string,
+  applicantId: string, when: string,
 ): Promise<void> {
   await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
     method: 'PATCH',
     body: JSON.stringify({
-      embeds: [{ description: `⚠️ **Claimed by <@${claimerDiscordId}>** — ${label}, but the calendar invite failed. Book manually in the app.`, color: 0xe74c3c }],
+      embeds: [{
+        description: `⚠️ <@${claimerDiscordId}> claimed this interview (${when}) but the calendar invite failed — [book manually in the app](${appLink(applicantId)}).`,
+        color: 0xe74c3c,
+      }],
       components: [],
     }),
   })
