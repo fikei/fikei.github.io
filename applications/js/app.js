@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.3.1';
+const VERSION = '3.4.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -938,16 +938,9 @@ function renderApplicants() {
         <h2 class="inbox-group__label">${esc(room?.name || 'Room')}
           <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
         </h2>
-        <span class="inbox-group__count">${listingWindow(l)}</span>
-        ${listingPricing(l) ? `<span class="inbox-group__count listing-row__pricing">${listingPricing(l)}</span>` : ''}
-        ${l.notes ? `<span class="inbox-group__count">${esc(l.notes)}</span>` : ''}
+        <span class="inbox-group__count">${listingMeta(l)}</span>
       </div>
-      <span class="listing-head__actions">
-        <button class="btn btn--sm" data-edit-listing="${l.id}">Edit</button>
-        <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
-          ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
-        </select>
-      </span>`;
+      <span class="listing-head__actions">${listingMenuHtml(l)}</span>`;
   };
 
   const outreachChrome = view === 'openings' ? `
@@ -970,10 +963,8 @@ function renderApplicants() {
               <span class="inbox-row__sub">${listingWindow(l)}</span>
             </span>
             <span class="inbox-row__actions">
-              <button class="btn btn--sm inbox-row__review" data-edit-listing="${l.id}">Edit</button>
-              <select class="listing-status listing-status--${l.status}" data-listing-status="${l.id}">
-                ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${l.status === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
-              </select>
+              <span class="note-count">${l.status}</span>
+              ${listingMenuHtml(l)}
             </span>
           </li>`;
         }).join('')}
@@ -1005,8 +996,39 @@ function renderApplicants() {
             </span>
           </li>`).join('')}
       </ul>`}
+      ${view === 'openings' ? othersAccordion(g.key) : ''}
     </section>`).join('') + doneDrawer + outreachHint;
   if (view === 'openings') wireRowDrag(host);
+}
+
+/* Collapsed rail of everyone else who'd fit this listing — removed
+   candidates can be re-added; Inbox folks link to their review page. */
+function othersAccordion(listingId) {
+  const others = otherQualified(listingId);
+  if (!others.length) return '';
+  return `<details class="occupants__past listing-others">
+    <summary>See other qualified applicants (${others.length})</summary>
+    <ul class="inbox-card">
+      ${others.map(a => {
+        const removed = placements.some(p => p.applicant_id === a.id && p.listing_id === listingId && p.status === 'removed');
+        return `<li class="inbox-row">
+          <button class="inbox-row__main" data-review="${a.id}">
+            ${avatarHtml(a)}
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(fullName(a))}</span>
+              <span class="inbox-row__sub">${esc(subLine(a))}</span>
+            </span>
+          </button>
+          <span class="inbox-row__actions">
+            ${a.stage === 'review' ? (voteChip(a) || '<span class="note-count">gathering votes</span>') : (removed ? '<span class="note-count" title="Removed from this listing by a recruiter">removed</span>' : '')}
+            ${a.stage === 'candidate'
+              ? `<button class="btn btn--sm inbox-row__review" data-add-placement="${a.id}|${esc(listingId)}">Add</button>`
+              : `<button class="btn btn--sm inbox-row__review" data-review="${a.id}">Open</button>`}
+          </span>
+        </li>`;
+      }).join('')}
+    </ul>
+  </details>`;
 }
 
 /* Drag-to-reorder applicants inside each listing group; shared house state. */
@@ -1469,6 +1491,51 @@ function listingPricing(l) {
   return parts.join(' + ');
 }
 
+/* One meta line, no repetition: when + terms + all-in cost (breakdown on
+   hover). Notes live in the edit modal, not the header. */
+function listingMeta(l) {
+  const bits = [];
+  if (l.kind === 'resident') {
+    bits.push(`Opens ${fmtDay(l.starts_on)}`, '3-month trial, then house vote');
+  } else {
+    bits.push(l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)} · end date TBD`);
+    const len = windowLength(l.starts_on, l.ends_on);
+    if (len) bits.push(len);
+  }
+  const costs = [l.rent_monthly, l.dues_monthly, l.groceries_monthly].filter(v => v != null);
+  if (costs.length) {
+    const total = costs.reduce((s, v) => s + Number(v), 0);
+    bits.push(`<span class="listing-allin" title="${esc(listingPricing(l))}">$${total.toLocaleString('en-US')}/mo all-in</span>`);
+  }
+  return bits.join(' · ');
+}
+
+/* ⋯ menu — edit + quick status moves; the inline status select is gone. */
+function listingMenuHtml(l) {
+  return `<span class="listing-menu-wrap">
+    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${l.id}" aria-label="Listing actions" aria-haspopup="menu">⋯</button>
+    <span class="listing-menu" data-menu-for="${l.id}" hidden>
+      <button type="button" class="listing-menu__item" data-edit-listing="${l.id}">Edit listing…</button>
+      ${l.status === 'open'
+        ? `<button type="button" class="listing-menu__item" data-set-status="${l.id}|filled">Mark filled</button>
+           <button type="button" class="listing-menu__item" data-set-status="${l.id}|closed">Close listing</button>`
+        : `<button type="button" class="listing-menu__item" data-set-status="${l.id}|open">Reopen</button>`}
+    </span>
+  </span>`;
+}
+
+/* Everyone who'd qualify for this listing but isn't on the active shortlist:
+   candidates a recruiter removed, plus qualifying applicants still in the
+   Inbox gathering votes. */
+function otherQualified(listingId) {
+  const l = listings.find(x => x.id === listingId);
+  if (!l) return [];
+  const placed = new Set(placements.filter(p => p.listing_id === listingId && p.status === 'active').map(p => p.applicant_id));
+  return applicants.filter(a => !placed.has(a.id)
+    && (a.stage === 'review' || a.stage === 'candidate')
+    && qualifiesFor(a, l));
+}
+
 function listingWindow(l) {
   const len = windowLength(l.starts_on, l.ends_on);
   if (l.kind === 'resident') {
@@ -1506,6 +1573,11 @@ function listingForm(l) {
       </label>
       <label class="listing-form__field">Groceries / mo
         <input type="number" name="groceries_monthly" class="listing-status" min="0" max="5000" step="5" value="${l.groceries_monthly ?? ''}" placeholder="210">
+      </label>
+      <label class="listing-form__field">Status
+        <select name="status" class="listing-status">
+          ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'open') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
+        </select>
       </label>
     </div>
     <label class="listing-form__field">Notes
@@ -1567,6 +1639,7 @@ async function onListingSubmit(e) {
     rent_monthly: num('rent_monthly'),
     dues_monthly: num('dues_monthly'),
     groceries_monthly: num('groceries_monthly'),
+    status: fd.get('status') || 'open',
     notes: (fd.get('notes') || '').trim(),
   };
   const err = form.querySelector('[data-form-error]');
@@ -1579,7 +1652,7 @@ async function onListingSubmit(e) {
   }
   if (id === 'new') {
     const { data, error } = await sb.from('recruit_listings').insert({
-      ...rec, status: 'open', source: 'manual', created_by: me.id, created_by_name: me.name,
+      ...rec, source: 'manual', created_by: me.id, created_by_name: me.name,
     }).select().single();
     if (error) { err.textContent = error.message; return; }
     listings.push(data);
@@ -2454,6 +2527,30 @@ function init() {
 
   // delegation
   document.addEventListener('click', e => {
+    // ⋯ listing menus: any click closes open menus except the one being toggled
+    const menuBtn = e.target.closest('[data-listing-menu]');
+    document.querySelectorAll('.listing-menu').forEach(m => {
+      if (!menuBtn || m.dataset.menuFor !== menuBtn.dataset.listingMenu) m.hidden = true;
+    });
+    if (menuBtn) {
+      const m = document.querySelector(`[data-menu-for="${menuBtn.dataset.listingMenu}"]`);
+      if (m) m.hidden = !m.hidden;
+      return;
+    }
+    const setSt = e.target.closest('[data-set-status]');
+    if (setSt) {
+      const [lid, st] = setSt.dataset.setStatus.split('|');
+      updateListingStatus(lid, st);
+      return;
+    }
+    const addPl = e.target.closest('[data-add-placement]');
+    if (addPl) {
+      const [aid, lid] = addPl.dataset.addPlacement.split('|');
+      addPlacement(aid, lid, 'manual').then(row => {
+        if (row) { toast('Added to the listing'); renderRailCounts(); renderApplicants(); }
+      });
+      return;
+    }
     const navLink = e.target.closest('[data-view-link]');
     if (navLink) { e.preventDefault(); setView(navLink.dataset.viewLink); return; }
     const fchip = e.target.closest('[data-fkey]');
