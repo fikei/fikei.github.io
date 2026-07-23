@@ -99,6 +99,11 @@ supabase functions deploy enrich-link
 supabase functions deploy generate-widget
 supabase functions deploy categorize
 
+# Recruiting (Agape) functions — Boards project
+supabase functions deploy recruit-gmail
+supabase functions deploy recruit-availability --no-verify-jwt   # public schedule-token picker
+supabase functions deploy recruit-discord --no-verify-jwt        # Discord interactions (Ed25519-signed)
+
 # Ops project functions
 supabase link --project-ref ycilriwjnmcelkspmfmg
 supabase functions deploy notion-sync
@@ -143,6 +148,11 @@ supabase functions deploy {function-name}
 | `notion-sync` | Ops | GitHub ↔ Notion documentation sync | 2026-02-04 |
 | `systemic-analyze` | Systemic | Design system analysis | Previous |
 | `systemic-fetch` | Systemic | Design system data fetching | Previous |
+| `recruit-gmail` | Boards | Shared-inbox applicant email pipe + availability extraction + Discord claim posts | — |
+| `recruit-availability` | Boards | Public applicant schedule picker backend (schedule_token auth) | — |
+| `recruit-discord` | Boards | Discord interactions endpoint for screening-claim buttons | — |
+
+**recruit-discord setup:** point the Discord application's *Interactions Endpoint URL* at `https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recruit-discord`. It verifies Ed25519 request signatures using the app's `verify_key`, fetched at runtime via `DISCORD_BOT_TOKEN` (`DISCORD_PUBLIC_KEY` env overrides). Claim posts go to `#recruiting-interviews` (`1529576830514762029`; `SCREENING_CLAIMS_CHANNEL_ID` env overrides). No extra secrets required.
 
 ---
 

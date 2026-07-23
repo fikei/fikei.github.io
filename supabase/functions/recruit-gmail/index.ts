@@ -16,11 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.3.0'
-console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe`)
+const VERSION = '1.4.0'
+console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendApplicantConfirmation, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
+import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,64 +36,111 @@ const CLIENT_SECRET = Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET')!
 // Same whitelisted redirect the ladder gmail flow uses; /ladder forwards
 // state=agape-gmail callbacks to /applications/.
 const REDIRECT_URI = Deno.env.get('GMAIL_OAUTH_REDIRECT_URI') || 'https://ctrl.rodeo/job/'
-const SHARED_EMAIL = Deno.env.get('AGAPE_GMAIL_ADDRESS') || 'live.at.agapesf@gmail.com'
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/calendar.events', // screening-call invites
 ]
-const TZ = 'America/Los_Angeles' 
 
 function db() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 }
 
-async function accessToken(client: ReturnType<typeof db>): Promise<string> {
-  const { data: acct } = await client.from('recruit_gmail_account').select('*').eq('id', 1).maybeSingle()
-  if (!acct) throw new Error('Shared Gmail not connected yet')
-  const resp = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID, client_secret: CLIENT_SECRET,
-      refresh_token: acct.refresh_token, grant_type: 'refresh_token',
-    }),
-  })
-  const tok = await resp.json()
-  if (!resp.ok || !tok.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(tok).slice(0, 180)}`)
-  return tok.access_token
+interface Extraction {
+  windows: Array<{ date: string; start: string; end: string }>
+  platform: { kind: string; handle?: string } | null
+  timezone_note: string | null
+  needs_human: boolean
 }
+const NO_EXTRACTION: Extraction = { windows: [], platform: null, timezone_note: null, needs_human: false }
 
-function b64url(s: string): string {
-  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-// Extract availability windows from an applicant's reply (Haiku).
-async function extractAvailability(text: string): Promise<Array<{ date: string; start: string; end: string }>> {
+// Extract scheduling info from an applicant's reply (Haiku, v2 prompt):
+// availability windows in PT, platform requests (IG/WhatsApp/phone),
+// timezone conversions, and a needs_human flag for unparseable replies.
+async function extractAvailability(text: string): Promise<Extraction> {
   const key = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
-  if (!key || !text.trim()) return []
-  const prompt = `Today is ${new Date().toLocaleDateString('en-CA', { timeZone: TZ })} (${TZ}).
-Extract every availability window this person offers for a call. Resolve relative days ("next Tuesday") to dates. Assume ${TZ} unless stated. If they give a day with no hours, use 09:00-18:00. Ignore anything that is not availability.
+  if (!key || !text.trim()) return NO_EXTRACTION
+  const prompt = `Today is ${new Date().toLocaleDateString('en-CA', { timeZone: TZ })} (${TZ}). You are extracting scheduling information from an email a housing applicant sent to Agape (San Francisco, Pacific time).
+
+Extract:
+1. "windows": every availability window they offer, as [{"date":"YYYY-MM-DD","start":"HH:MM","end":"HH:MM"}] in Pacific time.
+   - Resolve relative days ("next Tuesday", "the 25th") to concrete dates, never in the past.
+   - If they name their own timezone or location ("I'm in Europe", "CET", "9 hour difference"), convert to Pacific. When they say "morning your time" they mean Pacific morning — take them at their word.
+   - Vague day-parts map to: morning 09:00-12:00, afternoon 12:00-17:00, evening 17:00-21:00, a bare day 09:00-18:00.
+   - Windows must be >=30 minutes. Cap at 10.
+2. "platform": if they request a specific medium (Instagram video, WhatsApp, phone, "not video"), return {"kind":..., "handle":...}; else null. Default assumption is Google Meet — only capture explicit requests.
+3. "timezone_note": one short string when a conversion happened ("applicant is in Europe, +9h from PT — windows converted"), else null.
+4. "needs_human": true when the email is clearly about scheduling but you cannot produce at least one concrete window (e.g. "whenever works!", a Calendly link, questions instead of times) — a human will read the thread instead. If the email is not about scheduling at all, return windows [] and needs_human false.
+
 EMAIL START
 ${text.slice(0, 3000)}
 EMAIL END
-Return exactly: [{"date":"YYYY-MM-DD","start":"HH:MM","end":"HH:MM"}] — [] if none.`
+Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "needs_human":...}. No prose.`
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 400,
-      system: 'You extract meeting availability from emails. Respond with a JSON array only.',
+      model: 'claude-haiku-4-5-20251001', max_tokens: 600,
+      system: 'You extract scheduling information from emails. Respond with a single JSON object only.',
       messages: [{ role: 'user', content: prompt }],
     }),
   })
-  if (!resp.ok) return []
+  if (!resp.ok) return NO_EXTRACTION
   const data = await resp.json()
   const out = (data.content || []).filter((b: Record<string, unknown>) => b.type === 'text').map((b: Record<string, unknown>) => b.text).join('')
   try {
-    const arr = JSON.parse(out.trim().replace(/^```json?\s*|\s*```$/g, ''))
-    return Array.isArray(arr) ? arr.filter((w) => /^\d{4}-\d{2}-\d{2}$/.test(w.date) && /^\d{2}:\d{2}$/.test(w.start) && /^\d{2}:\d{2}$/.test(w.end)).slice(0, 10) : []
-  } catch { return [] }
+    const obj = JSON.parse(out.trim().replace(/^```json?\s*|\s*```$/g, ''))
+    const windows = (Array.isArray(obj.windows) ? obj.windows : [])
+      // deno-lint-ignore no-explicit-any
+      .filter((w: any) => /^\d{4}-\d{2}-\d{2}$/.test(w.date) && /^\d{2}:\d{2}$/.test(w.start) && /^\d{2}:\d{2}$/.test(w.end) && w.start < w.end)
+      .slice(0, 10)
+    return {
+      windows,
+      platform: obj.platform?.kind ? { kind: String(obj.platform.kind).slice(0, 40), ...(obj.platform.handle ? { handle: String(obj.platform.handle).replace(/^@/, '').slice(0, 60) } : {}) } : null,
+      timezone_note: obj.timezone_note ? String(obj.timezone_note).slice(0, 200) : null,
+      needs_human: Boolean(obj.needs_human) && !windows.length,
+    }
+  } catch { return NO_EXTRACTION }
+}
+
+// After availability lands, post/refresh the claimable message in
+// #recruiting-interviews. Warn-only: Discord being down never breaks a scan.
+async function postClaim(client: ReturnType<typeof db>, applicantId: string, extraction: Extraction): Promise<void> {
+  if (!extraction.windows.length && !extraction.needs_human) return
+  try {
+    const { data: applicant } = await client.from('recruit_applicants')
+      .select('first_name, why_agape').eq('id', applicantId).maybeSingle()
+    if (!applicant) return
+    await upsertClaimMessage(client, {
+      applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape,
+      windows: extraction.windows, platform: extraction.platform,
+      timezoneNote: extraction.timezone_note, needsHuman: extraction.needs_human,
+    })
+  } catch (err) {
+    console.warn(`claim post failed for ${applicantId}: ${(err as Error).message}`)
+  }
+}
+
+// 96h stuck-metric: one channel nudge per unclaimed post. Piggybacks on scan
+// (the app triggers scans regularly) — no extra cron infrastructure.
+async function remindStuckPosts(client: ReturnType<typeof db>): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - 96 * 3600 * 1000).toISOString()
+    const { data: stuck } = await client.from('recruit_claim_posts')
+      .select('applicant_id, discord_channel_id, discord_message_id, posted_at')
+      .eq('status', 'open').is('reminded_at', null).lt('posted_at', cutoff).limit(5)
+    for (const post of (stuck || [])) {
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('first_name').eq('id', post.applicant_id).maybeSingle()
+      await notifyStuck(post.discord_channel_id, post.discord_message_id, applicant?.first_name || 'An applicant')
+      await client.from('recruit_claim_posts')
+        .update({ reminded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('applicant_id', post.applicant_id)
+      console.log(`stuck reminder sent for ${post.applicant_id} (open since ${post.posted_at})`)
+    }
+  } catch (err) {
+    console.warn(`stuck reminder sweep failed: ${(err as Error).message}`)
+  }
 }
 
 function header(headers: Array<{ name: string; value: string }>, name: string): string {
@@ -243,13 +292,14 @@ serve(async (req) => {
           const { data: existingAv } = await client.from('recruit_availability')
             .select('source_gmail_id').eq('applicant_id', applicant.id).maybeSingle()
           if (existingAv?.source_gmail_id !== msg.id) {
-            const windows = await extractAvailability(bodyText)
-            if (windows.length) {
+            const extraction = await extractAvailability(bodyText)
+            if (extraction.windows.length) {
               await client.from('recruit_availability').upsert({
-                applicant_id: applicant.id, windows, source_gmail_id: msg.id,
+                applicant_id: applicant.id, windows: extraction.windows, source_gmail_id: msg.id,
                 updated_at: new Date().toISOString(),
               })
             }
+            await postClaim(client, applicant.id, extraction)
           }
         }
       }
@@ -262,47 +312,53 @@ serve(async (req) => {
     }
 
     if (action === 'schedule') {
-      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
-      if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
+      const applicantId = String(body.applicantId || '')
       const startsAt = new Date(String(body.startsAt || ''))
       if (isNaN(startsAt.getTime()) || startsAt < new Date()) return json({ error: 'Pick a future start time' }, 400)
-      const endsAt = new Date(startsAt.getTime() + (Number(body.minutes) || 30) * 60000)
 
       const { data: rp } = await client.from('recruit_profiles').select('display_name').eq('user_id', userData.user.id).maybeSingle()
       const housemateName = rp?.display_name || membership.discord_username || 'an Agape housemate'
       const housemateEmail = (userData.user.email || '').toLowerCase()
 
-      const at = await accessToken(client)
-      const event = {
-        summary: `Agape screening call — ${applicant.first_name} ${applicant.last_name} × ${housemateName}`,
-        description: `Get-to-know-you call with ${applicant.first_name} (Agape application), scheduled from their offered availability.`,
-        start: { dateTime: startsAt.toISOString(), timeZone: TZ },
-        end: { dateTime: endsAt.toISOString(), timeZone: TZ },
-        attendees: [
-          { email: applicant.email },
-          ...(housemateEmail.includes('@') ? [{ email: housemateEmail }] : []),
-        ],
-        conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
-        reminders: { useDefault: true },
+      let result
+      try {
+        result = await scheduleScreening(client, {
+          applicantId, startsAt, minutes: Number(body.minutes) || 30,
+          housemateUserId: userData.user.id, housemateName, housemateEmail,
+        })
+      } catch (err) {
+        const msg = (err as Error).message
+        return json({ error: msg }, msg === 'Applicant has no email' ? 400 : 500)
       }
-      const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      })
-      const created = await resp.json()
-      if (!resp.ok) return json({ error: `Calendar failed: ${JSON.stringify(created).slice(0, 200)} — if this mentions scopes, reconnect the shared Gmail to grant calendar access` }, 500)
-      // deno-lint-ignore no-explicit-any
-      const meet = created.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || created.hangoutLink || null
-      const { data: row, error } = await client.from('recruit_screenings').insert({
-        applicant_id: applicant.id, housemate_user_id: userData.user.id,
-        housemate_name: housemateName, housemate_email: housemateEmail,
-        starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
-        gcal_event_id: created.id, meet_link: meet, status: 'scheduled',
-      }).select().single()
-      if (error) return json({ error: error.message }, 500)
-      console.log(`screening ${applicant.id} x ${housemateName} @ ${startsAt.toISOString()}`)
-      return json({ scheduled: true, screening: row })
+
+      // App-side booking closes any open Discord claim post for this applicant.
+      try {
+        const label = slotLabel(startsAt)
+        const { data: post } = await client.from('recruit_claim_posts')
+          .update({
+            status: 'claimed', claimed_by_user_id: userData.user.id,
+            claimed_slot: { start: startsAt.toISOString(), label },
+            claimed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          })
+          .eq('applicant_id', applicantId).in('status', ['open', 'manual'])
+          .select('discord_channel_id, discord_message_id').maybeSingle()
+        if (post) {
+          const { data: dm } = await client.from('user_discord_membership')
+            .select('discord_user_id').eq('user_id', userData.user.id).maybeSingle()
+          if (dm?.discord_user_id) await editClaimMessageClaimed(post.discord_channel_id, post.discord_message_id, dm.discord_user_id, label)
+        }
+      } catch (err) {
+        console.warn(`claim post close failed for ${applicantId}: ${(err as Error).message}`)
+      }
+
+      try {
+        await sendApplicantConfirmation(client, result.applicant, housemateName, startsAt, result.meetLink)
+      } catch (err) {
+        console.warn(`confirmation email failed for ${applicantId}: ${(err as Error).message}`)
+      }
+
+      console.log(`screening ${applicantId} x ${housemateName} @ ${startsAt.toISOString()}`)
+      return json({ scheduled: true, screening: result.screening })
     }
 
     if (action === 'scan') {
@@ -353,16 +409,18 @@ serve(async (req) => {
         if (direction === 'in') {
           replied.add(applicantId)
           if (bodyText.trim()) {
-            const windows = await extractAvailability(bodyText)
-            if (windows.length) {
+            const extraction = await extractAvailability(bodyText)
+            if (extraction.windows.length) {
               await client.from('recruit_availability').upsert({
-                applicant_id: applicantId, windows, source_gmail_id: msg.id,
+                applicant_id: applicantId, windows: extraction.windows, source_gmail_id: msg.id,
                 updated_at: new Date().toISOString(),
               })
             }
+            await postClaim(client, applicantId, extraction)
           }
         }
       }
+      await remindStuckPosts(client)
       console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied`)
       return json({ matched, replied: [...replied] })
     }

@@ -5,3 +5,8 @@ project_id = "yfhudwakpgzswiylhfbh"
 # Disable platform JWT verification so cron can hit it.
 [functions.pull-recommendations]
 verify_jwt = false
+
+# recruit-discord is Discord's interactions endpoint — authenticated by
+# Ed25519 request signatures, not JWTs.
+[functions.recruit-discord]
+verify_jwt = false
