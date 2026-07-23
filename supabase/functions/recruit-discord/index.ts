@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -127,7 +127,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     try {
       await dmUser(opts.discordUserId,
         `⚠️ You claimed the call with this applicant (${label}), but scheduling hit an error: ${(err as Error).message.slice(0, 200)}\n` +
-        `Please book it manually in the app: https://ctrl.rodeo/applications/?id=${encodeURIComponent(applicantId)}`)
+        `Please book it manually in the app: https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`)
     } catch { /* best effort */ }
   }
 }
@@ -234,7 +234,7 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
         await dmUser(dm.discord_user_id,
           `⏰ Coming up: you're interviewing **${name}** at ${slotWhen(new Date(s.starts_at))} PT.\n` +
           `Meet: ${s.meet_link || '(see calendar invite)'}\n` +
-          `Background: https://ctrl.rodeo/applications/?id=${encodeURIComponent(s.applicant_id)}`)
+          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(s.applicant_id)}`)
         sent++
       }
       // Stamp even without a Discord id so we don't retry forever.

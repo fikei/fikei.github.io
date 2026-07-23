@@ -7,7 +7,7 @@
 // POST { token }                      → { firstName, windows }
 // POST { token, windows: [...] }      → save; { saved: true, windows }
 
-const VERSION = '1.2.2'
+const VERSION = '1.2.3'
 console.log(`[recruit-availability] v${VERSION} — public applicant availability endpoint + Discord claim post`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
