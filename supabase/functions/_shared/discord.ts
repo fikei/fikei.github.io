@@ -10,6 +10,8 @@ import { TZ } from './recruit-schedule.ts'
 const DISCORD_API = 'https://discord.com/api/v10'
 // #recruiting-interviews in the Agape guild (952961396121931838)
 export const CLAIMS_CHANNEL_ID = Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || '1529576830514762029'
+// #recruiting-society — where finished Intro Call notes/recordings post
+export const NOTES_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
 
 function botHeaders(): Record<string, string> {
   const token = Deno.env.get('DISCORD_BOT_TOKEN')
@@ -249,7 +251,7 @@ export async function postRecordingNote(
     videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
     `📋 [Full profile](${appLink(applicantId)})`,
   ]
-  await discordFetch(`/channels/${CLAIMS_CHANNEL_ID}/messages`, {
+  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
     method: 'POST',
     body: JSON.stringify({
       embeds: [{
