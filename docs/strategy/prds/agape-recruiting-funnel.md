@@ -7,7 +7,7 @@ Status: **Phase A shipped (v3.0.0, migration 120); auto-placement shipped early 
 ### v3.2.0 amendments (2026-07-22)
 - "Review" is named **Inbox**; Openings sits in the House rail group under Occupancy.
 - Legacy Hold applicants went back to Inbox — hold ≠ passed review.
-- **AI listing suggestions removed** from profiles. Replaced by deterministic auto-placement: candidates land in **every** open listing they qualify for (`recruit_listing_candidates`; qualification = track match, budget ≥ rent when both known, move-in window overlaps listing window ±1 month; flexible/unknown move-in qualifies on track). Recruiter removals are tombstoned so the sweep never re-adds them. This delivers most of old Phase C — remaining Phase C scope is only auto-*generating* draft listings from occupancy gaps.
+- **AI listing suggestions removed** from profiles. Replaced by deterministic auto-placement: candidates land in **every** open listing they qualify for (`recruit_listing_candidates`; qualification = track match, budget ≥ rent when both known, move-in dates must fall inside the listing window — no padding; only explicit "flexible" rides any window, ASAP fits rooms opening within a month, unparseable dates never auto-place). Recruiter removals are tombstoned so the sweep never re-adds them. This delivers most of old Phase C — remaining Phase C scope is only auto-*generating* draft listings from occupancy gaps.
 
 ---
 
