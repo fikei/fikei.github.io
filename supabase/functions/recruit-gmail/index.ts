@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.6.0'
+const VERSION = '1.7.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendApplicantConfirmation, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen } from '../_shared/discord.ts'
+import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -299,7 +299,9 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
-            await postClaim(client, applicant.id, extraction)
+            // Auto-post to Discord is off for now — a recruiter triggers the
+            // claim post from the app (claim-preview/claim-post actions).
+            // await postClaim(client, applicant.id, extraction)
           }
         }
       }
@@ -362,6 +364,39 @@ serve(async (req) => {
 
       console.log(`screening ${applicantId} x ${housemateName} @ ${startsAt.toISOString()}`)
       return json({ scheduled: true, screening: result.screening })
+    }
+
+    if (action === 'claim-preview' || action === 'claim-post') {
+      // Manual Discord trigger: preview composes the exact message; post
+      // sends it. The extraction rides back from preview to post so Haiku
+      // runs once. Future cutover: re-enable the auto postClaim calls.
+      const applicantId = String(body.applicantId || '')
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('id, first_name, why_agape').eq('id', applicantId).maybeSingle()
+      if (!applicant) return json({ error: 'unknown applicant' }, 404)
+      let extraction: Extraction = body.extraction && Array.isArray(body.extraction.windows)
+        ? body.extraction as Extraction
+        : NO_EXTRACTION
+      if (!body.extraction) {
+        const { data: latest } = await client.from('recruit_emails')
+          .select('body_text').eq('applicant_id', applicantId).eq('direction', 'in')
+          .order('sent_at', { ascending: false }).limit(1).maybeSingle()
+        if (!latest?.body_text?.trim()) return json({ error: 'no inbound email to read times from' }, 400)
+        extraction = await extractAvailability(latest.body_text)
+        if (!extraction.windows.length && !extraction.needs_human) extraction = { ...extraction, needs_human: true }
+      }
+      const input = {
+        applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape,
+        windows: extraction.windows, platform: extraction.platform,
+        timezoneNote: extraction.timezone_note, needsHuman: extraction.needs_human,
+      }
+      const slots = extraction.needs_human ? [] : deriveSlots(extraction.windows)
+      const message = buildMessage(input, slots)
+      if (action === 'claim-preview') {
+        return json({ preview: message, slotLabels: slots.map((sl) => sl.label), extraction })
+      }
+      const row = await upsertClaimMessage(client, input)
+      return json({ posted: !!row, alreadyClaimed: !row })
     }
 
     if (action === 'scan') {
@@ -428,10 +463,47 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
-            await postClaim(client, applicantId, extraction)
+            // manual-trigger era: no auto post (see claim-preview/claim-post)
+            // await postClaim(client, applicantId, extraction)
           }
         }
       }
+      // Availability backfill: extraction normally runs when a message first
+      // lands, but replies matched late (thread fallback) or from before an
+      // extraction fix slip through. For each applicant whose LATEST inbound
+      // was never extracted, run it from the stored body. Empty extractions
+      // are stored too (windows []) so a non-scheduling reply is marked
+      // processed and Haiku doesn't re-read it every scan. Capped per scan.
+      let backfilled = 0
+      try {
+        const { data: avRows } = await client.from('recruit_availability').select('applicant_id, source_gmail_id')
+        const avBy = new Map((avRows || []).map((r) => [r.applicant_id, r.source_gmail_id]))
+        const { data: inbound } = await client.from('recruit_emails')
+          .select('applicant_id, gmail_id, body_text, sent_at')
+          .eq('direction', 'in').order('sent_at', { ascending: false }).limit(60)
+        const seen = new Set<string>()
+        for (const r of (inbound || [])) {
+          if (seen.has(r.applicant_id)) continue
+          seen.add(r.applicant_id)
+          if (backfilled >= 5) break
+          if (avBy.get(r.applicant_id) === r.gmail_id) continue // latest already processed
+          if (!r.body_text?.trim()) continue
+          const { data: sched } = await client.from('recruit_screenings')
+            .select('id').eq('applicant_id', r.applicant_id).eq('status', 'scheduled').limit(1).maybeSingle()
+          if (sched) continue // call already booked — nothing to extract for
+          const extraction = await extractAvailability(r.body_text)
+          await client.from('recruit_availability').upsert({
+            applicant_id: r.applicant_id, windows: extraction.windows,
+            source_gmail_id: r.gmail_id, updated_at: new Date().toISOString(),
+          })
+          // manual-trigger era: no auto post (see claim-preview/claim-post)
+          backfilled++
+          console.log(`availability backfill: ${r.applicant_id} → ${extraction.windows.length} windows`)
+        }
+      } catch (err) {
+        console.warn(`availability backfill failed: ${(err as Error).message}`)
+      }
+
       // Manual-scheduling pickup: a human who jumps in and sends a calendar
       // invite from the shared account bypasses the app's schedule action.
       // Sweep upcoming events; any attendee matching an applicant — by their
@@ -478,8 +550,8 @@ serve(async (req) => {
       }
 
       await remindStuckPosts(client)
-      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up`)
-      return json({ matched, replied: [...replied], manualPickups })
+      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills`)
+      return json({ matched, replied: [...replied], manualPickups, backfilled })
     }
 
     return json({ error: 'Unknown action' }, 400)
