@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.2.1'
+const VERSION = '1.3.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -245,6 +245,53 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
   return sent
 }
 
+// Harvest finished Recall recordings: after a call ends, pull the transcript,
+// summarize with Haiku, post notes + recording link to #recruiting-interviews,
+// and store the summary on the screening row (the app reads it from there).
+// Runs on the same 15-min cron tick as reminders; inert without RECALL_API_KEY.
+async function processRecordings(client: ReturnType<typeof db>): Promise<number> {
+  const { recallEnabled, getBotResult, fetchTranscriptText, summarizeIntroCall } = await import('../_shared/recall.ts')
+  if (!recallEnabled()) return 0
+  const { postRecordingNote } = await import('../_shared/discord.ts')
+  const { data: rows } = await client.from('recruit_screenings')
+    .select('id, applicant_id, housemate_name, recall_bot_id, ends_at')
+    .not('recall_bot_id', 'is', null).is('recording_posted_at', null)
+    .lt('ends_at', new Date(Date.now() - 5 * 60000).toISOString())
+    .limit(5)
+  let posted = 0
+  for (const s of (rows || [])) {
+    try {
+      const bot = await getBotResult(s.recall_bot_id)
+      if (!bot.done && !bot.failed) continue // still recording or processing
+      if (bot.failed) {
+        await client.from('recruit_screenings')
+          .update({ recall_status: 'failed', recording_posted_at: new Date().toISOString() }).eq('id', s.id)
+        console.warn(`[recall] bot ${s.recall_bot_id} failed (${bot.statusCode}) for screening ${s.id}`)
+        continue
+      }
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('first_name, last_name').eq('id', s.applicant_id).maybeSingle()
+      const applicantName = `${applicant?.first_name || 'Applicant'} ${applicant?.last_name || ''}`.trim()
+      let summary: string | null = null
+      if (bot.transcriptUrl) {
+        const transcript = await fetchTranscriptText(bot.transcriptUrl)
+        summary = await summarizeIntroCall(transcript, applicantName, s.housemate_name || 'a resident')
+      }
+      await postRecordingNote(applicant?.first_name || 'Applicant', s.applicant_id, s.housemate_name || 'resident', summary, bot.videoUrl)
+      await client.from('recruit_screenings').update({
+        recall_status: 'done',
+        recording_summary: summary,
+        recording_posted_at: new Date().toISOString(),
+      }).eq('id', s.id)
+      posted++
+      console.log(`[recall] notes posted for screening ${s.id}`)
+    } catch (err) {
+      console.warn(`[recall] processing failed for screening ${s.id}: ${(err as Error).message}`)
+    }
+  }
+  return posted
+}
+
 serve(async (req) => {
   try {
     // Cron path: interview reminders (header auth, not Discord-signed).
@@ -264,8 +311,9 @@ serve(async (req) => {
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
       const sent = await remindUpcoming(client)
-      console.log(`[recruit-discord] reminder sweep: ${sent} DM(s) sent`)
-      return json({ reminded: sent })
+      const recorded = await processRecordings(client)
+      console.log(`[recruit-discord] tick: ${sent} reminder(s), ${recorded} recording(s) posted`)
+      return json({ reminded: sent, recorded })
     }
 
     const body = await req.text()

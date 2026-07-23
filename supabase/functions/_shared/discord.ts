@@ -238,6 +238,29 @@ export async function dmUser(discordUserId: string, content: string): Promise<vo
   })
 }
 
+// Post the recording + summary back to the claims channel after a call ends.
+export async function postRecordingNote(
+  firstName: string, applicantId: string, residentName: string,
+  summary: string | null, videoUrl: string | null,
+): Promise<void> {
+  const lines = [
+    summary || '_No transcript captured (captions may have been off)._',
+    '',
+    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+    `📋 [Full profile](${appLink(applicantId)})`,
+  ]
+  await discordFetch(`/channels/${CLAIMS_CHANNEL_ID}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      embeds: [{
+        title: `${firstName} × ${residentName} — Intro Call notes`,
+        description: lines.join('\n').slice(0, 4000),
+        color: 0x9b59b6,
+      }],
+    }),
+  })
+}
+
 // One channel nudge for a post nobody claimed within 96h.
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
