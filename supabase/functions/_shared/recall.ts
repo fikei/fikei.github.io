@@ -85,6 +85,31 @@ export async function fetchTranscriptText(transcriptUrl: string): Promise<string
   return lines.join('\n')
 }
 
+// Generic meeting summary for non-applicant calls hosted by the shared account.
+export async function summarizeMeeting(transcript: string, title: string): Promise<string | null> {
+  const key = Deno.env.get('RECRUIT_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY')
+  if (!key || !transcript.trim()) return null
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001', max_tokens: 700,
+      system: 'You summarize meetings for the Agape co-op house. Be concrete and neutral.',
+      messages: [{
+        role: 'user',
+        content: `Summarize this meeting ("${title}") for housemates who missed it: what was discussed, decisions made, and open follow-ups. Under 250 words, bullets welcome. Transcript:\n\n${transcript.slice(0, 24000)}`,
+      }],
+    }),
+  })
+  if (!resp.ok) {
+    console.warn(`summarizeMeeting: anthropic ${resp.status} ${(await resp.text()).slice(0, 200)}`)
+    return null
+  }
+  const data = await resp.json()
+  // deno-lint-ignore no-explicit-any
+  return (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim() || null
+}
+
 // Haiku summary of the call — the "screener representation" that rides back
 // to Discord and the applicant's profile.
 export async function summarizeIntroCall(transcript: string, applicantName: string, residentName: string): Promise<string | null> {
