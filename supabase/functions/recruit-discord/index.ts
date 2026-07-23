@@ -216,10 +216,22 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
 serve(async (req) => {
   try {
     // Cron path: interview reminders (header auth, not Discord-signed).
+    // Auth: X-Cron-Secret when CRON_SECRET is configured, else the one-time
+    // nonce minted by the pg_cron tick (migration 123) — delete-on-use.
     if (new URL(req.url).pathname.endsWith('/remind')) {
+      const client = db()
       const secret = Deno.env.get('CRON_SECRET')
-      if (!secret || req.headers.get('x-cron-secret') !== secret) return json({ error: 'unauthorized' }, 401)
-      const sent = await remindUpcoming(db())
+      let authorized = Boolean(secret) && req.headers.get('x-cron-secret') === secret
+      const nonce = req.headers.get('x-cron-nonce')
+      if (!authorized && nonce && /^[0-9a-f-]{36}$/i.test(nonce)) {
+        const { data: burned } = await client.from('recruit_cron_nonce')
+          .delete().eq('nonce', nonce)
+          .gte('created_at', new Date(Date.now() - 10 * 60000).toISOString())
+          .select().maybeSingle()
+        authorized = Boolean(burned)
+      }
+      if (!authorized) return json({ error: 'unauthorized' }, 401)
+      const sent = await remindUpcoming(client)
       console.log(`[recruit-discord] reminder sweep: ${sent} DM(s) sent`)
       return json({ reminded: sent })
     }
