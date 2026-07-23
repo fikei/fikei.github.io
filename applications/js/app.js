@@ -371,7 +371,7 @@ function openingsCta(a) {
     const join = sc.link ? `<a class="btn btn--sm inbox-row__review cta-std" href="${esc(sc.link)}" target="_blank" rel="noopener">Join call</a>` : '';
     return chip + join;
   }
-  if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Pick a time</button>`;
+  if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-claim-preview="${a.id}">Post to Discord</button><button class="btn btn--sm inbox-row__review" data-pick-time="${a.id}">Pick a time</button>`;
   const st = emailState[a.id];
   if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Reply</button>`;
   if (st?.lastDir === 'out') {
@@ -1066,7 +1066,7 @@ function renderApplicants() {
               ${avatarHtml(a)}
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
-                <span class="inbox-row__sub">${trackBadge(a)}${subLine(a) ? `${esc(subLine(a))} · ` : ''}applied ${fmtDate(a.ts_iso)}</span>
+                <span class="inbox-row__sub">${trackBadge(a)}${esc(subLine(a))}</span>
               </span>
             </button>
             <span class="inbox-row__actions">
@@ -1583,7 +1583,7 @@ function listingPricing(l) {
 function listingMeta(l) {
   const bits = [];
   if (l.kind === 'resident') {
-    bits.push(`Opens ${fmtDay(l.starts_on)}`, '3-month trial, then house vote');
+    bits.push(`Opens ${fmtDay(l.starts_on)}`);
   } else {
     bits.push(l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)} · end date TBD`);
     const len = windowLength(l.starts_on, l.ends_on);

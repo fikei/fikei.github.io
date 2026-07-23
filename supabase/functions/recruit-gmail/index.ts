@@ -58,7 +58,9 @@ const NO_EXTRACTION: Extraction = { windows: [], platform: null, timezone_note: 
 // availability windows in PT, platform requests (IG/WhatsApp/phone),
 // timezone conversions, and a needs_human flag for unparseable replies.
 async function extractAvailability(text: string): Promise<Extraction> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
+  // Recruiting has its own key (own workspace + cap); shared/Ladder keys are
+  // emergency fallbacks only.
+  const key = Deno.env.get('RECRUIT_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
   if (!key || !text.trim()) return NO_EXTRACTION
   const prompt = `Today is ${new Date().toLocaleDateString('en-CA', { timeZone: TZ })} (${TZ}). You are extracting scheduling information from an email a housing applicant sent to Agape (San Francisco, Pacific time).
 
