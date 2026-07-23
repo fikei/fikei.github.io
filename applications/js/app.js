@@ -1,8 +1,13 @@
 /* Agape recruiting viewer — /applications
    Discord-gated (Recruiting Society channel on the Agape server, verified by
-   the discord-membership edge fn). Applicants, shared decisions, and house
-   notes live in Supabase behind RLS (migration 108). */
-const VERSION = '2.16.1';
+   the discord-membership edge fn). Applicants, votes, shared decisions, and
+   house notes live in Supabase behind RLS (migrations 108 + 120).
+
+   v3 funnel: Review (collective 1–5 votes, veto rejects) → Candidates →
+   Openings (listing shortlists) → Screening → Archive. The applicant's
+   stage column is recomputed server-side by a trigger on recruit_votes;
+   manual moves go through the recruit_set_stage RPC. */
+const VERSION = '3.0.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -43,20 +48,26 @@ const HOLD_REASONS = DECISION_REASONS.hold; // legacy references
 const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Archive' };
 
 const VIEWS = {
-  inbox: { title: 'Inbox', kind: 'applicants' },
-  outreach: { title: 'Outreach', kind: 'applicants' },
-  hold: { title: 'Hold', kind: 'applicants' },
+  review: { title: 'Review', kind: 'applicants' },
+  candidates: { title: 'Candidates', kind: 'applicants' },
+  openings: { title: 'Openings', kind: 'applicants' },
+  screening: { title: 'Screening', kind: 'applicants' },
   archive: { title: 'Archive', kind: 'applicants' },
   occupancy: { title: 'Occupancy', kind: 'house' },
 };
+// Old bookmarks and deep links keep working.
+const LEGACY_VIEWS = { inbox: 'review', outreach: 'openings', hold: 'candidates', listings: 'openings' };
 
 let sb = null;                // supabase client (from CtrlAuth)
 let me = null;                // { id, name }
-let applicants = [];          // newest first
+let applicants = [];          // newest first; each carries .stage
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
+let votes = {};               // applicant_id -> recruit_votes rows
+let screeningState = {};      // applicant_id -> { at?, with?, availability? }
+let pendingVote = null;       // { score, veto } while the vote bar is open
 let commentCounts = {};       // applicant_id -> n
 let comments = [];            // comments for the applicant open in review
-let view = 'inbox';           // current rail view
+let view = 'review';          // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
 let rooms = [];               // recruit_rooms
 let stays = [];               // recruit_stays rows (date-based tenures)
@@ -348,13 +359,23 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, sRes, eRes] = await Promise.all([
+  const [aRes, dRes, cRes, sRes, eRes, vRes, scRes, avRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id'),
     sb.from('recruit_match_suggestions').select('*'),
     sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at'),
+    sb.from('recruit_votes').select('*').order('created_at'),
+    sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name').order('starts_at'),
+    sb.from('recruit_availability').select('applicant_id, updated_at'),
   ]);
+  votes = {};
+  for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
+  screeningState = {};
+  for (const s of (scRes.data || [])) {
+    if (s.status === 'scheduled') screeningState[s.applicant_id] = { at: s.starts_at, with: s.housemate_name };
+  }
+  for (const av of (avRes.data || [])) screeningState[av.applicant_id] ||= { availability: true };
   emailState = {};
   for (const e of (eRes.data || [])) {
     const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, replies: 0 });
@@ -374,6 +395,7 @@ async function loadAll() {
     email: r.email, social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
     movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url, scheduleToken: r.schedule_token,
+    stage: r.stage || 'review',
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -545,13 +567,71 @@ function attachmentLabel(rec) {
   return `${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}`;
 }
 
-/* House rule: a stated budget ceiling under $1,500/mo is an automatic pass.
-   Applied to undecided applicants after load; recorded like any decision so
-   it syncs, shows attribution, and can be undone from the review page. */
-async function applyAutoPass() {
-  const auto = applicants.filter(a => !decisions[a.id] && budgetMax(a.budget) !== null && budgetMax(a.budget) < 1500);
+/* ---------- votes + stage machine ---------- */
+/* Thresholds come from recruit_settings (tunable without a deploy). */
+const voteMin = () => Number(settings.vote_min_count) || 3;
+const votePassAvg = () => Number(settings.vote_pass_avg) || 3.5;
+
+const myVote = id => (votes[id] || []).find(v => v.voter_id === me?.id) || null;
+
+function voteStats(id) {
+  const list = votes[id] || [];
+  const scored = list.filter(v => !v.veto && v.score != null);
+  const avg = scored.length ? scored.reduce((s, v) => s + v.score, 0) / scored.length : null;
+  return {
+    n: list.length,
+    scored: scored.length,
+    avg,
+    veto: list.find(v => v.veto) || null,
+  };
+}
+
+/* Manual stage moves go through the RPC — recruit_applicants is read-only
+   to clients; vote-driven moves happen in the DB trigger. */
+async function setStage(id, stage) {
+  const { error } = await sb.rpc('recruit_set_stage', { p_applicant: id, p_stage: stage });
+  if (error) { toast(`Stage change failed: ${error.message}`); return false; }
+  const a = applicants.find(x => x.id === id);
+  if (a) a.stage = stage;
+  return true;
+}
+
+/* Upsert my vote, then pick up whatever stage the DB trigger computed. */
+async function castVote(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a || !pendingVote) return;
+  const note = (document.getElementById('vote-note')?.value || '').trim();
+  const { score, veto } = pendingVote;
+  if (!veto && !score) { toast('Pick a score — or veto'); return; }
+  if (veto && note.length < 3) { toast('A veto needs a short why'); return; }
+  const { data, error } = await sb.from('recruit_votes').upsert({
+    applicant_id: applicantId, voter_id: me.id, voter_name: me.name,
+    score: veto ? null : score, veto, note,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'applicant_id,voter_id' }).select().single();
+  if (error) { toast(`Vote failed: ${error.message}`); return; }
+  votes[applicantId] = [...(votes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
+  const { data: fresh } = await sb.from('recruit_applicants').select('stage').eq('id', applicantId).single();
+  const before = a.stage;
+  if (fresh) a.stage = fresh.stage;
+  pendingVote = null;
+  const st = voteStats(applicantId);
+  if (a.stage === 'rejected') toast(`${fullName(a)} vetoed — auto-archived, update email queued`);
+  else if (a.stage === 'candidate' && before !== 'candidate') toast(`${fullName(a)} passed review → Candidates`);
+  else toast(`Vote saved — ${st.scored}/${voteMin()} votes${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}`);
+  renderRailCounts();
+  renderReview();
+}
+
+/* House rule: a stated budget ceiling under $1,500/mo is an auto-flag —
+   straight to Archive (rejected: an update email is owed). Recorded as a
+   decision too, for attribution and undo. */
+async function applyAutoFlags() {
+  const auto = applicants.filter(a => a.stage === 'review' && !decisions[a.id]
+    && budgetMax(a.budget) !== null && budgetMax(a.budget) < 1500);
   for (const a of auto) {
-    await saveDecision(a.id, 'pass', null, 'Auto — budget under $1,500');
+    await saveDecision(a.id, 'pass', 'budget', 'Auto — budget under $1,500');
+    await setStage(a.id, 'rejected');
   }
   return auto.length;
 }
@@ -577,8 +657,8 @@ async function loadHouse() {
 
 /* ---------- router ---------- */
 function setView(next, push = true) {
-  if (next === 'listings') next = 'outreach'; // merged in v2.15
-  if (!VIEWS[next]) next = 'inbox';
+  next = LEGACY_VIEWS[next] || next;
+  if (!VIEWS[next]) next = 'review';
   view = next;
   if (push) {
     const url = new URL(location);
@@ -600,7 +680,7 @@ async function render() {
   renderRailCounts();
 
   const root = document.getElementById('view-root');
-  if ((def.kind === 'house' || view === 'outreach') && !houseLoaded) {
+  if ((def.kind === 'house' || view === 'openings') && !houseLoaded) {
     root.innerHTML = `<p class="inbox-empty">Loading…</p>`;
     await loadHouse();
     if (VIEWS[view].kind !== 'house') return; // navigated away meanwhile
@@ -612,9 +692,13 @@ async function render() {
 /* ---------- applicants render ---------- */
 function matchesView(a) {
   const rec = decisions[a.id];
-  if (view === 'inbox') return !rec;
-  if (view === 'archive') return rec?.d === 'pass';
-  return rec?.d === view;
+  const out = a.stage !== 'rejected' && a.stage !== 'archived';
+  if (view === 'review') return a.stage === 'review';
+  if (view === 'candidates') return a.stage === 'candidate' && rec?.d !== 'outreach';
+  if (view === 'openings') return rec?.d === 'outreach' && out;
+  if (view === 'screening') return !!screeningState[a.id] && out;
+  if (view === 'archive') return !out;
+  return false;
 }
 
 /* Shared filters — applied on top of whichever applicant view is open. */
@@ -663,19 +747,21 @@ function renderFilterBar(viewList) {
 }
 
 function counts() {
-  const c = { inbox: 0, outreach: 0, hold: 0, archive: 0 };
+  const c = { review: 0, candidates: 0, openings: 0, screening: 0, archive: 0 };
   for (const a of applicants) {
     const rec = decisions[a.id];
-    if (!rec) c.inbox++;
-    else if (rec.d === 'pass') c.archive++;
-    else c[rec.d]++;
+    if (a.stage === 'rejected' || a.stage === 'archived') { c.archive++; continue; }
+    if (a.stage === 'review') c.review++;
+    else if (rec?.d === 'outreach') c.openings++;
+    else c.candidates++;
+    if (screeningState[a.id]) c.screening++;
   }
   return c;
 }
 
 function renderRailCounts() {
   const c = counts();
-  for (const key of ['inbox', 'outreach', 'hold', 'archive']) {
+  for (const key of ['review', 'candidates', 'openings', 'screening', 'archive']) {
     const el = document.getElementById(`count-${key}`);
     if (el) el.textContent = c[key] || '';
   }
@@ -689,6 +775,41 @@ function decisionChip(id) {
   return `<span class="decision-chip decision-chip--${rec.d}" title="${esc(DECISION_LABELS[rec.d] + reason + by)}">${DECISION_LABELS[rec.d]}</span>`;
 }
 
+/* Per-view row badge: vote progress in Review, funnel state in Archive,
+   call state in Screening, the recruiter decision elsewhere. */
+function voteChip(a) {
+  const st = voteStats(a.id);
+  if (st.veto) return `<span class="decision-chip decision-chip--pass" title="Vetoed by ${esc(st.veto.voter_name || 'a housemate')}">Vetoed</span>`;
+  if (!st.scored) return '';
+  // The average stays blind until you've cast your own vote.
+  if (!myVote(a.id)) return `<span class="decision-chip decision-chip--vote" title="${voteMin()} votes needed — tally shows after you vote">${st.scored}/${voteMin()} votes</span>`;
+  const passing = st.scored >= voteMin() && st.avg >= votePassAvg();
+  return `<span class="decision-chip decision-chip--vote ${passing ? 'decision-chip--outreach' : ''}" title="${st.scored} of ${voteMin()} votes needed · passing average is ${votePassAvg()}">${st.scored}/${voteMin()} · avg ${st.avg.toFixed(1)}</span>`;
+}
+
+function stageChip(a) {
+  if (a.stage === 'rejected') {
+    const st = voteStats(a.id);
+    const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}` : (decisions[a.id]?.note || 'Did not pass review');
+    return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
+  }
+  return `<span class="decision-chip decision-chip--pass">Archived</span>`;
+}
+
+function screeningChip(a) {
+  const sc = screeningState[a.id];
+  if (!sc) return '';
+  if (sc.at) return `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
+  return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
+}
+
+function rowBadge(a) {
+  if (view === 'review') return voteChip(a);
+  if (view === 'archive') return stageChip(a);
+  if (view === 'screening') return screeningChip(a);
+  return decisionChip(a.id);
+}
+
 function renderApplicants() {
   const viewList = applicants.filter(matchesView);
   const list = viewList.filter(matchesFilters);
@@ -696,18 +817,19 @@ function renderApplicants() {
   document.getElementById('page-sub').textContent =
     (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
     ` applicant${(filtered ? viewList.length : list.length) === 1 ? '' : 's'}` +
-    (view === 'inbox' ? ' to review' : '');
+    (view === 'review' ? ` gathering votes · ${voteMin()} needed, one veto rejects` :
+     view === 'candidates' ? ' passed review — waiting for a room' : '');
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
-  const bar = view === 'inbox' ? '' : renderFilterBar(viewList); // inbox stays clean
+  const bar = view === 'review' ? '' : renderFilterBar(viewList); // review stays clean
   if (!list.length) {
-    host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'Inbox zero — every applicant is decided.' : 'Nothing here yet.')}</p>`;
+    host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'review' ? 'All caught up — every application has its votes.' : 'Nothing here yet.')}</p>`;
     return;
   }
-  // Outreach groups by listing (custom-orderable); other views group by month.
+  // Openings groups by listing (custom-orderable); other views group by month.
   const groups = [];
-  if (view === 'outreach') {
+  if (view === 'openings') {
     const byKey = new Map();
     for (const l of listings.filter(x => x.status === 'open')) byKey.set(l.id, []);
     for (const a of list) {
@@ -738,7 +860,7 @@ function renderApplicants() {
   }
 
   const groupHead = g => {
-    if (view !== 'outreach') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
+    if (view !== 'openings') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
     if (g.key === 'general') return `<div class="listing-head__text"><h2 class="inbox-group__label">General interest</h2>
       <span class="inbox-group__count">no room yet — kept warm for future availability</span></div>`;
     const l = listings.find(x => x.id === g.key);
@@ -760,12 +882,12 @@ function renderApplicants() {
       </span>`;
   };
 
-  const outreachChrome = view === 'outreach' ? `
+  const outreachChrome = view === 'openings' ? `
     <div class="listing-toolbar">
       <span class="notes__empty">Each open listing is a ranked shortlist — drag rows to reorder.</span>
       <button class="btn btn--sm" data-new-listing>New listing</button>
     </div>` : '';
-  const doneListings = view === 'outreach' ? listings.filter(l => l.status !== 'open') : [];
+  const doneListings = view === 'openings' ? listings.filter(l => l.status !== 'open') : [];
   const doneDrawer = doneListings.length ? `
     <details class="occupants__past">
       <summary>Filled & closed listings (${doneListings.length})</summary>
@@ -789,35 +911,35 @@ function renderApplicants() {
         }).join('')}
       </ul>
     </details>` : '';
-  const outreachHint = view === 'outreach' ? `<p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>` : '';
+  const outreachHint = view === 'openings' ? `<p class="listing-hint">Listings also come from the <a href="?view=occupancy" data-view-link="occupancy">Occupancy calendar</a>: click an open stretch, or mark a resident as leaving.</p>` : '';
 
   host.innerHTML = bar + outreachChrome + groups.map(g => `
-    <section class="inbox-group ${view === 'outreach' && g.key !== 'general' ? 'listing-group' : ''}" ${view === 'outreach' ? `data-group-key="${esc(g.key)}"` : ''}>
-      <div class="inbox-group__head ${view === 'outreach' ? 'listing-head' : ''}">
+    <section class="inbox-group ${view === 'openings' && g.key !== 'general' ? 'listing-group' : ''}" ${view === 'openings' ? `data-group-key="${esc(g.key)}"` : ''}>
+      <div class="inbox-group__head ${view === 'openings' ? 'listing-head' : ''}">
         ${groupHead(g)}
         <span class="inbox-group__count listing-head__n">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
       </div>
-      ${view === 'outreach' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No one attached yet — add applicants via Review → Add to listing.</p>` : `<ul class="inbox-card">
+      ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No one attached yet — add candidates via their review page → Add to listing.</p>` : `<ul class="inbox-card">
         ${g.items.map(a => `
-          <li class="inbox-row" ${view === 'outreach' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
-            ${view === 'outreach' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
+          <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
+            ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
                 <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
-                ${view === 'outreach' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — open to apply</span>` : ''}
+                ${view === 'openings' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — open to apply</span>` : ''}
               </span>
             </button>
             <span class="inbox-row__actions">
-              ${emailState[a.id]?.lastDir === 'in' ? `<span class="decision-chip decision-chip--replied" title="They replied — last message ${relTime(emailState[a.id].lastAt)}">↙ Replied</span>` : (view === 'outreach' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : '')}
+              ${emailState[a.id]?.lastDir === 'in' ? `<span class="decision-chip decision-chip--replied" title="They replied — last message ${relTime(emailState[a.id].lastAt)}">↙ Replied</span>` : (view === 'openings' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : '')}
               ${commentCounts[a.id] ? `<span class="note-count" title="${commentCounts[a.id]} house note${commentCounts[a.id] === 1 ? '' : 's'}">✎ ${commentCounts[a.id]}</span>` : ''}
-              ${view === 'outreach' ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${decisionChip(a.id)}<button class="btn inbox-row__review" data-review="${a.id}">Review</button>`}
+              ${view === 'openings' ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${rowBadge(a)}<button class="btn inbox-row__review" data-review="${a.id}">${view === 'review' && !myVote(a.id) ? 'Vote' : 'Open'}</button>`}
             </span>
           </li>`).join('')}
       </ul>`}
     </section>`).join('') + doneDrawer + outreachHint;
-  if (view === 'outreach') wireRowDrag(host);
+  if (view === 'openings') wireRowDrag(host);
 }
 
 /* Drag-to-reorder applicants inside each listing group; shared house state. */
@@ -1244,7 +1366,7 @@ async function markLeaving(roomId, defaultDate) {
   if (error) { toast(`Listing failed: ${error.message}`); return; }
   listings.push(data);
   toast(`${room.resident || 'Resident'} marked leaving — resident listing created for ${room.name}`);
-  setView('outreach');
+  setView('openings');
 }
 
 /* ---------- listings ---------- */
@@ -1340,7 +1462,7 @@ function closeListingModal() {
 function rerenderAfterListingChange() {
   closeListingModal();
   renderRailCounts();
-  if (view === 'outreach') renderApplicants();
+  if (view === 'openings') renderApplicants();
   else if (view === 'occupancy') renderOccupancy();
 }
 
@@ -1420,6 +1542,7 @@ function openReview(id) {
   if (!queue.includes(id)) queue = applicants.map(a => a.id);
   qIndex = Math.max(0, queue.indexOf(id));
   reviewTab = 'profile';
+  pendingVote = null;
   document.getElementById('review').hidden = false;
   document.body.style.overflow = 'hidden';
   hideHoldSheet();
@@ -1439,6 +1562,7 @@ function step(delta) {
   const next = qIndex + delta;
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
+  pendingVote = null;
   hideHoldSheet();
   renderReview();
   resetScroll();
@@ -1472,8 +1596,24 @@ function renderReview() {
   const miNorm = normalizeMoveIn(a);
   const buNorm = normalizeBudget(a.budget);
 
+  const archived = a.stage === 'rejected' || a.stage === 'archived';
+  const archiveBanner = () => {
+    const st = voteStats(a.id);
+    const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}${st.veto.note ? ` — “${st.veto.note}”` : ''}`
+      : rec?.note || (rec?.reason ? reasonLabel(rec.reason) : 'Did not pass review');
+    return `<div class="decision-banner decision-banner--pass">
+      <div class="decision-banner__text">
+        <span class="decision-banner__label">${a.stage === 'rejected' ? 'Archived — update email queued' : 'Archived'}</span>
+        <span class="decision-banner__meta">${esc(why)}</span>
+      </div>
+      <span class="decision-banner__actions">
+        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Review</button>
+      </span>
+    </div>`;
+  };
+
   document.getElementById('review-body').innerHTML = `
-    ${rec ? `<div class="decision-banner decision-banner--${rec.d}">
+    ${archived ? archiveBanner() : rec ? `<div class="decision-banner decision-banner--${rec.d}">
       <div class="decision-banner__text">
         <span class="decision-banner__label">${DECISION_LABELS[rec.d]}</span>
         <span class="decision-banner__meta">${rec.reason ? esc(reasonLabel(rec.reason)) : 'No reason recorded'}${rec.byName ? ` · by ${esc(rec.byName)}` : ''}${rec.at ? ` · ${fmtDate(rec.at)}` : ''}</span>
@@ -1510,6 +1650,7 @@ function renderReview() {
     </div>
     ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : `
     <div id="review-ai">${matchBlockHtml(a)}</div>
+    ${voteSectionHtml(a)}
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
@@ -1526,10 +1667,7 @@ function renderReview() {
     </section>`}
   `;
 
-  for (const d of ['pass', 'hold', 'outreach']) {
-    const btn = document.getElementById(`btn-${d}`);
-    btn.classList.toggle(`is-active--${d}`, rec?.d === d);
-  }
+  renderReviewFoot(a);
 
   if (reviewTab === 'emails') loadEmailsPanel(a);
   if (houseLoaded) ensureMatch(a);
@@ -1542,6 +1680,84 @@ function renderReview() {
     e.preventDefault();
     postNote(a.id);
   });
+}
+
+/* House votes in the review body. The tally stays hidden until you've cast
+   yours — no anchoring. */
+function voteSectionHtml(a) {
+  const list = votes[a.id] || [];
+  const mine = myVote(a.id);
+  const st = voteStats(a.id);
+  let body;
+  if (!list.length) {
+    body = `<p class="notes__empty">No votes yet — be the first.</p>`;
+  } else if (!mine && a.stage === 'review') {
+    body = `<p class="notes__empty">${list.length} vote${list.length === 1 ? '' : 's'} cast — the tally appears after you cast yours.</p>`;
+  } else {
+    const summary = st.veto
+      ? `Vetoed — auto-archived, update email queued.`
+      : st.scored
+        ? `${st.scored}/${voteMin()} votes · avg ${st.avg.toFixed(1)} · ${st.scored >= voteMin() && st.avg >= votePassAvg() ? 'passing' : `needs avg ≥ ${votePassAvg()}`}`
+        : '';
+    body = `${summary ? `<p class="vote-summary">${esc(summary)}</p>` : ''}
+      <ul class="notes__list">${list.map(v => `
+        <li class="note">
+          <span class="avatar">${esc((v.voter_name || '?')[0].toUpperCase())}</span>
+          <div class="note__body-wrap">
+            <div class="note__meta">
+              <span class="note__author">${esc(v.voter_name || 'Housemate')}</span>
+              <span class="note__time">${v.veto ? '<span class="vote-score vote-score--veto">Veto</span>' : `<span class="vote-score">${v.score}/5</span>`} · ${relTime(v.updated_at || v.created_at)}</span>
+            </div>
+            ${v.note ? `<p class="note__body">${esc(v.note)}</p>` : ''}
+          </div>
+        </li>`).join('')}</ul>`;
+  }
+  return `<section class="review__section notes">
+    <div class="notes__head"><h3 class="review__section-title">House votes</h3></div>
+    ${body}
+  </section>`;
+}
+
+/* Contextual footer: vote bar in review, recruiter actions for candidates,
+   reopen for archived. */
+function renderReviewFoot(a) {
+  const foot = document.getElementById('review-foot');
+  if (!foot) return;
+  const keepNote = document.getElementById('vote-note')?.value ?? null;
+  if (a.stage === 'review') {
+    const mine = myVote(a.id);
+    const sel = pendingVote || (mine ? { score: mine.score, veto: mine.veto } : { score: null, veto: false });
+    foot.innerHTML = `
+      <div class="vote-bar">
+        <span class="vote-bar__q">Would you live with them?</span>
+        <span class="vote-bar__scores">
+          ${[1, 2, 3, 4, 5].map(n =>
+            `<button type="button" class="vote-bar__score ${!sel.veto && sel.score === n ? 'is-on' : ''}" data-vote-score="${n}" aria-label="Vote ${n}">${n}</button>`).join('')}
+        </span>
+        <button type="button" class="vote-bar__veto ${sel.veto ? 'is-on' : ''}" data-vote-veto>${sel.veto ? 'Veto — tap to undo' : 'Veto'}</button>
+        <input type="text" class="listing-status vote-bar__note" id="vote-note" maxlength="500"
+          placeholder="${sel.veto ? 'Why the veto? (required)' : 'One line on why (optional)'}"
+          value="${esc(keepNote ?? mine?.note ?? '')}">
+        <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote>${mine ? 'Update vote' : 'Cast vote'}</button>
+      </div>`;
+  } else if (a.stage === 'candidate') {
+    foot.innerHTML = `
+      <button class="btn review__btn review__btn--notfit" data-open-decision="pass">Not a fit</button>
+      <button class="btn review__btn review__btn--place" data-open-decision="outreach">${decisions[a.id]?.d === 'outreach' ? 'Move listing' : 'Add to listing'}</button>`;
+  } else {
+    foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Review</button>`;
+  }
+}
+
+async function reopenApplicant(id) {
+  const a = applicants.find(x => x.id === id);
+  if (!a) return;
+  if (await setStage(id, 'review')) {
+    const st = voteStats(id);
+    toast(st.veto ? `Reopened — note: ${st.veto.voter_name || 'a housemate'}'s veto still stands until they change their vote` : 'Reopened — back in Review');
+    renderRailCounts();
+    if (!document.getElementById('review').hidden) renderReview(); else render();
+  }
 }
 
 function renderNotes(applicantId) {
@@ -1778,7 +1994,7 @@ function hideDecisionSheet() {
 }
 const hideHoldSheet = hideDecisionSheet; // step()/openReview() call this on navigation
 
-function submitDecision() {
+async function submitDecision() {
   const a = applicants.find(x => x.id === queue[qIndex]);
   if (!a || !pendingDecision) return;
   const d = pendingDecision;
@@ -1789,8 +2005,12 @@ function submitDecision() {
   const editing = sheetMode === 'edit';
   hideDecisionSheet();
   saveDecision(a.id, d, reason, null, note, listingId);
-  toast(`${fullName(a)} → ${DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
+  // Recruiter "not a fit" on a candidate auto-archives — the update email is
+  // owed, same as a veto; outreach keeps them a candidate.
+  if (d === 'pass' && a.stage !== 'archived') await setStage(a.id, 'rejected');
+  toast(`${fullName(a)} → ${d === 'pass' ? 'Archived — update email queued' : DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
   if (d === 'outreach') computeMatch(a.id); // refresh the AI suggestion in the background
+  renderRailCounts();
   if (editing) { renderReview(); return; }
   if (qIndex === queue.length - 1) closeReview(); else step(1);
 }
@@ -1842,12 +2062,14 @@ function stopDictation() {
 /* ---------- export ---------- */
 function exportCsv() {
   const cols = ['first', 'last', 'email', 'ts_iso', 'residency', 'movein', 'budget', 'source'];
-  const head = [...cols, 'decision', 'reason', 'decision_note', 'decided_by', 'decided_at', 'notes'];
+  const head = [...cols, 'stage', 'votes', 'vote_avg', 'vetoed', 'decision', 'reason', 'decision_note', 'decided_by', 'decided_at', 'notes'];
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [head.join(',')];
   for (const a of applicants) {
     const rec = decisions[a.id] || {};
-    lines.push([...cols.map(c => q(a[c])), q(DECISION_LABELS[rec.d] || ''),
+    const st = voteStats(a.id);
+    lines.push([...cols.map(c => q(a[c])), q(a.stage), q(st.n || 0), q(st.avg ? st.avg.toFixed(2) : ''),
+      q(st.veto ? (st.veto.voter_name || 'yes') : ''), q(DECISION_LABELS[rec.d] || ''),
       q(rec.reason ? reasonLabel(rec.reason) : ''), q(rec.note || ''),
       q(rec.byName || ''), q(rec.at || ''), q(commentCounts[a.id] || 0)].join(','));
   }
@@ -2055,15 +2277,16 @@ async function _checkMembershipAndEnter() {
     });
     resolveAvatars(); // background — server resolves any unchecked profile photos
     scanInbox();      // background — badge replies without opening each thread
-    const autoPassed = await applyAutoPass();
+    const autoFlagged = await applyAutoFlags();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
     renderRailUser();
     handleGmailCallback();
-    view = new URLSearchParams(location.search).get('view') || 'inbox';
-    if (!VIEWS[view]) view = 'inbox';
+    view = new URLSearchParams(location.search).get('view') || 'review';
+    view = LEGACY_VIEWS[view] || view;
+    if (!VIEWS[view]) view = 'review';
     render();
-    if (autoPassed) toast(`${autoPassed} applicant${autoPassed === 1 ? '' : 's'} auto-archived (budget under $1,500)`);
+    if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived (budget under $1,500) — update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
     if (deep && applicants.some(x => x.id === deep)) openReview(deep);
   } catch (e) {
@@ -2121,8 +2344,40 @@ function init() {
     if (fclear) { filters = { track: 'all', month: 'any', budget: 'any' }; renderApplicants(); return; }
     const review = e.target.closest('[data-review]');
     if (review) { openReview(review.dataset.review); return; }
+    const vs = e.target.closest('[data-vote-score]');
+    if (vs) {
+      pendingVote = { score: +vs.dataset.voteScore, veto: false };
+      renderReviewFoot(applicants.find(x => x.id === queue[qIndex]));
+      return;
+    }
+    const vv = e.target.closest('[data-vote-veto]');
+    if (vv) {
+      pendingVote = { score: pendingVote?.score || null, veto: !(pendingVote?.veto ?? myVote(queue[qIndex])?.veto) };
+      renderReviewFoot(applicants.find(x => x.id === queue[qIndex]));
+      return;
+    }
+    const cv = e.target.closest('[data-cast-vote]');
+    if (cv) {
+      if (!pendingVote) {
+        const mine = myVote(queue[qIndex]);
+        pendingVote = mine ? { score: mine.score, veto: mine.veto } : null;
+      }
+      castVote(queue[qIndex]);
+      return;
+    }
+    const od = e.target.closest('[data-open-decision]');
+    if (od) { openDecisionSheet(od.dataset.openDecision); return; }
+    const ro = e.target.closest('[data-reopen]');
+    if (ro) { reopenApplicant(ro.dataset.reopen); return; }
     const clear = e.target.closest('[data-clear]');
-    if (clear) { saveDecision(clear.dataset.clear, null); renderReview(); return; }
+    if (clear) {
+      const a = applicants.find(x => x.id === clear.dataset.clear);
+      saveDecision(clear.dataset.clear, null);
+      // undoing an auto/manual archive puts them back in front of the house
+      if (a && a.stage === 'rejected') setStage(a.id, 'review').then(() => { renderRailCounts(); renderReview(); });
+      renderReview();
+      return;
+    }
     const cps = e.target.closest('[data-copy-schedule]');
     if (cps) {
       const a = applicants.find(x => x.id === cps.dataset.copySchedule);
@@ -2241,7 +2496,7 @@ function init() {
   });
 
   window.addEventListener('popstate', () => {
-    const v = new URLSearchParams(location.search).get('view') || 'inbox';
+    const v = new URLSearchParams(location.search).get('view') || 'review';
     setView(v, false);
   });
 
@@ -2301,9 +2556,6 @@ function init() {
   document.getElementById('review-close').onclick = closeReview;
   document.getElementById('review-prev').onclick = () => step(-1);
   document.getElementById('review-next').onclick = () => step(1);
-  document.getElementById('btn-pass').onclick = () => openDecisionSheet('pass');
-  document.getElementById('btn-outreach').onclick = () => openDecisionSheet('outreach');
-  document.getElementById('btn-hold').onclick = () => openDecisionSheet('hold');
   document.getElementById('decision-cancel').onclick = hideDecisionSheet;
   document.getElementById('decision-submit').onclick = submitDecision;
   document.getElementById('decision-mic').onclick = toggleDictation;
