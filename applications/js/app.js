@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.6.0';
+const VERSION = '3.6.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -125,9 +125,11 @@ function displayMoveIn(a) {
   return normalizeMoveIn(a).replace(/ · flexible$/, '');
 }
 
-/* Track badge — same pill component as the listing headers. */
+/* Track badge — same pill component as the listing headers. Full-time is
+   the default track, so it stays neutral (blends with the background);
+   Sublet keeps its tint as the exception worth noticing. */
 const trackBadge = a =>
-  `<span class="listing-kind listing-kind--${isSublet(a) ? 'sublet' : 'resident'} listing-kind--xs">${trackLabel(a)}</span>`;
+  `<span class="listing-kind listing-kind--${isSublet(a) ? 'sublet' : 'fulltime'} listing-kind--xs">${trackLabel(a)}</span>`;
 
 /* Row subline (text after the track badge): pronouns · move-in dates.
    Budget lives on the review page. */
