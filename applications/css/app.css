@@ -1211,3 +1211,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   max-height: 420px; overflow-y: auto;
 }
 .email-row__body[hidden] { display: none; }
+
+/* --- v3.10: openings ↔ occupancy links --- */
+.listing-head__room { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border-strong); }
+.listing-head__room:hover { color: var(--accent); border-bottom-color: var(--accent); }
