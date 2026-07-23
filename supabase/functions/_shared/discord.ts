@@ -338,7 +338,7 @@ export async function postLiveCall(title: string, when: string, meetLink: string
     method: 'POST',
     body: JSON.stringify({
       embeds: [{
-        description: `🔴 **Happening now:** ${title} — ${when}${meetLink ? `\n[Join the call](${meetLink}) if you'd like to sit in.` : ''}`,
+        description: `🎥 **Join — ${title}** · ${when}${meetLink ? `\n[▶ Tap to join the call](${meetLink})` : ''}`,
         color: 0xe74c3c,
       }],
     }),

@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.11.0';
+const VERSION = '3.11.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -366,6 +366,9 @@ function avatarHtml(a, large) {
    slot chip (+ Join when there's a Meet link). */
 function openingsCta(a) {
   const sc = screeningState[a.id];
+  if (!sc?.at && sc?.watch) {
+    return `<span class="decision-chip decision-chip--pass" style="cursor:pointer" title="Watch the recorded Intro Call" onclick="event.stopPropagation();watchRecording('${sc.watch}')">▶ Watch</span>`;
+  }
   if (sc?.at) {
     const chip = `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
     const join = sc.link ? `<a class="btn btn--sm inbox-row__review cta-std" href="${esc(sc.link)}" target="_blank" rel="noopener">Join call</a>` : '';
