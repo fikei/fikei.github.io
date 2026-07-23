@@ -1,6 +1,6 @@
 // _shared/recall.ts
 // Recall.ai meeting-recording bot for Agape Intro Calls. Entirely inert until
-// RECALL_API_KEY is set. The bot ("Agape Notetaker") joins the Meet at start
+// RECALL_API_KEY is set. The bot ("Agape Notes") joins the Meet at start
 // time, records, and captures the transcript via Meet's own captions (free
 // tier — no per-minute transcription cost).
 //
@@ -33,7 +33,7 @@ export async function createRecordingBot(meetingUrl: string, joinAtISO: string):
     method: 'POST',
     body: JSON.stringify({
       meeting_url: meetingUrl,
-      bot_name: 'Agape Notetaker',
+      bot_name: 'Agape Notes',
       join_at: joinAtISO,
       recording_config: {
         transcript: { provider: { meeting_captions: {} } },
