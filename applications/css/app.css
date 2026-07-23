@@ -1107,3 +1107,40 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .listing-allin { font-weight: var(--fw-semibold); cursor: help; }
 .listing-others { margin-top: var(--space-2); }
 .listing-others summary { color: var(--fg-subtle); font-size: var(--font-size-small); cursor: pointer; }
+
+/* --- v3.5.0: row-state polish — response dot, note bubble, ✕, see-more bar --- */
+.inbox-row { position: relative; }
+.replied-dot {
+  position: absolute; left: 5px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+}
+.note-bubble {
+  position: relative; width: 22px; height: 22px;
+  color: var(--accent); flex-shrink: 0; display: inline-block;
+}
+.note-bubble svg { width: 100%; height: 100%; display: block; }
+.note-bubble__n {
+  position: absolute; left: 0; right: 0; top: 2px; height: 14px;
+  display: grid; place-items: center;
+  font-size: 10px; font-weight: var(--fw-bold);
+  color: var(--accent-fg);
+}
+.row-x {
+  border: 0; background: none; padding: 4px 8px;
+  color: var(--fg-subtle); font-size: 14px; line-height: 1;
+  cursor: pointer; border-radius: var(--radius-pill);
+}
+.row-x:hover { color: var(--error); background: var(--bg-overlay); }
+.listing-others { margin-top: 0; }
+.listing-others > summary {
+  list-style: none;
+  display: flex; justify-content: center; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 0 var(--space-2);
+  color: var(--fg-muted); font-size: var(--font-size-small); font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.listing-others > summary::-webkit-details-marker { display: none; }
+.listing-others > summary:hover { color: var(--fg); }
+.listing-others__chev { font-size: 12px; transition: transform 120ms ease; }
+.listing-others[open] .listing-others__chev { transform: rotate(180deg); }

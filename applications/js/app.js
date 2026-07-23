@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.4.0';
+const VERSION = '3.5.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -343,6 +343,25 @@ function avatarHtml(a, large) {
   const px = large ? 112 : 56;
   const src = `https://images.weserv.nl/?url=${encodeURIComponent(a.avatarUrl.replace(/^https:\/\//, ''))}&w=${px}&h=${px}&fit=cover`;
   return `<span class="${cls}">${esc(initials(a))}<img class="avatar__img" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
+}
+
+/* Blue response dot in the row's left gutter — sits beside the avatar,
+   never on top of it. */
+function repliedDot(a) {
+  const st = emailState[a.id];
+  if (st?.lastDir !== 'in') return '';
+  return `<span class="replied-dot" title="They replied — ${relTime(st.lastAt)}"></span>`;
+}
+
+/* Filled square speech bubble (tail centered on the bottom) with the note
+   count inside — louder than the old pencil count. */
+function noteBubble(id) {
+  const n = commentCounts[id];
+  if (!n) return '';
+  return `<span class="note-bubble" title="${n} house note${n === 1 ? '' : 's'}">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-4.6L12 21l-2.4-4H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg>
+    <b class="note-bubble__n">${n}</b>
+  </span>`;
 }
 
 /* Kick server-side resolution for anyone not yet checked (fire-and-forget;
@@ -865,10 +884,19 @@ function screeningChip(a) {
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
 }
 
+/* One pill per room they're placed in, with the room's open date. Falls
+   back to a count before house data lands. */
 function placementChip(a) {
-  const n = activePlacements(a.id).length;
-  if (!n) return '';
-  return `<span class="decision-chip decision-chip--outreach" title="Placed in ${n} open listing${n === 1 ? '' : 's'} — see Openings">In ${n} listing${n === 1 ? '' : 's'}</span>`;
+  const active = activePlacements(a.id);
+  if (!active.length) return '';
+  if (!houseLoaded) return `<span class="decision-chip decision-chip--outreach">In ${active.length} listing${active.length === 1 ? '' : 's'}</span>`;
+  return active.map(p => {
+    const l = listings.find(x => x.id === p.listing_id);
+    if (!l || l.status !== 'open') return '';
+    const room = rooms.find(r => r.id === l.room_id);
+    const d = new Date(l.starts_on + 'T12:00');
+    return `<span class="decision-chip decision-chip--outreach" title="${esc(`${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}`)}">${esc(room?.name || 'Room')} · ${d.getMonth() + 1}/${d.getDate()}</span>`;
+  }).join('');
 }
 
 function rowBadge(a) {
@@ -982,6 +1010,7 @@ function renderApplicants() {
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
+            ${repliedDot(a)}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
               <span class="inbox-row__text">
@@ -990,9 +1019,11 @@ function renderApplicants() {
               </span>
             </button>
             <span class="inbox-row__actions">
-              ${emailState[a.id]?.lastDir === 'in' ? `<span class="decision-chip decision-chip--replied" title="They replied — last message ${relTime(emailState[a.id].lastAt)}">↙ Replied</span>` : (view === 'openings' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : '')}
-              ${commentCounts[a.id] ? `<span class="note-count" title="${commentCounts[a.id]} house note${commentCounts[a.id] === 1 ? '' : 's'}">✎ ${commentCounts[a.id]}</span>` : ''}
-              ${view === 'openings' ? `<button class="btn btn--sm inbox-row__review" data-remove-placement="${a.id}|${esc(g.key)}" title="Pull them out of this listing (the auto-sweep won't re-add)">Remove</button><button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${rowBadge(a)}<button class="btn inbox-row__review" data-review="${a.id}">${view === 'inbox' && !myVote(a.id) ? 'Vote' : 'Open'}</button>`}
+              ${view === 'openings' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : ''}
+              ${noteBubble(a.id)}
+              ${view === 'openings'
+                ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button><button class="row-x" data-remove-placement="${a.id}|${esc(g.key)}" title="Remove from this listing — the auto-sweep won't re-add them" aria-label="Remove from listing">✕</button>`
+                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Vote</button>` : ''}`}
             </span>
           </li>`).join('')}
       </ul>`}
@@ -1006,12 +1037,13 @@ function renderApplicants() {
 function othersAccordion(listingId) {
   const others = otherQualified(listingId);
   if (!others.length) return '';
-  return `<details class="occupants__past listing-others">
-    <summary>See other qualified applicants (${others.length})</summary>
+  return `<details class="listing-others">
+    <summary>See other qualified applicants (${others.length}) <span class="listing-others__chev" aria-hidden="true">▾</span></summary>
     <ul class="inbox-card">
       ${others.map(a => {
         const removed = placements.some(p => p.applicant_id === a.id && p.listing_id === listingId && p.status === 'removed');
         return `<li class="inbox-row">
+          ${repliedDot(a)}
           <button class="inbox-row__main" data-review="${a.id}">
             ${avatarHtml(a)}
             <span class="inbox-row__text">
@@ -1021,9 +1053,7 @@ function othersAccordion(listingId) {
           </button>
           <span class="inbox-row__actions">
             ${a.stage === 'review' ? (voteChip(a) || '<span class="note-count">gathering votes</span>') : (removed ? '<span class="note-count" title="Removed from this listing by a recruiter">removed</span>' : '')}
-            ${a.stage === 'candidate'
-              ? `<button class="btn btn--sm inbox-row__review" data-add-placement="${a.id}|${esc(listingId)}">Add</button>`
-              : `<button class="btn btn--sm inbox-row__review" data-review="${a.id}">Open</button>`}
+            ${a.stage === 'candidate' ? `<button class="btn btn--sm inbox-row__review" data-add-placement="${a.id}|${esc(listingId)}">Add</button>` : ''}
           </span>
         </li>`;
       }).join('')}
