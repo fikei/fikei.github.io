@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.2.1';
+const VERSION = '3.3.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -104,13 +104,20 @@ const relTime = iso => {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
+/* Recruiter-confirmed move-in window (set after emailing them) — when
+   present it beats the parsed free text everywhere dates matter. */
+const confirmedMoveIn = a => a.moveinFrom
+  ? (a.moveinTo ? `${fmtDay(a.moveinFrom)} – ${fmtDay(a.moveinTo)}` : fmtDay(a.moveinFrom))
+  : '';
+const effectiveMoveIn = a => confirmedMoveIn(a) || normalizeMoveIn(a);
+
 /* Row subline stays clean: track + move-in (+ stay length for sublets).
    Budget lives on the review page. */
 function subLine(a) {
   const bits = [];
   if (a.pronouns) bits.push(a.pronouns.toLowerCase());
   bits.push(trackLabel(a));
-  const mi = normalizeMoveIn(a);
+  const mi = effectiveMoveIn(a);
   if (mi) bits.push(mi);
   if (isSublet(a)) {
     const len = stayLength(a);
@@ -197,6 +204,10 @@ function normalizeBudget(raw) {
 /* Day-level stay length for sublets, when the move-in text carries two dates
    ("July 28 - Aug 29", "June 21st - Sept 4th"). Null when not parseable. */
 function stayLength(a) {
+  if (a.moveinFrom && a.moveinTo) {
+    const days = Math.round((new Date(a.moveinTo) - new Date(a.moveinFrom)) / 86400000);
+    if (days > 0 && days <= 366) return days < 21 ? `${days}-day stay` : `${Math.round(days / 7)}-week stay`;
+  }
   const raw = (a.movein || '');
   const rx = new RegExp(`\\b(${MONTH_ABBR.join('|')})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi');
   const dates = [];
@@ -398,6 +409,7 @@ async function loadAll() {
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
     movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url, scheduleToken: r.schedule_token,
     stage: r.stage || 'review',
+    moveinFrom: r.move_in_from, moveinTo: r.move_in_to, moveinSetBy: r.move_in_set_by_name,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -433,8 +445,12 @@ async function saveDecision(id, d, reason, byName, note, listingId) {
    when both are known, and their move-in window brushes the listing's.
    Unknown/flexible move-in qualifies everywhere on its track. */
 
-/* Parsed move-in as a {lo, hi} 'YYYY-MM' range, or null when flexible/unknown. */
+/* Move-in as a {lo, hi} 'YYYY-MM' range, or null when flexible/unknown.
+   A recruiter-confirmed window is exact and wins over the parsed text. */
 function moveInRange(a) {
+  if (a.moveinFrom) {
+    return { lo: a.moveinFrom.slice(0, 7), hi: (a.moveinTo || a.moveinFrom).slice(0, 7) };
+  }
   const norm = normalizeMoveIn(a);
   if (!norm || /^(ASAP|Flexible)/.test(norm)) return null;
   const yr = norm.match(/(20\d\d)/)?.[1];
@@ -454,14 +470,19 @@ function qualifiesFor(a, l) {
   if (isSublet(a) !== (l.kind === 'sublet')) return false;
   const bm = budgetMax(a.budget);
   if (bm !== null && l.rent_monthly != null && bm < l.rent_monthly) return false;
-  // Dates have to line up. Only an explicit "flexible" rides any window;
-  // ASAP only fits a room opening within the month after now; stated dates
-  // must fall inside the listing's actual window (a resident trial's window
-  // is its start month — that's when the room is free).
-  const norm = normalizeMoveIn(a);
-  if (/flexible/i.test(norm || '')) return true;
+  // Dates have to line up. A recruiter-confirmed window is exact — no
+  // flexible escape hatch. Otherwise: only an explicit "flexible" rides any
+  // window; ASAP only fits a room opening within the month after now; stated
+  // dates must fall inside the listing's actual window (a resident trial's
+  // window is its start month — that's when the room is free).
   const startMonth = l.starts_on.slice(0, 7);
   const endMonth = l.ends_on ? l.ends_on.slice(0, 7) : startMonth;
+  if (a.moveinFrom) {
+    const r = moveInRange(a);
+    return r.hi >= startMonth && r.lo <= endMonth;
+  }
+  const norm = normalizeMoveIn(a);
+  if (/flexible/i.test(norm || '')) return true;
   if (/^ASAP/.test(norm || '')) {
     const now = new Date();
     const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -745,7 +766,7 @@ function matchesView(a) {
 
 /* Shared filters — applied on top of whichever applicant view is open. */
 function moveInBucket(a) {
-  const norm = normalizeMoveIn(a);
+  const norm = effectiveMoveIn(a);
   if (!norm) return 'unknown';
   if (/^(ASAP|Flexible)/.test(norm)) return 'flex';
   const m = norm.match(/^([A-Z][a-z]{2})/);
@@ -1609,6 +1630,7 @@ function openReview(id) {
   qIndex = Math.max(0, queue.indexOf(id));
   reviewTab = 'profile';
   pendingVote = null;
+  moveinEditing = false;
   document.getElementById('review').hidden = false;
   document.body.style.overflow = 'hidden';
   hideHoldSheet();
@@ -1629,6 +1651,7 @@ function step(delta) {
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
   pendingVote = null;
+  moveinEditing = false;
   hideHoldSheet();
   renderReview();
   resetScroll();
@@ -1702,7 +1725,7 @@ function renderReview() {
             ${a.source ? `<span class="review__badge" title="How they heard about Agape">${esc(a.source)}</span>` : ''}
           </div>
           <div class="review__facts">
-            <div class="review__fact"><span class="review__fact-label">Move-in</span><span class="review__fact-value">${esc(miNorm || a.movein || '—')}${isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : ''} ${infoDot(a.movein, miNorm)}</span></div>
+            <div class="review__fact"><span class="review__fact-label">Move-in</span><span class="review__fact-value">${esc(miNorm || a.movein || '—')}${isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : ''} ${infoDot(a.movein, miNorm)}</span>${moveInFieldHtml(a)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
@@ -1744,6 +1767,49 @@ function renderReview() {
     e.preventDefault();
     postNote(a.id);
   });
+}
+
+/* ---------- confirmed move-in field ----------
+   What they typed stays on top; the structured window a recruiter confirms
+   (usually after emailing them) lives underneath and drives placement. */
+let moveinEditing = false;
+
+function moveInFieldHtml(a) {
+  if (moveinEditing) {
+    return `<span class="movein-set movein-set--form">
+      <input type="date" class="listing-status movein-set__input" id="movein-from" value="${esc(a.moveinFrom || '')}" aria-label="Confirmed move-in">
+      <span class="movein-set__sep">→</span>
+      <input type="date" class="listing-status movein-set__input" id="movein-to" value="${esc(a.moveinTo || '')}" aria-label="Through (optional)" title="Through — leave empty for open-ended">
+      <button type="button" class="btn btn--sm btn--accent" data-movein-save>Save</button>
+      ${a.moveinFrom ? `<button type="button" class="btn btn--sm" data-movein-clear>Clear</button>` : ''}
+      <button type="button" class="hold-sheet__cancel movein-set__cancel" data-movein-cancel>Cancel</button>
+    </span>`;
+  }
+  return a.moveinFrom
+    ? `<span class="movein-set">
+        <span class="movein-set__val">Confirmed: ${esc(confirmedMoveIn(a))}</span>
+        <span class="movein-set__meta">${a.moveinSetBy ? `by ${esc(a.moveinSetBy)}` : ''}</span>
+        <button type="button" class="movein-set__edit" data-movein-edit>Edit</button>
+      </span>`
+    : `<span class="movein-set"><button type="button" class="movein-set__edit" data-movein-edit>Confirm a date…</button></span>`;
+}
+
+async function saveMoveIn(id, clear = false) {
+  const a = applicants.find(x => x.id === id);
+  if (!a) return;
+  const from = clear ? null : (document.getElementById('movein-from')?.value || null);
+  const to = clear ? null : (document.getElementById('movein-to')?.value || null);
+  if (!clear && !from) { toast('Pick a move-in date (or Cancel)'); return; }
+  if (from && to && to < from) { toast('"Through" must be after the move-in date'); return; }
+  const { error } = await sb.rpc('recruit_set_move_in', { p_applicant: id, p_from: from, p_to: to, p_name: me.name });
+  if (error) { toast(`Save failed: ${error.message}`); return; }
+  a.moveinFrom = from; a.moveinTo = to; a.moveinSetBy = from ? me.name : null;
+  moveinEditing = false;
+  if (!houseLoaded) await loadHouse();
+  await syncAutoPlacements(); // dates changed — placements reshuffle to match
+  toast(from ? `Move-in confirmed: ${confirmedMoveIn(a)} — placements updated` : 'Confirmed date cleared — back to their stated answer');
+  renderRailCounts();
+  renderReview();
 }
 
 /* House votes in the review body. The tally stays hidden until you've cast
@@ -2444,6 +2510,14 @@ function init() {
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
+    const miEdit = e.target.closest('[data-movein-edit]');
+    if (miEdit) { moveinEditing = true; renderReview(); return; }
+    const miSave = e.target.closest('[data-movein-save]');
+    if (miSave) { saveMoveIn(queue[qIndex]); return; }
+    const miClear = e.target.closest('[data-movein-clear]');
+    if (miClear) { saveMoveIn(queue[qIndex], true); return; }
+    const miCancel = e.target.closest('[data-movein-cancel]');
+    if (miCancel) { moveinEditing = false; renderReview(); return; }
     const rmPl = e.target.closest('[data-remove-placement]');
     if (rmPl) {
       const [aid, lid] = rmPl.dataset.removePlacement.split('|');

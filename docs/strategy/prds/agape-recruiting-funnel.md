@@ -51,3 +51,6 @@ Out of scope for now (manual): post-screening accept/vote, house tour, onboardin
 - **B:** Discord ping on new application; rejection-email queue + template in Archive (`recruit-gmail` gains a `rejection` kind; needs a `update_email_sent_at` marker).
 - **C:** auto-generate draft listings from occupancy gaps (`recruit_listings.source='auto'`, `pool_key` for same-date grouping); auto-bucket candidates via `recruit-match` on pool entry.
 - **D:** "Request screening" action + integration with the screening-claim automation.
+
+### v3.3.0 (2026-07-22): recruiter-confirmed move-in
+Structured `move_in_from`/`move_in_to` window on the applicant (migration 124, set via `recruit_set_move_in` RPC, attributed). Editable from the profile's Move-in fact — the applicant's typed answer stays on top, the confirmed window sits underneath. When set it is exact (no "flexible" escape hatch) and overrides the parsed text in sublines, filters, and placement qualification; saving re-runs the placement sweep.
