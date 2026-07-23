@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.2.0';
+const VERSION = '3.2.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -454,17 +454,29 @@ function qualifiesFor(a, l) {
   if (isSublet(a) !== (l.kind === 'sublet')) return false;
   const bm = budgetMax(a.budget);
   if (bm !== null && l.rent_monthly != null && bm < l.rent_monthly) return false;
+  // Dates have to line up. Only an explicit "flexible" rides any window;
+  // ASAP only fits a room opening within the month after now; stated dates
+  // must fall inside the listing's actual window (a resident trial's window
+  // is its start month — that's when the room is free).
+  const norm = normalizeMoveIn(a);
+  if (/flexible/i.test(norm || '')) return true;
+  const startMonth = l.starts_on.slice(0, 7);
+  const endMonth = l.ends_on ? l.ends_on.slice(0, 7) : startMonth;
+  if (/^ASAP/.test(norm || '')) {
+    const now = new Date();
+    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return startMonth >= cur && startMonth <= monthShift(cur, 1);
+  }
   const range = moveInRange(a);
-  if (!range) return true;
-  const listLo = monthShift(l.starts_on.slice(0, 7), -1); // a month early is fine
-  const listHi = l.ends_on ? l.ends_on.slice(0, 7) : monthShift(l.starts_on.slice(0, 7), 2);
-  return range.hi >= listLo && range.lo <= listHi;
+  if (!range) return false; // no parseable dates — can't confirm they line up
+  return range.hi >= startMonth && range.lo <= endMonth;
 }
 
 const activePlacements = id => placements.filter(p => p.applicant_id === id && p.status === 'active');
 
-/* Insert missing placements for every candidate; never resurrects rows a
-   recruiter removed (tombstones stay). Returns how many were added. */
+/* Insert missing placements for every candidate AND prune auto rows that no
+   longer qualify (rule changes, edited listings, stage moves). Never touches
+   manual placements or tombstones a recruiter removed. Returns adds. */
 async function syncAutoPlacements() {
   if (!houseLoaded) return 0;
   const have = new Set(placements.map(p => `${p.applicant_id}:${p.listing_id}`));
@@ -474,6 +486,20 @@ async function syncAutoPlacements() {
       if (!have.has(`${a.id}:${l.id}`) && qualifiesFor(a, l)) {
         fresh.push({ applicant_id: a.id, listing_id: l.id, source: 'auto' });
       }
+    }
+  }
+  const stale = placements.filter(p => {
+    if (p.source !== 'auto' || p.status !== 'active') return false;
+    const a = applicants.find(x => x.id === p.applicant_id);
+    const l = listings.find(x => x.id === p.listing_id);
+    return !a || !l || a.stage !== 'candidate' || !qualifiesFor(a, l);
+  });
+  if (stale.length) {
+    const { error } = await sb.from('recruit_listing_candidates').delete().in('id', stale.map(r => r.id));
+    if (error) console.warn('placement prune failed', error.message);
+    else {
+      const gone = new Set(stale.map(r => r.id));
+      placements = placements.filter(p => !gone.has(p.id));
     }
   }
   if (!fresh.length) return 0;
