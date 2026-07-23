@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.9.0';
+const VERSION = '3.9.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2102,15 +2102,21 @@ function section(title, text) {
 }
 
 /* ---------- emails panel ---------- */
+/* Each row expands in place to the full message body. */
 function emailRow(m) {
   const arrow = m.direction === 'out' ? '↗' : '↙';
   const who = m.direction === 'out' ? `Agape${m.sent_by_name ? ` (${esc(m.sent_by_name)})` : ''}` : esc(m.from_email.replace(/<.*>/, '').trim() || m.from_email);
+  const body = (m.body_text || '').trim();
   return `<li class="email-row email-row--${m.direction}">
-    <span class="email-row__dir" title="${m.direction === 'out' ? 'Sent by the house' : 'Received'}">${arrow}</span>
-    <span class="inbox-row__text">
-      <span class="inbox-row__title">${esc(m.subject || '(no subject)')}</span>
-      <span class="inbox-row__sub">${who} · ${new Date(m.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${m.snippet ? ` — ${esc(m.snippet.slice(0, 110))}` : ''}</span>
-    </span>
+    <button type="button" class="email-row__head" data-email-toggle aria-expanded="false" ${body ? '' : 'disabled title="No text body stored for this message"'}>
+      <span class="email-row__dir" title="${m.direction === 'out' ? 'Sent by the house' : 'Received'}">${arrow}</span>
+      <span class="inbox-row__text">
+        <span class="inbox-row__title">${esc(m.subject || '(no subject)')}</span>
+        <span class="inbox-row__sub">${who} · ${new Date(m.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${m.snippet ? ` — ${esc(m.snippet.slice(0, 110))}` : ''}</span>
+      </span>
+      ${body ? '<span class="email-row__chev" aria-hidden="true">▾</span>' : ''}
+    </button>
+    ${body ? `<div class="email-row__body" hidden>${esc(body.slice(0, 8000))}</div>` : ''}
   </li>`;
 }
 
@@ -2743,6 +2749,16 @@ function init() {
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
+    const et = e.target.closest('[data-email-toggle]');
+    if (et) {
+      const bodyEl = et.parentElement.querySelector('.email-row__body');
+      if (bodyEl) {
+        bodyEl.hidden = !bodyEl.hidden;
+        et.setAttribute('aria-expanded', String(!bodyEl.hidden));
+        et.parentElement.classList.toggle('is-open', !bodyEl.hidden);
+      }
+      return;
+    }
     const cp = e.target.closest('[data-claim-preview]');
     if (cp) { openClaimPreview(cp.dataset.claimPreview); return; }
     const pt = e.target.closest('[data-pick-time]');

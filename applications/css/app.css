@@ -901,7 +901,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .review-tabs__tab.is-on { color: var(--fg); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
 .emails-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
 .email-list { padding-inline: var(--space-4); }
-.email-row { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; position: relative; }
+.email-row { display: flex; flex-direction: column; padding: var(--space-3) 0; position: relative; }
 .email-row::after { content: ''; position: absolute; left: 28px; right: 0; bottom: 0; border-bottom: 1px solid var(--border); }
 .email-row:last-child::after { display: none; }
 .email-row__dir { flex-shrink: 0; width: 20px; text-align: center; font-weight: var(--fw-bold); }
@@ -1191,3 +1191,23 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .claim-preview__title { margin: 0 0 var(--space-2); font-weight: var(--fw-bold); }
 .claim-preview__desc { margin: 0; font-size: var(--font-size-small); line-height: var(--lh-body); white-space: normal; }
 .claim-preview__slots { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* --- v3.9.1: expandable email rows --- */
+.email-row__head {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  width: 100%; border: 0; background: none; padding: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.email-row__head:disabled { cursor: default; }
+.email-row__head:not(:disabled):hover .inbox-row__title { text-decoration: underline; }
+.email-row__chev { margin-left: auto; color: var(--fg-subtle); font-size: 12px; transition: transform 120ms ease; flex-shrink: 0; }
+.email-row.is-open .email-row__chev { transform: rotate(180deg); }
+.email-row__body {
+  margin: var(--space-3) 0 0 28px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+  font-size: var(--font-size-small); line-height: var(--lh-body);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  max-height: 420px; overflow-y: auto;
+}
+.email-row__body[hidden] { display: none; }
