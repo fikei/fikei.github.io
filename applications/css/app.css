@@ -1086,3 +1086,24 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   opacity: 0.45; cursor: pointer; vertical-align: baseline;
 }
 .review__fact:hover .fact-edit, .fact-edit:focus-visible { opacity: 1; color: var(--fg-link); }
+
+/* --- v3.4.0: listing header cleanup — ⋯ menu, all-in price, others rail --- */
+.listing-menu-wrap { position: relative; display: inline-flex; }
+.listing-menu-btn { font-weight: var(--fw-bold); letter-spacing: 1px; }
+.listing-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
+  display: flex; flex-direction: column; min-width: 160px;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 4px; text-align: left;
+}
+.listing-menu[hidden] { display: none; }
+.listing-menu__item {
+  border: 0; background: none; border-radius: var(--radius-xs);
+  padding: 8px 10px; font-size: var(--font-size-small); color: var(--fg);
+  text-align: left; cursor: pointer;
+}
+.listing-menu__item:hover { background: var(--bg-overlay); }
+.listing-allin { font-weight: var(--fw-semibold); cursor: help; }
+.listing-others { margin-top: var(--space-2); }
+.listing-others summary { color: var(--fg-subtle); font-size: var(--font-size-small); cursor: pointer; }
