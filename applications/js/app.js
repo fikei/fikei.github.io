@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.9.1';
+const VERSION = '3.10.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -797,6 +797,8 @@ function setView(next, push = true) {
     const url = new URL(location);
     url.searchParams.set('view', view);
     url.searchParams.delete('a');
+    url.searchParams.delete('room');
+    if (view === 'occupancy' && pendingOccRoom) url.searchParams.set('room', String(pendingOccRoom));
     history.pushState(null, '', url);
   }
   document.getElementById('rail').classList.remove('is-open');
@@ -1015,7 +1017,8 @@ function renderApplicants() {
     if (!l) return `<h2 class="inbox-group__label">Listing removed</h2>`;
     const room = rooms.find(r => r.id === l.room_id);
     return `<div class="listing-head__text">
-        <h2 class="inbox-group__label">${esc(room?.name || 'Room')}
+        <h2 class="inbox-group__label">
+          <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="View on the occupancy calendar">${esc(room?.name || 'Room')}</a>
           <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
         </h2>
         <span class="inbox-group__count">${listingMeta(l)}</span>
@@ -1033,7 +1036,8 @@ function renderApplicants() {
           const room = rooms.find(r => r.id === l.room_id);
           return `<li class="inbox-row listing-row is-done">
             <span class="inbox-row__text">
-              <span class="inbox-row__title">${esc(room?.name || 'Room')}
+              <span class="inbox-row__title">
+                <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="View on the occupancy calendar">${esc(room?.name || 'Room')}</a>
                 <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
               </span>
               <span class="inbox-row__sub">${listingWindow(l)}</span>
@@ -1148,6 +1152,7 @@ let OCC_WINDOW = 12;         // months visible at once (3 on phones — set per 
 const occMq = window.matchMedia('(max-width: 720px)');
 let occStart = null;         // 'YYYY-MM-01' — left edge of the window
 let occDrawer = null;        // { type:'stay'|'gap'|'room', ... } | null — opens on click; hover shows a tooltip
+let pendingOccRoom = null;   // room id to open once the calendar renders (openings → occupancy links)
 
 function firstOfMonth(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -1285,6 +1290,12 @@ function renderOccupancy() {
     ${occupantsHtml()}
     <div id="occ-drawer-host"></div>`;
   renderOccDrawer();
+  if (pendingOccRoom) {
+    const rid = pendingOccRoom;
+    pendingOccRoom = null;
+    if (rooms.some(r => r.id === rid)) openOccDrawer({ type: 'room', roomId: rid });
+    document.querySelector(`[data-room-info="${rid}"]`)?.scrollIntoView({ block: 'nearest' });
+  }
 }
 
 /* --- right-hand drawer: stay editor, gap actions, or room details --- */
@@ -2617,6 +2628,7 @@ async function _checkMembershipAndEnter() {
     view = new URLSearchParams(location.search).get('view') || 'inbox';
     view = LEGACY_VIEWS[view] || view;
     if (!VIEWS[view]) view = 'inbox';
+    pendingOccRoom = view === 'occupancy' ? +new URLSearchParams(location.search).get('room') || null : null;
     render();
     if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived (budget under $1,500) — update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
@@ -2686,6 +2698,13 @@ function init() {
       addPlacement(aid, lid, 'manual').then(row => {
         if (row) { toast('Added to the listing'); renderRailCounts(); renderApplicants(); }
       });
+      return;
+    }
+    const occLink = e.target.closest('[data-occ-room-link]');
+    if (occLink) {
+      e.preventDefault();
+      pendingOccRoom = +occLink.dataset.occRoomLink;
+      setView('occupancy');
       return;
     }
     const navLink = e.target.closest('[data-view-link]');
