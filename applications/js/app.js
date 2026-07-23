@@ -7,7 +7,7 @@
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
    manual moves go through the recruit_set_stage RPC. */
-const VERSION = '3.0.1';
+const VERSION = '3.1.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1174,10 +1174,26 @@ function roomDetailsHtml(r) {
     ['Share of private space', r.pct_private ? `${(+r.pct_private).toFixed(2)}%` : null],
   ].filter(([, v]) => v);
   const open = listings.filter(l => l.room_id === r.id && l.status === 'open');
+  const money = n => n != null && n !== '' ? '$' + Number(n).toLocaleString('en-US') : null;
+  const food = settings.food_monthly, dues = settings.dues_monthly;
+  const allIn = r.rent_monthly != null && food != null && dues != null
+    ? r.rent_monthly + Number(food) + Number(dues) : null;
+  const costsHtml = r.rent_monthly != null ? `
+    <div class="occ-drawer__section">Monthly costs</div>
+    <dl class="occ-drawer__facts">
+      <div class="occ-drawer__fact"><dt>Room (lease share)</dt><dd>${money(r.rent_monthly)}</dd></div>
+      ${r.rent_private != null && r.rent_public ? `<div class="occ-drawer__fact occ-drawer__fact--sub"><dt>${money(r.rent_private)} private + ${money(r.rent_public)} shared</dt><dd></dd></div>` : ''}
+      <div class="occ-drawer__fact"><dt>Food <span class="occ-drawer__global">per person · global</span></dt>
+        <dd><input type="number" class="listing-status occ-drawer__cost" data-cost-setting="food_monthly" value="${food ?? ''}" min="0" max="2000" step="5"></dd></div>
+      <div class="occ-drawer__fact"><dt>Communal dues <span class="occ-drawer__global">per person · global</span></dt>
+        <dd><input type="number" class="listing-status occ-drawer__cost" data-cost-setting="dues_monthly" value="${dues ?? ''}" min="0" max="5000" step="5"></dd></div>
+      ${allIn != null ? `<div class="occ-drawer__fact occ-drawer__fact--total"><dt>All-in, one person</dt><dd>${money(allIn)}/mo</dd></div>` : ''}
+    </dl>` : '';
   return `
     <dl class="occ-drawer__facts">
       ${facts.map(([k, v]) => `<div class="occ-drawer__fact"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('')}
     </dl>
+    ${costsHtml}
     ${r.details_notes ? `<p class="occ-drawer__note">${esc(r.details_notes)}</p>` : ''}
     ${open.length ? `<div class="occ-drawer__listings">
       ${open.map(l => `<p class="occ-drawer__note">Open listing: ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}
@@ -2463,6 +2479,20 @@ function init() {
   document.addEventListener('change', e => {
     const sel = e.target.closest('[data-listing-status]');
     if (sel) updateListingStatus(sel.dataset.listingStatus, sel.value);
+    const cost = e.target.closest('[data-cost-setting]');
+    if (cost) {
+      const key = cost.dataset.costSetting;
+      const value = cost.value === '' ? null : Math.round(+cost.value);
+      if (value === null || value < 0) return;
+      settings[key] = value;
+      sb.from('recruit_settings').upsert({
+        key, value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+      }).then(({ error }) => {
+        if (error) toast(`Save failed: ${error.message}`);
+        else toast('Global cost updated — applies to everyone');
+      });
+      renderOccDrawer();
+    }
   });
 
   // Re-fit the timeline when the viewport crosses the phone breakpoint.
