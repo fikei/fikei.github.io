@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.8.1'
+const VERSION = '1.8.2'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -354,7 +354,7 @@ async function completePastCalls(client: ReturnType<typeof db>): Promise<number>
   const { data: rows } = await client.from('recruit_screenings')
     .update({ status: 'completed' })
     .eq('status', 'scheduled')
-    .lt('ends_at', new Date(Date.now() - 30 * 60000).toISOString())
+    .lt('ends_at', new Date(Date.now() - 5 * 60000).toISOString())
     .select('id')
   if (rows?.length) console.log(`[recruit-discord] ${rows.length} call(s) marked completed`)
   return rows?.length || 0

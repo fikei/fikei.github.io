@@ -1223,9 +1223,9 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 
 /* Watch / Join row buttons + recording viewer (v3.12.0) */
 .btn--watch { background: #1D9E75; border-color: #1D9E75; color: #fff; gap: 6px; }
-.btn--watch:hover { filter: brightness(1.08); border-color: #1D9E75; }
+.btn--watch:hover { background: #0F6E56; border-color: #0F6E56; color: #fff; }
 .btn--join { background: #378ADD; border-color: #378ADD; color: #fff; gap: 6px; }
-.btn--join:hover { filter: brightness(1.08); border-color: #378ADD; }
+.btn--join:hover { background: #185FA5; border-color: #185FA5; color: #fff; }
 .watch-modal__card { max-width: 1060px; width: min(1060px, 94vw); }
 .watch-modal__grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 .watch-modal__player video { width: 100%; border-radius: 8px; background: #000; min-height: 300px; display: block; }

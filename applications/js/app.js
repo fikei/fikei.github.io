@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.12.0';
+const VERSION = '3.13.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -364,15 +364,44 @@ function avatarHtml(a, large) {
    nothing sent yet → Reach out · waiting on them → Follow up · they wrote
    back → Reply · availability in hand → Pick a time · call booked → the
    slot chip (+ Join when there's a Meet link). */
+/* Time-derived call phase — a clock, not a cron, decides these. Stored
+   status only carries facts time can't tell us (cancelled). Join renders
+   ONLY while the call is actually live (T-10min through end). */
+function callPhase(sc) {
+  if (!sc) return null;
+  if (sc.watch) return 'watch';
+  if (sc.at) {
+    const now = Date.now();
+    const start = new Date(sc.at).getTime();
+    const end = sc.ends ? new Date(sc.ends).getTime() : start + 30 * 60000;
+    if (now >= end) return 'processing';
+    if (now >= start - 10 * 60000) return 'live';
+    return 'scheduled';
+  }
+  if (sc.availability) return 'availability';
+  return null;
+}
+
+function processingChip() {
+  return `<span class="decision-chip decision-chip--vote" title="The call ended — recording and notes usually land within 30 minutes">Notes on the way…</span>`;
+}
+
+function watchBtn(sc) {
+  return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded Intro Call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
+}
+
+function joinBtn(sc) {
+  return sc.link ? `<a class="btn btn--sm inbox-row__review cta-std btn--join" href="${esc(sc.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Join</a>` : '';
+}
+
 function openingsCta(a) {
   const sc = screeningState[a.id];
-  if (!sc?.at && sc?.watch) {
-    return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded Intro Call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
-  }
-  if (sc?.at) {
-    const chip = `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
-    const join = sc.link ? `<a class="btn btn--sm inbox-row__review cta-std btn--join" href="${esc(sc.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Join</a>` : '';
-    return chip + join;
+  const phase = callPhase(sc);
+  if (phase === 'watch') return watchBtn(sc);
+  if (phase === 'processing') return processingChip();
+  if (phase === 'live') return joinBtn(sc) || processingChip();
+  if (phase === 'scheduled') {
+    return `<span class="decision-chip decision-chip--outreach" title="Intro Call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
   }
   if (sc?.availability) return `<button class="btn btn--sm btn--discord inbox-row__review cta-std" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Post to Discord</button><button class="btn btn--sm inbox-row__review" data-pick-time="${a.id}">Pick a time</button>`;
   const st = emailState[a.id];
@@ -442,7 +471,7 @@ async function loadAll() {
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
     sb.from('recruit_emails').select('applicant_id, direction, sent_at, snippet').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
-    sb.from('recruit_screenings').select('id, applicant_id, starts_at, status, housemate_name, meet_link, recall_status').order('starts_at'),
+    sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
   ]);
@@ -451,7 +480,7 @@ async function loadAll() {
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
   for (const s of (scRes.data || [])) {
-    if (s.status === 'scheduled') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), at: s.starts_at, with: s.housemate_name, link: s.meet_link };
+    if (s.status === 'scheduled') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), at: s.starts_at, ends: s.ends_at, with: s.housemate_name, link: s.meet_link };
     // A finished recording adds a Watch state to the row (fresh link on click).
     if (s.recall_status === 'done') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), watch: s.id };
   }
@@ -939,9 +968,11 @@ function stageChip(a) {
 function screeningChip(a) {
   const sc = screeningState[a.id];
   if (!sc) return '';
-  const watch = sc.watch ? `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded Intro Call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>` : '';
-  if (sc.at) return `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>` + watch;
-  if (watch) return watch;
+  const phase = callPhase(sc);
+  if (phase === 'watch') return watchBtn(sc);
+  if (phase === 'processing') return processingChip();
+  if (phase === 'live') return joinBtn(sc) || processingChip();
+  if (phase === 'scheduled') return `<span class="decision-chip decision-chip--outreach" title="Intro Call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
 }
 
