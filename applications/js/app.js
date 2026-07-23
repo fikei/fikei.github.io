@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.5.0';
+const VERSION = '3.6.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -106,23 +106,36 @@ const relTime = iso => {
 
 /* Recruiter-confirmed move-in window (set after emailing them) — when
    present it beats the parsed free text everywhere dates matter. */
+const fmtMD = iso => new Date(iso + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const confirmedMoveIn = a => a.moveinFrom
-  ? (a.moveinTo ? `${fmtDay(a.moveinFrom)} – ${fmtDay(a.moveinTo)}` : fmtDay(a.moveinFrom))
+  ? (a.moveinTo ? `${fmtMD(a.moveinFrom)} → ${fmtMD(a.moveinTo)}` : fmtDay(a.moveinFrom))
   : '';
 const effectiveMoveIn = a => confirmedMoveIn(a) || normalizeMoveIn(a);
 
-/* Row subline stays clean: track + move-in (+ stay length for sublets).
+/* The canonical, simplified move-in display. One of:
+   "Sep 1, 2026" · "Sep 2026" · "Aug–Sep 2026" · "ASAP" · "Flexible" ·
+   "Jul 28 → Aug 29" (a known in→out window) · '' (unparseable).
+   The "· flexible" suffix never renders in sublines — the raw answer lives
+   behind the profile info-dot. */
+function displayMoveIn(a) {
+  const conf = confirmedMoveIn(a);
+  if (conf) return conf;
+  const win = parsedStayWindow(a);
+  if (win) return `${fmtMD(win[0])} → ${fmtMD(win[1])}`;
+  return normalizeMoveIn(a).replace(/ · flexible$/, '');
+}
+
+/* Track badge — same pill component as the listing headers. */
+const trackBadge = a =>
+  `<span class="listing-kind listing-kind--${isSublet(a) ? 'sublet' : 'resident'} listing-kind--xs">${trackLabel(a)}</span>`;
+
+/* Row subline (text after the track badge): pronouns · move-in dates.
    Budget lives on the review page. */
 function subLine(a) {
   const bits = [];
   if (a.pronouns) bits.push(a.pronouns.toLowerCase());
-  bits.push(trackLabel(a));
-  const mi = effectiveMoveIn(a);
+  const mi = displayMoveIn(a);
   if (mi) bits.push(mi);
-  if (isSublet(a)) {
-    const len = stayLength(a);
-    if (len) bits.push(len);
-  }
   return bits.join(' · ');
 }
 
@@ -203,11 +216,10 @@ function normalizeBudget(raw) {
 
 /* Day-level stay length for sublets, when the move-in text carries two dates
    ("July 28 - Aug 29", "June 21st - Sept 4th"). Null when not parseable. */
-function stayLength(a) {
-  if (a.moveinFrom && a.moveinTo) {
-    const days = Math.round((new Date(a.moveinTo) - new Date(a.moveinFrom)) / 86400000);
-    if (days > 0 && days <= 366) return days < 21 ? `${days}-day stay` : `${Math.round(days / 7)}-week stay`;
-  }
+/* A stated in→out window parsed from the free text ("July 28 - Aug 29"),
+   as a pair of ISO dates. Null when the answer doesn't carry two dates. */
+function parsedStayWindow(a) {
+  if (!isSublet(a)) return null;
   const raw = (a.movein || '');
   const rx = new RegExp(`\\b(${MONTH_ABBR.join('|')})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'gi');
   const dates = [];
@@ -220,7 +232,7 @@ function stayLength(a) {
   if (dates[1] < dates[0]) dates[1].setFullYear(dates[1].getFullYear() + 1);
   const days = Math.round((dates[1] - dates[0]) / 86400000);
   if (days <= 0 || days > 366) return null;
-  return days < 21 ? `${days}-day stay` : `${Math.round(days / 7)}-week stay`;
+  return dates.map(d => d.toISOString().slice(0, 10));
 }
 
 /* Human length of a listing window. */
@@ -345,6 +357,24 @@ function avatarHtml(a, large) {
   return `<span class="${cls}">${esc(initials(a))}<img class="avatar__img" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
 }
 
+/* The one CTA an Openings row needs right now, from its funnel micro-state:
+   nothing sent yet → Reach out · waiting on them → Follow up · they wrote
+   back → Reply · availability in hand → Pick a time · call booked → the
+   slot chip (+ Join when there's a Meet link). */
+function openingsCta(a) {
+  const sc = screeningState[a.id];
+  if (sc?.at) {
+    const chip = `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
+    const join = sc.link ? `<a class="btn btn--sm inbox-row__review" href="${esc(sc.link)}" target="_blank" rel="noopener">Join call</a>` : '';
+    return chip + join;
+  }
+  if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review" data-pick-time="${a.id}">Pick a time</button>`;
+  const st = emailState[a.id];
+  if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review" data-pick-time="${a.id}">Reply</button>`;
+  if (st?.lastDir === 'out') return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review" data-email="${a.id}">Follow up</button>`;
+  return `<button class="btn inbox-row__review" data-email="${a.id}">Reach out</button>`;
+}
+
 /* Blue response dot in the row's left gutter — sits beside the avatar,
    never on top of it. */
 function repliedDot(a) {
@@ -397,7 +427,7 @@ async function loadAll() {
     sb.from('recruit_comments').select('applicant_id'),
     sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
-    sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name').order('starts_at'),
+    sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, meet_link').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
   ]);
@@ -406,7 +436,7 @@ async function loadAll() {
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
   for (const s of (scRes.data || [])) {
-    if (s.status === 'scheduled') screeningState[s.applicant_id] = { at: s.starts_at, with: s.housemate_name };
+    if (s.status === 'scheduled') screeningState[s.applicant_id] = { at: s.starts_at, with: s.housemate_name, link: s.meet_link };
   }
   for (const av of (avRes.data || [])) screeningState[av.applicant_id] ||= { availability: true };
   emailState = {};
@@ -1015,14 +1045,13 @@ function renderApplicants() {
               ${avatarHtml(a)}
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
-                <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
+                <span class="inbox-row__sub">${trackBadge(a)}${subLine(a) ? `${esc(subLine(a))} · ` : ''}applied ${fmtDate(a.ts_iso)}</span>
               </span>
             </button>
             <span class="inbox-row__actions">
-              ${view === 'openings' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : ''}
               ${noteBubble(a.id)}
               ${view === 'openings'
-                ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button><button class="row-x" data-remove-placement="${a.id}|${esc(g.key)}" title="Remove from this listing — the auto-sweep won't re-add them" aria-label="Remove from listing">✕</button>`
+                ? `${openingsCta(a)}<button class="row-x" data-remove-placement="${a.id}|${esc(g.key)}" title="Remove from this listing — the auto-sweep won't re-add them" aria-label="Remove from listing">✕</button>`
                 : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Vote</button>` : ''}`}
             </span>
           </li>`).join('')}
@@ -1048,7 +1077,7 @@ function othersAccordion(listingId) {
             ${avatarHtml(a)}
             <span class="inbox-row__text">
               <span class="inbox-row__title">${esc(fullName(a))}</span>
-              <span class="inbox-row__sub">${esc(subLine(a))}</span>
+              <span class="inbox-row__sub">${trackBadge(a)}${esc(subLine(a))}</span>
             </span>
           </button>
           <span class="inbox-row__actions">
@@ -1892,10 +1921,9 @@ function moveInFactHtml(a, miNorm) {
     </span>`;
   }
   const conf = confirmedMoveIn(a);
-  const shown = conf || miNorm || a.movein || '—';
-  const stay = isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : '';
+  const shown = conf || displayMoveIn(a) || a.movein || '—';
   return `<span class="review__fact-value ${conf ? 'is-confirmed' : ''}">
-    ${esc(shown)}${stay}
+    ${esc(shown)}
     ${conf ? `<span class="movein-check" title="Confirmed by ${esc(a.moveinSetBy || 'the house')} — their stated answer is behind the (i)">✓</span>` : ''}
     ${infoDot(a.movein, conf || miNorm)}
     <button type="button" class="fact-edit" data-movein-edit title="${conf ? 'Edit the confirmed date' : 'Confirm their real date'}" aria-label="Edit move-in date">✎</button>
@@ -2642,6 +2670,13 @@ function init() {
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
+    const pt = e.target.closest('[data-pick-time]');
+    if (pt) {
+      openReview(pt.dataset.pickTime);
+      reviewTab = 'emails';
+      renderReview();
+      return;
+    }
     const miEdit = e.target.closest('[data-movein-edit]');
     if (miEdit) { moveinEditing = true; renderReview(); return; }
     const miSave = e.target.closest('[data-movein-save]');
