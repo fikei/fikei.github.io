@@ -1157,3 +1157,19 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 /* --- v3.7.0: openings chrome cleanup + standardized CTA column --- */
 .page__head-action { margin-left: var(--space-3); margin-top: 6px; }
 .cta-std { min-width: 108px; justify-content: center; }
+
+/* --- v3.8.0: note-bubble tooltip (same mechanics as the info-dot) --- */
+.note-bubble { cursor: help; }
+.note-bubble::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: min(340px, 80vw);
+  background: var(--fg); color: var(--bg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  font-size: var(--font-size-caption); font-weight: 400;
+  line-height: var(--lh-tight); text-align: left; white-space: normal;
+  opacity: 0; visibility: hidden; transition: opacity 120ms ease;
+  pointer-events: none; z-index: 90;
+}
+.note-bubble:hover::after { opacity: 1; visibility: visible; }

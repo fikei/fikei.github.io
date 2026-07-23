@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.7.0';
+const VERSION = '3.8.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -69,6 +69,7 @@ let placements = [];          // recruit_listing_candidates rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let pendingVote = null;       // { score, veto } while the vote bar is open
 let commentCounts = {};       // applicant_id -> n
+let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
 let view = 'inbox';           // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
@@ -373,7 +374,14 @@ function openingsCta(a) {
   if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Pick a time</button>`;
   const st = emailState[a.id];
   if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Reply</button>`;
-  if (st?.lastDir === 'out') return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
+  if (st?.lastDir === 'out') {
+    // A human saying "I'll send an invite" reads as manual scheduling — say
+    // so instead of nagging Follow up. Calendar invites from the shared
+    // account get picked up automatically by the scan's calendar sweep.
+    const promised = /\b(invite|calendar|schedul|let'?s (chat|talk|meet)|talk (soon|then|tomorrow))\b/i.test(st.lastSnippet || '');
+    if (promised) return `<span class="decision-chip decision-chip--vote" title="The last email reads like manual scheduling — an invite from the shared account will be picked up automatically">Invite promised</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
+    return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
+  }
   return `<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`;
 }
 
@@ -390,7 +398,9 @@ function repliedDot(a) {
 function noteBubble(id) {
   const n = commentCounts[id];
   if (!n) return '';
-  return `<span class="note-bubble" title="${n} house note${n === 1 ? '' : 's'}">
+  const latest = latestNotes[id];
+  const tip = `${n} house note${n === 1 ? '' : 's'}${latest ? ` · latest — ${latest.author}: “${latest.body.replace(/\s+/g, ' ').slice(0, 140)}${latest.body.length > 140 ? '…' : ''}”` : ''}`;
+  return `<span class="note-bubble" data-tip="${esc(tip)}">
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-4.6L12 21l-2.4-4H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"/></svg>
     <b class="note-bubble__n">${n}</b>
   </span>`;
@@ -426,8 +436,8 @@ async function loadAll() {
   const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
-    sb.from('recruit_comments').select('applicant_id'),
-    sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at'),
+    sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
+    sb.from('recruit_emails').select('applicant_id, direction, sent_at, snippet').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
     sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, meet_link').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, updated_at'),
@@ -443,8 +453,8 @@ async function loadAll() {
   for (const av of (avRes.data || [])) screeningState[av.applicant_id] ||= { availability: true };
   emailState = {};
   for (const e of (eRes.data || [])) {
-    const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, replies: 0 });
-    st.lastDir = e.direction; st.lastAt = e.sent_at;
+    const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, lastSnippet: '', replies: 0 });
+    st.lastDir = e.direction; st.lastAt = e.sent_at; st.lastSnippet = e.snippet || '';
     if (e.direction === 'in') st.replies++;
   }
   sb.from('recruit_settings').select('*').then(({ data }) => {
@@ -467,7 +477,11 @@ async function loadAll() {
     decisions[d.applicant_id] = { d: d.decision, reason: d.reason, note: d.note || '', listingId: d.listing_id || null, byName: d.decided_by_name, at: d.decided_at };
   }
   commentCounts = {};
-  for (const c of (cRes.data || [])) commentCounts[c.applicant_id] = (commentCounts[c.applicant_id] || 0) + 1;
+  latestNotes = {};
+  for (const c of (cRes.data || [])) {
+    commentCounts[c.applicant_id] = (commentCounts[c.applicant_id] || 0) + 1;
+    latestNotes[c.applicant_id] = { author: c.author_name || 'Housemate', body: c.body || '' }; // rows are created_at-ordered
+  }
 }
 
 async function saveDecision(id, d, reason, byName, note, listingId) {
