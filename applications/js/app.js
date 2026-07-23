@@ -7,7 +7,7 @@
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
    manual moves go through the recruit_set_stage RPC. */
-const VERSION = '3.0.0';
+const VERSION = '3.0.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -982,7 +982,7 @@ const KIND_LABELS = { resident: 'Resident', sublet: 'Sublet (short-term)', candi
 let OCC_WINDOW = 12;         // months visible at once (3 on phones — set per render)
 const occMq = window.matchMedia('(max-width: 720px)');
 let occStart = null;         // 'YYYY-MM-01' — left edge of the window
-let occDrawer = null;        // { type:'stay'|'gap'|'room', ..., pinned } | null
+let occDrawer = null;        // { type:'stay'|'gap'|'room', ... } | null — opens on click; hover shows a tooltip
 
 function firstOfMonth(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
@@ -1136,7 +1136,7 @@ function stayFormHtml(s, roomId) {
   const isNew = !s.id;
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
     <label class="listing-form__field">Who
-      <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" ${occDrawer.pinned ? 'autofocus' : ''}>
+      <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" autofocus>
     </label>
     <label class="listing-form__field">Type
       <select name="kind" class="listing-status">
@@ -1213,7 +1213,7 @@ function renderOccDrawer() {
     body = roomDetailsHtml(r);
   }
   hostWrap.innerHTML = `
-    <aside class="occ-drawer ${occDrawer.pinned ? 'is-pinned' : ''}">
+    <aside class="occ-drawer">
       <div class="occ-drawer__head">
         <div>
           <h3 class="occ-drawer__title">${esc(title)}</h3>
@@ -2413,7 +2413,6 @@ function init() {
     if (reason) { pendingReason = reason.dataset.reason; renderDecisionOptions(); return; }
     const delNote = e.target.closest('[data-delete-note]');
     if (delNote) { deleteNote(delNote.dataset.deleteNote, queue[qIndex]); return; }
-    if (occDrawer && e.target.closest('.occ-drawer')) occDrawer.pinned = true; // interacting pins a hover-preview
     const calNav = e.target.closest('[data-cal-nav]');
     if (calNav) {
       const dir = calNav.dataset.calNav;
@@ -2430,19 +2429,19 @@ function init() {
     if (stayDel) { deleteStay(stayDel.dataset.stayDelete); return; }
     const stayBar = e.target.closest('[data-stay]');
     if (stayBar) {
-      const already = occDrawer?.type === 'stay' && occDrawer.id === stayBar.dataset.stay && occDrawer.pinned;
-      openOccDrawer(already ? null : { type: 'stay', id: stayBar.dataset.stay, pinned: true });
+      const already = occDrawer?.type === 'stay' && occDrawer.id === stayBar.dataset.stay;
+      openOccDrawer(already ? null : { type: 'stay', id: stayBar.dataset.stay });
       return;
     }
     const gapBar = e.target.closest('[data-gap-room]');
     if (gapBar) {
-      openOccDrawer({ type: 'gap', roomId: +gapBar.dataset.gapRoom, start: gapBar.dataset.gapStart, end: gapBar.dataset.gapEnd, pinned: true });
+      openOccDrawer({ type: 'gap', roomId: +gapBar.dataset.gapRoom, start: gapBar.dataset.gapStart, end: gapBar.dataset.gapEnd });
       return;
     }
     const roomBtn = e.target.closest('[data-room-info]');
     if (roomBtn) {
       const already = occDrawer?.type === 'room' && occDrawer.roomId === +roomBtn.dataset.roomInfo;
-      openOccDrawer(already ? null : { type: 'room', roomId: +roomBtn.dataset.roomInfo, pinned: true });
+      openOccDrawer(already ? null : { type: 'room', roomId: +roomBtn.dataset.roomInfo });
       return;
     }
     const drawerClose = e.target.closest('[data-drawer-close]');
@@ -2471,29 +2470,6 @@ function init() {
     if (view === 'occupancy' && houseLoaded) renderOccupancy();
   });
 
-  // Hovering a name on the occupancy calendar previews it in the drawer;
-  // clicking (or touching any control inside) pins it open.
-  let occHoverTimer = null, occHoverClose = null;
-  document.addEventListener('mouseover', e => {
-    if (view !== 'occupancy') return;
-    if (e.target.closest('.occ-drawer')) { clearTimeout(occHoverClose); return; }
-    const bar = e.target.closest('[data-stay]');
-    if (!bar) return;
-    clearTimeout(occHoverClose);
-    if (occDrawer?.pinned) return;
-    clearTimeout(occHoverTimer);
-    const id = bar.dataset.stay;
-    if (occDrawer?.type === 'stay' && occDrawer.id === id) return;
-    occHoverTimer = setTimeout(() => openOccDrawer({ type: 'stay', id, pinned: false }), 250);
-  });
-  document.addEventListener('mouseout', e => {
-    if (view !== 'occupancy') return;
-    clearTimeout(occHoverTimer);
-    if (!occDrawer || occDrawer.pinned) return;
-    const to = e.relatedTarget;
-    if (to && (to.closest?.('.occ-drawer') || to.closest?.('[data-stay]'))) return;
-    occHoverClose = setTimeout(() => { if (occDrawer && !occDrawer.pinned) openOccDrawer(null); }, 350);
-  });
 
   window.addEventListener('popstate', () => {
     const v = new URLSearchParams(location.search).get('view') || 'review';
