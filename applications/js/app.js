@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.3.0';
+const VERSION = '3.3.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1725,7 +1725,7 @@ function renderReview() {
             ${a.source ? `<span class="review__badge" title="How they heard about Agape">${esc(a.source)}</span>` : ''}
           </div>
           <div class="review__facts">
-            <div class="review__fact"><span class="review__fact-label">Move-in</span><span class="review__fact-value">${esc(miNorm || a.movein || '—')}${isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : ''} ${infoDot(a.movein, miNorm)}</span>${moveInFieldHtml(a)}</div>
+            <div class="review__fact"><span class="review__fact-label">Move-in</span>${moveInFactHtml(a, miNorm)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
@@ -1774,7 +1774,10 @@ function renderReview() {
    (usually after emailing them) lives underneath and drives placement. */
 let moveinEditing = false;
 
-function moveInFieldHtml(a) {
+/* One value, cleanly swapped: the confirmed window replaces the parsed text
+   when set (green, ✓, attributed on hover); the applicant's raw answer stays
+   behind the info-dot either way. A quiet ✎ opens the inline editor. */
+function moveInFactHtml(a, miNorm) {
   if (moveinEditing) {
     return `<span class="movein-set movein-set--form">
       <input type="date" class="listing-status movein-set__input" id="movein-from" value="${esc(a.moveinFrom || '')}" aria-label="Confirmed move-in">
@@ -1785,13 +1788,15 @@ function moveInFieldHtml(a) {
       <button type="button" class="hold-sheet__cancel movein-set__cancel" data-movein-cancel>Cancel</button>
     </span>`;
   }
-  return a.moveinFrom
-    ? `<span class="movein-set">
-        <span class="movein-set__val">Confirmed: ${esc(confirmedMoveIn(a))}</span>
-        <span class="movein-set__meta">${a.moveinSetBy ? `by ${esc(a.moveinSetBy)}` : ''}</span>
-        <button type="button" class="movein-set__edit" data-movein-edit>Edit</button>
-      </span>`
-    : `<span class="movein-set"><button type="button" class="movein-set__edit" data-movein-edit>Confirm a date…</button></span>`;
+  const conf = confirmedMoveIn(a);
+  const shown = conf || miNorm || a.movein || '—';
+  const stay = isSublet(a) && stayLength(a) ? ` · ${stayLength(a)}` : '';
+  return `<span class="review__fact-value ${conf ? 'is-confirmed' : ''}">
+    ${esc(shown)}${stay}
+    ${conf ? `<span class="movein-check" title="Confirmed by ${esc(a.moveinSetBy || 'the house')} — their stated answer is behind the (i)">✓</span>` : ''}
+    ${infoDot(a.movein, conf || miNorm)}
+    <button type="button" class="fact-edit" data-movein-edit title="${conf ? 'Edit the confirmed date' : 'Confirm their real date'}" aria-label="Edit move-in date">✎</button>
+  </span>`;
 }
 
 async function saveMoveIn(id, clear = false) {

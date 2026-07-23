@@ -1076,3 +1076,13 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .movein-set__input { height: 32px; font-size: var(--font-size-caption); padding: 0 var(--space-2); }
 .movein-set__sep { color: var(--fg-subtle); }
 .movein-set__cancel { font-size: var(--font-size-caption); }
+
+/* --- v3.3.1: confirmed date replaces the value; quiet ✎ edit --- */
+.review__fact-value.is-confirmed { color: var(--success); font-weight: var(--fw-semibold); }
+.movein-check { color: var(--success); font-weight: var(--fw-bold); cursor: default; }
+.fact-edit {
+  border: 0; background: none; padding: 0 2px;
+  color: var(--fg-subtle); font-size: 13px; line-height: 1;
+  opacity: 0.45; cursor: pointer; vertical-align: baseline;
+}
+.review__fact:hover .fact-edit, .fact-edit:focus-visible { opacity: 1; color: var(--fg-link); }
