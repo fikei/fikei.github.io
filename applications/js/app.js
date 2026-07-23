@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.8.1';
+const VERSION = '3.9.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -440,7 +440,7 @@ async function loadAll() {
     sb.from('recruit_emails').select('applicant_id, direction, sent_at, snippet').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
     sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, meet_link').order('starts_at'),
-    sb.from('recruit_availability').select('applicant_id, updated_at'),
+    sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
   ]);
   placements = pRes.data || [];
@@ -450,7 +450,10 @@ async function loadAll() {
   for (const s of (scRes.data || [])) {
     if (s.status === 'scheduled') screeningState[s.applicant_id] = { at: s.starts_at, with: s.housemate_name, link: s.meet_link };
   }
-  for (const av of (avRes.data || [])) screeningState[av.applicant_id] ||= { availability: true };
+  for (const av of (avRes.data || [])) {
+    // empty windows = a processed non-scheduling reply — no Pick a time
+    if (Array.isArray(av.windows) && av.windows.length) screeningState[av.applicant_id] ||= { availability: true };
+  }
   emailState = {};
   for (const e of (eRes.data || [])) {
     const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, lastSnippet: '', replies: 0 });
@@ -2184,11 +2187,59 @@ function schedulingHtml(a) {
           <span class="avail-card__slots">${windowSlots(w).map(d =>
             `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${a.id}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
         </div>`).join('')}
+      <p class="avail-card__discord">…or hand it to the house: <button type="button" class="btn btn--sm" data-claim-preview="${a.id}">Post to Discord…</button>
+        <span class="notes__empty">first housemate to claim a slot runs the call (manual for now)</span></p>
     </div>`);
   } else if (!screenings.length) {
-    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.</p>`);
+    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.${emailState[a.id]?.lastDir === 'in' ? ` <button type="button" class="btn btn--sm" data-claim-preview="${a.id}">Post to Discord…</button>` : ''}</p>`);
   }
   return parts.join('');
+}
+
+/* ---------- manual Discord claim trigger (preview → post) ---------- */
+let claimCtx = null; // { applicantId, extraction } while the modal is open
+
+async function openClaimPreview(applicantId) {
+  claimCtx = { applicantId, extraction: null };
+  document.getElementById('claim-modal').hidden = false;
+  document.getElementById('claim-status').textContent = 'Reading their reply and composing the post…';
+  document.getElementById('claim-preview-body').innerHTML = '';
+  document.getElementById('claim-post-btn').disabled = true;
+  try {
+    const out = await gmailCall({ action: 'claim-preview', applicantId });
+    if (claimCtx?.applicantId !== applicantId) return; // closed meanwhile
+    claimCtx.extraction = out.extraction;
+    const emb = out.preview?.embeds?.[0] || {};
+    document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-interviews:';
+    document.getElementById('claim-preview-body').innerHTML = `
+      <div class="claim-preview ${out.slotLabels?.length ? '' : 'claim-preview--manual'}">
+        <p class="claim-preview__title">${esc(emb.title || '')}</p>
+        <p class="claim-preview__desc">${esc(emb.description || '').replace(/\n/g, '<br>')}</p>
+        ${out.slotLabels?.length ? `<div class="claim-preview__slots">${out.slotLabels.map(l => `<span class="chip">${esc(l)}</span>`).join('')}<span class="chip">Other time…</span></div>` : ''}
+      </div>`;
+    document.getElementById('claim-post-btn').disabled = false;
+  } catch (e) {
+    document.getElementById('claim-status').textContent = `Preview failed: ${e.message}`;
+  }
+}
+
+function closeClaimModal() {
+  claimCtx = null;
+  document.getElementById('claim-modal').hidden = true;
+}
+
+async function postClaimFromModal() {
+  if (!claimCtx?.extraction) return;
+  const btn = document.getElementById('claim-post-btn');
+  btn.disabled = true; btn.textContent = 'Posting…';
+  try {
+    const out = await gmailCall({ action: 'claim-post', applicantId: claimCtx.applicantId, extraction: claimCtx.extraction });
+    toast(out.posted ? 'Posted to #recruiting-interviews — first claim wins' : 'Already claimed — not reposted');
+    closeClaimModal();
+  } catch (e) {
+    toast(`Post failed: ${e.message}`);
+  }
+  btn.disabled = false; btn.textContent = 'Post to Discord';
 }
 
 async function scheduleSlot(applicantId, iso, btn) {
@@ -2692,6 +2743,8 @@ function init() {
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
+    const cp = e.target.closest('[data-claim-preview]');
+    if (cp) { openClaimPreview(cp.dataset.claimPreview); return; }
     const pt = e.target.closest('[data-pick-time]');
     if (pt) {
       openReview(pt.dataset.pickTime);
@@ -2825,6 +2878,9 @@ function init() {
     else toast(value ? 'House preference: open to couples' : 'House preference: not open to couples');
   };
 
+  document.getElementById('claim-close').onclick = closeClaimModal;
+  document.getElementById('claim-cancel').onclick = closeClaimModal;
+  document.getElementById('claim-post-btn').onclick = postClaimFromModal;
   document.getElementById('email-close').onclick = closeEmailModal;
   document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
   document.getElementById('email-send').onclick = async () => {
@@ -2869,6 +2925,7 @@ function init() {
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
     if (e.key === 'Escape') {
       if (!document.getElementById('email-modal').hidden) closeEmailModal();
+      else if (!document.getElementById('claim-modal').hidden) closeClaimModal();
       else if (!document.getElementById('listing-modal').hidden) closeListingModal();
       else if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet();
       else closeReview();

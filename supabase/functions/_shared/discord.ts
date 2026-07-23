@@ -107,7 +107,9 @@ function appLink(applicantId: string): string {
   return `https://ctrl.rodeo/applications/?id=${encodeURIComponent(applicantId)}`
 }
 
-function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<string, unknown> {
+// Exported so the app can render a faithful preview before a human
+// triggers the post (auto-posting is off for now — manual first).
+export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<string, unknown> {
   const why = (input.whyLine || '').trim().replace(/\s+/g, ' ').slice(0, 140)
   const manual = input.needsHuman || !slots.length
 
