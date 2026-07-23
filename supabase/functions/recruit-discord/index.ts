@@ -13,12 +13,12 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.2.0'
+const VERSION = '1.2.1'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { scheduleScreening, sendIntroEmail } from '../_shared/recruit-schedule.ts'
+import { scheduleScreening, sendIntroEmail, sharedAccessToken } from '../_shared/recruit-schedule.ts'
 import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
@@ -186,13 +186,44 @@ async function handleClaim(interaction: Record<string, any>): Promise<Response> 
 async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
   const now = Date.now()
   const { data: upcoming } = await client.from('recruit_screenings')
-    .select('id, applicant_id, housemate_user_id, starts_at, meet_link')
+    .select('id, applicant_id, housemate_user_id, housemate_email, starts_at, meet_link, gcal_event_id')
     .eq('status', 'scheduled').is('reminder_sent_at', null)
     .gte('starts_at', new Date(now).toISOString())
     .lte('starts_at', new Date(now + 65 * 60000).toISOString())
+  if (!upcoming?.length) return 0
+  // One calendar token per tick; if Gmail is disconnected we fail open and
+  // remind anyway — a stray reminder beats a silent no-show.
+  let gcalToken: string | null = null
+  try { gcalToken = await sharedAccessToken(client) } catch { /* fail open */ }
   let sent = 0
   for (const s of (upcoming || [])) {
     try {
+      // Liveness check: the calendar is the source of truth. Cancelled event,
+      // or the resident declined / was removed → mark cancelled, stay quiet.
+      if (gcalToken && s.gcal_event_id) {
+        try {
+          const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(s.gcal_event_id)}`, {
+            headers: { Authorization: `Bearer ${gcalToken}` },
+          })
+          let dead = resp.status === 404 || resp.status === 410
+          if (resp.ok) {
+            const ev = await resp.json()
+            // deno-lint-ignore no-explicit-any
+            const me = (ev.attendees || []).find((a: any) => (a.email || '').toLowerCase() === (s.housemate_email || '').toLowerCase())
+            dead = ev.status === 'cancelled'
+              || me?.responseStatus === 'declined'
+              || (!me && (ev.attendees || []).length > 0)
+          }
+          if (dead) {
+            await client.from('recruit_screenings')
+              .update({ status: 'cancelled', reminder_sent_at: new Date().toISOString() }).eq('id', s.id)
+            console.log(`[recruit-discord] screening ${s.id} cancelled/declined on calendar — no reminder`)
+            continue
+          }
+        } catch (err) {
+          console.warn(`[recruit-discord] gcal liveness check failed for ${s.id}: ${(err as Error).message}`)
+        }
+      }
       const [{ data: applicant }, { data: dm }] = await Promise.all([
         client.from('recruit_applicants').select('first_name, last_name').eq('id', s.applicant_id).maybeSingle(),
         client.from('user_discord_membership').select('discord_user_id').eq('user_id', s.housemate_user_id).maybeSingle(),
