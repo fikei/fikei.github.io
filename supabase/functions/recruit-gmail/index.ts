@@ -16,12 +16,12 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.7.1'
+const VERSION = '1.8.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendApplicantConfirmation, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
+import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
 import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage } from '../_shared/discord.ts'
 
 const corsHeaders = {
@@ -320,9 +320,10 @@ serve(async (req) => {
       const startsAt = new Date(String(body.startsAt || ''))
       if (isNaN(startsAt.getTime()) || startsAt < new Date()) return json({ error: 'Pick a future start time' }, 400)
 
-      const { data: rp } = await client.from('recruit_profiles').select('display_name').eq('user_id', userData.user.id).maybeSingle()
+      const { data: rp } = await client.from('recruit_profiles').select('display_name, group_email').eq('user_id', userData.user.id).maybeSingle()
       const housemateName = rp?.display_name || membership.discord_username || 'an Agape housemate'
-      const housemateEmail = (userData.user.email || '').toLowerCase()
+      // Google Group address preferred — it's the email residents actually read.
+      const housemateEmail = (rp?.group_email || userData.user.email || '').toLowerCase().trim()
 
       let result
       try {
@@ -359,9 +360,9 @@ serve(async (req) => {
       }
 
       try {
-        await sendApplicantConfirmation(client, result.applicant, housemateName, startsAt, result.meetLink)
+        await sendIntroEmail(client, result.applicant, housemateName, housemateEmail, startsAt, result.meetLink)
       } catch (err) {
-        console.warn(`confirmation email failed for ${applicantId}: ${(err as Error).message}`)
+        console.warn(`intro email failed for ${applicantId}: ${(err as Error).message}`)
       }
 
       console.log(`screening ${applicantId} x ${housemateName} @ ${startsAt.toISOString()}`)

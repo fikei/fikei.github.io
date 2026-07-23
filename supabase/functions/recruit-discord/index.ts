@@ -13,12 +13,12 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.1.1'
+const VERSION = '1.2.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { scheduleScreening, sendApplicantConfirmation } from '../_shared/recruit-schedule.ts'
+import { scheduleScreening, sendIntroEmail } from '../_shared/recruit-schedule.ts'
 import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
@@ -90,10 +90,11 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
 }): Promise<void> {
   const { claimPost, applicantId, startsAt, label } = opts
   try {
-    const { data: rp } = await client.from('recruit_profiles').select('display_name').eq('user_id', opts.userId).maybeSingle()
+    const { data: rp } = await client.from('recruit_profiles').select('display_name, group_email').eq('user_id', opts.userId).maybeSingle()
     const housemateName = rp?.display_name || opts.discordUsername || 'an Agape housemate'
     const { data: authUser, error: authErr } = await client.auth.admin.getUserById(opts.userId)
-    const housemateEmail = (authUser?.user?.email || '').toLowerCase()
+    // Google Group address preferred — it's the email residents actually read.
+    const housemateEmail = (rp?.group_email || authUser?.user?.email || '').toLowerCase().trim()
     if (authErr || !housemateEmail.includes('@')) throw new Error('Could not resolve your account email')
 
     const { screening, meetLink, applicant } = await scheduleScreening(client, {
@@ -111,13 +112,13 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
       ? `\nHeads up: they asked for ${platform.kind}${platform.handle ? ` (@${platform.handle})` : ''} — default is the Meet link, but feel free to DM them about it.`
       : ''
     await dmUser(opts.discordUserId,
-      `✅ You claimed **${applicantName}**'s screening call — ${slotWhen(startsAt)}.\n` +
+      `✅ You claimed **${applicantName}**'s Agape Intro Call — ${slotWhen(startsAt)}.\n` +
       `Calendar invites are out to you both. Meet: ${meetLink || '(see calendar invite)'}${platformLine}`)
 
     try {
-      await sendApplicantConfirmation(client, applicant, housemateName, startsAt, meetLink)
+      await sendIntroEmail(client, applicant, housemateName, housemateEmail, startsAt, meetLink)
     } catch (err) {
-      console.warn(`[recruit-discord] confirmation email failed for ${applicantId}: ${(err as Error).message}`)
+      console.warn(`[recruit-discord] intro email failed for ${applicantId}: ${(err as Error).message}`)
     }
     console.log(`[recruit-discord] claim complete: ${applicantId} × ${housemateName} @ ${startsAt.toISOString()} (screening ${screening.id})`)
   } catch (err) {

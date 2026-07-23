@@ -117,7 +117,7 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
   if (manual) {
     description += `Couldn't extract concrete times from their reply — read their thread and coordinate by email.\n\n[Open in the app](${appLink(input.applicantId)})`
   } else {
-    description += `Offered times for a screening call — tap one to claim it.`
+    description += `Offered times for an Agape Intro Call — tap one to claim it.`
   }
   const warnings: string[] = []
   if (input.timezoneNote) warnings.push(`⚠️ ${input.timezoneNote}`)
@@ -141,7 +141,7 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
 
   return {
     embeds: [{
-      title: `${input.firstName} — screening call`,
+      title: `${input.firstName} — Agape Intro Call`,
       description,
       color: manual ? 0xe67e22 : 0x3498db,
     }],
@@ -244,7 +244,7 @@ export async function notifyStuck(channelId: string, messageId: string, firstNam
   await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: JSON.stringify({
-      content: `⏰ **${firstName}**'s screening call has been unclaimed for 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
+      content: `⏰ **${firstName}**'s Agape Intro Call has been unclaimed for 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
     }),
   })
 }
