@@ -3,11 +3,13 @@
    the discord-membership edge fn). Applicants, votes, shared decisions, and
    house notes live in Supabase behind RLS (migrations 108 + 120).
 
-   v3 funnel: Review (collective 1–5 votes, veto rejects) → Candidates →
+   v3 funnel: Inbox (collective 1–5 votes, veto rejects) → Candidates →
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
-   manual moves go through the recruit_set_stage RPC. */
-const VERSION = '3.1.0';
+   manual moves go through the recruit_set_stage RPC. Candidates are
+   auto-placed into every open listing they qualify for
+   (recruit_listing_candidates, migration 123). */
+const VERSION = '3.2.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -48,7 +50,7 @@ const HOLD_REASONS = DECISION_REASONS.hold; // legacy references
 const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Archive' };
 
 const VIEWS = {
-  review: { title: 'Review', kind: 'applicants' },
+  inbox: { title: 'Inbox', kind: 'applicants' },
   candidates: { title: 'Candidates', kind: 'applicants' },
   openings: { title: 'Openings', kind: 'applicants' },
   screening: { title: 'Screening', kind: 'applicants' },
@@ -56,24 +58,24 @@ const VIEWS = {
   occupancy: { title: 'Occupancy', kind: 'house' },
 };
 // Old bookmarks and deep links keep working.
-const LEGACY_VIEWS = { inbox: 'review', outreach: 'openings', hold: 'candidates', listings: 'openings' };
+const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings' };
 
 let sb = null;                // supabase client (from CtrlAuth)
 let me = null;                // { id, name }
 let applicants = [];          // newest first; each carries .stage
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let votes = {};               // applicant_id -> recruit_votes rows
+let placements = [];          // recruit_listing_candidates rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let pendingVote = null;       // { score, veto } while the vote bar is open
 let commentCounts = {};       // applicant_id -> n
 let comments = [];            // comments for the applicant open in review
-let view = 'review';          // current rail view
+let view = 'inbox';           // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
 let rooms = [];               // recruit_rooms
 let stays = [];               // recruit_stays rows (date-based tenures)
 let listings = [];            // recruit_listings rows
 let houseLoaded = false;
-let suggestions = {};         // applicant_id -> recruit_match_suggestions row
 let settings = { open_to_couples: true };
 let gmailStatus = { connected: false };
 let reviewTab = 'profile';   // 'profile' | 'emails'
@@ -359,16 +361,17 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, sRes, eRes, vRes, scRes, avRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id'),
-    sb.from('recruit_match_suggestions').select('*'),
     sb.from('recruit_emails').select('applicant_id, direction, sent_at').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
     sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, updated_at'),
+    sb.from('recruit_listing_candidates').select('*'),
   ]);
+  placements = pRes.data || [];
   votes = {};
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
@@ -382,7 +385,6 @@ async function loadAll() {
     st.lastDir = e.direction; st.lastAt = e.sent_at;
     if (e.direction === 'in') st.replies++;
   }
-  suggestions = Object.fromEntries((sRes.data || []).map(r => [r.applicant_id, r]));
   sb.from('recruit_settings').select('*').then(({ data }) => {
     for (const row of (data || [])) settings[row.key] = row.value;
     const box = document.getElementById('pref-couples');
@@ -424,52 +426,84 @@ async function saveDecision(id, d, reason, byName, note, listingId) {
   if (error) toast(`Save failed: ${error.message}`);
 }
 
-const matchInFlight = new Set();
+/* ---------- deterministic listing placement ----------
+   AI suggestions are gone: a candidate is auto-placed into EVERY open
+   listing they qualify for. Qualification = track match (sublet applicants
+   → sublet listings, full-time → resident trials), budget covers the rent
+   when both are known, and their move-in window brushes the listing's.
+   Unknown/flexible move-in qualifies everywhere on its track. */
 
-/* Fire the matcher as soon as a reviewer lands on an applicant, so the
-   suggestion is on screen before any decision is tapped. */
-function ensureMatch(a) {
-  const sug = suggestions[a.id];
-  const fresh = sug && Date.now() - new Date(sug.created_at || 0).getTime() < 7 * 86400_000;
-  if (fresh || matchInFlight.has(a.id)) return;
-  matchInFlight.add(a.id);
-  computeMatch(a.id).finally(() => {
-    matchInFlight.delete(a.id);
-    // refresh whichever surface is showing this applicant
-    if (queue[qIndex] === a.id) {
-      renderReviewMatch(a);
-      if (pendingDecision === 'outreach') renderMatchHint(a);
+/* Parsed move-in as a {lo, hi} 'YYYY-MM' range, or null when flexible/unknown. */
+function moveInRange(a) {
+  const norm = normalizeMoveIn(a);
+  if (!norm || /^(ASAP|Flexible)/.test(norm)) return null;
+  const yr = norm.match(/(20\d\d)/)?.[1];
+  const ms = [...norm.matchAll(new RegExp(`\\b(${MONTH_ABBR.join('|')})\\b`, 'g'))].map(m => MONTH_ABBR.indexOf(m[1]));
+  if (!yr || !ms.length) return null;
+  const key = m => `${yr}-${String(m + 1).padStart(2, '0')}`;
+  return { lo: key(Math.min(...ms)), hi: key(Math.max(...ms)) };
+}
+
+const monthShift = (ym, n) => {
+  const d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 15);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+function qualifiesFor(a, l) {
+  if (l.status !== 'open') return false;
+  if (isSublet(a) !== (l.kind === 'sublet')) return false;
+  const bm = budgetMax(a.budget);
+  if (bm !== null && l.rent_monthly != null && bm < l.rent_monthly) return false;
+  const range = moveInRange(a);
+  if (!range) return true;
+  const listLo = monthShift(l.starts_on.slice(0, 7), -1); // a month early is fine
+  const listHi = l.ends_on ? l.ends_on.slice(0, 7) : monthShift(l.starts_on.slice(0, 7), 2);
+  return range.hi >= listLo && range.lo <= listHi;
+}
+
+const activePlacements = id => placements.filter(p => p.applicant_id === id && p.status === 'active');
+
+/* Insert missing placements for every candidate; never resurrects rows a
+   recruiter removed (tombstones stay). Returns how many were added. */
+async function syncAutoPlacements() {
+  if (!houseLoaded) return 0;
+  const have = new Set(placements.map(p => `${p.applicant_id}:${p.listing_id}`));
+  const fresh = [];
+  for (const a of applicants.filter(x => x.stage === 'candidate')) {
+    for (const l of listings.filter(l => l.status === 'open')) {
+      if (!have.has(`${a.id}:${l.id}`) && qualifiesFor(a, l)) {
+        fresh.push({ applicant_id: a.id, listing_id: l.id, source: 'auto' });
+      }
     }
-  });
-}
-
-/* One shared block: suggestion + soft flags. */
-function matchBlockHtml(a) {
-  const sug = suggestions[a.id];
-  if (!sug) {
-    return matchInFlight.has(a.id)
-      ? `<p class="match-hint match-hint--empty">Sizing up the open listings…</p>`
-      : '';
   }
-  const flags = Array.isArray(sug.flags) ? sug.flags : [];
-  return `
-    <div class="match-hint">
-      <span class="match-hint__text"><strong>AI suggests:</strong> ${esc(matchListingLabel(sug))}
-        ${sug.confidence ? `<span class="match-hint__conf">${Math.round(sug.confidence * 100)}%</span>` : ''}
-        <span class="match-hint__why">${esc(sug.rationale || '')}</span>
-      </span>
-      <button type="button" class="btn btn--sm" data-use-suggestion="${esc(sug.listing_id || '')}" data-open-outreach>Use</button>
-    </div>
-    ${flags.map(f => {
-      const pref = f.type === 'couple' && settings.open_to_couples === false
-        ? ' House preference: not open to couples right now.' : '';
-      return `<div class="match-flag ${pref ? 'match-flag--strong' : ''}"><strong>${esc((f.type || 'heads-up'))}:</strong> ${esc((f.message || '') + pref)}</div>`;
-    }).join('')}`;
+  if (!fresh.length) return 0;
+  const { data, error } = await sb.from('recruit_listing_candidates')
+    .upsert(fresh, { onConflict: 'applicant_id,listing_id', ignoreDuplicates: true }).select();
+  if (error) { console.warn('placement sync failed', error.message); return 0; }
+  placements.push(...(data || []));
+  return (data || []).length;
 }
 
-function renderReviewMatch(a) {
-  const host = document.getElementById('review-ai');
-  if (host && queue[qIndex] === a.id) host.innerHTML = matchBlockHtml(a);
+async function addPlacement(applicantId, listingId, source = 'manual') {
+  const { data, error } = await sb.from('recruit_listing_candidates').upsert({
+    applicant_id: applicantId, listing_id: listingId, source,
+    status: 'active', added_by_name: me?.name || null, updated_at: new Date().toISOString(),
+  }, { onConflict: 'applicant_id,listing_id' }).select().single();
+  if (error) { toast(`Couldn't add to listing: ${error.message}`); return null; }
+  placements = [...placements.filter(p => !(p.applicant_id === applicantId && p.listing_id === listingId)), data];
+  return data;
+}
+
+async function removePlacement(applicantId, listingId) {
+  const { error } = await sb.from('recruit_listing_candidates')
+    .update({ status: 'removed', updated_at: new Date().toISOString() })
+    .eq('applicant_id', applicantId).eq('listing_id', listingId);
+  if (error) { toast(`Remove failed: ${error.message}`); return; }
+  const row = placements.find(p => p.applicant_id === applicantId && p.listing_id === listingId);
+  if (row) row.status = 'removed';
+  toast('Removed from the listing — the auto-sweep won\'t re-add them');
+  renderRailCounts();
+  renderApplicants();
 }
 
 /* ---------- outreach email drafts ---------- */
@@ -537,26 +571,6 @@ async function requestSecondOpinion(applicantId, btn) {
   }
 }
 
-/* Ask the recruit-match fn to (re)compute one applicant's suggestion. */
-async function computeMatch(applicantId) {
-  try {
-    const { data } = await sb.auth.getSession();
-    const token = data?.session?.access_token;
-    if (!token) return;
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ applicantId }),
-    });
-    const out = await resp.json();
-    const s = out.suggestions?.[0];
-    if (s) suggestions[applicantId] = {
-      applicant_id: applicantId, listing_id: s.listingId, confidence: s.confidence,
-      rationale: s.rationale, flags: s.flags, created_at: new Date().toISOString(),
-    };
-  } catch (e) { console.warn('recruit-match failed', e); }
-}
-
 /* Short label for what an outreach decision is attached to. */
 function attachmentLabel(rec) {
   if (!rec || rec.d !== 'outreach') return '';
@@ -617,8 +631,11 @@ async function castVote(applicantId) {
   pendingVote = null;
   const st = voteStats(applicantId);
   if (a.stage === 'rejected') toast(`${fullName(a)} vetoed — auto-archived, update email queued`);
-  else if (a.stage === 'candidate' && before !== 'candidate') toast(`${fullName(a)} passed review → Candidates`);
-  else toast(`Vote saved — ${st.scored}/${voteMin()} votes${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}`);
+  else if (a.stage === 'candidate' && before !== 'candidate') {
+    if (!houseLoaded) await loadHouse();
+    const added = await syncAutoPlacements();
+    toast(`${fullName(a)} passed review → Candidates${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
+  } else toast(`Vote saved — ${st.scored}/${voteMin()} votes${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}`);
   renderRailCounts();
   renderReview();
 }
@@ -658,7 +675,7 @@ async function loadHouse() {
 /* ---------- router ---------- */
 function setView(next, push = true) {
   next = LEGACY_VIEWS[next] || next;
-  if (!VIEWS[next]) next = 'review';
+  if (!VIEWS[next]) next = 'inbox';
   view = next;
   if (push) {
     const url = new URL(location);
@@ -691,11 +708,10 @@ async function render() {
 
 /* ---------- applicants render ---------- */
 function matchesView(a) {
-  const rec = decisions[a.id];
   const out = a.stage !== 'rejected' && a.stage !== 'archived';
-  if (view === 'review') return a.stage === 'review';
-  if (view === 'candidates') return a.stage === 'candidate' && rec?.d !== 'outreach';
-  if (view === 'openings') return rec?.d === 'outreach' && out;
+  if (view === 'inbox') return a.stage === 'review';
+  if (view === 'candidates') return a.stage === 'candidate';
+  if (view === 'openings') return activePlacements(a.id).length > 0 && out;
   if (view === 'screening') return !!screeningState[a.id] && out;
   if (view === 'archive') return !out;
   return false;
@@ -747,13 +763,12 @@ function renderFilterBar(viewList) {
 }
 
 function counts() {
-  const c = { review: 0, candidates: 0, openings: 0, screening: 0, archive: 0 };
+  const c = { inbox: 0, candidates: 0, openings: 0, screening: 0, archive: 0 };
   for (const a of applicants) {
-    const rec = decisions[a.id];
     if (a.stage === 'rejected' || a.stage === 'archived') { c.archive++; continue; }
-    if (a.stage === 'review') c.review++;
-    else if (rec?.d === 'outreach') c.openings++;
-    else c.candidates++;
+    if (a.stage === 'review') c.inbox++;
+    else if (a.stage === 'candidate') c.candidates++;
+    if (activePlacements(a.id).length) c.openings++;
     if (screeningState[a.id]) c.screening++;
   }
   return c;
@@ -761,7 +776,7 @@ function counts() {
 
 function renderRailCounts() {
   const c = counts();
-  for (const key of ['review', 'candidates', 'openings', 'screening', 'archive']) {
+  for (const key of ['inbox', 'candidates', 'openings', 'screening', 'archive']) {
     const el = document.getElementById(`count-${key}`);
     if (el) el.textContent = c[key] || '';
   }
@@ -803,10 +818,17 @@ function screeningChip(a) {
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
 }
 
+function placementChip(a) {
+  const n = activePlacements(a.id).length;
+  if (!n) return '';
+  return `<span class="decision-chip decision-chip--outreach" title="Placed in ${n} open listing${n === 1 ? '' : 's'} — see Openings">In ${n} listing${n === 1 ? '' : 's'}</span>`;
+}
+
 function rowBadge(a) {
-  if (view === 'review') return voteChip(a);
+  if (view === 'inbox') return voteChip(a);
   if (view === 'archive') return stageChip(a);
   if (view === 'screening') return screeningChip(a);
+  if (view === 'candidates') return placementChip(a);
   return decisionChip(a.id);
 }
 
@@ -817,25 +839,26 @@ function renderApplicants() {
   document.getElementById('page-sub').textContent =
     (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
     ` applicant${(filtered ? viewList.length : list.length) === 1 ? '' : 's'}` +
-    (view === 'review' ? ` gathering votes · ${voteMin()} needed, one veto rejects` :
+    (view === 'inbox' ? ` gathering votes · ${voteMin()} needed, one veto rejects` :
      view === 'candidates' ? ' passed review — waiting for a room' : '');
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
-  const bar = view === 'review' ? '' : renderFilterBar(viewList); // review stays clean
+  const bar = view === 'inbox' ? '' : renderFilterBar(viewList); // the inbox stays clean
   if (!list.length) {
-    host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'review' ? 'All caught up — every application has its votes.' : 'Nothing here yet.')}</p>`;
+    host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'All caught up — every application has its votes.' : 'Nothing here yet.')}</p>`;
     return;
   }
   // Openings groups by listing (custom-orderable); other views group by month.
   const groups = [];
   if (view === 'openings') {
+    // A candidate appears under EVERY open listing they're placed in.
     const byKey = new Map();
     for (const l of listings.filter(x => x.status === 'open')) byKey.set(l.id, []);
     for (const a of list) {
-      const key = decisions[a.id]?.listingId || 'general';
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key).push(a);
+      for (const p of activePlacements(a.id)) {
+        if (byKey.has(p.listing_id)) byKey.get(p.listing_id).push(a);
+      }
     }
     const order = Array.isArray(settings.outreach_group_order) ? settings.outreach_group_order : [];
     const keys = [...byKey.keys()].sort((x, y) => {
@@ -861,8 +884,6 @@ function renderApplicants() {
 
   const groupHead = g => {
     if (view !== 'openings') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
-    if (g.key === 'general') return `<div class="listing-head__text"><h2 class="inbox-group__label">General interest</h2>
-      <span class="inbox-group__count">no room yet — kept warm for future availability</span></div>`;
     const l = listings.find(x => x.id === g.key);
     if (!l) return `<h2 class="inbox-group__label">Listing removed</h2>`;
     const room = rooms.find(r => r.id === l.room_id);
@@ -919,7 +940,7 @@ function renderApplicants() {
         ${groupHead(g)}
         <span class="inbox-group__count listing-head__n">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
       </div>
-      ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No one attached yet — add candidates via their review page → Add to listing.</p>` : `<ul class="inbox-card">
+      ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No qualifying candidates yet — they land here automatically when they pass review.</p>` : `<ul class="inbox-card">
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
@@ -928,13 +949,12 @@ function renderApplicants() {
               <span class="inbox-row__text">
                 <span class="inbox-row__title">${esc(fullName(a))}</span>
                 <span class="inbox-row__sub">${esc(subLine(a))} · applied ${fmtDate(a.ts_iso)}</span>
-                ${view === 'openings' && decisions[a.id] && !decisions[a.id].listingId && suggestions[a.id]?.listing_id ? `<span class="inbox-row__sub inbox-row__ai">AI suggests ${esc(matchListingLabel(suggestions[a.id]))} — open to apply</span>` : ''}
               </span>
             </button>
             <span class="inbox-row__actions">
               ${emailState[a.id]?.lastDir === 'in' ? `<span class="decision-chip decision-chip--replied" title="They replied — last message ${relTime(emailState[a.id].lastAt)}">↙ Replied</span>` : (view === 'openings' && emailState[a.id]?.lastDir === 'out' ? `<span class="note-count" title="Waiting on their reply">sent ${relTime(emailState[a.id].lastAt)}</span>` : '')}
               ${commentCounts[a.id] ? `<span class="note-count" title="${commentCounts[a.id]} house note${commentCounts[a.id] === 1 ? '' : 's'}">✎ ${commentCounts[a.id]}</span>` : ''}
-              ${view === 'openings' ? `<button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${rowBadge(a)}<button class="btn inbox-row__review" data-review="${a.id}">${view === 'review' && !myVote(a.id) ? 'Vote' : 'Open'}</button>`}
+              ${view === 'openings' ? `<button class="btn btn--sm inbox-row__review" data-remove-placement="${a.id}|${esc(g.key)}" title="Pull them out of this listing (the auto-sweep won't re-add)">Remove</button><button class="btn inbox-row__review" data-email="${a.id}">Send email</button>` : `${rowBadge(a)}<button class="btn inbox-row__review" data-review="${a.id}">${view === 'inbox' && !myVote(a.id) ? 'Vote' : 'Open'}</button>`}
             </span>
           </li>`).join('')}
       </ul>`}
@@ -1477,9 +1497,13 @@ function closeListingModal() {
 
 function rerenderAfterListingChange() {
   closeListingModal();
-  renderRailCounts();
-  if (view === 'openings') renderApplicants();
-  else if (view === 'occupancy') renderOccupancy();
+  // a new or reopened listing may pick up qualifying candidates
+  syncAutoPlacements().then(added => {
+    renderRailCounts();
+    if (view === 'openings') renderApplicants();
+    else if (view === 'occupancy') renderOccupancy();
+    if (added) toast(`${added} candidate${added === 1 ? '' : 's'} auto-placed`);
+  });
 }
 
 async function onListingSubmit(e) {
@@ -1665,7 +1689,6 @@ function renderReview() {
       <button class="review-tabs__tab ${reviewTab === 'emails' ? 'is-on' : ''}" data-review-tab="emails">Emails${(emailsCache[a.id] || []).length ? ` (${emailsCache[a.id].length})` : ''}</button>
     </div>
     ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : `
-    <div id="review-ai">${matchBlockHtml(a)}</div>
     ${voteSectionHtml(a)}
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
@@ -1686,8 +1709,7 @@ function renderReview() {
   renderReviewFoot(a);
 
   if (reviewTab === 'emails') loadEmailsPanel(a);
-  if (houseLoaded) ensureMatch(a);
-  else loadHouse().then(() => { houseLoaded = true; ensureMatch(a); renderReviewMatch(a); });
+  if (!houseLoaded) loadHouse().then(() => { renderRailCounts(); });
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
     if (queue[qIndex] === a.id) renderNotes(a.id);
@@ -1759,7 +1781,7 @@ function renderReviewFoot(a) {
   } else if (a.stage === 'candidate') {
     foot.innerHTML = `
       <button class="btn review__btn review__btn--notfit" data-open-decision="pass">Not a fit</button>
-      <button class="btn review__btn review__btn--place" data-open-decision="outreach">${decisions[a.id]?.d === 'outreach' ? 'Move listing' : 'Add to listing'}</button>`;
+      <button class="btn review__btn review__btn--place" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to listing'}</button>`;
   } else {
     foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Review</button>`;
   }
@@ -1969,9 +1991,6 @@ async function _openDecisionSheet(d) {
       `<option value="">General interest — future availability</option>` +
       open.map(l => `<option value="${l.id}" ${rec?.listingId === l.id ? 'selected' : ''}>` +
         `${esc(roomById[l.room_id]?.name || 'Room')} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}</option>`).join('');
-    renderMatchHint(a);
-  } else {
-    document.getElementById('decision-ai').innerHTML = '';
   }
   const noteEl = document.getElementById('decision-note');
   noteEl.value = (rec?.d === d ? rec.note : '') || '';
@@ -1980,18 +1999,6 @@ async function _openDecisionSheet(d) {
     !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
   document.getElementById('decision-sheet').hidden = false;
   document.getElementById('review-foot').hidden = true;
-}
-
-function matchListingLabel(sug) {
-  if (!sug?.listing_id) return 'General interest — future availability';
-  const l = listings.find(x => x.id === sug.listing_id);
-  const room = rooms.find(r => r.id === l?.room_id);
-  return l ? `${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}` : 'General interest — future availability';
-}
-
-function renderMatchHint(a) {
-  document.getElementById('decision-ai').innerHTML =
-    matchBlockHtml(a) || `<p class="match-hint match-hint--empty">Sizing up the open listings…</p>`;
 }
 
 function renderDecisionOptions() {
@@ -2024,8 +2031,8 @@ async function submitDecision() {
   // Recruiter "not a fit" on a candidate auto-archives — the update email is
   // owed, same as a veto; outreach keeps them a candidate.
   if (d === 'pass' && a.stage !== 'archived') await setStage(a.id, 'rejected');
+  if (d === 'outreach' && listingId) await addPlacement(a.id, listingId, 'manual');
   toast(`${fullName(a)} → ${d === 'pass' ? 'Archived — update email queued' : DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
-  if (d === 'outreach') computeMatch(a.id); // refresh the AI suggestion in the background
   renderRailCounts();
   if (editing) { renderReview(); return; }
   if (qIndex === queue.length - 1) closeReview(); else step(1);
@@ -2287,7 +2294,9 @@ async function _checkMembershipAndEnter() {
     await loadAll();
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
-    loadHouse().then(() => {
+    loadHouse().then(async () => {
+      const added = await syncAutoPlacements();
+      if (added) toast(`${added} auto-placement${added === 1 ? '' : 's'} added across open listings`);
       renderRailCounts();
       if (VIEWS[view]?.kind === 'applicants') renderApplicants();
     });
@@ -2298,9 +2307,9 @@ async function _checkMembershipAndEnter() {
     document.getElementById('app').hidden = false;
     renderRailUser();
     handleGmailCallback();
-    view = new URLSearchParams(location.search).get('view') || 'review';
+    view = new URLSearchParams(location.search).get('view') || 'inbox';
     view = LEGACY_VIEWS[view] || view;
-    if (!VIEWS[view]) view = 'review';
+    if (!VIEWS[view]) view = 'inbox';
     render();
     if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived (budget under $1,500) — update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
@@ -2409,14 +2418,10 @@ function init() {
     if (em) { openEmailModal(em.dataset.email); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
-    const useSug = e.target.closest('[data-use-suggestion]');
-    if (useSug) {
-      const val = useSug.dataset.useSuggestion || '';
-      if (useSug.hasAttribute('data-open-outreach') && document.getElementById('decision-sheet').hidden) {
-        openDecisionSheet('outreach').then(() => { document.getElementById('decision-listing').value = val; });
-      } else {
-        document.getElementById('decision-listing').value = val;
-      }
+    const rmPl = e.target.closest('[data-remove-placement]');
+    if (rmPl) {
+      const [aid, lid] = rmPl.dataset.removePlacement.split('|');
+      removePlacement(aid, lid);
       return;
     }
     const editDec = e.target.closest('[data-edit-decision]');
@@ -2502,7 +2507,7 @@ function init() {
 
 
   window.addEventListener('popstate', () => {
-    const v = new URLSearchParams(location.search).get('view') || 'review';
+    const v = new URLSearchParams(location.search).get('view') || 'inbox';
     setView(v, false);
   });
 
