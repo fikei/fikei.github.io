@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.10.1'
+const VERSION = '1.11.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -400,6 +400,17 @@ serve(async (req) => {
       }
       const row = await upsertClaimMessage(client, input)
       return json({ posted: !!row, alreadyClaimed: !row })
+    }
+
+    if (action === 'recording-link') {
+      // Fresh Recall download URL for a finished recording (links expire).
+      const { data: s } = await client.from('recruit_screenings')
+        .select('id, recall_bot_id').eq('id', String(body.screeningId || '')).maybeSingle()
+      if (!s?.recall_bot_id) return json({ error: 'No recording for this call' }, 404)
+      const { getBotResult } = await import('../_shared/recall.ts')
+      const bot = await getBotResult(s.recall_bot_id)
+      if (!bot.videoUrl) return json({ error: 'Recording not ready (or has been purged)' }, 404)
+      return json({ url: bot.videoUrl })
     }
 
     if (action === 'scan') {
