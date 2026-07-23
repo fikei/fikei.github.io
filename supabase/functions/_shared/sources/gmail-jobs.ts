@@ -437,7 +437,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
         mode:        'live',
       });
       if (appScan.classified || appScan.inserted) {
-        console.log(`[gmail-jobs] application-scan: ${appScan.inserted}/${appScan.classified} events, ${appScan.autoAdvanced} auto-advanced, ${appScan.needsReview} needs-review`);
+        console.log(`[gmail-jobs] application-scan: ${appScan.inserted}/${appScan.classified} events, ${appScan.autoAdvanced} auto-advanced, ${appScan.needsReview} needs-review, ${appScan.rolesCreated} roles-created`);
       }
     } catch (e) {
       console.warn(`[gmail-jobs] application-scan failed: ${(e as Error).message}`);

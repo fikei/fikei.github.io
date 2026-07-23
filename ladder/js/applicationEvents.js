@@ -194,6 +194,9 @@ export const UPDATE_KIND_META = {
   // no application_events row behind it.
   easy_apply:          { tint: 'green', icon: ICONS.bolt,     chip: 'Easy apply',      actionLabel: 'Show them' },
   role_closed:         { tint: 'gray',  icon: ICONS.archive,  chip: 'Closed',          actionLabel: 'Open role' },
+  // Scan auto-created the role from an application-receipt email that
+  // matched nothing in the pipeline (applied outside Ladder).
+  role_created:        { tint: 'blue',  icon: ICONS.stairs,   chip: 'New application', actionLabel: 'Open role' },
 };
 
 export function updateKindMeta(kind) {

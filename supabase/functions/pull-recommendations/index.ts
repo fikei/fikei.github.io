@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.28.1';
-console.log(`[pull-recommendations] v${VERSION} - dedup: query-keyed digest links (kimblegroup.com/job?payload=…) no longer collapse to one URL key`);
+const VERSION = '0.29.0';
+console.log(`[pull-recommendations] v${VERSION} - app-scan auto-creates pipeline roles from unmatched application receipts`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
