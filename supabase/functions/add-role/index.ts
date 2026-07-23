@@ -12,11 +12,11 @@ import { computeFit } from '../jobs-pipe/fit.ts';
 import { scoreOne } from '../_shared/job-fit-haiku.ts';
 import { compClears } from '../_shared/comp.ts';
 
-const VERSION = '0.6.0';
+const VERSION = '0.7.0';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
-console.log(`[add-role] v${VERSION} - comp_acceptable computed deterministically from the salary range (compClears)`);
+console.log(`[add-role] v${VERSION} - Outdoor sector recognition (inferSector + canonical tags)`);
 
 const URL_RE = /^https?:\/\//i;
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -218,6 +218,7 @@ function inferSector(text: string, company: string): string {
     [/\b(fintech|banking|consumer\s+lending|payments?\s+platform|insurtech)\b/, 'Fintech'],
     [/saas/, 'SaaS'],
     [/marketplace/, 'Marketplace'],
+    [/\b(outdoor|outdoors|camping|hiking|climbing|backpacks?|ski|snowboard|surf|cycling|apparel|sporting goods|gear for)\b/, 'Outdoor'],
     [/consumer|retail|e-?commerce/, 'Consumer'],
     [/hardware|robotics/, 'Hardware'],
     [/productivity|workflow|automation/, 'Productivity'],

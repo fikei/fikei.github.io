@@ -28,6 +28,10 @@ const CANONICAL: Record<string, string> = {
   'SaaS - Productivity': 'Productivity',
   'AI / Consumer Hardware': 'Consumer',
   'Consumer Hardware': 'Consumer',
+  'Outdoor Recreation': 'Outdoor',
+  'Outdoor Industry': 'Outdoor',
+  'Outdoor Gear': 'Outdoor',
+  'Sporting Goods': 'Outdoor',
 };
 
 function splitToken(token: string): string[] {
