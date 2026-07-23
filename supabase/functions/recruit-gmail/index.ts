@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -85,7 +85,7 @@ Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "ne
       messages: [{ role: 'user', content: prompt }],
     }),
   })
-  if (!resp.ok) return NO_EXTRACTION
+  if (!resp.ok) { console.warn(`extractAvailability: anthropic ${resp.status} ${(await resp.text()).slice(0, 300)}`); return NO_EXTRACTION }
   const data = await resp.json()
   const out = (data.content || []).filter((b: Record<string, unknown>) => b.type === 'text').map((b: Record<string, unknown>) => b.text).join('')
   try {
