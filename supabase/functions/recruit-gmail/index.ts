@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.9.0'
+const VERSION = '1.9.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -111,10 +111,10 @@ async function postClaim(client: ReturnType<typeof db>, applicantId: string, ext
   if (!extraction.windows.length && !extraction.needs_human) return
   try {
     const { data: applicant } = await client.from('recruit_applicants')
-      .select('first_name, why_agape').eq('id', applicantId).maybeSingle()
+      .select('first_name, why_agape, pronouns').eq('id', applicantId).maybeSingle()
     if (!applicant) return
     await upsertClaimMessage(client, {
-      applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape,
+      applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape, pronouns: applicant.pronouns,
       windows: extraction.windows, platform: extraction.platform,
       timezoneNote: extraction.timezone_note, needsHuman: extraction.needs_human,
     })
@@ -375,7 +375,7 @@ serve(async (req) => {
       // runs once. Future cutover: re-enable the auto postClaim calls.
       const applicantId = String(body.applicantId || '')
       const { data: applicant } = await client.from('recruit_applicants')
-        .select('id, first_name, why_agape').eq('id', applicantId).maybeSingle()
+        .select('id, first_name, why_agape, pronouns').eq('id', applicantId).maybeSingle()
       if (!applicant) return json({ error: 'unknown applicant' }, 404)
       let extraction: Extraction = body.extraction && Array.isArray(body.extraction.windows)
         ? body.extraction as Extraction
@@ -389,7 +389,7 @@ serve(async (req) => {
         if (!extraction.windows.length && !extraction.needs_human) extraction = { ...extraction, needs_human: true }
       }
       const input = {
-        applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape,
+        applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape, pronouns: applicant.pronouns,
         windows: extraction.windows, platform: extraction.platform,
         timezoneNote: extraction.timezone_note, needsHuman: extraction.needs_human,
       }

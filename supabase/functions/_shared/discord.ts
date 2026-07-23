@@ -99,6 +99,7 @@ export interface ClaimPostInput {
   applicantId: string
   firstName: string
   whyLine: string | null
+  pronouns?: string | null
   windows: Array<{ date: string; start: string; end: string }>
   platform: { kind: string; handle?: string } | null
   timezoneNote: string | null
@@ -109,26 +110,45 @@ function appLink(applicantId: string): string {
   return `https://ctrl.rodeo/applications/?id=${encodeURIComponent(applicantId)}`
 }
 
+// "her/his/their application" from the applicant's own pronouns field;
+// neutral "their" whenever unstated or ambiguous.
+function possessive(pronouns: string | null | undefined): string {
+  const p = (pronouns || '').toLowerCase()
+  if (/she/.test(p) && !/he\/|\bhe\b/.test(p.replace(/she/g, ''))) return 'her'
+  if (/\bhe\b|he\/him/.test(p) && !/she/.test(p)) return 'his'
+  return 'their'
+}
+
 // Exported so the app can render a faithful preview before a human
 // triggers the post (auto-posting is off for now — manual first).
 export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<string, unknown> {
-  const why = (input.whyLine || '').trim().replace(/\s+/g, ' ').slice(0, 140)
   const manual = input.needsHuman || !slots.length
+  const poss = possessive(input.pronouns)
 
-  let description = why ? `_${why}_\n\n` : ''
-  if (manual) {
-    description += `Couldn't extract concrete times from their reply — read their thread and coordinate by email.\n\n[Open in the app](${appLink(input.applicantId)})`
-  } else {
-    description += `Offered times for an Agape Intro Call — tap one to claim it.`
-  }
-  const warnings: string[] = []
-  if (input.timezoneNote) warnings.push(`⚠️ ${input.timezoneNote}`)
+  const considerations: string[] = []
+  if (input.timezoneNote) considerations.push(`⚠️ ${input.timezoneNote}`)
   if (input.platform?.kind) {
     const handle = input.platform.handle ? ` (@${input.platform.handle})` : ''
-    warnings.push(`⚠️ Asked for ${input.platform.kind}${handle} — default is Meet; claimer can DM them about it.`)
+    considerations.push(`⚠️ Asked for ${input.platform.kind}${handle} — default is Meet; the resident can DM them about it.`)
   }
-  if (warnings.length) description += `\n\n${warnings.join('\n')}`
-  if (!manual) description += `\n\n_Tap a time to claim the call — you'll both get a calendar invite._`
+  // Considerations section only exists when there is something to flag.
+  const considerationsBlock = considerations.length
+    ? `**Considerations:**\n${considerations.join('\n')}\n\n`
+    : ''
+
+  let description: string
+  if (manual) {
+    description =
+      `**${input.firstName}** replied about scheduling, but no concrete times could be read.\n\n` +
+      considerationsBlock +
+      `See ${poss} [application](${appLink(input.applicantId)}) — read the thread and coordinate by email.`
+  } else {
+    description =
+      `Can someone take this Intro Call with **${input.firstName}**?\n\n` +
+      considerationsBlock +
+      `See ${poss} [application](${appLink(input.applicantId)}).\n\n` +
+      `_Tap a time below to claim the call — you'll both receive an invite._`
+  }
 
   const components: Array<Record<string, unknown>> = []
   if (!manual) {
@@ -143,7 +163,6 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
 
   return {
     embeds: [{
-      title: `${input.firstName} — Agape Intro Call`,
       description,
       color: manual ? 0xe67e22 : 0x3498db,
     }],

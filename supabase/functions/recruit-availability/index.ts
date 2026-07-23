@@ -7,7 +7,7 @@
 // POST { token }                      → { firstName, windows }
 // POST { token, windows: [...] }      → save; { saved: true, windows }
 
-const VERSION = '1.2.0'
+const VERSION = '1.2.1'
 console.log(`[recruit-availability] v${VERSION} — public applicant availability endpoint + Discord claim post`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -61,10 +61,10 @@ serve(async (req) => {
       // Warn-only: Discord being down never blocks the applicant's save.
       try {
         const { data: full } = await client.from('recruit_applicants')
-          .select('why_agape').eq('id', applicant.id).maybeSingle()
+          .select('why_agape, pronouns').eq('id', applicant.id).maybeSingle()
         await upsertClaimMessage(client, {
           applicantId: applicant.id, firstName: applicant.first_name,
-          whyLine: full?.why_agape || null,
+          whyLine: full?.why_agape || null, pronouns: full?.pronouns || null,
           windows, platform: null, timezoneNote: null, needsHuman: false,
         })
       } catch (err) {
