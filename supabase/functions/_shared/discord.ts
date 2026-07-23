@@ -107,7 +107,7 @@ export interface ClaimPostInput {
 }
 
 function appLink(applicantId: string): string {
-  return `https://ctrl.rodeo/applications/?id=${encodeURIComponent(applicantId)}`
+  return `https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`
 }
 
 // "her/his/their application" from the applicant's own pronouns field;

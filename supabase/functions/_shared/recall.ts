@@ -128,9 +128,8 @@ export async function summarizeIntroCall(transcript: string, applicantName: stri
 **Vibe** — one sentence on how the conversation felt.
 **About them** — 3-5 bullets: work, background, why they want co-op living, logistics (move-in, budget) if mentioned.
 **Highlights** — anything that stood out, positive or concerning.
-**Follow-ups** — open questions the house should still ask.
 
-Keep it under 250 words. Transcript:
+Keep it under 200 words. Transcript:
 
 ${transcript.slice(0, 24000)}`,
       }],
