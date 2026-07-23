@@ -1150,3 +1150,6 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   height: 16px; padding: 0 6px; margin: 0 6px 0 0;
   font-size: 10px; vertical-align: text-bottom;
 }
+
+/* --- v3.6.1: neutral Full-time badge — blends with the row background --- */
+.listing-kind--fulltime { background: var(--resident-tint); color: var(--fg-muted); }
