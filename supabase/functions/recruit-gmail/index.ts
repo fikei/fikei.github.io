@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.4.0'
+const VERSION = '1.4.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendApplicantConfirmation, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel } from '../_shared/discord.ts'
+import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -345,7 +345,10 @@ serve(async (req) => {
         if (post) {
           const { data: dm } = await client.from('user_discord_membership')
             .select('discord_user_id').eq('user_id', userData.user.id).maybeSingle()
-          if (dm?.discord_user_id) await editClaimMessageClaimed(post.discord_channel_id, post.discord_message_id, dm.discord_user_id, label)
+          if (dm?.discord_user_id) {
+            const applicantName = `${result.applicant.first_name} ${result.applicant.last_name || ''}`.trim()
+            await editClaimMessageClaimed(post.discord_channel_id, post.discord_message_id, dm.discord_user_id, applicantName, applicantId, slotWhen(startsAt))
+          }
         }
       } catch (err) {
         console.warn(`claim post close failed for ${applicantId}: ${(err as Error).message}`)
