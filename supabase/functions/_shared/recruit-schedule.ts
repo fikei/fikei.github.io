@@ -56,8 +56,8 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
 
   const at = await sharedAccessToken(db)
   const event = {
-    summary: `Agape screening call — ${applicant.first_name} ${applicant.last_name} × ${opts.housemateName}`,
-    description: `Get-to-know-you call with ${applicant.first_name} (Agape application), scheduled from their offered availability.`,
+    summary: `Agape Intro Call — ${applicant.first_name} ${applicant.last_name} × ${opts.housemateName}`,
+    description: `A get-to-know-you Agape Intro Call with ${applicant.first_name}, scheduled from their offered availability.`,
     start: { dateTime: opts.startsAt.toISOString(), timeZone: TZ },
     end: { dateTime: endsAt.toISOString(), timeZone: TZ },
     attendees: [
@@ -86,21 +86,35 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
   return { screening: row, meetLink: meet, applicant }
 }
 
-// Short plain-text confirmation so the booking isn't missed if the bare
-// calendar invite is. Logged to recruit_emails as an automated send.
-export async function sendApplicantConfirmation(
-  db: Db, applicant: any, housemateName: string, startsAt: Date, meetLink: string | null,
+// Introduction email: replies in the applicant's existing thread from the
+// shared inbox, introducing the resident (CC'd on their real email) so the
+// two are directly connected. Falls back to a fresh email when the applicant
+// has no thread yet (picker-only applicants). Logged to recruit_emails.
+export async function sendIntroEmail(
+  db: Db, applicant: any, residentName: string, residentEmail: string, startsAt: Date, meetLink: string | null,
 ): Promise<void> {
   const when = startsAt.toLocaleString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ,
   })
-  const subject = `You're confirmed — Agape call with ${housemateName}`
+  // Latest thread with this applicant, if any — reply there so the intro
+  // lands in the conversation they already have open.
+  const { data: lastMail } = await db.from('recruit_emails')
+    .select('thread_id, subject').eq('applicant_id', applicant.id)
+    .not('thread_id', 'is', null)
+    .order('sent_at', { ascending: false }).limit(1).maybeSingle()
+  const subject = lastMail?.subject
+    ? (/^re:/i.test(lastMail.subject) ? lastMail.subject : `Re: ${lastMail.subject}`)
+    : `You're confirmed — Agape Intro Call with ${residentName}`
+
+  const cc = residentEmail.includes('@') ? residentEmail : null
   const text = [
     `Hi ${applicant.first_name},`,
     '',
-    `You're confirmed for a call with ${housemateName} on ${when} (Pacific time).`,
+    cc
+      ? `Meet ${residentName} (cc'd here) — you two are set for your Agape Intro Call on ${when} (Pacific time).`
+      : `You're set for your Agape Intro Call with ${residentName} on ${when} (Pacific time).`,
     meetLink ? `Google Meet link: ${meetLink}` : `The Google Meet link is in your calendar invite.`,
-    `A calendar invite from ${SHARED_EMAIL} is on its way to this address.`,
+    `A calendar invite from ${SHARED_EMAIL} is on its way too.`,
     '',
     `Looking forward to it!`,
     `— Agape`,
@@ -111,6 +125,7 @@ export async function sendApplicantConfirmation(
   const raw = [
     `From: Agape <${SHARED_EMAIL}>`,
     `To: ${applicant.email}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: ${encSubject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
@@ -120,14 +135,22 @@ export async function sendApplicantConfirmation(
   const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: b64url(raw) }),
+    body: JSON.stringify({ raw: b64url(raw), ...(lastMail?.thread_id ? { threadId: lastMail.thread_id } : {}) }),
   })
   const sent = await resp.json()
-  if (!resp.ok) throw new Error(`Confirmation send failed: ${JSON.stringify(sent).slice(0, 180)}`)
+  if (!resp.ok) throw new Error(`Intro send failed: ${JSON.stringify(sent).slice(0, 180)}`)
   await db.from('recruit_emails').upsert({
     applicant_id: applicant.id, gmail_id: sent.id, thread_id: sent.threadId,
     direction: 'out', subject, snippet: text.slice(0, 180), body_text: text,
     from_email: SHARED_EMAIL, to_email: applicant.email,
     sent_by_name: 'auto', sent_at: new Date().toISOString(),
   }, { onConflict: 'gmail_id' })
+}
+
+// Resolve the email a resident should be CC'd/invited on: the Google Group
+// email from their profile when set, else their ctrl.rodeo login email.
+export async function residentEmailFor(db: Db, userId: string, fallback: string): Promise<string> {
+  const { data: rp } = await db.from('recruit_profiles').select('group_email').eq('user_id', userId).maybeSingle()
+  const email = (rp?.group_email || fallback || '').toLowerCase().trim()
+  return email
 }
