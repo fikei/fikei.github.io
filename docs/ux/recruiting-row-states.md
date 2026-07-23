@@ -1,6 +1,6 @@
 # Recruiting app — row states & subcopy reference
 
-Design documentation for `/applications` list rows (v3.5.0). One row = one applicant; every visual state derives from four inputs: `stage` (server-owned), `placements`, `email state`, and `your vote`. Nothing else may add chrome to a row.
+Design documentation for `/applications` list rows (v3.6.0). One row = one applicant; every visual state derives from four inputs: `stage` (server-owned), `placements`, `email state`, and `your vote`. Nothing else may add chrome to a row.
 
 ## Shared row anatomy
 
@@ -37,11 +37,15 @@ Pills fall back to `In N listings` for the beat before house data loads.
 
 ## Openings (rows = active placements, grouped per open listing)
 
-| State | Visual | Logic |
+Every row carries grip ⠿ + rank, **one contextual CTA**, and **✕** at the far right. The CTA is a state machine — never a generic "Send email":
+
+| Micro-state | CTA | Logic |
 |---|---|---|
-| On the shortlist | grip ⠿ + rank · **Send email** · **✕** at the far right | placement `status='active'`; the same person can appear under several listings |
-| Awaiting their reply | muted `sent 3h ago` before the buttons | last email direction = out |
-| They replied | blue response dot | last email direction = in |
+| Nothing sent yet | **Reach out** (primary) — opens the AI email draft | no email either direction |
+| Waiting on them | muted `sent 3h ago` + **Follow up** | last email direction = out |
+| They replied | blue response dot + **Reply** — opens the Emails tab to read first | last email direction = in, no availability parsed |
+| Availability in hand | **Pick a time** (accent) — opens the Emails tab slot picker | `recruit_availability` has windows, no screening booked |
+| Call booked | slot chip `Fri, Jul 25, 9:00 AM` + **Join call** when a Meet link exists | scheduled row in `recruit_screenings` |
 
 **✕** removes from *this* listing only — tombstones the placement so the auto-sweep never re-adds; tooltip says so.
 
@@ -58,17 +62,17 @@ Because the sweep places every qualifying candidate, this set is provably {still
 
 ## Row subcopy grammar
 
-`[pronouns] · [track] · [move-in] · [stay] · applied [date]` — segments drop out when unknown, never render placeholders.
+`[track badge] [pronouns] · [move-in] · applied [date]` — segments drop out when unknown, never render placeholders.
 
 | Segment | Values |
 |---|---|
+| track badge | The same `listing-kind` pill as listing headers, xs size: `Full-time` (resident tint) \| `Sublet` (sublet tint). Always first; never plain text. |
 | pronouns | lowercase, only when given — `she/her` |
-| track | `Full-time` \| `Sublet` (from the residency answer) |
-| move-in (parsed) | `Sep 2026` · `Sep 5, 2026` · `Aug–Sep 2026` · `ASAP` · `Flexible` · any + `· flexible` · omitted when unparseable |
-| move-in (confirmed) | recruiter-confirmed window **replaces** the parsed value everywhere: `Sep 1, 2026` or `Sep 1 – Oct 15, 2026` (green + ✓ on the profile only; plain in sublines) |
-| stay (sublets) | `6-week stay`; under 21 days `12-day stay` — from the confirmed window when set, else the parsed range |
+| move-in | **One canonical set:** `Sep 5, 2026` (day known) · `Sep 2026` (month) · `Aug–Sep 2026` (month range) · `Jul 28 → Aug 29` (known in→out window — replaces the old "N-week stay") · `ASAP` · `Flexible` · omitted when unparseable. The `· flexible` suffix never renders in sublines (the raw answer lives behind the profile info-dot). A recruiter-confirmed window replaces the parsed value everywhere: `Sep 1, 2026` or `Sep 1 → Oct 15`. |
 | applied | `applied Jul 1` — main rows only; accordion rows omit it |
 | email recency | Openings, awaiting state only: `sent 3h ago` → `2d ago` → date |
+
+There is no stay-length segment — sublet durations read as move-in → move-out dates.
 
 ## Empty states & page subtitles
 
