@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.6.1';
+const VERSION = '3.7.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -367,14 +367,14 @@ function openingsCta(a) {
   const sc = screeningState[a.id];
   if (sc?.at) {
     const chip = `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
-    const join = sc.link ? `<a class="btn btn--sm inbox-row__review" href="${esc(sc.link)}" target="_blank" rel="noopener">Join call</a>` : '';
+    const join = sc.link ? `<a class="btn btn--sm inbox-row__review cta-std" href="${esc(sc.link)}" target="_blank" rel="noopener">Join call</a>` : '';
     return chip + join;
   }
-  if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review" data-pick-time="${a.id}">Pick a time</button>`;
+  if (sc?.availability) return `<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Pick a time</button>`;
   const st = emailState[a.id];
-  if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review" data-pick-time="${a.id}">Reply</button>`;
-  if (st?.lastDir === 'out') return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review" data-email="${a.id}">Follow up</button>`;
-  return `<button class="btn inbox-row__review" data-email="${a.id}">Reach out</button>`;
+  if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Reply</button>`;
+  if (st?.lastDir === 'out') return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
+  return `<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`;
 }
 
 /* Blue response dot in the row's left gutter — sits beside the avatar,
@@ -790,6 +790,8 @@ async function render() {
   const def = VIEWS[view];
   document.getElementById('page-title').textContent = def.title;
   document.getElementById('mobile-title').textContent = def.title;
+  const headAction = document.getElementById('page-head-action');
+  if (headAction) headAction.innerHTML = view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>` : '';
   document.querySelectorAll('[data-view-link]').forEach(el =>
     el.classList.toggle('is-current', el.dataset.viewLink === view && el.classList.contains('rail-nav__row')));
   renderRailCounts();
@@ -951,7 +953,7 @@ function renderApplicants() {
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
-  const bar = view === 'inbox' ? '' : renderFilterBar(viewList); // the inbox stays clean
+  const bar = view === 'inbox' || view === 'openings' ? '' : renderFilterBar(viewList); // inbox + openings stay clean
   if (!list.length) {
     host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'All caught up — every application has its votes.' : 'Nothing here yet.')}</p>`;
     return;
@@ -1003,11 +1005,7 @@ function renderApplicants() {
       <span class="listing-head__actions">${listingMenuHtml(l)}</span>`;
   };
 
-  const outreachChrome = view === 'openings' ? `
-    <div class="listing-toolbar">
-      <span class="notes__empty">Each open listing is a ranked shortlist — drag rows to reorder.</span>
-      <button class="btn btn--sm" data-new-listing>New listing</button>
-    </div>` : '';
+  const outreachChrome = '';
   const doneListings = view === 'openings' ? listings.filter(l => l.status !== 'open') : [];
   const doneDrawer = doneListings.length ? `
     <details class="occupants__past">

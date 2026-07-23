@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.4.1'
+const VERSION = '1.5.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -372,6 +372,13 @@ serve(async (req) => {
       const byEmail = new Map((allApplicants || [])
         .filter((a) => a.email?.includes('@'))
         .map((a) => [a.email.toLowerCase(), a.id]))
+      // Thread fallback: people reply from addresses other than the one on
+      // their application. Any message in a thread we've already matched
+      // belongs to that applicant, regardless of From/To.
+      const { data: knownThreads } = await client.from('recruit_emails').select('thread_id, applicant_id')
+      const byThread = new Map((knownThreads || [])
+        .filter((r) => r.thread_id)
+        .map((r) => [r.thread_id, r.applicant_id]))
       const list = await (await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent('newer_than:14d') + '&maxResults=60', {
         headers: { Authorization: `Bearer ${at}` },
       })).json()
@@ -389,7 +396,9 @@ serve(async (req) => {
         const direction = from.toLowerCase().includes(SHARED_EMAIL) ? 'out' : 'in'
         const counterpart = (direction === 'in' ? from : to).toLowerCase()
         const applicantId = [...byEmail.entries()].find(([em]) => counterpart.includes(em))?.[1]
+          || byThread.get(msg.threadId)
         if (!applicantId) continue
+        if (!byThread.has(msg.threadId)) byThread.set(msg.threadId, applicantId)
         let bodyText = ''
         // deno-lint-ignore no-explicit-any
         const walk = (part: any) => {

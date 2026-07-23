@@ -1111,7 +1111,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 /* --- v3.5.0: row-state polish — response dot, note bubble, ✕, see-more bar --- */
 .inbox-row { position: relative; }
 .replied-dot {
-  position: absolute; left: 5px; top: 50%; transform: translateY(-50%);
+  position: absolute; left: -13px; top: 50%; transform: translateY(-50%);
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent);
 }
@@ -1153,3 +1153,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 
 /* --- v3.6.1: neutral Full-time badge — blends with the row background --- */
 .listing-kind--fulltime { background: var(--resident-tint); color: var(--fg-muted); }
+
+/* --- v3.7.0: openings chrome cleanup + standardized CTA column --- */
+.page__head-action { margin-left: var(--space-3); margin-top: 6px; }
+.cta-std { min-width: 108px; justify-content: center; }
