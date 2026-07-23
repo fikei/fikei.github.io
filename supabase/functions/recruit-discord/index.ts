@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.5.0'
+const VERSION = '1.6.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -276,6 +276,22 @@ async function scheduleMissingBots(client: ReturnType<typeof db>): Promise<numbe
   return created
 }
 
+// Invite the bot's Google account to an existing event (idempotent) so a
+// signed-in bot joins without knocking — covers manually created events.
+// deno-lint-ignore-next-line no-explicit-any
+async function inviteBotToEvent(token: string, ev: any): Promise<void> {
+  const botEmail = (Deno.env.get('RECALL_BOT_EMAIL') || '').toLowerCase()
+  if (!botEmail.includes('@')) return
+  // deno-lint-ignore no-explicit-any
+  const attendees = (ev.attendees || []) as any[]
+  if (attendees.some((a) => (a.email || '').toLowerCase() === botEmail)) return
+  await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(ev.id)}?sendUpdates=none`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attendees: [...attendees, { email: botEmail }] }),
+  })
+}
+
 // Default: record EVERY Meet hosted by the shared account. Sweep the shared
 // calendar for upcoming Meet-bearing events it organizes; applicant calls are
 // covered via recruit_screenings, anything else lands in recruit_recorded_events.
@@ -309,6 +325,11 @@ async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<numb
 
   let created = 0
   for (const ev of candidates) {
+    // Idempotently keep the bot account invited on every upcoming Meet,
+    // including events whose bot already exists.
+    try { await inviteBotToEvent(token, ev) } catch (err) {
+      console.warn(`[recall] bot invite failed for ${ev.id}: ${(err as Error).message}`)
+    }
     if (known.has(ev.id)) continue
     try {
       const meet = meetOf(ev)
@@ -344,6 +365,7 @@ async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<
       if (bot.failed) {
         await client.from('recruit_recorded_events')
           .update({ recall_status: 'failed', recording_posted_at: new Date().toISOString() }).eq('gcal_event_id', m.gcal_event_id)
+        try { await postMeetingNote(m.title || 'Agape call', `⚠️ Recording failed (${bot.statusCode}) — no notes for this one.`, null) } catch { /* best effort */ }
         continue
       }
       let summary: string | null = null
@@ -365,7 +387,7 @@ async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<
 async function processRecordings(client: ReturnType<typeof db>): Promise<number> {
   const { recallEnabled, getBotResult, fetchTranscriptText, summarizeIntroCall } = await import('../_shared/recall.ts')
   if (!recallEnabled()) return 0
-  const { postRecordingNote } = await import('../_shared/discord.ts')
+  const { postRecordingNote, postMeetingNote } = await import('../_shared/discord.ts')
   const { data: rows } = await client.from('recruit_screenings')
     .select('id, applicant_id, housemate_name, recall_bot_id, ends_at')
     .not('recall_bot_id', 'is', null).is('recording_posted_at', null)
@@ -380,6 +402,10 @@ async function processRecordings(client: ReturnType<typeof db>): Promise<number>
         await client.from('recruit_screenings')
           .update({ recall_status: 'failed', recording_posted_at: new Date().toISOString() }).eq('id', s.id)
         console.warn(`[recall] bot ${s.recall_bot_id} failed (${bot.statusCode}) for screening ${s.id}`)
+        try {
+          const { data: a } = await client.from('recruit_applicants').select('first_name').eq('id', s.applicant_id).maybeSingle()
+          await postMeetingNote(`${a?.first_name || 'Applicant'}'s Intro Call`, `⚠️ Recording failed (${bot.statusCode}) — the claimer's own notes are all we have.`, null)
+        } catch { /* best effort */ }
         continue
       }
       const { data: applicant } = await client.from('recruit_applicants')
