@@ -1043,3 +1043,18 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .vote-summary { margin: 0 0 var(--space-3); font-size: var(--font-size-small); font-weight: var(--fw-semibold); color: var(--fg-muted); }
 .vote-score { font-weight: var(--fw-semibold); color: var(--fg); }
 .vote-score--veto { color: var(--error); }
+
+/* --- v3.1: room costs in the drawer --- */
+.occ-drawer__section {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-caption); font-weight: var(--fw-semibold);
+  color: var(--fg-subtle); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.occ-drawer__fact--sub dt { font-size: var(--font-size-caption); color: var(--fg-subtle); }
+.occ-drawer__fact--total { border-top: 1px solid var(--border); padding-top: var(--space-2); }
+.occ-drawer__fact--total dd { font-weight: var(--fw-semibold); }
+.occ-drawer__global {
+  display: block; font-size: var(--font-size-caption);
+  color: var(--fg-subtle); font-weight: 400;
+}
+.occ-drawer__cost { width: 90px; height: 32px; text-align: right; }
