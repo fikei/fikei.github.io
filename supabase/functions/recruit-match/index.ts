@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.7.1'
+const VERSION = '1.8.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -177,9 +177,28 @@ Let me know if you have any questions!
 
 [sender]`
 
+// What kind of email does this interaction need next? Deterministic read of
+// the thread + call state; the caller can override with body.emailType.
+// deno-lint-ignore no-explicit-any
+function classifyOutreach(emails: any[], screening: any): { type: string; reason: string } {
+  const lastOut = emails.find((e) => e.direction === 'out')
+  const last = emails[0]
+  const days = (t: string) => Math.round((Date.now() - new Date(t).getTime()) / 86400000)
+  if (screening?.status === 'completed' && screening.ends_at && days(screening.ends_at) <= 14
+      && (!lastOut || new Date(lastOut.sent_at) < new Date(screening.ends_at))) {
+    return { type: 'post_call', reason: `their Intro Call with ${screening.housemate_name || 'a housemate'} just happened` }
+  }
+  if (screening?.status === 'cancelled' && (!last || last.direction === 'out')) {
+    return { type: 'reschedule', reason: 'their call was cancelled and nothing is rebooked' }
+  }
+  if (!lastOut) return { type: 'first_response', reason: 'no outreach sent yet' }
+  if (last?.direction === 'in') return { type: 'reply', reason: `they wrote back ${days(last.sent_at)}d ago` }
+  return { type: 'follow_up', reason: `no reply to our email from ${days(lastOut.sent_at)}d ago` }
+}
+
 // Draft a tailored outreach email for an applicant + their listing.
 // deno-lint-ignore no-explicit-any
-async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string): Promise<{ subject: string; body: string }> {
+async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string, ctx?: { type: string; emails: any[]; screening: any }): Promise<{ subject: string; body: string }> {
   const scheduleUrl = applicant.schedule_token ? `https://ctrl.rodeo/applications/schedule/?t=${applicant.schedule_token}` : null
   const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
   const pricing = listing ? [
@@ -191,6 +210,41 @@ async function draftEmail(applicant: any, listing: any, room: any, flags: any[],
     ? `${room?.name || 'A room'} — ${listing.kind === 'resident' ? '3-month resident trial (full residency track, house vote at the end)' : 'short-term sublet'}, available from ${listing.starts_on}${listing.ends_on ? ` through ${listing.ends_on}` : ''}${pricing ? `. Pricing: ${pricing}` : ''}${listing.notes ? `. Notes: ${listing.notes}` : ''}`
     : 'No specific room right now — we want to keep them warm for future availability (general interest).'
   const conflictLines = (flags || []).map((f) => `- ${f.type}: ${f.message}`).join('\n') || '(none)'
+
+  if (ctx && ctx.type !== 'first_response') {
+    const thread = (ctx.emails || []).slice(0, 6).reverse()
+      // deno-lint-ignore no-explicit-any
+      .map((e: any) => `[${e.direction === 'in' ? applicant.first_name : (e.sent_by_name || 'Agape')} — ${String(e.sent_at).slice(0, 10)}]\n${trim(e.body_text, 500)}`)
+      .join('\n---\n') || '(no emails on file)'
+    const cta = scheduleUrl ? `pick a time at ${scheduleUrl} (include the URL on its own line)` : 'reply with 3 days where they have a couple hours free'
+    const briefs: Record<string, string> = {
+      follow_up: `They have not replied to our last email. Write a SHORT warm nudge (under 80 words): reference what we asked last time, make replying effortless, restate the single CTA — ${cta}. No re-pitching the house, no guilt.`,
+      reply: `They wrote back last — respond directly and concretely to what they said (use the listing details below for pricing/dates if asked). If no call is booked yet, close with the call CTA — ${cta}. Under 140 words.`,
+      post_call: `Their Intro Call with ${ctx.screening?.housemate_name || 'a housemate'} just happened. Thank them warmly, one specific human touch, and say the house will be in touch about next steps soon. Do NOT promise an outcome or timeline beyond "soon". Under 80 words.`,
+      reschedule: `Their scheduled call fell through. Own it lightly (no blame either way) and reopen scheduling — ${cta}. Under 90 words.`,
+    }
+    const situationBrief = briefs[ctx.type] || briefs.follow_up
+    const ctxPrompt = `Write the NEXT email in an ongoing thread from ${senderName} at Agape (13-bedroom co-op near Dolores Park, SF) to applicant ${applicant.first_name}.
+
+SITUATION — this determines the entire shape of the email:
+${situationBrief}
+
+LISTING CONTEXT (only if relevant to what they asked):
+${listingLine}
+
+EMAIL THREAD SO FAR (oldest first):
+${thread}
+
+Hard rules:
+- They applied and we are mid-conversation — never re-introduce or pitch Agape, never ask them to apply.
+- Match the thread's tone; reference the thread naturally, don't recap it.
+- Subject: thread naturally — reuse "Re: <last subject>" when continuing the conversation.
+- Body with real newlines, no markdown. Sign off with ${senderName}.
+Return exactly: {"subject": "...", "body": "..."}.`
+    const text = await callClaudeRaw(OPINION_MODEL, 'You write warm, concise community-house emails. Respond with a single JSON object only.', ctxPrompt, 700)
+    const parsed = JSON.parse(text.replace(/^```json?\s*|\s*```$/g, ''))
+    return { subject: String(parsed.subject || 'Re: Hi from Agape!').slice(0, 150), body: String(parsed.body || '').slice(0, 3000) }
+  }
 
   const prompt = `Draft a reply from ${senderName} at Agape (13-bedroom intentional community / co-op in a Victorian near Dolores Park, SF) to someone who ALREADY APPLIED to live at Agape. We reviewed their application and want to move forward.
 
@@ -260,8 +314,17 @@ serve(async (req) => {
         (await client.from('recruit_listings').select('*').eq('id', decision.listing_id).maybeSingle()).data : null
       const room = listing ? (rooms || []).find((r) => r.id === listing.room_id) : null
       const { data: prof } = await client.from('user_discord_membership').select('discord_username').eq('user_id', userData.user.id).maybeSingle()
-      const draft = await draftEmail(applicant, listing, room, sug?.flags || [], prof?.discord_username || 'a housemate')
-      return new Response(JSON.stringify(draft), { headers: jsonHeaders })
+      const [{ data: emails }, { data: screening }] = await Promise.all([
+        client.from('recruit_emails').select('direction, subject, body_text, sent_at, sent_by_name')
+          .eq('applicant_id', applicant.id).order('sent_at', { ascending: false }).limit(8),
+        client.from('recruit_screenings').select('status, starts_at, ends_at, housemate_name')
+          .eq('applicant_id', applicant.id).order('starts_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      const cls = classifyOutreach(emails || [], screening)
+      const type = typeof body.emailType === 'string' && body.emailType ? String(body.emailType) : cls.type
+      const draft = await draftEmail(applicant, listing, room, sug?.flags || [], prof?.discord_username || 'a housemate',
+        { type, emails: emails || [], screening })
+      return new Response(JSON.stringify({ ...draft, emailType: type, reason: cls.reason }), { headers: jsonHeaders })
     }
 
     if (body.action === 'second_opinion' && body.applicantId) {
