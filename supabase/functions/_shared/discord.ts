@@ -332,6 +332,19 @@ export async function postMeetingNote(
   })
 }
 
+// "Happening now" — announce a starting call so housemates can drop in.
+export async function postLiveCall(title: string, when: string, meetLink: string | null): Promise<void> {
+  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      embeds: [{
+        description: `🔴 **Happening now:** ${title} — ${when}${meetLink ? `\n[Join the call](${meetLink}) if you'd like to sit in.` : ''}`,
+        color: 0xe74c3c,
+      }],
+    }),
+  })
+}
+
 // One channel nudge for a post nobody claimed within 96h.
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'

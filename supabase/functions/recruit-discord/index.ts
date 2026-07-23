@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.6.0'
+const VERSION = '1.7.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -348,6 +348,45 @@ async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<numb
   return created
 }
 
+// Announce calls starting within the next tick window so housemates can
+// join live. One post per call (live_posted_at stamp).
+async function announceLiveCalls(client: ReturnType<typeof db>): Promise<number> {
+  const { postLiveCall } = await import('../_shared/discord.ts')
+  const now = Date.now()
+  const from = new Date(now - 5 * 60000).toISOString()
+  const to = new Date(now + 16 * 60000).toISOString()
+  let posted = 0
+  const { data: screenings } = await client.from('recruit_screenings')
+    .select('id, applicant_id, housemate_name, starts_at, meet_link')
+    .eq('status', 'scheduled').is('live_posted_at', null)
+    .gte('starts_at', from).lte('starts_at', to)
+  for (const s of (screenings || [])) {
+    try {
+      const { data: a } = await client.from('recruit_applicants').select('first_name, last_name').eq('id', s.applicant_id).maybeSingle()
+      const name = `${a?.first_name || 'Applicant'} ${a?.last_name || ''}`.trim()
+      await postLiveCall(`Agape Intro Call — ${name} × ${s.housemate_name || 'the house'}`, slotWhen(new Date(s.starts_at)), s.meet_link)
+      await client.from('recruit_screenings').update({ live_posted_at: new Date().toISOString() }).eq('id', s.id)
+      posted++
+    } catch (err) {
+      console.warn(`[live] announce failed for screening ${s.id}: ${(err as Error).message}`)
+    }
+  }
+  const { data: meetings } = await client.from('recruit_recorded_events')
+    .select('gcal_event_id, title, starts_at, meet_link')
+    .is('live_posted_at', null)
+    .gte('starts_at', from).lte('starts_at', to)
+  for (const m of (meetings || [])) {
+    try {
+      await postLiveCall(m.title || 'Agape call', slotWhen(new Date(m.starts_at)), m.meet_link)
+      await client.from('recruit_recorded_events').update({ live_posted_at: new Date().toISOString() }).eq('gcal_event_id', m.gcal_event_id)
+      posted++
+    } catch (err) {
+      console.warn(`[live] announce failed for event ${m.gcal_event_id}: ${(err as Error).message}`)
+    }
+  }
+  return posted
+}
+
 // Harvest finished non-applicant meeting recordings.
 async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<number> {
   const { recallEnabled, getBotResult, fetchTranscriptText, summarizeMeeting } = await import('../_shared/recall.ts')
@@ -450,10 +489,11 @@ serve(async (req) => {
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
       const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
+      const live = await announceLiveCalls(client)
       const sent = await remindUpcoming(client)
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
-      console.log(`[recruit-discord] tick: ${bots} bot(s) backfilled, ${sent} reminder(s), ${recorded} recording(s) posted`)
-      return json({ bots, reminded: sent, recorded })
+      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s)`)
+      return json({ bots, live, reminded: sent, recorded })
     }
 
     const body = await req.text()
