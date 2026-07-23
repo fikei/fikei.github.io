@@ -97,7 +97,7 @@ export async function summarizeMeeting(transcript: string, title: string): Promi
       system: 'You summarize meetings for the Agape co-op house. Be concrete and neutral.',
       messages: [{
         role: 'user',
-        content: `Summarize this meeting ("${title}") for housemates who missed it: what was discussed, decisions made, and open follow-ups. Under 250 words, bullets welcome. Transcript:\n\n${transcript.slice(0, 24000)}`,
+        content: `Summarize this meeting ("${title}") for housemates who missed it: what was discussed and any decisions made. Under 250 words, bullets welcome. Never include follow-ups, action items, open questions, or recommended next steps — describe the meeting only. Transcript:\n\n${transcript.slice(0, 24000)}`,
       }],
     }),
   })
@@ -129,7 +129,7 @@ export async function summarizeIntroCall(transcript: string, applicantName: stri
 **About them** — 3-5 bullets: work, background, why they want co-op living, logistics (move-in, budget) if mentioned.
 **Highlights** — anything that stood out, positive or concerning.
 
-Keep it under 200 words. Transcript:
+Keep it under 200 words. Never include follow-ups, action items, suggested questions, or next steps of any kind — describe the call only. Transcript:
 
 ${transcript.slice(0, 24000)}`,
       }],

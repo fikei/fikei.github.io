@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.10.2';
+const VERSION = '3.11.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -439,7 +439,7 @@ async function loadAll() {
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
     sb.from('recruit_emails').select('applicant_id, direction, sent_at, snippet').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
-    sb.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, meet_link').order('starts_at'),
+    sb.from('recruit_screenings').select('id, applicant_id, starts_at, status, housemate_name, meet_link, recall_status').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
   ]);
@@ -448,7 +448,9 @@ async function loadAll() {
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
   for (const s of (scRes.data || [])) {
-    if (s.status === 'scheduled') screeningState[s.applicant_id] = { at: s.starts_at, with: s.housemate_name, link: s.meet_link };
+    if (s.status === 'scheduled') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), at: s.starts_at, with: s.housemate_name, link: s.meet_link };
+    // A finished recording adds a Watch state to the row (fresh link on click).
+    if (s.recall_status === 'done') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), watch: s.id };
   }
   for (const av of (avRes.data || [])) {
     // empty windows = a processed non-scheduling reply — no Pick a time
@@ -934,8 +936,23 @@ function stageChip(a) {
 function screeningChip(a) {
   const sc = screeningState[a.id];
   if (!sc) return '';
-  if (sc.at) return `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
+  const watch = sc.watch
+    ? `<span class="decision-chip decision-chip--pass" style="cursor:pointer" title="Watch the recorded Intro Call" onclick="event.stopPropagation();watchRecording('${sc.watch}')">▶ Watch</span>`
+    : '';
+  if (sc.at) return `<span class="decision-chip decision-chip--outreach" title="Screening call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>` + watch;
+  if (watch) return watch;
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
+}
+
+/* Watch a recorded Intro Call: Recall links expire, so fetch a fresh one. */
+async function watchRecording(screeningId) {
+  try {
+    toast('Fetching recording…');
+    const out = await gmailCall({ action: 'recording-link', screeningId });
+    if (out.url) window.open(out.url, '_blank'); else toast('Recording not available');
+  } catch (e) {
+    toast(`Recording: ${e.message}`);
+  }
 }
 
 /* One pill per room they're placed in, with the room's open date. Falls
