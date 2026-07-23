@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.7.1'
+const VERSION = '1.8.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -348,6 +348,18 @@ async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<numb
   return created
 }
 
+// Calls whose end time passed flip scheduled -> completed so the app stops
+// showing them as upcoming (the Watch chip takes over once notes land).
+async function completePastCalls(client: ReturnType<typeof db>): Promise<number> {
+  const { data: rows } = await client.from('recruit_screenings')
+    .update({ status: 'completed' })
+    .eq('status', 'scheduled')
+    .lt('ends_at', new Date(Date.now() - 30 * 60000).toISOString())
+    .select('id')
+  if (rows?.length) console.log(`[recruit-discord] ${rows.length} call(s) marked completed`)
+  return rows?.length || 0
+}
+
 // Announce calls starting within the next tick window so housemates can
 // join live. One post per call (live_posted_at stamp).
 async function announceLiveCalls(client: ReturnType<typeof db>): Promise<number> {
@@ -490,6 +502,7 @@ serve(async (req) => {
       if (!authorized) return json({ error: 'unauthorized' }, 401)
       const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
       const live = await announceLiveCalls(client)
+      await completePastCalls(client)
       const sent = await remindUpcoming(client)
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
       console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s)`)
