@@ -1,0 +1,133 @@
+// _shared/recruit-schedule.ts
+// Screening-call scheduling on the shared Agape Google account, used by both
+// recruit-gmail (app-side "schedule" action) and recruit-discord (claim
+// button). Also owns the shared-account token refresh and the short applicant
+// confirmation email, so there is exactly one implementation of each.
+
+// deno-lint-ignore-file no-explicit-any
+
+export const SHARED_EMAIL = Deno.env.get('AGAPE_GMAIL_ADDRESS') || 'live.at.agapesf@gmail.com'
+export const TZ = 'America/Los_Angeles'
+
+const CLIENT_ID = Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID')!
+const CLIENT_SECRET = Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET')!
+
+// Minimal structural type so we don't pin a supabase-js version here.
+type Db = any
+
+// Refresh an access token for the shared account (recruit_gmail_account row 1).
+export async function sharedAccessToken(db: Db): Promise<string> {
+  const { data: acct } = await db.from('recruit_gmail_account').select('*').eq('id', 1).maybeSingle()
+  if (!acct) throw new Error('Shared Gmail not connected yet')
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID, client_secret: CLIENT_SECRET,
+      refresh_token: acct.refresh_token, grant_type: 'refresh_token',
+    }),
+  })
+  const tok = await resp.json()
+  if (!resp.ok || !tok.access_token) throw new Error(`Token refresh failed: ${JSON.stringify(tok).slice(0, 180)}`)
+  return tok.access_token
+}
+
+export function b64url(s: string): string {
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+export interface ScheduleOpts {
+  applicantId: string
+  startsAt: Date
+  minutes?: number
+  housemateUserId: string
+  housemateName: string
+  housemateEmail: string
+}
+
+// Create the GCal event (both attendees + Meet) and the recruit_screenings row.
+// Throws on any failure; callers map to their own error shapes.
+export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
+  screening: any; meetLink: string | null; applicant: any
+}> {
+  const { data: applicant } = await db.from('recruit_applicants').select('*').eq('id', opts.applicantId).maybeSingle()
+  if (!applicant?.email?.includes('@')) throw new Error('Applicant has no email')
+  const endsAt = new Date(opts.startsAt.getTime() + (opts.minutes || 30) * 60000)
+
+  const at = await sharedAccessToken(db)
+  const event = {
+    summary: `Agape screening call — ${applicant.first_name} ${applicant.last_name} × ${opts.housemateName}`,
+    description: `Get-to-know-you call with ${applicant.first_name} (Agape application), scheduled from their offered availability.`,
+    start: { dateTime: opts.startsAt.toISOString(), timeZone: TZ },
+    end: { dateTime: endsAt.toISOString(), timeZone: TZ },
+    attendees: [
+      { email: applicant.email },
+      ...(opts.housemateEmail.includes('@') ? [{ email: opts.housemateEmail }] : []),
+    ],
+    conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
+    reminders: { useDefault: true },
+  }
+  const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+  })
+  const created = await resp.json()
+  if (!resp.ok) throw new Error(`Calendar failed: ${JSON.stringify(created).slice(0, 200)} — if this mentions scopes, reconnect the shared Gmail to grant calendar access`)
+  const meet = created.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || created.hangoutLink || null
+
+  const { data: row, error } = await db.from('recruit_screenings').insert({
+    applicant_id: applicant.id, housemate_user_id: opts.housemateUserId,
+    housemate_name: opts.housemateName, housemate_email: opts.housemateEmail,
+    starts_at: opts.startsAt.toISOString(), ends_at: endsAt.toISOString(),
+    gcal_event_id: created.id, meet_link: meet, status: 'scheduled',
+  }).select().single()
+  if (error) throw new Error(error.message)
+  return { screening: row, meetLink: meet, applicant }
+}
+
+// Short plain-text confirmation so the booking isn't missed if the bare
+// calendar invite is. Logged to recruit_emails as an automated send.
+export async function sendApplicantConfirmation(
+  db: Db, applicant: any, housemateName: string, startsAt: Date, meetLink: string | null,
+): Promise<void> {
+  const when = startsAt.toLocaleString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ,
+  })
+  const subject = `You're confirmed — Agape call with ${housemateName}`
+  const text = [
+    `Hi ${applicant.first_name},`,
+    '',
+    `You're confirmed for a call with ${housemateName} on ${when} (Pacific time).`,
+    meetLink ? `Google Meet link: ${meetLink}` : `The Google Meet link is in your calendar invite.`,
+    `A calendar invite from ${SHARED_EMAIL} is on its way to this address.`,
+    '',
+    `Looking forward to it!`,
+    `— Agape`,
+  ].join('\n')
+
+  const at = await sharedAccessToken(db)
+  const encSubject = `=?UTF-8?B?${b64url(subject).replace(/-/g, '+').replace(/_/g, '/')}?=`
+  const raw = [
+    `From: Agape <${SHARED_EMAIL}>`,
+    `To: ${applicant.email}`,
+    `Subject: ${encSubject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    '',
+    text,
+  ].join('\r\n')
+  const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: b64url(raw) }),
+  })
+  const sent = await resp.json()
+  if (!resp.ok) throw new Error(`Confirmation send failed: ${JSON.stringify(sent).slice(0, 180)}`)
+  await db.from('recruit_emails').upsert({
+    applicant_id: applicant.id, gmail_id: sent.id, thread_id: sent.threadId,
+    direction: 'out', subject, snippet: text.slice(0, 180), body_text: text,
+    from_email: SHARED_EMAIL, to_email: applicant.email,
+    sent_by_name: 'auto', sent_at: new Date().toISOString(),
+  }, { onConflict: 'gmail_id' })
+}

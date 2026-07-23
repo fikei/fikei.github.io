@@ -29,7 +29,7 @@ Applicant uses the /schedule picker ───────────┤
                                                ▼
                         recruit_availability updated (existing)
                                                ▼
-                 NEW: post to #screening-claims (bot message)
+                 NEW: post to #recruiting-interviews (bot message)
                  One message per applicant. Buttons = concrete
                  30-min slots derived from their windows (max ~8,
                  spread across days) + "Other time…"
@@ -51,7 +51,7 @@ Dedup rules: one open post per applicant (re-availability edits the existing pos
 
 ## Channel
 
-New channel **`#screening-claims`** (bot-writable, visible to the Recruiting Society role). Keep it single-purpose: posts and claims only, discussion goes to the applicant thread in `#recruiting`.
+**`#recruiting-interviews`** (ID `1529576830514762029`) — bot-writable, visible to the Recruiting Society role. Keep it single-purpose: posts and claims only, discussion goes to the applicant thread in `#recruiting`.
 
 ## Hosting
 
@@ -99,8 +99,17 @@ Expected: `windows: [{date: 2026-07-25, start: 09:00, end: 12:00}]`, `platform: 
 
 ---
 
-## Open questions for the house
+## Decisions (adopted 2026-07-22, shipped in v1)
 
-1. **Claim scope** — anyone in Recruiting Society, or an opt-in "interviewer" role (the pipeline doc's model)? Recommend starting with the whole channel; add the role when volume demands it.
-2. **Instagram-call requests** — honor them (claimer DMs the handle, no Meet link) or steer to Meet in the confirmation email? Recommend steering to Meet by default with the IG handle noted for the claimer.
-3. **Applicant confirmation email** — is the bare Google Calendar invite enough, or should `recruit-gmail` also send a short "you're confirmed with {name}, {time}" email? Recommend the short email; invites alone get missed.
+1. **Claim scope** — anyone in Recruiting Society can claim. Revisit an opt-in "interviewer" role when volume demands it.
+2. **Instagram-call requests** — steer to Meet by default; the IG handle and context are surfaced to the claimer (post warning line + their confirmation DM) so they can DM the applicant about it.
+3. **Applicant confirmation email** — yes: `sendApplicantConfirmation` sends a short "you're confirmed with {name}, {time}" email in addition to the GCal invite, logged to `recruit_emails` as `sent_by_name: 'auto'`.
+
+## Implementation notes (v1, 2026-07-22)
+
+- The v2 extraction prompt above is live in `recruit-gmail` v1.4.0, with one refinement: `needs_human` is only true for emails that are *about scheduling* but yield no concrete window — non-scheduling replies return `windows: []` + `needs_human: false` and produce no Discord post (otherwise every "thanks!" would spam the channel).
+- New pieces: migration 121 (`recruit_claim_posts`), `_shared/recruit-schedule.ts` (scheduling + confirmation email, shared by app and Discord paths), `_shared/discord.ts` (post/edit/DM/slot derivation), `recruit-discord` fn v1.0.0 (Ed25519-verified interactions; public key fetched via the bot token, no new secrets).
+- Button `custom_id`s are `claim|<applicantId>|<epochMs>` (ISO timestamps contain `:`; epoch avoids delimiter collisions).
+- Claim is first-write-wins via `UPDATE ... WHERE status='open'`; the 3s interaction deadline is met by ACKing with DEFERRED_UPDATE_MESSAGE and doing GCal/edit/DM/email in `EdgeRuntime.waitUntil`. Calendar failure after a claim never reopens the post (no double-booking) — the post flips to a ⚠️ state and the claimer is DM'd to book manually.
+- App-side booking (`schedule` action in /applications) also closes any open claim post for that applicant.
+- The 96h stuck nudge piggybacks on `recruit-gmail scan` (no new cron).

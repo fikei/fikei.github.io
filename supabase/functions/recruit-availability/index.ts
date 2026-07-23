@@ -7,11 +7,12 @@
 // POST { token }                      → { firstName, windows }
 // POST { token, windows: [...] }      → save; { saved: true, windows }
 
-const VERSION = '1.0.0'
-console.log(`[recruit-availability] v${VERSION} — public applicant availability endpoint`)
+const VERSION = '1.1.0'
+console.log(`[recruit-availability] v${VERSION} — public applicant availability endpoint + Discord claim post`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { upsertClaimMessage } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +56,21 @@ serve(async (req) => {
       })
       if (error) return json({ error: 'Could not save — try again' }, 500)
       console.log(`availability saved for ${applicant.id} (${windows.length} windows)`)
+
+      // Post/refresh the claimable message in #recruiting-interviews.
+      // Warn-only: Discord being down never blocks the applicant's save.
+      try {
+        const { data: full } = await client.from('recruit_applicants')
+          .select('why_agape').eq('id', applicant.id).maybeSingle()
+        await upsertClaimMessage(client, {
+          applicantId: applicant.id, firstName: applicant.first_name,
+          whyLine: full?.why_agape || null,
+          windows, platform: null, timezoneNote: null, needsHuman: false,
+        })
+      } catch (err) {
+        console.warn(`claim post failed for ${applicant.id}: ${(err as Error).message}`)
+      }
+
       return json({ saved: true, windows })
     }
 
