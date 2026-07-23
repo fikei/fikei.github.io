@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.1.2'
+const VERSION = '1.2.0'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -155,6 +155,35 @@ async function verifyAndCache(userId: string, identity: DiscordIdentity) {
     .from('user_discord_membership')
     .upsert(row, { onConflict: 'user_id' })
   if (error) throw new Error(`Cache write failed: ${error.message}`)
+
+  // First-sign-in nicety: when the login email is on the AgapeSF group
+  // roster, seed recruit_profiles with their real name + group email so
+  // Intro Call invites and intro emails use real identities from day one.
+  if (isRecruiting) {
+    try {
+      const db = getSupabase()
+      const { data: au } = await db.auth.admin.getUserById(userId)
+      const email = (au?.user?.email || '').toLowerCase()
+      const { data: roster } = email
+        ? await db.from('recruit_group_roster').select('full_name, email').eq('email', email).maybeSingle()
+        : { data: null }
+      if (roster) {
+        const { data: prof } = await db.from('recruit_profiles')
+          .select('user_id, display_name, group_email').eq('user_id', userId).maybeSingle()
+        if (!prof) {
+          await db.from('recruit_profiles').insert({ user_id: userId, display_name: roster.full_name, group_email: roster.email })
+        } else if (!prof.display_name || !prof.group_email) {
+          await db.from('recruit_profiles').update({
+            display_name: prof.display_name || roster.full_name,
+            group_email: prof.group_email || roster.email,
+          }).eq('user_id', userId)
+        }
+      }
+    } catch (err) {
+      console.warn('roster autofill failed:', (err as Error).message)
+    }
+  }
+
   console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember} recruiting=${isRecruiting}`)
   return row
 }

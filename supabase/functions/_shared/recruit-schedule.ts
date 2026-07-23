@@ -83,6 +83,23 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
     gcal_event_id: created.id, meet_link: meet, status: 'scheduled',
   }).select().single()
   if (error) throw new Error(error.message)
+
+  // Recording bot: "Agape Notetaker" joins the Meet at start time. Warn-only
+  // and inert until RECALL_API_KEY is set — never blocks scheduling.
+  if (meet) {
+    try {
+      const { recallEnabled, createRecordingBot } = await import('./recall.ts')
+      if (recallEnabled()) {
+        const botId = await createRecordingBot(meet, opts.startsAt.toISOString())
+        await db.from('recruit_screenings').update({ recall_bot_id: botId, recall_status: 'scheduled' }).eq('id', row.id)
+        row.recall_bot_id = botId
+        console.log(`[recall] bot ${botId} scheduled for screening ${row.id}`)
+      }
+    } catch (err) {
+      console.warn(`[recall] bot scheduling failed for screening ${row.id}: ${(err as Error).message}`)
+    }
+  }
+
   return { screening: row, meetLink: meet, applicant }
 }
 
