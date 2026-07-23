@@ -147,7 +147,7 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
       `Can someone take this Intro Call with **${input.firstName}**?\n\n` +
       considerationsBlock +
       `See ${poss} [application](${appLink(input.applicantId)}).\n\n` +
-      `_Tap a time below to claim the call — you'll both receive an invite._`
+      `_Tap a time below to claim the call — you'll both receive an invite and be added to the email thread._`
   }
 
   const components: Array<Record<string, unknown>> = []
@@ -311,6 +311,23 @@ export async function postRecordingNote(
         description: lines.join('\n').slice(0, 4000),
         color: 0x9b59b6,
       }],
+    }),
+  })
+}
+
+// Notes for a non-applicant meeting hosted by the shared account.
+export async function postMeetingNote(
+  title: string, summary: string | null, videoUrl: string | null,
+): Promise<void> {
+  const lines = [
+    summary || '_No transcript captured (captions may have been off)._',
+    '',
+    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+  ]
+  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
     }),
   })
 }

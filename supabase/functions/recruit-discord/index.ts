@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.4.0'
+const VERSION = '1.5.0'
 console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -205,11 +205,15 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
           let dead = resp.status === 404 || resp.status === 410
           if (resp.ok) {
             const ev = await resp.json()
+            const myEmail = (s.housemate_email || '').toLowerCase()
             // deno-lint-ignore no-explicit-any
-            const me = (ev.attendees || []).find((a: any) => (a.email || '').toLowerCase() === (s.housemate_email || '').toLowerCase())
+            const me = (ev.attendees || []).find((a: any) => (a.email || '').toLowerCase() === myEmail)
+            // Missing-attendee only signals a release when we actually know the
+            // resident's email — calendar-pickup rows have none (housemate_email
+            // null) and must not be treated as declined (the Katie 10am bug).
             dead = ev.status === 'cancelled'
               || me?.responseStatus === 'declined'
-              || (!me && (ev.attendees || []).length > 0)
+              || (Boolean(myEmail) && !me && (ev.attendees || []).length > 0)
           }
           if (dead) {
             await client.from('recruit_screenings')
@@ -246,6 +250,118 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
 // summarize with Haiku, post notes + recording link to #recruiting-interviews,
 // and store the summary on the screening row (the app reads it from there).
 // Runs on the same 15-min cron tick as reminders; inert without RECALL_API_KEY.
+// Every scheduled screening with a Meet link gets a recording bot — including
+// calls created by hand on the shared calendar (picked up by scan) and calls
+// booked before RECALL_API_KEY existed. Runs on the 15-min tick.
+async function scheduleMissingBots(client: ReturnType<typeof db>): Promise<number> {
+  const { recallEnabled, createRecordingBot } = await import('../_shared/recall.ts')
+  if (!recallEnabled()) return 0
+  const { data: rows } = await client.from('recruit_screenings')
+    .select('id, meet_link, starts_at')
+    .eq('status', 'scheduled').is('recall_bot_id', null)
+    .not('meet_link', 'is', null)
+    .gt('starts_at', new Date().toISOString()).limit(10)
+  let created = 0
+  for (const s of (rows || [])) {
+    try {
+      const botId = await createRecordingBot(s.meet_link, s.starts_at)
+      await client.from('recruit_screenings')
+        .update({ recall_bot_id: botId, recall_status: 'scheduled' }).eq('id', s.id)
+      created++
+      console.log(`[recall] backfilled bot ${botId} for screening ${s.id} (${s.starts_at})`)
+    } catch (err) {
+      console.warn(`[recall] backfill failed for screening ${s.id}: ${(err as Error).message}`)
+    }
+  }
+  return created
+}
+
+// Default: record EVERY Meet hosted by the shared account. Sweep the shared
+// calendar for upcoming Meet-bearing events it organizes; applicant calls are
+// covered via recruit_screenings, anything else lands in recruit_recorded_events.
+async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<number> {
+  const { recallEnabled, createRecordingBot } = await import('../_shared/recall.ts')
+  if (!recallEnabled()) return 0
+  let token: string
+  try { token = await sharedAccessToken(client) } catch { return 0 }
+  const now = new Date()
+  const timeMax = new Date(now.getTime() + 7 * 24 * 3600 * 1000)
+  const resp = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=50&timeMin=${encodeURIComponent(now.toISOString())}&timeMax=${encodeURIComponent(timeMax.toISOString())}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (!resp.ok) { console.warn(`[recall] calendar sweep failed: ${resp.status}`); return 0 }
+  const events = (await resp.json()).items || []
+  // deno-lint-ignore no-explicit-any
+  const meetOf = (ev: any) => ev.hangoutLink || ev.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || null
+  // deno-lint-ignore no-explicit-any
+  const candidates = events.filter((ev: any) => ev.status !== 'cancelled' && ev.organizer?.self && meetOf(ev) && ev.start?.dateTime)
+  if (!candidates.length) return 0
+
+  // deno-lint-ignore no-explicit-any
+  const ids = candidates.map((ev: any) => ev.id)
+  const [{ data: screenings }, { data: tracked }] = await Promise.all([
+    client.from('recruit_screenings').select('gcal_event_id').in('gcal_event_id', ids),
+    client.from('recruit_recorded_events').select('gcal_event_id').in('gcal_event_id', ids),
+  ])
+  // deno-lint-ignore no-explicit-any
+  const known = new Set([...(screenings || []), ...(tracked || [])].map((r: any) => r.gcal_event_id))
+
+  let created = 0
+  for (const ev of candidates) {
+    if (known.has(ev.id)) continue
+    try {
+      const meet = meetOf(ev)
+      const botId = await createRecordingBot(meet, ev.start.dateTime)
+      await client.from('recruit_recorded_events').upsert({
+        gcal_event_id: ev.id, title: (ev.summary || 'Agape call').slice(0, 200),
+        starts_at: ev.start.dateTime, ends_at: ev.end?.dateTime || null,
+        meet_link: meet, recall_bot_id: botId, recall_status: 'scheduled',
+      })
+      created++
+      console.log(`[recall] calendar bot ${botId} for "${ev.summary}" (${ev.start.dateTime})`)
+    } catch (err) {
+      console.warn(`[recall] calendar bot failed for ${ev.id}: ${(err as Error).message}`)
+    }
+  }
+  return created
+}
+
+// Harvest finished non-applicant meeting recordings.
+async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<number> {
+  const { recallEnabled, getBotResult, fetchTranscriptText, summarizeMeeting } = await import('../_shared/recall.ts')
+  if (!recallEnabled()) return 0
+  const { postMeetingNote } = await import('../_shared/discord.ts')
+  const { data: rows } = await client.from('recruit_recorded_events')
+    .select('gcal_event_id, title, recall_bot_id, ends_at')
+    .not('recall_bot_id', 'is', null).is('recording_posted_at', null)
+    .lt('ends_at', new Date(Date.now() - 5 * 60000).toISOString()).limit(5)
+  let posted = 0
+  for (const m of (rows || [])) {
+    try {
+      const bot = await getBotResult(m.recall_bot_id)
+      if (!bot.done && !bot.failed) continue
+      if (bot.failed) {
+        await client.from('recruit_recorded_events')
+          .update({ recall_status: 'failed', recording_posted_at: new Date().toISOString() }).eq('gcal_event_id', m.gcal_event_id)
+        continue
+      }
+      let summary: string | null = null
+      if (bot.transcriptUrl) {
+        summary = await summarizeMeeting(await fetchTranscriptText(bot.transcriptUrl), m.title || 'Agape call')
+      }
+      await postMeetingNote(m.title || 'Agape call', summary, bot.videoUrl)
+      await client.from('recruit_recorded_events').update({
+        recall_status: 'done', recording_summary: summary, recording_posted_at: new Date().toISOString(),
+      }).eq('gcal_event_id', m.gcal_event_id)
+      posted++
+    } catch (err) {
+      console.warn(`[recall] meeting processing failed for ${m.gcal_event_id}: ${(err as Error).message}`)
+    }
+  }
+  return posted
+}
+
 async function processRecordings(client: ReturnType<typeof db>): Promise<number> {
   const { recallEnabled, getBotResult, fetchTranscriptText, summarizeIntroCall } = await import('../_shared/recall.ts')
   if (!recallEnabled()) return 0
@@ -307,10 +423,11 @@ serve(async (req) => {
         authorized = Boolean(burned)
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
+      const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
       const sent = await remindUpcoming(client)
-      const recorded = await processRecordings(client)
-      console.log(`[recruit-discord] tick: ${sent} reminder(s), ${recorded} recording(s) posted`)
-      return json({ reminded: sent, recorded })
+      const recorded = await processRecordings(client) + await processMeetingRecordings(client)
+      console.log(`[recruit-discord] tick: ${bots} bot(s) backfilled, ${sent} reminder(s), ${recorded} recording(s) posted`)
+      return json({ bots, reminded: sent, recorded })
     }
 
     const body = await req.text()
