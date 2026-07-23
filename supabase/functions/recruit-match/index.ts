@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -32,7 +32,9 @@ function db() {
 }
 
 async function callClaudeRaw(model: string, system: string, prompt: string, maxTokens = 500): Promise<string> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
+  // Recruiting has its own key (own workspace + cap); shared/Ladder keys are
+  // emergency fallbacks only.
+  const key = Deno.env.get('RECRUIT_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
   if (!key) throw new Error('No Anthropic API key configured')
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
