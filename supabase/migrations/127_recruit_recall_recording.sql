@@ -1,5 +1,5 @@
 -- Migration 127: Recall.ai recording bot tracking on recruit_screenings.
--- recall_bot_id set at schedule time (bot joins the Meet as "Agape Notetaker");
+-- recall_bot_id set at schedule time (bot joins the Meet as "Agape Notes");
 -- the 15-min recruit-discord tick harvests finished recordings, summarizes the
 -- transcript, posts to #recruiting-interviews, and stamps recording_posted_at.
 ALTER TABLE recruit_screenings

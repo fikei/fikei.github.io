@@ -84,7 +84,7 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
   }).select().single()
   if (error) throw new Error(error.message)
 
-  // Recording bot: "Agape Notetaker" joins the Meet at start time. Warn-only
+  // Recording bot: "Agape Notes" joins the Meet at start time. Warn-only
   // and inert until RECALL_API_KEY is set — never blocks scheduling.
   if (meet) {
     try {
