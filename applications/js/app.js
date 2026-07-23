@@ -615,7 +615,8 @@ async function removePlacement(applicantId, listingId) {
   if (row) row.status = 'removed';
   toast('Removed from the listing — the auto-sweep won\'t re-add them');
   renderRailCounts();
-  renderApplicants();
+  if (!document.getElementById('review').hidden) renderReview();
+  else if (VIEWS[view]?.kind === 'applicants') renderApplicants();
 }
 
 /* ---------- outreach email drafts ---------- */
@@ -1053,7 +1054,6 @@ function renderApplicants() {
       ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No qualifying candidates yet — they land here automatically when they pass review.</p>` : `<ul class="inbox-card">
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
-            ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
             ${repliedDot(a)}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
@@ -1065,7 +1065,7 @@ function renderApplicants() {
             <span class="inbox-row__actions">
               ${noteBubble(a.id)}
               ${view === 'openings'
-                ? `${openingsCta(a)}<button class="row-x" data-remove-placement="${a.id}|${esc(g.key)}" title="Remove from this listing — the auto-sweep won't re-add them" aria-label="Remove from listing">✕</button>`
+                ? `${openingsCta(a)}<span class="inbox-row__grip" title="Drag to reorder">⠿</span>`
                 : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Vote</button>` : ''}`}
             </span>
           </li>`).join('')}
@@ -2021,7 +2021,15 @@ function renderReviewFoot(a) {
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote>${mine ? 'Update vote' : 'Cast vote'}</button>
       </div>`;
   } else if (a.stage === 'candidate') {
+    // Placement pills with ✕ — row-level removal moved here from Openings.
+    const pills = activePlacements(a.id).map(p => {
+      const l = listings.find(x => x.id === p.listing_id);
+      if (!l || l.status !== 'open') return '';
+      const room = rooms.find(r => r.id === l.room_id);
+      return `<button type="button" class="decision-chip decision-chip--outreach placement-pill" data-remove-placement="${a.id}|${p.listing_id}" title="Remove from ${esc(room?.name || 'this listing')} — the auto-sweep won't re-add them">${esc(room?.name || 'Room')} ✕</button>`;
+    }).join('');
     foot.innerHTML = `
+      ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
       <button class="btn review__btn review__btn--notfit" data-open-decision="pass">Not a fit</button>
       <button class="btn review__btn review__btn--place" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to listing'}</button>`;
   } else {

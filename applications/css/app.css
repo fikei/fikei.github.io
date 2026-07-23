@@ -1111,7 +1111,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 /* --- v3.5.0: row-state polish — response dot, note bubble, ✕, see-more bar --- */
 .inbox-row { position: relative; }
 .replied-dot {
-  position: absolute; left: -13px; top: 50%; transform: translateY(-50%);
+  position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent);
 }
@@ -1173,3 +1173,9 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   pointer-events: none; z-index: 90;
 }
 .note-bubble:hover::after { opacity: 1; visibility: visible; }
+
+/* --- v3.8.1: grip on the right, removal pills in the overlay foot --- */
+.inbox-row__actions .inbox-row__grip { margin-left: var(--space-1); }
+.foot-pills { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.placement-pill { border: 0; cursor: pointer; }
+.placement-pill:hover { filter: brightness(1.1); box-shadow: inset 0 0 0 1.5px currentColor; }
