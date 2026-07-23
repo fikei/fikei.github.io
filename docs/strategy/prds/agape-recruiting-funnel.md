@@ -2,7 +2,12 @@
 
 **One line:** `/applications` moves from single-decider triage (Inbox → Outreach/Hold/Archive) to a staged funnel — Review (collective votes) → Candidates → Openings → Screening → Archive — with server-side stage computation.
 
-Status: **Phase A shipped (v3.0.0, migration 120)** · Phases B–D planned.
+Status: **Phase A shipped (v3.0.0, migration 120); auto-placement shipped early (v3.2.0, migration 123)** · Phases B + D planned.
+
+### v3.2.0 amendments (2026-07-22)
+- "Review" is named **Inbox**; Openings sits in the House rail group under Occupancy.
+- Legacy Hold applicants went back to Inbox — hold ≠ passed review.
+- **AI listing suggestions removed** from profiles. Replaced by deterministic auto-placement: candidates land in **every** open listing they qualify for (`recruit_listing_candidates`; qualification = track match, budget ≥ rent when both known, move-in window overlaps listing window ±1 month; flexible/unknown move-in qualifies on track). Recruiter removals are tombstoned so the sweep never re-adds them. This delivers most of old Phase C — remaining Phase C scope is only auto-*generating* draft listings from occupancy gaps.
 
 ---
 
