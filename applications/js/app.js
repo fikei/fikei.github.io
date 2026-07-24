@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.17.1';
+const VERSION = '3.18.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1302,7 +1302,7 @@ function othersAccordion(listingId) {
 function rowMenuHtml(a, listingId) {
   const mid = `row-${a.id}-${listingId}`;
   return `<span class="listing-menu-wrap">
-    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${esc(mid)}" aria-label="Applicant actions" aria-haspopup="menu">⋯</button>
+    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${esc(mid)}" aria-label="Applicant actions" aria-haspopup="menu">⋮</button>
     <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
@@ -1801,7 +1801,7 @@ function listingMeta(l) {
 /* ⋯ menu — edit + quick status moves; the inline status select is gone. */
 function listingMenuHtml(l) {
   return `<span class="listing-menu-wrap">
-    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${l.id}" aria-label="Listing actions" aria-haspopup="menu">⋯</button>
+    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${l.id}" aria-label="Listing actions" aria-haspopup="menu">⋮</button>
     <span class="listing-menu" data-menu-for="${l.id}" hidden>
       <button type="button" class="listing-menu__item" data-edit-listing="${l.id}">Edit listing…</button>
       ${l.status === 'open'
@@ -2465,14 +2465,18 @@ async function postClaimFromModal() {
 /* Review-availability modal: bookable slots from their windows, "how we
    read it" bullets, and the coverage ask as the secondary path. */
 let availApplicantId = null;
+let availSelected = null;    // ISO of the slot picked in the modal, pre-confirm
 
 async function openAvailModal(applicantId) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
   availApplicantId = applicantId;
-  document.getElementById('avail-title').textContent = `Availability — ${fullName(a)}`;
-  document.getElementById('avail-body').innerHTML = '<p class="notes__empty">Reading their reply…</p>';
+  availSelected = null;
+  const poss = /she/i.test(a.pronouns || '') ? 'her' : /\bhe\b|he\//i.test(a.pronouns || '') ? 'his' : 'their';
+  document.getElementById('avail-title').textContent = `Schedule a call with ${a.first}`;
+  document.getElementById('avail-body').innerHTML = `<p class="notes__empty">Reading ${poss} reply…</p>`;
   document.getElementById('avail-modal').hidden = false;
+  renderAvailFoot();
   try {
     const [avRes, out] = await Promise.all([
       sb.from('recruit_availability').select('windows, source_gmail_id, updated_at').eq('applicant_id', applicantId).maybeSingle(),
@@ -2486,28 +2490,36 @@ async function openAvailModal(applicantId) {
     if (availApplicantId !== applicantId) return;
     const windows = av?.windows || [];
     const ex = out.extraction || {};
-    const bullets = [];
-    // Gmail snippets arrive HTML-escaped — decode before our own escaping.
+    // One quote + one interpretation line — nothing the quote already says plainly.
     const deent = (t) => String(t || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-    if (srcEmail?.snippet) bullets.push(`They wrote${srcEmail.sent_at ? ` on ${fmtDate(srcEmail.sent_at)}` : ''}: “${esc(deent(srcEmail.snippet).slice(0, 180))}”`);
-    if (ex.timezone_note) bullets.push(esc(ex.timezone_note));
-    if (ex.platform?.kind) bullets.push(`They asked for ${esc(ex.platform.kind)}${ex.platform.handle ? ` (@${esc(ex.platform.handle)})` : ''} — the default is Google Meet.`);
-    bullets.push('Vague day-parts map to morning 9:00–12:00, afternoon 12:00–17:00, evening 17:00–21:00 PT; windows under 30 minutes are dropped.');
+    const bullets = [];
+    if (srcEmail?.snippet) bullets.push(`${a.first} wrote${srcEmail.sent_at ? ` on ${fmtDate(srcEmail.sent_at)}` : ''}: “${esc(deent(srcEmail.snippet).slice(0, 180))}”`);
+    const readBits = [];
+    if (ex.timezone_note) readBits.push(esc(ex.timezone_note));
+    if (ex.platform?.kind) readBits.push(`${esc(ex.platform.kind)}${ex.platform.handle ? ` (@${esc(ex.platform.handle)})` : ''} requested — the invite defaults to Google Meet`);
+    if (readBits.length) bullets.push(`Read as: ${readBits.join(' · ')}`);
     document.getElementById('avail-body').innerHTML = `
+      <p class="notes__empty">Here's ${poss} availability:</p>
       ${windows.length ? windows.map(w => `
         <div class="avail-card__window">
           <span class="avail-card__range">${new Date(w.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${w.start}–${w.end}</span>
           <span class="avail-card__slots">${windowSlots(w).map(d =>
-            `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${applicantId}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
-        </div>`).join('') : '<p class="notes__empty">No windows on file — read their thread in the Emails tab.</p>'}
-      <p class="notes__empty">Tap a time to book it — calendar invites go to both.</p>
-      <section class="review__section">
+            `<button type="button" class="chip" data-slot-pick="${d.toISOString()}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
+        </div>`).join('') : `<p class="notes__empty">No windows on file for ${a.first}.</p>`}
+      ${bullets.length ? `<section class="review__section">
         <h3 class="review__section-title">How we read it</h3>
         <ul class="avail-why">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>
-      </section>`;
+      </section>` : ''}`;
   } catch (e) {
     if (availApplicantId === applicantId) document.getElementById('avail-body').innerHTML = `<p class="notes__empty">Couldn't load availability: ${esc(e.message)}</p>`;
   }
+}
+
+function renderAvailFoot() {
+  const btn = document.getElementById('avail-confirm');
+  if (!btn) return;
+  btn.disabled = !availSelected;
+  btn.textContent = availSelected ? `Confirm ${fmtSlot(availSelected)}` : 'Confirm a time';
 }
 
 function closeAvailModal() {
@@ -2515,10 +2527,10 @@ function closeAvailModal() {
   document.getElementById('avail-modal').hidden = true;
 }
 
-async function scheduleSlot(applicantId, iso, btn) {
+async function scheduleSlot(applicantId, iso, btn, skipConfirm = false) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
-  if (!confirm(`Book the screening call for ${fmtSlot(iso)} (30 min)?\nCalendar invites go to ${a.email} and you.`)) return;
+  if (!skipConfirm && !confirm(`Book the screening call for ${fmtSlot(iso)} (30 min)?\nCalendar invites go to ${a.email} and you.`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
   try {
     const out = await gmailCall({ action: 'schedule', applicantId, startsAt: iso, minutes: 30 });
@@ -3050,6 +3062,18 @@ function init() {
           if (VIEWS[view]?.kind === 'applicants') renderApplicants();
         });
       }
+      return;
+    }
+    const sp = e.target.closest('[data-slot-pick]');
+    if (sp) {
+      availSelected = sp.dataset.slotPick;
+      document.querySelectorAll('[data-slot-pick]').forEach(c => c.classList.toggle('is-on', c.dataset.slotPick === availSelected));
+      renderAvailFoot();
+      return;
+    }
+    const ac = e.target.closest('#avail-confirm');
+    if (ac && availSelected && availApplicantId) {
+      scheduleSlot(availApplicantId, availSelected, ac, true);
       return;
     }
     const ar = e.target.closest('[data-avail-review]');

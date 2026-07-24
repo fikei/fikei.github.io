@@ -1270,3 +1270,16 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .cta-pair { display: inline-flex; align-items: center; gap: 6px; }
 .cta-icon { padding: 0 9px; min-width: 0; }
 .listing-menu__item--danger { color: var(--error); }
+
+/* --- v3.18.0: aligned CTA column, quiet ⋮, confirm-to-book modal --- */
+.inbox-row__actions .cta-stack { width: 172px; align-items: stretch; }
+.inbox-row__actions .cta-stack .cta-std { width: 100%; justify-content: center; }
+.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; }
+.inbox-row__actions .cta-pair .cta-std { flex: 1; }
+.inbox-row__actions .cta-context { align-self: flex-end; }
+.listing-menu-btn { border-color: transparent; background: transparent; letter-spacing: 0; font-size: 16px; }
+.listing-menu-btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+.avail-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.avail-foot__go { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+.avail-foot__note { font-size: var(--font-size-caption); color: var(--fg-subtle); max-width: 260px; text-align: right; }
+.avail-card__slots .chip.is-on { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-strong-fg); }
