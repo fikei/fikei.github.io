@@ -45,7 +45,7 @@ Every row carries grip ⠿ + rank, **one contextual CTA**, and **✕** at the fa
 | Waiting on them | muted `sent 3h ago` + **Follow up** | last email direction = out |
 | Invite promised | gray chip `Invite promised` + **Follow up** | last outbound reads like manual scheduling ("I'll send an invite", "let's chat tomorrow") — regex on the snippet |
 | They replied | blue response dot + **Reply** — opens the Emails tab to read first | last email direction = in, no availability parsed |
-| Availability in hand | **Pick a time** (accent, THE primary) + context-line link *"or send to housemates to claim"* (opens the Discord preview modal) | `recruit_availability` has windows, no screening booked. Discord copy describes the goal (housemates claim), never the transport ("post to Discord") |
+| Availability in hand | **Pick a time** (accent, THE primary) + context-line link *"Ask for coverage"* (opens the Discord preview modal) | `recruit_availability` has windows, no screening booked. Discord copy describes the goal (housemates claim), never the transport ("post to Discord") |
 | Call booked | slot chip `Fri, Jul 25, 9:00 AM` + **Join call** when a Meet link exists | scheduled row in `recruit_screenings` — booked in-app **or picked up from the shared calendar**: the scan sweeps upcoming events and matches attendees to applicants (application address or any address they've replied from), so manually-sent invites become screening rows automatically |
 
 **✕** removes from *this* listing only — tombstones the placement so the auto-sweep never re-adds; tooltip says so.
@@ -98,7 +98,7 @@ Downstyle (sentence case) everywhere in buttons, banners, badges, and chips; cap
 ## The two-tier right rail (v3.14.0)
 Every Openings row's right side is a stack:
 - **Top tier — exactly one primary** (accent button when it's your move, chip when it's someone else's).
-- **Context tier — quiet caption below**: timestamps (`replied 2h ago`, `sent 3d ago`), the secondary action as a text link (`or send to housemates to claim`, `▶ rewatch`), or who/when (`Fri, Jul 25 · 9:00 AM · Sam`).
+- **Context tier — quiet caption below**: timestamps (`replied 2h ago`, `sent 3d ago`), the secondary action as a text link (`Ask for coverage`, `▶ rewatch`), or who/when (`Fri, Jul 25 · 9:00 AM · Sam`).
 If a row needs two buttons, the state machine is wrong — demote one to the context tier.
 
 ## Call tab (v3.14.0)
