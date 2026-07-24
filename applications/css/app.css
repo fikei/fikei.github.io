@@ -1297,3 +1297,7 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .prose-more { margin-top: 6px; }
 .vote-recap { margin: 0 0 var(--space-5); font-size: var(--font-size-small); color: var(--fg-subtle); }
 .review__fact-value--quiet { color: var(--fg-subtle); }
+/* --- v3.19.1: footer CTA pair sizing --- */
+.foot-cta .cta-pair { display: flex; width: 100%; gap: 6px; }
+.foot-cta .cta-pair .cta-std { width: auto; flex: 1; }
+.foot-cta .cta-pair .cta-icon { width: auto; flex: 0 0 auto; }
