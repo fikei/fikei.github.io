@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.18.0';
+const VERSION = '3.19.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -287,7 +287,8 @@ function linkMeta(url) {
         let seg = u.pathname.split('/').filter(Boolean).pop() || '';
         if (!seg && /substack\.com$/i.test(u.hostname) && !/^www\./i.test(u.hostname)) seg = u.hostname.split('.')[0];
         const handle = decodeURIComponent(seg).replace(/^@/, '').replace(/\/$/, '');
-        const label = handle && !/^(in|company|profile|people)$/i.test(handle) ? handle : platform;
+        let label = handle && !/^(in|company|profile|people)$/i.test(handle) ? handle : platform;
+        if (platform === 'linkedin') label = label.replace(/-[0-9a-f]{6,}$/i, '').replace(/-/g, ' ');
         return { platform, label };
       }
     }
@@ -726,7 +727,7 @@ async function requestSecondOpinion(applicantId, btn) {
   } catch (e) {
     toast(`Second opinion failed: ${e.message}`);
   } finally {
-    if (btn && document.contains(btn)) { btn.disabled = false; btn.textContent = 'Second opinion'; }
+    if (btn && document.contains(btn)) { btn.disabled = false; btn.textContent = 'Get an AI read'; }
   }
 }
 
@@ -1987,7 +1988,11 @@ function openReview(id) {
   const domOrder = VIEWS[view]?.kind === 'applicants' ? renderedQueue() : [];
   queue = domOrder.includes(id) ? domOrder
     : applicants.filter(a => matchesView(a) && matchesFilters(a)).map(a => a.id);
-  if (!queue.includes(id)) queue = applicants.map(a => a.id);
+  if (!queue.includes(id)) {
+    const target = applicants.find(x => x.id === id);
+    queue = applicants.filter(x => x.stage === target?.stage).map(x => x.id);
+    if (!queue.includes(id)) queue = [id];
+  }
   qIndex = Math.max(0, queue.indexOf(id));
   reviewTab = 'profile';
   pendingVote = null;
@@ -2063,18 +2068,7 @@ function renderReview() {
   };
 
   document.getElementById('review-body').innerHTML = `
-    ${archived ? archiveBanner() : rec ? `<div class="decision-banner decision-banner--${rec.d}">
-      <div class="decision-banner__text">
-        <span class="decision-banner__label">${DECISION_LABELS[rec.d]}</span>
-        <span class="decision-banner__meta">${rec.reason ? esc(reasonLabel(rec.reason)) : 'No reason recorded'}${rec.byName ? ` · by ${esc(rec.byName)}` : ''}${rec.at ? ` · ${fmtDate(rec.at)}` : ''}</span>
-        ${rec.d === 'outreach' ? `<span class="decision-banner__meta">→ ${esc(attachmentLabel(rec))}</span>` : ''}
-        ${rec.note ? `<span class="decision-banner__note">“${esc(rec.note)}”</span>` : ''}
-      </div>
-      <span class="decision-banner__actions">
-        <button class="decision-banner__undo" data-edit-decision="${a.id}">Edit</button>
-        <button class="decision-banner__undo" data-clear="${a.id}">Undo</button>
-      </span>
-    </div>` : ''}
+    ${archived ? archiveBanner() : ''}
     <div class="review__card">
       <div class="review__head">
         ${avatarHtml(a, true)}
@@ -2083,11 +2077,12 @@ function renderReview() {
           <p class="review__meta"><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></p>
           <div class="review__badges">
             <span class="review__badge review__badge--track">${trackLabel(a)}</span>
-            ${a.source ? `<span class="review__badge" title="How they heard about Agape">${esc(a.source)}</span>` : ''}
+
           </div>
           <div class="review__facts">
             <div class="review__fact"><span class="review__fact-label">Move-in</span>${moveInFactHtml(a, miNorm)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
+            ${a.source ? `<div class="review__fact"><span class="review__fact-label">Via</span><span class="review__fact-value review__fact-value--quiet">${esc(a.source)}</span></div>` : ''}
             <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
           </div>
@@ -2107,7 +2102,7 @@ function renderReview() {
     <section class="review__section notes" id="notes">
       <div class="notes__head">
         <h3 class="review__section-title">House notes</h3>
-        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Second opinion</button>
+        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Get an AI read</button>
       </div>
       <div id="notes-body"><p class="notes__empty">Loading notes…</p></div>
       <form class="notes__form" id="notes-form">
@@ -2153,10 +2148,9 @@ function moveInFactHtml(a, miNorm) {
   }
   const conf = confirmedMoveIn(a);
   const shown = conf || displayMoveIn(a) || a.movein || '—';
-  return `<span class="review__fact-value ${conf ? 'is-confirmed' : ''}">
+  return `<span class="review__fact-value ${conf ? 'is-confirmed' : ''}" title="${esc(a.movein || '')}">
     ${esc(shown)}
-    ${conf ? `<span class="movein-check" title="Confirmed by ${esc(a.moveinSetBy || 'the house')} — their stated answer is behind the (i)">✓</span>` : ''}
-    ${infoDot(a.movein, conf || miNorm)}
+    ${conf ? `<span class="movein-check" title="Confirmed by ${esc(a.moveinSetBy || 'the house')}">✓</span>` : ''}
     <button type="button" class="fact-edit" data-movein-edit title="${conf ? 'Edit the confirmed date' : 'Confirm their real date'}" aria-label="Edit move-in date">✎</button>
   </span>`;
 }
@@ -2182,6 +2176,11 @@ async function saveMoveIn(id, clear = false) {
 /* House votes in the review body. The tally stays hidden until you've cast
    yours — no anchoring. */
 function voteSectionHtml(a) {
+  if (a.stage !== 'review') {
+    const st = voteStats(a.id);
+    if (!st.n) return '';
+    return `<p class="vote-recap">Review: ${st.scored} vote${st.scored === 1 ? '' : 's'}${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}${st.veto ? ' · vetoed' : ''}</p>`;
+  }
   const list = votes[a.id] || [];
   const mine = myVote(a.id);
   const st = voteStats(a.id);
@@ -2238,7 +2237,6 @@ function renderReviewFoot(a) {
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote>${mine ? 'Update vote' : 'Cast vote'}</button>
       </div>`;
   } else if (a.stage === 'candidate') {
-    // Placement pills with ✕ — row-level removal moved here from Openings.
     const pills = activePlacements(a.id).map(p => {
       const l = listings.find(x => x.id === p.listing_id);
       if (!l || l.status !== 'open') return '';
@@ -2247,8 +2245,11 @@ function renderReviewFoot(a) {
     }).join('');
     foot.innerHTML = `
       ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
-      <button class="btn review__btn review__btn--notfit" data-open-decision="pass">Not a fit</button>
-      <button class="btn review__btn review__btn--place" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to listing'}</button>`;
+      <span class="foot-cta">${openingsCta(a)}</span>
+      <span class="foot-links">
+        <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to a listing'}</button>
+        <button type="button" class="cta-link cta-link--danger" data-open-decision="pass">Not a fit…</button>
+      </span>`;
   } else {
     foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Inbox</button>`;
   }
@@ -2309,9 +2310,11 @@ async function deleteNote(noteId, applicantId) {
 
 function section(title, text) {
   if (!text) return '';
+  const long = text.length > 700;
   return `<section class="review__section">
     <h3 class="review__section-title">${title}</h3>
-    <p class="review__prose">${esc(text)}</p>
+    <p class="review__prose ${long ? 'is-clamped' : ''}">${esc(text)}</p>
+    ${long ? '<button type="button" class="cta-link prose-more" data-prose-toggle>More</button>' : ''}
   </section>`;
 }
 
@@ -2593,6 +2596,8 @@ async function _openDecisionSheet(d) {
 }
 
 function renderDecisionOptions() {
+  // Outreach is just "attach to a listing" — the votes are the reasons now.
+  if (pendingDecision === 'outreach') { document.getElementById('decision-options').innerHTML = ''; return; }
   document.getElementById('decision-options').innerHTML =
     (DECISION_REASONS[pendingDecision] || []).map(r =>
       `<button class="hold-sheet__option ${pendingReason === r.id ? 'is-selected' : ''}" data-reason="${r.id}">${r.label}</button>`).join('');
@@ -3049,6 +3054,13 @@ function init() {
         et.setAttribute('aria-expanded', String(!bodyEl.hidden));
         et.parentElement.classList.toggle('is-open', !bodyEl.hidden);
       }
+      return;
+    }
+    const proseT = e.target.closest('[data-prose-toggle]');
+    if (proseT) {
+      const prose = proseT.previousElementSibling;
+      const clamped = prose.classList.toggle('is-clamped');
+      proseT.textContent = clamped ? 'More' : 'Less';
       return;
     }
     const pr = e.target.closest('[data-pass-row]');
