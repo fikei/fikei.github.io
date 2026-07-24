@@ -1262,3 +1262,11 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .cta--amber:hover { filter: brightness(1.08); border-color: #D97706; color: #fff; }
 .btn--discord.cta-std, .btn--watch.cta-std, .btn--join.cta-std { border-radius: var(--radius-sm); }
 
+
+/* --- v3.17.0: availability modal + inline secondary icon + row ⋯ --- */
+.avail-why { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--font-size-small); color: var(--fg-muted); }
+.avail-foot { border-top: 1px solid var(--border); margin-top: var(--space-4); padding-top: var(--space-3); }
+.avail-foot__ask { font-size: var(--font-size-small); color: var(--fg-muted); }
+.cta-pair { display: inline-flex; align-items: center; gap: 6px; }
+.cta-icon { padding: 0 9px; min-width: 0; }
+.listing-menu__item--danger { color: var(--error); }
