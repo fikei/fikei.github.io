@@ -1222,10 +1222,10 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .btn-discord__icon { width: 16px; height: 16px; flex-shrink: 0; }
 
 /* Watch / Join row buttons + recording viewer (v3.12.0) */
-.btn--watch { background: #0F6E56; border-color: #0F6E56; color: #fff; gap: 6px; }
-.btn--watch:hover { background: #085041; border-color: #085041; color: #fff; }
-.btn--join { background: #185FA5; border-color: #185FA5; color: #fff; gap: 6px; }
-.btn--join:hover { background: #0C447C; border-color: #0C447C; color: #fff; }
+.btn--watch { background: #1D9E75; border-color: #1D9E75; color: #fff; gap: 6px; }
+.btn--watch:hover { background: #0F6E56; border-color: #0F6E56; color: #fff; }
+.btn--join { background: #378ADD; border-color: #378ADD; color: #fff; gap: 6px; }
+.btn--join:hover { background: #185FA5; border-color: #185FA5; color: #fff; }
 .watch-modal__card { max-width: 1060px; width: min(1060px, 94vw); }
 .watch-modal__grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 .watch-modal__player video { width: 100%; border-radius: 8px; background: #000; min-height: 300px; display: block; }
@@ -1254,11 +1254,11 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 
 /* --- v3.16.0: state-colored rounded-rect primaries + comments column --- */
 .cta-std { border-radius: var(--radius-sm); }
-.cta--blue { background: #185FA5; border-color: #185FA5; color: #fff; }
-.cta--blue:hover { filter: brightness(1.12); border-color: #185FA5; color: #fff; }
-.cta--green { background: #0F6E56; border-color: #0F6E56; color: #fff; }
-.cta--green:hover { filter: brightness(1.12); border-color: #0F6E56; color: #fff; }
-.cta--amber { background: #B45309; border-color: #B45309; color: #fff; }
-.cta--amber:hover { filter: brightness(1.1); border-color: #B45309; color: #fff; }
+.cta--blue { background: #378ADD; border-color: #378ADD; color: #fff; }
+.cta--blue:hover { filter: brightness(1.08); border-color: #378ADD; color: #fff; }
+.cta--green { background: #1D9E75; border-color: #1D9E75; color: #fff; }
+.cta--green:hover { filter: brightness(1.08); border-color: #1D9E75; color: #fff; }
+.cta--amber { background: #D97706; border-color: #D97706; color: #fff; }
+.cta--amber:hover { filter: brightness(1.08); border-color: #D97706; color: #fff; }
 .btn--discord.cta-std, .btn--watch.cta-std, .btn--join.cta-std { border-radius: var(--radius-sm); }
 
