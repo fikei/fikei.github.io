@@ -90,3 +90,6 @@ There is no stay-length segment — sublet durations read as move-in → move-ou
 
 1. Waiting candidates don't say *why* nothing fits (dates vs budget vs no open listing).
 3. Auto vs manual placements are visually identical.
+
+## Copy rule (2026-07-22)
+Downstyle (sentence case) everywhere in buttons, banners, badges, and chips; capitalize proper nouns only (Discord, Agape, Gmail, view names like Inbox). "Post to Discord" ✓ · "Post To Discord" ✗ · "Agape intro call" ✓.
