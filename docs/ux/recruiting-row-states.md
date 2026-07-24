@@ -45,7 +45,7 @@ Every row carries grip ⠿ + rank, **one contextual CTA**, and **✕** at the fa
 | Waiting on them | muted `sent 3h ago` + **Follow up** | last email direction = out |
 | Invite promised | gray chip `Invite promised` + **Follow up** | last outbound reads like manual scheduling ("I'll send an invite", "let's chat tomorrow") — regex on the snippet |
 | They replied | blue response dot + **Reply** — opens the Emails tab to read first | last email direction = in, no availability parsed |
-| Availability in hand | **Post to Discord** (accent, primary — opens the claim-post preview modal) + **Pick a time** (secondary, Emails-tab slot picker) | `recruit_availability` has windows, no screening booked. Discord claim is the primary route; posts are manual-with-preview for now |
+| Availability in hand | **Post to Discord** (blurple, THE primary — opens the claim-post preview modal) + quiet text link "or pick a time yourself" | `recruit_availability` has windows, no screening booked. **Rule: exactly one primary button per row** — secondaries render as text links, never a second button |
 | Call booked | slot chip `Fri, Jul 25, 9:00 AM` + **Join call** when a Meet link exists | scheduled row in `recruit_screenings` — booked in-app **or picked up from the shared calendar**: the scan sweeps upcoming events and matches attendees to applicants (application address or any address they've replied from), so manually-sent invites become screening rows automatically |
 
 **✕** removes from *this* listing only — tombstones the placement so the auto-sweep never re-adds; tooltip says so.

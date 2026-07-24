@@ -1237,3 +1237,12 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .watch-modal__note-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
 .watch-modal__note-form .notes__input { flex: 1; }
 @media (max-width: 900px) { .watch-modal__grid { grid-template-columns: 1fr; } .watch-modal__side { max-height: none; } }
+
+/* --- v3.10.3: one primary action per row — secondaries are text links --- */
+.cta-link {
+  border: 0; background: none; padding: 0;
+  color: var(--fg-link); font-size: var(--font-size-caption);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  white-space: nowrap;
+}
+.cta-link:hover { color: var(--accent-strong); }
