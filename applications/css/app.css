@@ -1246,3 +1246,8 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   white-space: nowrap;
 }
 .cta-link:hover { color: var(--accent-strong); }
+
+/* --- v3.14.0: CTA stack (context line under the action) + Call tab --- */
+.cta-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.cta-context { font-size: var(--font-size-caption); color: var(--fg-subtle); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.call-video { width: 100%; max-height: 420px; border-radius: var(--radius-md); background: #000; margin-bottom: var(--space-3); }

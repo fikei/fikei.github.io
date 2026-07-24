@@ -386,8 +386,11 @@ function processingChip() {
   return `<span class="decision-chip decision-chip--vote" title="The call ended — recording and notes usually land within 30 minutes">Notes on the way…</span>`;
 }
 
-function watchBtn(sc) {
-  return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded Intro Call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
+function watchBtn(sc, applicantId) {
+  // Opens the Call tab on their profile (video + summary + comments) —
+  // not a detached modal.
+  if (applicantId) return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded intro call" data-open-call="${applicantId}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
+  return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded intro call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
 }
 
 function joinBtn(sc) {
@@ -397,24 +400,27 @@ function joinBtn(sc) {
 function openingsCta(a) {
   const sc = screeningState[a.id];
   const phase = callPhase(sc);
-  if (phase === 'watch') return watchBtn(sc);
-  if (phase === 'processing') return processingChip();
-  if (phase === 'live') return joinBtn(sc) || processingChip();
+  const stack = (top, ctx) => `<span class="cta-stack">${top}${ctx ? `<span class="cta-context">${ctx}</span>` : ''}</span>`;
+  const when = sc?.at ? `${fmtSlot(sc.at)}${sc.with ? ` · ${esc(sc.with)}` : ''}` : '';
+  if (phase === 'watch') return stack(watchBtn(sc, a.id), when);
+  if (phase === 'processing') return stack(processingChip(), when);
+  if (phase === 'live') return stack(joinBtn(sc) || processingChip(), when);
   if (phase === 'scheduled') {
-    return `<span class="decision-chip decision-chip--outreach" title="Intro Call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
+    return stack(`<span class="decision-chip decision-chip--outreach" title="Intro call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`, sc.with ? `with ${esc(sc.with)}` : '');
   }
-  if (sc?.availability) return `<button class="btn btn--sm btn--discord inbox-row__review cta-std" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Post to Discord</button><button type="button" class="cta-link" data-pick-time="${a.id}">or pick a time yourself</button>`;
+  if (sc?.availability) return stack(
+    `<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Pick a time</button>`,
+    `<button type="button" class="cta-link" data-claim-preview="${a.id}">or send to housemates to claim</button>`);
   const st = emailState[a.id];
-  if (st?.lastDir === 'in') return `<button class="btn btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Reply</button>`;
+  if (st?.lastDir === 'in') return stack(`<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-pick-time="${a.id}">Reply</button>`, `replied ${relTime(st.lastAt)}`);
   if (st?.lastDir === 'out') {
-    // A human saying "I'll send an invite" reads as manual scheduling — say
-    // so instead of nagging Follow up. Calendar invites from the shared
-    // account get picked up automatically by the scan's calendar sweep.
+    // "I'll send an invite" reads as manual scheduling — say so instead of
+    // nagging; a shared-account invite gets picked up by the calendar sweep.
     const promised = /\b(invite|calendar|schedul|let'?s (chat|talk|meet)|talk (soon|then|tomorrow))\b/i.test(st.lastSnippet || '');
-    if (promised) return `<span class="decision-chip decision-chip--vote" title="The last email reads like manual scheduling — an invite from the shared account will be picked up automatically">Invite promised</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
-    return `<span class="note-count" title="Waiting on their reply">sent ${relTime(st.lastAt)}</span><button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`;
+    return stack(`<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Follow up</button>`,
+      `${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`);
   }
-  return `<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`;
+  return stack(`<button class="btn btn--accent btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`, '');
 }
 
 /* Blue response dot in the row's left gutter — sits beside the avatar,
@@ -1019,6 +1025,63 @@ async function postWatchNote() {
   comments.push(data);
   commentCounts[watchApplicantId] = comments.length;
   renderWatchNotes();
+}
+
+/* Call tab: recording + AI summary + the house's comments, with a
+   timestamp-stamp affordance. Same recruit_comments store as House notes. */
+async function loadCallPanel(a) {
+  const host = () => document.getElementById('call-panel');
+  if (!host()) return;
+  const sc = screeningState[a.id] || {};
+  let row = null;
+  if (sc.watch) {
+    ({ data: row } = await sb.from('recruit_screenings')
+      .select('id, housemate_name, starts_at, recording_summary')
+      .eq('id', sc.watch).maybeSingle());
+  } else {
+    ({ data: row } = await sb.from('recruit_screenings')
+      .select('id, housemate_name, starts_at, recording_summary')
+      .eq('applicant_id', a.id).order('starts_at', { ascending: false }).limit(1).maybeSingle());
+  }
+  if (queue[qIndex] !== a.id || reviewTab !== 'call' || !host()) return;
+  if (!row) { host().innerHTML = '<p class="notes__empty">No intro call yet.</p>'; return; }
+  host().innerHTML = `
+    <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
+    ${sc.watch ? `<video id="call-video" class="call-video" controls playsinline></video><p class="email-modal__status" id="call-status">Fetching recording…</p>` : `<p class="notes__empty">The recording lands here after the call.</p>`}
+    ${row.recording_summary ? `<section class="review__section"><h3 class="review__section-title">Call summary</h3>${mdLite(row.recording_summary)}</section>` : ''}
+    <section class="review__section notes">
+      <div class="notes__head">
+        <h3 class="review__section-title">Comments</h3>
+        ${sc.watch ? `<button type="button" class="btn btn--sm" id="call-stamp" title="Prefix your comment with the video's current time">Comment at current time</button>` : ''}
+      </div>
+      <div id="notes-body"><p class="notes__empty">Loading comments…</p></div>
+      <form class="notes__form" id="notes-form-call">
+        <textarea class="notes__input" id="notes-input" placeholder="Comment on the call — visible to the whole house." maxlength="4000"></textarea>
+        <button class="btn btn--accent btn--sm notes__submit" type="submit">Add comment</button>
+      </form>
+    </section>`;
+  loadComments(a.id).then(() => { if (queue[qIndex] === a.id && reviewTab === 'call') renderNotes(a.id); });
+  document.getElementById('notes-form-call')?.addEventListener('submit', (ev) => { ev.preventDefault(); postNote(a.id); });
+  document.getElementById('call-stamp')?.addEventListener('click', () => {
+    const v = document.getElementById('call-video');
+    const t = v?.currentTime || 0;
+    const stamp = `[${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}] `;
+    const input = document.getElementById('notes-input');
+    if (input && !input.value.startsWith(stamp)) input.value = stamp + input.value;
+    input?.focus();
+  });
+  if (sc.watch) {
+    try {
+      const out = await gmailCall({ action: 'recording-link', screeningId: sc.watch });
+      const v = document.getElementById('call-video');
+      const st = document.getElementById('call-status');
+      if (v && out.url) { v.src = out.url; if (st) st.textContent = ''; }
+      else if (st) st.textContent = 'Recording unavailable';
+    } catch (e) {
+      const st = document.getElementById('call-status');
+      if (st) st.textContent = `Recording unavailable: ${e.message}`;
+    }
+  }
 }
 
 async function openWatch(screeningId) {
@@ -2017,8 +2080,9 @@ function renderReview() {
     <div class="review-tabs">
       <button class="review-tabs__tab ${reviewTab === 'profile' ? 'is-on' : ''}" data-review-tab="profile">Profile</button>
       <button class="review-tabs__tab ${reviewTab === 'emails' ? 'is-on' : ''}" data-review-tab="emails">Emails${(emailsCache[a.id] || []).length ? ` (${emailsCache[a.id].length})` : ''}</button>
+      ${(screeningState[a.id]?.watch || screeningState[a.id]?.at) ? `<button class="review-tabs__tab ${reviewTab === 'call' ? 'is-on' : ''}" data-review-tab="call">Call</button>` : ''}
     </div>
-    ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : `
+    ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : `
     ${voteSectionHtml(a)}
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
@@ -2039,6 +2103,7 @@ function renderReview() {
   renderReviewFoot(a);
 
   if (reviewTab === 'emails') loadEmailsPanel(a);
+  else if (reviewTab === 'call') loadCallPanel(a);
   if (!houseLoaded) loadHouse().then(() => { renderRailCounts(); });
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
@@ -2325,11 +2390,11 @@ function schedulingHtml(a) {
           <span class="avail-card__slots">${windowSlots(w).map(d =>
             `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${a.id}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
         </div>`).join('')}
-      <p class="avail-card__discord">…or hand it to the house: <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Post to Discord…</button>
+      <p class="avail-card__discord">…or <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Send to housemates to claim…</button>
         <span class="notes__empty">first housemate to claim a slot runs the call (manual for now)</span></p>
     </div>`);
   } else if (!screenings.length) {
-    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.${emailState[a.id]?.lastDir === 'in' ? ` <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Post to Discord…</button>` : ''}</p>`);
+    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.${emailState[a.id]?.lastDir === 'in' ? ` <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Send to housemates to claim…</button>` : ''}</p>`);
   }
   return parts.join('');
 }
@@ -2897,6 +2962,13 @@ function init() {
         et.setAttribute('aria-expanded', String(!bodyEl.hidden));
         et.parentElement.classList.toggle('is-open', !bodyEl.hidden);
       }
+      return;
+    }
+    const oc = e.target.closest('[data-open-call]');
+    if (oc) {
+      openReview(oc.dataset.openCall);
+      reviewTab = 'call';
+      renderReview();
       return;
     }
     const cp = e.target.closest('[data-claim-preview]');
