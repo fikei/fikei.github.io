@@ -103,3 +103,8 @@ If a row needs two buttons, the state machine is wrong — demote one to the con
 
 ## Call tab (v3.14.0)
 Watch opens a **Call** tab on the applicant profile (not a modal): recording player, AI call summary, and comments — the shared `recruit_comments` store, with a "comment at current time" button that prefixes the comment with the video timestamp. The tab appears whenever a screening is scheduled or recorded.
+
+## v3.17 amendments
+- **Review availability** (blue) replaces Pick a time; context tier shows `N windows offered`. Opens a modal: bookable slot chips per window, a **How we read it** bullet list (their verbatim snippet + date, timezone conversion note, platform request, the day-part mapping rules), and the secondary path at the bottom: *"Doesn't work with your schedule? Ask the house on Discord"* (→ claim-post preview).
+- **Post-screening primary is Schedule a visit** (blue, opens the email draft); Watch demotes to a small inline green ▶ icon beside it — an icon secondary doesn't violate the one-primary rule.
+- **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach).
