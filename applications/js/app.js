@@ -1037,7 +1037,7 @@ async function openWatch(screeningId) {
     const a = applicants.find(x => x.id === sRow?.applicant_id);
     watchApplicantId = sRow?.applicant_id || null;
     document.getElementById('watch-title').textContent =
-      `${a ? fullName(a) : 'Agape Intro Call'}${sRow?.housemate_name ? ` × ${sRow.housemate_name}` : ''} · ${sRow?.starts_at ? fmtSlot(sRow.starts_at) : ''}`;
+      `${a ? fullName(a) : 'Agape intro call'}${sRow?.housemate_name ? ` × ${sRow.housemate_name}` : ''} · ${sRow?.starts_at ? fmtSlot(sRow.starts_at) : ''}`;
     document.getElementById('watch-summary').innerHTML =
       sRow?.recording_summary ? mdLite(sRow.recording_summary) : '<p class="notes__empty">No summary was captured for this call.</p>';
     if (watchApplicantId) { await loadComments(watchApplicantId); renderWatchNotes(); }
@@ -1977,7 +1977,7 @@ function renderReview() {
         <span class="decision-banner__meta">${esc(why)}</span>
       </div>
       <span class="decision-banner__actions">
-        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Review</button>
+        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Inbox</button>
       </span>
     </div>`;
   };
@@ -2168,7 +2168,7 @@ function renderReviewFoot(a) {
       <button class="btn review__btn review__btn--notfit" data-open-decision="pass">Not a fit</button>
       <button class="btn review__btn review__btn--place" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to listing'}</button>`;
   } else {
-    foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Review</button>`;
+    foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Inbox</button>`;
   }
 }
 
@@ -2177,7 +2177,7 @@ async function reopenApplicant(id) {
   if (!a) return;
   if (await setStage(id, 'review')) {
     const st = voteStats(id);
-    toast(st.veto ? `Reopened — note: ${st.veto.voter_name || 'a housemate'}'s veto still stands until they change their vote` : 'Reopened — back in Review');
+    toast(st.veto ? `Reopened — note: ${st.veto.voter_name || 'a housemate'}'s veto still stands until they change their vote` : 'Reopened — back in the Inbox');
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
