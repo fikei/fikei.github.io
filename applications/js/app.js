@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.16.3';
+const VERSION = '3.17.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -402,15 +402,16 @@ function openingsCta(a) {
   const phase = callPhase(sc);
   const stack = (top, ctx) => `<span class="cta-stack">${top}${ctx ? `<span class="cta-context">${ctx}</span>` : ''}</span>`;
   const when = sc?.at ? `${fmtSlot(sc.at)}${sc.with ? ` · ${esc(sc.with)}` : ''}` : '';
-  if (phase === 'watch') return stack(watchBtn(sc, a.id), when);
+  if (phase === 'watch') return stack(
+    `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Watch the recorded intro call" data-open-call="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`, when);
   if (phase === 'processing') return stack(processingChip(), when);
   if (phase === 'live') return stack(joinBtn(sc) || processingChip(), when);
   if (phase === 'scheduled') {
     return stack(`<span class="decision-chip decision-chip--outreach" title="Intro call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`, sc.with ? `with ${esc(sc.with)}` : '');
   }
   if (sc?.availability) return stack(
-    `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-pick-time="${a.id}">Pick a time</button>`,
-    `<button type="button" class="cta-link" data-claim-preview="${a.id}">Ask for coverage</button>`);
+    `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review availability</button>`,
+    sc.nWindows ? `${sc.nWindows} window${sc.nWindows === 1 ? '' : 's'} offered` : '');
   const st = emailState[a.id];
   if (st?.lastDir === 'in') return stack(`<button class="btn btn--sm inbox-row__review cta-std cta--green" data-pick-time="${a.id}">Reply</button>`, `replied ${relTime(st.lastAt)}`);
   if (st?.lastDir === 'out') {
@@ -492,7 +493,7 @@ async function loadAll() {
   }
   for (const av of (avRes.data || [])) {
     // empty windows = a processed non-scheduling reply — no Pick a time
-    if (Array.isArray(av.windows) && av.windows.length) screeningState[av.applicant_id] ||= { availability: true };
+    if (Array.isArray(av.windows) && av.windows.length) screeningState[av.applicant_id] ||= { availability: true, nWindows: av.windows.length };
   }
   emailState = {};
   for (const e of (eRes.data || [])) {
@@ -1246,6 +1247,7 @@ function renderApplicants() {
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${repliedDot(a)}
+            ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
               <span class="inbox-row__text">
@@ -1256,7 +1258,7 @@ function renderApplicants() {
             <span class="inbox-row__actions">
               ${noteBubble(a.id)}
               ${view === 'openings'
-                ? `${openingsCta(a)}<span class="inbox-row__grip" title="Drag to reorder">⠿</span>`
+                ? `${openingsCta(a)}${rowMenuHtml(a, g.key)}`
                 : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Vote</button>` : ''}`}
             </span>
           </li>`).join('')}
@@ -1293,6 +1295,21 @@ function othersAccordion(listingId) {
       }).join('')}
     </ul>
   </details>`;
+}
+
+/* Row-level ⋯: profile, availability link, remove, and Pass (archives +
+   queues the update email — passing always requires outreach). */
+function rowMenuHtml(a, listingId) {
+  const mid = `row-${a.id}-${listingId}`;
+  return `<span class="listing-menu-wrap">
+    <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${esc(mid)}" aria-label="Applicant actions" aria-haspopup="menu">⋯</button>
+    <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
+      <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
+      ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
+      <button type="button" class="listing-menu__item" data-remove-placement="${a.id}|${esc(listingId)}">Remove from this listing</button>
+      <button type="button" class="listing-menu__item listing-menu__item--danger" data-pass-row="${a.id}">Pass on ${esc(a.first)}…</button>
+    </span>
+  </span>`;
 }
 
 /* Drag-to-reorder applicants inside each listing group; shared house state. */
@@ -2445,6 +2462,57 @@ async function postClaimFromModal() {
   btn.disabled = false; btn.textContent = 'Post to Discord';
 }
 
+/* Review-availability modal: bookable slots from their windows, "how we
+   read it" bullets, and the coverage ask as the secondary path. */
+let availApplicantId = null;
+
+async function openAvailModal(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  availApplicantId = applicantId;
+  document.getElementById('avail-title').textContent = `Availability — ${fullName(a)}`;
+  document.getElementById('avail-body').innerHTML = '<p class="notes__empty">Reading their reply…</p>';
+  document.getElementById('avail-modal').hidden = false;
+  try {
+    const [avRes, out] = await Promise.all([
+      sb.from('recruit_availability').select('windows, source_gmail_id, updated_at').eq('applicant_id', applicantId).maybeSingle(),
+      gmailCall({ action: 'claim-preview', applicantId }).catch(() => ({})),
+    ]);
+    const av = avRes.data;
+    let srcEmail = null;
+    if (av?.source_gmail_id) {
+      ({ data: srcEmail } = await sb.from('recruit_emails').select('snippet, sent_at').eq('gmail_id', av.source_gmail_id).maybeSingle());
+    }
+    if (availApplicantId !== applicantId) return;
+    const windows = av?.windows || [];
+    const ex = out.extraction || {};
+    const bullets = [];
+    if (srcEmail?.snippet) bullets.push(`They wrote${srcEmail.sent_at ? ` on ${fmtDate(srcEmail.sent_at)}` : ''}: “${esc(srcEmail.snippet.slice(0, 180))}”`);
+    if (ex.timezone_note) bullets.push(esc(ex.timezone_note));
+    if (ex.platform?.kind) bullets.push(`They asked for ${esc(ex.platform.kind)}${ex.platform.handle ? ` (@${esc(ex.platform.handle)})` : ''} — the default is Google Meet.`);
+    bullets.push('Vague day-parts map to morning 9:00–12:00, afternoon 12:00–17:00, evening 17:00–21:00 PT; windows under 30 minutes are dropped.');
+    document.getElementById('avail-body').innerHTML = `
+      ${windows.length ? windows.map(w => `
+        <div class="avail-card__window">
+          <span class="avail-card__range">${new Date(w.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${w.start}–${w.end}</span>
+          <span class="avail-card__slots">${windowSlots(w).map(d =>
+            `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${applicantId}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
+        </div>`).join('') : '<p class="notes__empty">No windows on file — read their thread in the Emails tab.</p>'}
+      <p class="notes__empty">Tap a time to book it — calendar invites go to both.</p>
+      <section class="review__section">
+        <h3 class="review__section-title">How we read it</h3>
+        <ul class="avail-why">${bullets.map(b => `<li>${b}</li>`).join('')}</ul>
+      </section>`;
+  } catch (e) {
+    if (availApplicantId === applicantId) document.getElementById('avail-body').innerHTML = `<p class="notes__empty">Couldn't load availability: ${esc(e.message)}</p>`;
+  }
+}
+
+function closeAvailModal() {
+  availApplicantId = null;
+  document.getElementById('avail-modal').hidden = true;
+}
+
 async function scheduleSlot(applicantId, iso, btn) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
@@ -2454,6 +2522,11 @@ async function scheduleSlot(applicantId, iso, btn) {
     const out = await gmailCall({ action: 'schedule', applicantId, startsAt: iso, minutes: 30 });
     (screeningsCache[applicantId] ||= []).unshift(out.screening);
     toast('Screening call booked — invites sent to both');
+    if (!document.getElementById('avail-modal').hidden) {
+      closeAvailModal();
+      renderRailCounts();
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    }
     if (queue[qIndex] === applicantId && reviewTab === 'emails') loadEmailsPanel(a);
   } catch (e) {
     toast(`Booking failed: ${e.message}`);
@@ -2964,6 +3037,21 @@ function init() {
       }
       return;
     }
+    const pr = e.target.closest('[data-pass-row]');
+    if (pr) {
+      const a = applicants.find(x => x.id === pr.dataset.passRow);
+      if (a && confirm(`Pass on ${fullName(a)}? They move to the Archive and get queued for an update email.`)) {
+        saveDecision(a.id, 'pass', null, null, '');
+        setStage(a.id, 'rejected').then(() => {
+          toast(`${fullName(a)} → Archived — update email queued`);
+          renderRailCounts();
+          if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+        });
+      }
+      return;
+    }
+    const ar = e.target.closest('[data-avail-review]');
+    if (ar) { openAvailModal(ar.dataset.availReview); return; }
     const oc = e.target.closest('[data-open-call]');
     if (oc) {
       openReview(oc.dataset.openCall);
@@ -3109,6 +3197,12 @@ function init() {
   document.getElementById('claim-close').onclick = closeClaimModal;
   document.getElementById('claim-cancel').onclick = closeClaimModal;
   document.getElementById('claim-post-btn').onclick = postClaimFromModal;
+  document.getElementById('avail-close').onclick = closeAvailModal;
+  document.getElementById('avail-ask-coverage').onclick = () => {
+    const id = availApplicantId;
+    closeAvailModal();
+    if (id) openClaimPreview(id);
+  };
   document.getElementById('email-close').onclick = closeEmailModal;
   document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
   document.getElementById('email-send').onclick = async () => {
