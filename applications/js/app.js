@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.16.0';
+const VERSION = '3.16.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2083,27 +2083,21 @@ function renderReview() {
       ${(screeningState[a.id]?.watch || screeningState[a.id]?.at) ? `<button class="review-tabs__tab ${reviewTab === 'call' ? 'is-on' : ''}" data-review-tab="call">Call</button>` : ''}
     </div>
     ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : `
-    <div class="review-cols">
-      <div class="review-cols__main">
-        ${voteSectionHtml(a)}
-        ${section('About them', a.about)}
-        ${section('Why Agape', a.why)}
-        ${section('Gifts to share', a.gifts)}
+    ${voteSectionHtml(a)}
+    ${section('About them', a.about)}
+    ${section('Why Agape', a.why)}
+    ${section('Gifts to share', a.gifts)}
+    <section class="review__section notes" id="notes">
+      <div class="notes__head">
+        <h3 class="review__section-title">House notes</h3>
+        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Second opinion</button>
       </div>
-      <aside class="review-cols__side">
-        <section class="review__section notes" id="notes">
-          <div class="notes__head">
-            <h3 class="review__section-title">Comments</h3>
-            <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Second opinion</button>
-          </div>
-          <div id="notes-body"><p class="notes__empty">Loading comments…</p></div>
-          <form class="notes__form" id="notes-form">
-            <textarea class="notes__input" id="notes-input" placeholder="Comment for the house — only Recruiting Society members see these." maxlength="4000"></textarea>
-            <button class="btn btn--accent btn--sm notes__submit" type="submit">Add comment</button>
-          </form>
-        </section>
-      </aside>
-    </div>`}
+      <div id="notes-body"><p class="notes__empty">Loading notes…</p></div>
+      <form class="notes__form" id="notes-form">
+        <textarea class="notes__input" id="notes-input" placeholder="Add an internal note for the house — only Recruiting Society members see these." maxlength="4000"></textarea>
+        <button class="btn btn--accent btn--sm notes__submit" type="submit">Add note</button>
+      </form>
+    </section>`}
   `;
 
   renderReviewFoot(a);
