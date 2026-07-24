@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.17.0';
+const VERSION = '3.17.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2487,7 +2487,9 @@ async function openAvailModal(applicantId) {
     const windows = av?.windows || [];
     const ex = out.extraction || {};
     const bullets = [];
-    if (srcEmail?.snippet) bullets.push(`They wrote${srcEmail.sent_at ? ` on ${fmtDate(srcEmail.sent_at)}` : ''}: “${esc(srcEmail.snippet.slice(0, 180))}”`);
+    // Gmail snippets arrive HTML-escaped — decode before our own escaping.
+    const deent = (t) => String(t || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    if (srcEmail?.snippet) bullets.push(`They wrote${srcEmail.sent_at ? ` on ${fmtDate(srcEmail.sent_at)}` : ''}: “${esc(deent(srcEmail.snippet).slice(0, 180))}”`);
     if (ex.timezone_note) bullets.push(esc(ex.timezone_note));
     if (ex.platform?.kind) bullets.push(`They asked for ${esc(ex.platform.kind)}${ex.platform.handle ? ` (@${esc(ex.platform.handle)})` : ''} — the default is Google Meet.`);
     bullets.push('Vague day-parts map to morning 9:00–12:00, afternoon 12:00–17:00, evening 17:00–21:00 PT; windows under 30 minutes are dropped.');
