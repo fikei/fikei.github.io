@@ -1283,3 +1283,17 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .avail-foot__go { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: auto; }
 .avail-foot__note { font-size: var(--font-size-caption); color: var(--fg-subtle); max-width: 260px; text-align: right; }
 .avail-card__slots .chip.is-on { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-strong-fg); }
+
+/* --- v3.19.0: contextual profile footer + quieter profile --- */
+.foot-cta { display: inline-flex; }
+.foot-cta .cta-stack { width: 200px; align-items: stretch; }
+.foot-cta .cta-std { width: 100%; justify-content: center; }
+.foot-links { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center; }
+.cta-link--danger { color: var(--error); }
+.review__prose.is-clamped {
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.prose-more { margin-top: 6px; }
+.vote-recap { margin: 0 0 var(--space-5); font-size: var(--font-size-small); color: var(--fg-subtle); }
+.review__fact-value--quiet { color: var(--fg-subtle); }
