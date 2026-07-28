@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.11.0'
+const VERSION = '1.12.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -367,6 +367,52 @@ serve(async (req) => {
 
       console.log(`screening ${applicantId} x ${housemateName} @ ${startsAt.toISOString()}`)
       return json({ scheduled: true, screening: result.screening })
+    }
+
+    if (action === 'link-recording') {
+      // Attach an orphaned recorded call to an applicant: clone it into
+      // recruit_screenings (the surface the app already renders — Watch chip,
+      // notes) and stamp the recorded-event row so it stops counting as
+      // unlinked. Idempotent per event via the gcal_event_id dedup.
+      const gcalEventId = String(body.gcalEventId || '')
+      const applicantId = String(body.applicantId || '')
+      const { data: rec } = await client.from('recruit_recorded_events')
+        .select('*').eq('gcal_event_id', gcalEventId).maybeSingle()
+      if (!rec) return json({ error: 'unknown recorded event' }, 404)
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('id, first_name').eq('id', applicantId).maybeSingle()
+      if (!applicant) return json({ error: 'unknown applicant' }, 404)
+      const { data: dupe } = await client.from('recruit_screenings')
+        .select('id').eq('gcal_event_id', gcalEventId).maybeSingle()
+      if (!dupe) {
+        const past = new Date(rec.ends_at || rec.starts_at) < new Date()
+        const { error: insErr } = await client.from('recruit_screenings').insert({
+          applicant_id: applicantId,
+          starts_at: rec.starts_at,
+          ends_at: rec.ends_at || rec.starts_at,
+          gcal_event_id: rec.gcal_event_id,
+          meet_link: rec.meet_link,
+          housemate_name: 'linked manually',
+          status: past ? 'completed' : 'scheduled',
+          recall_bot_id: rec.recall_bot_id,
+          recall_status: rec.recall_status,
+          recording_summary: rec.recording_summary,
+          recording_posted_at: rec.recording_posted_at,
+        })
+        if (insErr) return json({ error: insErr.message }, 500)
+      }
+      await client.from('recruit_recorded_events')
+        .update({ applicant_id: applicantId }).eq('gcal_event_id', gcalEventId)
+      return json({ linked: true, applicantId, firstName: applicant.first_name })
+    }
+
+    if (action === 'unlinked-recordings') {
+      // Feed for the app's link modal: swept calls with no applicant.
+      const { data } = await client.from('recruit_recorded_events')
+        .select('gcal_event_id, title, starts_at, recording_summary')
+        .is('applicant_id', null)
+        .order('starts_at', { ascending: false }).limit(25)
+      return json({ recordings: data || [] })
     }
 
     if (action === 'claim-preview' || action === 'claim-post') {

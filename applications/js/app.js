@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.20.1';
+const VERSION = '3.21.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2809,6 +2809,50 @@ async function connectSharedGmail() {
   } catch (e) { toast(`Couldn't start Gmail connect: ${e.message}`); }
 }
 
+/* ---------- link orphaned recording to applicant (?link=<gcal id>) ---------- */
+async function openLinkRecording(gcalEventId) {
+  const clean = new URL(location.href);
+  clean.searchParams.delete('link');
+  history.replaceState(null, '', clean);
+  const modal = document.getElementById('link-modal');
+  const { data: rec } = await sb.from('recruit_recorded_events')
+    .select('gcal_event_id, title, starts_at, applicant_id').eq('gcal_event_id', gcalEventId).maybeSingle();
+  if (!rec) { toast('Recording not found — it may already be linked.'); return; }
+  if (rec.applicant_id) { toast('Already linked.'); openReview(rec.applicant_id); return; }
+  document.getElementById('link-title').textContent = `Link "${rec.title || 'Agape call'}" to an applicant`;
+  document.getElementById('link-status').textContent =
+    new Date(rec.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const results = document.getElementById('link-results');
+  const search = document.getElementById('link-search');
+  const renderRows = q => {
+    const needle = (q || '').toLowerCase();
+    const rows = applicants
+      .filter(a => !needle || `${a.first_name} ${a.last_name || ''} ${a.email || ''}`.toLowerCase().includes(needle))
+      .slice(0, 30);
+    results.innerHTML = rows.map(a =>
+      `<button type="button" class="hold-sheet__cancel" style="display:block;width:100%;text-align:left;margin-top:4px" data-link-pick="${esc(a.id)}">
+        ${esc(`${a.first_name} ${a.last_name || ''}`.trim())} <span style="opacity:.6">${esc(a.email || '')}</span>
+      </button>`).join('') || '<p class="email-modal__status">No matches.</p>';
+  };
+  search.value = ''; renderRows('');
+  search.oninput = () => renderRows(search.value);
+  results.onclick = async e => {
+    const btn = e.target.closest('[data-link-pick]');
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      const out = await gmailCall({ action: 'link-recording', gcalEventId, applicantId: btn.dataset.linkPick });
+      modal.hidden = true;
+      toast(`Linked to ${out.firstName} — notes will land on their profile`);
+      await loadAll(); render();
+      openReview(btn.dataset.linkPick);
+    } catch (err) { toast(`Link failed: ${err.message}`); btn.disabled = false; }
+  };
+  document.getElementById('link-close').onclick = () => { modal.hidden = true; };
+  modal.hidden = false;
+  search.focus();
+}
+
 /* ---------- auth + boot ---------- */
 
 /* Webview sandboxes (Discord/Instagram/FB in-app browsers, Android wv) break
@@ -2950,6 +2994,8 @@ async function _checkMembershipAndEnter() {
     if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived (budget under $1,500) — update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
     if (deep && applicants.some(x => x.id === deep)) openReview(deep);
+    const linkEv = new URLSearchParams(location.search).get('link');
+    if (linkEv) openLinkRecording(linkEv);
   } catch (e) {
     setGate('Something went wrong checking access.', 'Try again');
     document.getElementById('gate-btn').onclick = checkMembershipAndEnter;
