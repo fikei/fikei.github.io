@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.19.1';
+const VERSION = '3.20.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2810,6 +2810,44 @@ async function connectSharedGmail() {
 }
 
 /* ---------- auth + boot ---------- */
+
+/* Webview sandboxes (Discord/Instagram/FB in-app browsers, Android wv) break
+   OAuth round-trips: isolated short-lived storage, and the PKCE verifier is
+   lost if the flow hops out and back. Nudge toward the real browser or the
+   bot's one-time link instead. */
+function inAppBrowser() {
+  const ua = navigator.userAgent || '';
+  return /discord|instagram|fban|fbav|; wv\)/i.test(ua);
+}
+
+/* One-time sign-in link from the Discord "Get sign-in link" button:
+   ?signin=<token> → recruit-discord /redeem → verifyOtp mints the session
+   (CtrlAuth then fires signedin and the normal gate flow takes over). */
+async function redeemSigninToken() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('signin');
+  if (!token) return;
+  const clean = new URL(location.href);
+  clean.searchParams.delete('signin');
+  history.replaceState(null, '', clean);
+  setGate('Signing you in…', null);
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-discord/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token }),
+    });
+    const out = await resp.json();
+    if (!resp.ok) throw new Error(out.error || 'redeem failed');
+    const { error } = await sb.auth.verifyOtp({ type: 'email', token_hash: out.token_hash, email: out.email });
+    if (error) throw error;
+  } catch (e) {
+    setGate(e.message || 'Sign-in link failed.', 'Continue with Discord',
+      'Get a fresh link from the "Get sign-in link" button on Discord, or sign in with Discord here.');
+    document.getElementById('gate-btn').onclick = signInWithDiscord;
+  }
+}
+
 /* Direct Discord OAuth — the gate's primary action goes straight to Discord
    rather than through the multi-provider modal. */
 async function signInWithDiscord() {
@@ -2931,7 +2969,11 @@ function init() {
     document.body.dataset.authState = 'out';
     document.getElementById('app').hidden = true;
     document.getElementById('gate').hidden = false;
-    setGate('Sign in with Discord to open the applicant inbox.', 'Continue with Discord');
+    if (new URLSearchParams(location.search).get('signin')) return; // redeem in flight
+    setGate('Sign in with Discord to open the applicant inbox.', 'Continue with Discord',
+      inAppBrowser()
+        ? 'Heads up: you\'re in an in-app browser, where Discord sign-in often loops. Use ⋯ → "Open in browser", or tap "Get sign-in link" in the recruiting channel for a one-tap link.'
+        : null);
     document.getElementById('gate-btn').onclick = signInWithDiscord;
   });
 
@@ -2942,6 +2984,7 @@ function init() {
     mountTo: '#ctrl-auth-root',
   });
   sb = window.CtrlAuth.getSupabaseClient();
+  redeemSigninToken(); // no-op without ?signin=
 
   document.getElementById('gate-btn').onclick = signInWithDiscord;
   document.getElementById('gate-alt').onclick = () => window.CtrlAuth.openLoginModal();
