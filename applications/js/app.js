@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.20.0';
+const VERSION = '3.20.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2839,7 +2839,8 @@ async function redeemSigninToken() {
     });
     const out = await resp.json();
     if (!resp.ok) throw new Error(out.error || 'redeem failed');
-    const { error } = await sb.auth.verifyOtp({ type: 'email', token_hash: out.token_hash, email: out.email });
+    // token_hash and type ONLY — supabase-js rejects the call if email rides along
+    const { error } = await sb.auth.verifyOtp({ type: 'email', token_hash: out.token_hash });
     if (error) throw error;
   } catch (e) {
     setGate(e.message || 'Sign-in link failed.', 'Continue with Discord',
