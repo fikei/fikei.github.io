@@ -1329,3 +1329,10 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .chip-line { color: var(--fg-muted); }
 .cta--green.btn { background: #1D9E75; border-color: #1D9E75; color: #fff; }
 .gd-no { color: var(--error); border-color: var(--error); background: transparent; }
+
+/* --- v3.22.1 (restored post-rebase): mobile CTA-column fix — must stay
+   LAST so the cascade resolves in its favor. --- */
+@media (max-width: 480px) {
+  .inbox-row__actions .cta-stack { width: auto; align-items: flex-end; }
+  .inbox-row__actions .cta-pair { width: auto; }
+}
