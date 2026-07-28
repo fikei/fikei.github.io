@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agape recruiting — design system</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --elevated: #1f2630;
+  --ink: #f0f6fc; --ink-2: rgba(240,246,252,0.72); --ink-3: rgba(240,246,252,0.5);
+  --line: rgba(240,246,252,0.12); --line-2: rgba(240,246,252,0.24);
+  --accent: #5CB2FF; --accent-ink: #0d1117;
+  --blue: #378ADD; --green: #1D9E75; --amber: #D97706; --blurple: #5865F2;
+  --red: #FF7A6E;
+  --tint-blue: rgba(92,178,255,0.18); --tint-blue-ink: #B5D4F4;
+  --tint-amber: rgba(255,235,105,0.14); --tint-amber-ink: #FFEB69;
+  --tint-gray: rgba(240,246,252,0.08);
+  --ok: #9FE870; --r-xs: 6px; --r-sm: 8px; --r-md: 12px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #FAFAF9; --surface: #F4F4F2; --elevated: #FFFFFF;
+    --ink: #0E0F0C; --ink-2: #454745; --ink-3: #6A6C6A;
+    --line: rgba(14,15,12,0.12); --line-2: rgba(14,15,12,0.24);
+    --accent-ink: #06264D;
+    --tint-blue: rgba(92,178,255,0.25); --tint-blue-ink: #185FA5;
+    --tint-amber: rgba(237,200,67,0.25); --tint-amber-ink: #6b5310;
+    --tint-gray: rgba(14,15,12,0.07); --ok: #2F5711; --red: #A8200D;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 14.5px/1.55 -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+
+.app { display: grid; grid-template-columns: 248px minmax(0,1fr); min-height: 100vh; }
+@media (max-width: 760px) { .app { grid-template-columns: 1fr; } .side { position: static !important; height: auto !important; border-right: 0 !important; border-bottom: 1px solid var(--line); } }
+
+.side {
+  background: var(--surface); border-right: 1px solid var(--line);
+  padding: 18px 12px 40px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.side .brand { display: block; padding: 4px 10px 14px; }
+.side .brand b { font-size: 13.5px; display: block; }
+.side .brand span { font-size: 11px; color: var(--ink-3); }
+.side .brand a { font-size: 11px; display: block; margin-top: 4px; }
+.side .grp { margin-top: 14px; }
+.side .grp > button {
+  width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  font: 600 10.5px/1 inherit; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3); padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;
+}
+.side .grp > button .tw { transition: transform 120ms ease; font-size: 9px; }
+.side .grp.closed > button .tw { transform: rotate(-90deg); }
+.side .grp.closed .items { display: none; }
+.side .items { display: flex; flex-direction: column; margin-top: 2px; }
+.side .items a {
+  font-size: 13px; color: var(--ink-2); padding: 6px 10px 6px 22px; border-radius: var(--r-xs);
+  display: flex; align-items: center; gap: 8px;
+}
+.side .items a::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--line-2); flex-shrink: 0; }
+.side .items a:hover { color: var(--ink); background: var(--tint-gray); }
+.side .items a.on { color: var(--ink); background: var(--tint-blue); }
+.side .items a.on::before { background: var(--accent); }
+
+.main { padding: 0 0 80px; }
+.topbar {
+  position: sticky; top: 0; z-index: 30; background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px; padding: 10px 28px;
+  font-size: 12px; color: var(--ink-3);
+}
+.topbar .crumb b { color: var(--ink); font-weight: 600; }
+.story { display: none; padding: 28px 28px 0; max-width: 860px; }
+.story.on { display: block; }
+.story h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.story .lede { color: var(--ink-2); font-size: 14px; margin: 0 0 22px; max-width: 64ch; }
+.canvas {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 26px; margin: 0 0 6px; position: relative;
+}
+.canvas::after { content: 'canvas'; position: absolute; top: 8px; right: 12px; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.notes { padding: 16px 2px; }
+.notes h3 { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+.notes p { max-width: 66ch; color: var(--ink-2); font-size: 13.5px; margin: 0 0 10px; }
+.notes b { color: var(--ink); }
+.notes ul { max-width: 66ch; color: var(--ink-2); font-size: 13.5px; padding-left: 18px; margin: 0 0 10px; display: flex; flex-direction: column; gap: 6px; }
+
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.sw { border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line); background: var(--elevated); }
+.sw .chipx { height: 48px; display: flex; align-items: flex-end; padding: 8px 10px; font-size: 11px; font-weight: 600; }
+.sw .meta { padding: 7px 10px; font-size: 11px; display: flex; justify-content: space-between; gap: 8px; }
+.sw .meta code { color: var(--ink-3); font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+
+table.vx { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.vx td, table.vx th { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
+.yes { color: var(--ok); font-weight: 600; }
+.no { color: var(--red); font-weight: 600; }
+.tblwrap { overflow-x: auto; }
+
+.row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md);
+  position: relative;
+}
+.grip { color: var(--ink-3); font-size: 11px; letter-spacing: -1px; cursor: grab; }
+.dot { position: absolute; left: -4px; top: 50%; transform: translate(-50%,-50%); width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+.av { width: 34px; height: 34px; border-radius: var(--r-xs); background: var(--tint-gray); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-2); flex-shrink: 0; }
+.who { flex: 1; min-width: 0; }
+.who b { display: block; font-size: 13.5px; }
+.who .sub { font-size: 11.5px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tk { font-size: 9.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--tint-gray); color: var(--ink-2); }
+.tk.sublet { background: var(--tint-amber); color: var(--tint-amber-ink); }
+.bubble { position: relative; width: 20px; height: 20px; color: var(--blue); flex-shrink: 0; }
+.bubble svg { width: 100%; height: 100%; display: block; }
+.bubble i { position: absolute; inset: 1px 0 auto; height: 12px; display: grid; place-items: center; font-style: normal; font-size: 9px; font-weight: 700; color: var(--elevated); }
+.stack { display: flex; flex-direction: column; align-items: stretch; gap: 3px; width: 168px; flex-shrink: 0; }
+.ctx { font-size: 11px; color: var(--ink-3); text-align: right; }
+.lnk { font-size: 11.5px; color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.lnk.danger { color: var(--red); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: 600 12.5px/1 inherit; padding: 9px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--line-2); background: var(--elevated); color: var(--ink); cursor: pointer;
+}
+.btn.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn.green { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.amber { background: var(--amber); border-color: var(--amber); color: #fff; }
+.btn.blurple { background: var(--blurple); border-color: var(--blurple); color: #fff; }
+.btn.icon { padding: 9px 10px; }
+.kebab { border: 1px solid transparent; background: transparent; color: var(--ink-2); border-radius: var(--r-sm); padding: 8px 10px; font-size: 15px; cursor: pointer; line-height: 1; }
+.kebab:hover { border-color: var(--line-2); background: var(--elevated); }
+.chip { font-size: 11px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.chip.blue { background: var(--tint-blue); color: var(--tint-blue-ink); }
+.chip.amber { background: var(--tint-amber); color: var(--tint-amber-ink); }
+.chip.gray { background: var(--tint-gray); color: var(--ink-2); }
+.pair { display: flex; gap: 6px; width: 100%; }
+.pair .btn:first-child { flex: 1; }
+.votepill { width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--elevated); color: var(--ink); font: 600 13px/1 inherit; cursor: pointer; }
+.votepill.on { background: var(--ok); border-color: var(--ok); color: #163300; }
+.callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 16px; }
+.co { font-size: 12px; color: var(--ink-2); display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
+.co b { color: var(--ink); font-size: 12px; }
+.co .m { width: 18px; height: 18px; border-radius: 50%; background: var(--tint-blue); color: var(--tint-blue-ink); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+.rule { display: grid; grid-template-columns: 16px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.rule:last-child { border-bottom: 0; }
+.rule .n { color: var(--ink-3); padding-top: 2px; }
+.rule b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+.rule span { color: var(--ink-2); font-size: 13px; }
+.dec { border-left: 3px solid var(--blue); padding: 4px 0 4px 16px; margin: 0 0 16px; }
+.dec b { font-size: 13.5px; }
+.dec p { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); max-width: 62ch; }
+.dec .d { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.type-row { display: grid; grid-template-columns: 130px 1fr; gap: 16px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.type-row:last-child { border-bottom: 0; }
+.type-row code { font-size: 10.5px; color: var(--ink-3); font-family: ui-monospace, Menlo, monospace; }
+.morebar { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; padding: 10px 0; color: var(--ink-2); font-size: 13px; font-weight: 500; border: 0; background: transparent; cursor: pointer; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="side">
+  <span class="brand"><b>Agape recruiting</b><span>design system · v3.19</span><a href="/design-system/">← all design systems</a></span>
+  <div class="grp" data-grp>
+    <button type="button">Getting started <span class="tw">▼</span></button>
+    <div class="items">
+      <a href="#introduction" data-story="introduction">Introduction</a>
+      <a href="#principles" data-story="principles">Principles</a>
+      <a href="#decision-log" data-story="decision-log">Decision log</a>
+    </div>
+  </div>
+  <div class="grp" data-grp>
+    <button type="button">Foundations <span class="tw">▼</span></button>
+    <div class="items">
+      <a href="#color" data-story="color">Color</a>
+      <a href="#typography" data-story="typography">Typography</a>
+      <a href="#shape" data-story="shape">Shape &amp; spacing</a>
+      <a href="#voice" data-story="voice">Voice</a>
+    </div>
+  </div>
+  <div class="grp" data-grp>
+    <button type="button">Components <span class="tw">▼</span></button>
+    <div class="items">
+      <a href="#row" data-story="row">Row</a>
+      <a href="#buttons" data-story="buttons">Buttons</a>
+      <a href="#chips" data-story="chips">Chips &amp; badges</a>
+      <a href="#note-bubble" data-story="note-bubble">Note bubble</a>
+      <a href="#overflow" data-story="overflow">Overflow menu</a>
+      <a href="#vote-bar" data-story="vote-bar">Vote bar</a>
+      <a href="#see-more" data-story="see-more">See-more bar</a>
+    </div>
+  </div>
+  <div class="grp" data-grp>
+    <button type="button">Patterns <span class="tw">▼</span></button>
+    <div class="items">
+      <a href="#two-tier" data-story="two-tier">Two-tier rail</a>
+      <a href="#row-states" data-story="row-states">Row states</a>
+      <a href="#schedule-modal" data-story="schedule-modal">Schedule modal</a>
+      <a href="#listing-header" data-story="listing-header">Listing header</a>
+      <a href="#profile" data-story="profile">Profile</a>
+      <a href="#stage-machine" data-story="stage-machine">Stage machine</a>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar"><span class="crumb" id="crumb"><b>Getting started</b> / Introduction</span></div>
+
+  <section class="story" id="s-introduction">
+    <h1>Introduction</h1>
+    <p class="lede">The design system for ctrl.rodeo/applications — the app that moves a person from application to Agape housemate. One screen of rows carries the whole funnel, so nearly every rule here is about earning the right to put something on a row.</p>
+    <div class="canvas">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;">
+        <span class="chip gray">Apply</span><span style="color:var(--ink-3)">→</span>
+        <span class="chip blue">Inbox</span><span style="color:var(--ink-3)">→</span>
+        <span class="chip blue">Candidates</span><span style="color:var(--ink-3)">→</span>
+        <span class="chip blue">Openings</span><span style="color:var(--ink-3)">→</span>
+        <span class="chip blue">Screening</span><span style="color:var(--ink-3)">→</span>
+        <span class="chip gray">Visit · decision</span>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <p>Dark-first, Inter/system sans, rounded rectangles for actions and pills for state. Blue stages are automated by the app; grey ones are human-run (for now). Source of truth for behavior: <b>docs/ux/recruiting-row-states.md</b> in the repo; this site is the articulated why.</p>
+    </div>
+  </section>
+
+  <section class="story" id="s-principles">
+    <h1>Principles</h1>
+    <p class="lede">Every rule below was earned by deleting something that violated it.</p>
+    <div class="canvas" style="padding:10px 22px;">
+      <div class="rule"><span class="n">·</span><div><b>One primary action per row</b><span>The right rail answers "whose move is it?" with exactly one button. If a row needs two buttons, the state machine is wrong — demote one to the context tier or an icon.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Two tiers: action, then context</b><span>Primary on top; timestamps, secondary links, and who/when live in a quiet caption beneath.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Name the goal, not the transport</b><span>"Ask for coverage," never "Post to Discord" as a goal label. Mechanism belongs in subcopy.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Never explain the UI</b><span>No "tap a time to book it." Outcome copy is welcome: "Invites will be sent to both of you, with an email introduction."</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Never be redundant</b><span>One quote plus one interpretation line. If a badge says it, the subline doesn't repeat it.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Select, then confirm</b><span>Anything that commits takes two taps: a selection state, then a labeled confirm. Never a native dialog in a polished flow.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Whitespace over chrome</b><span>Overflow menus are borderless ⋮ until hover. Hint text and toolbars get removed before a divider gets added.</span></div></div>
+      <div class="rule"><span class="n">·</span><div><b>Dates have to line up</b><span>A candidate appears under a listing only when their window genuinely overlaps it. "Flexible" must be their word, not our guess.</span></div></div>
+    </div>
+  </section>
+
+  <section class="story" id="s-decision-log">
+    <h1>Decision log</h1>
+    <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
+    <div class="notes">
+      <div class="dec"><span class="d">Jul 22</span><br><b>Collective votes replaced the single decider.</b><p>Culture fit is the house's call; the app's job is quorum, blindness until you've voted, and a hard veto.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>AI suggestions replaced by deterministic placement.</b><p>A candidate is in every listing they qualify for, by rule. Confidence percentages were deleted — dates either line up or they don't.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>Discord posts are manual-with-preview, for now.</b><p>A human sees the exact message before the house does. Auto-posting is a cutover we'll earn, not a default.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>Pick-a-time beat the Discord post as the schedule primary.</b><p>Self-serve booking is the fast path; coverage is the fallback, so it reads as one ("Ask for coverage").</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>The rail became two tiers with a fixed-width column.</b><p>One primary, quiet context beneath, every edge aligned. The alternative — badges, timestamps, and two buttons jostling inline — is where the old design died.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>Accessible-dark palette softened to friendly mid-tones.</b><p>Strict AA darks read as heavy. The system trades measured contrast for warmth at semibold sizes — a deliberate, documented exception.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>The profile footer joined the state machine.</b><p>The lime/red decision pills were the last pre-v3 survivors; the footer now shows the same primary as the person's row.</p></div>
+    </div>
+  </section>
+
+  <section class="story" id="s-color">
+    <h1>Color</h1>
+    <p class="lede">Dark-first; the light theme is a first-class remap, not an inversion. Action hues encode the kind of move, never decoration.</p>
+    <div class="canvas">
+      <div class="grid3">
+        <div class="sw"><div class="chipx" style="background:#0d1117;color:#f0f6fc;">Bg</div><div class="meta"><span>Page</span><code>#0d1117</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#161b22;color:#f0f6fc;">Surface</div><div class="meta"><span>Rails, cards</span><code>#161b22</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#1f2630;color:#f0f6fc;">Elevated</div><div class="meta"><span>Rows, modals</span><code>#1f2630</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#5CB2FF;color:#06264D;">Accent</div><div class="meta"><span>Links, focus</span><code>#5CB2FF</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#378ADD;color:#fff;">Blue</div><div class="meta"><span>Start / schedule</span><code>#378ADD</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#1D9E75;color:#fff;">Green</div><div class="meta"><span>Respond / attend</span><code>#1D9E75</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#D97706;color:#fff;">Amber</div><div class="meta"><span>Nudge</span><code>#D97706</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#5865F2;color:#fff;">Blurple</div><div class="meta"><span>Discord handoffs</span><code>#5865F2</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#9FE870;color:#163300;">Lime</div><div class="meta"><span>Vote selection only</span><code>#9FE870</code></div></div>
+        <div class="sw"><div class="chipx" style="background:#FF7A6E;color:#4A1B0C;">Error</div><div class="meta"><span>Veto, destructive</span><code>#FF7A6E</code></div></div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li><b>Grey is the default action</b> (Reach out). Color means the state changed.</li>
+        <li>White text on friendly mid-tones — deliberately warmer than strict AA darks; contrast is traded knowingly for approachability at 12.5px semibold.</li>
+        <li>Blurple appears only when work is handed to the house via Discord.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-typography">
+    <h1>Typography</h1>
+    <p class="lede">One family (Inter / system sans). Hierarchy comes from weight and ink level, never from a second face.</p>
+    <div class="canvas" style="padding:12px 22px;">
+      <div class="type-row"><code>title · 24/700</code><span style="font-size:24px;font-weight:700;letter-spacing:-0.02em;">Openings</span></div>
+      <div class="type-row"><code>section · 15/600</code><span style="font-size:15px;font-weight:600;">House votes</span></div>
+      <div class="type-row"><code>row name · 13.5/600</code><span style="font-size:13.5px;font-weight:600;">Marisa Maccaro</span></div>
+      <div class="type-row"><code>body · 15/400</code><span>Full sentences, ~66ch measure, generous line-height.</span></div>
+      <div class="type-row"><code>subline · 11.5/400</code><span style="font-size:11.5px;color:var(--ink-3);">she/her · Sep 1, 2026</span></div>
+      <div class="type-row"><code>context · 11/400</code><span style="font-size:11px;color:var(--ink-3);">sent 3h ago</span></div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>Three ink levels (primary, secondary at 72%, subtle at 50%) do the work italics and color would otherwise do. Tabular numerals wherever digits align.</p></div>
+  </section>
+
+  <section class="story" id="s-shape">
+    <h1>Shape &amp; spacing</h1>
+    <p class="lede">A pill means state; a rectangle means action.</p>
+    <div class="canvas">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+        <button class="btn blue">Action · 8px</button>
+        <span class="chip blue">State · pill</span>
+        <span style="background:var(--elevated);border:1px solid var(--line);border-radius:12px;padding:14px 18px;font-size:12px;color:var(--ink-2);">Card · 12px</span>
+        <span style="background:var(--elevated);border:1px solid var(--line);border-radius:16px;padding:14px 18px;font-size:12px;color:var(--ink-2);">Modal · 16px</span>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li>Radii: 6 (avatars) · 8 (buttons, inputs) · 12 (cards, rows) · 16 (modals) · 999 (pills).</li>
+        <li>Spacing scale: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40. Lists breathe with row padding, not dividers-on-dividers.</li>
+        <li>Same-size buttons in a column share a fixed width (172px in rails) so edges never drift.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-voice">
+    <h1>Voice</h1>
+    <p class="lede">Copy is a component. These are enforced, not aspirational.</p>
+    <div class="canvas" style="padding:10px;">
+      <div class="tblwrap"><table class="vx">
+        <tr><th>Rule</th><th class="yes">Yes</th><th class="no">No</th></tr>
+        <tr><td>Downstyle; proper nouns keep caps</td><td>Ask for coverage · Agape intro call</td><td>Ask For Coverage · Agape Intro Call</td></tr>
+        <tr><td>Goal, not transport</td><td>Ask for coverage</td><td>Post to Discord</td></tr>
+        <tr><td>Outcome copy, not instructions</td><td>Invites will be sent to both of you, with an email introduction.</td><td>Tap a time to book it.</td></tr>
+        <tr><td>Personal, descriptive titles</td><td>Schedule a call with Marisa — "Here's her availability:"</td><td>Availability — Marisa Maccaro</td></tr>
+        <tr><td>One interpretation, no boilerplate</td><td>Read as: +9h from PT · Instagram requested</td><td>Four bullets restating the parsing rules</td></tr>
+        <tr><td>Attribution over anonymity</td><td>Confirmed: Aug 1, 2026 · by fikei</td><td>Confirmed ✓</td></tr>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="story" id="s-row">
+    <h1>Row</h1>
+    <p class="lede">The core component. Everything on it is load-bearing; everything decorative was removed.</p>
+    <div class="canvas" style="padding:26px 30px;">
+      <div class="row">
+        <span class="dot"></span>
+        <span class="grip">⠿⠿</span>
+        <span class="av">MM</span>
+        <span class="who"><b>Marisa Maccaro</b><span class="sub"><span class="tk">Full-time</span> any · Sep 1, 2026</span></span>
+        <span class="bubble"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-4.6L12 21l-2.4-4H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"></path></svg><i>2</i></span>
+        <span class="stack"><button class="btn blue">Review availability</button><span class="ctx">1 window offered</span></span>
+        <button class="kebab" aria-label="Applicant actions">⋮</button>
+      </div>
+      <div class="callouts">
+        <div class="co"><span class="m">1</span><span><b>Response dot</b> — blue, in the card gutter. Last email was inbound; the ball is yours.</span></div>
+        <div class="co"><span class="m">2</span><span><b>Drag grip</b> — left edge, Openings only. Rank is a recruiter opinion, so it's manual.</span></div>
+        <div class="co"><span class="m">3</span><span><b>Track badge first</b> — Full-time neutral (the default); Sublet amber (the exception). Then pronouns · move-in. No applied dates.</span></div>
+        <div class="co"><span class="m">4</span><span><b>Note bubble</b> — count inside; hover shows the latest comment.</span></div>
+        <div class="co"><span class="m">5</span><span><b>Two-tier rail</b> — fixed 172px column; context caption beneath.</span></div>
+        <div class="co"><span class="m">6</span><span><b>⋮ overflow</b> — Open profile · Copy availability link · Remove from listing · Pass on [name]…</span></div>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>The whole row is a tap target that opens the profile; buttons and grips stop propagation. Same skeleton serves Inbox, Candidates, Openings, Screening, and Archive — only the badge/rail contents change per view.</p></div>
+  </section>
+
+  <section class="story" id="s-buttons">
+    <h1>Buttons</h1>
+    <p class="lede">Rounded rectangles, white text on state hues, one primary per context.</p>
+    <div class="canvas">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+        <button class="btn">Reach out</button>
+        <button class="btn blue">Pick a time</button>
+        <button class="btn green">Reply</button>
+        <button class="btn amber">Follow up</button>
+        <button class="btn blurple">◆ Ask for coverage</button>
+        <button class="btn green icon" aria-label="Watch">▶</button>
+        <button class="lnk">or send to housemates to claim</button>
+        <button class="lnk danger">Not a fit…</button>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li>Grey is the resting default; a hue signals the state advanced.</li>
+        <li>Secondaries are text links or small icon buttons — never a second full button.</li>
+        <li>Hover brightens ~8%; no elevation or shadow play.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-chips">
+    <h1>Chips &amp; badges</h1>
+    <p class="lede">Pills carry state. Tinted background + matching ink, never solid fills.</p>
+    <div class="canvas">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <span class="chip blue">Fri, Jul 25 · 9:00 AM</span>
+        <span class="chip blue">Priest · 9/1</span>
+        <span class="chip gray">2/3 votes</span>
+        <span class="chip gray">sent 3h ago</span>
+        <span class="chip amber">update queued</span>
+        <span class="tk">Full-time</span>
+        <span class="tk sublet">Sublet</span>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>Blue tint = scheduled/placed facts. Grey = counts and timestamps. Amber tint = something is owed (an update email, a stale follow-up). Placement pills are one-per-room with the open date — tapping ✕ in the profile removes with a tombstone so the auto-sweep never re-adds.</p></div>
+  </section>
+
+  <section class="story" id="s-note-bubble">
+    <h1>Note bubble</h1>
+    <p class="lede">The house's voice on a row: a filled speech square with the comment count.</p>
+    <div class="canvas">
+      <div style="display:flex;gap:22px;align-items:center;">
+        <span class="bubble" style="width:26px;height:26px;"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3h14a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-4.6L12 21l-2.4-4H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z"></path></svg><i style="font-size:11px;height:16px;">2</i></span>
+        <span style="font-size:12px;color:var(--ink-2);max-width:380px;">Hover tooltip: <b style="color:var(--ink);">2 house notes · latest — Sam: "dinner series is exactly our energy…"</b></span>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>One comment store everywhere: profile, Call tab (with video-timestamp stamps), and this bubble. Accent-colored because comments are signal, not metadata.</p></div>
+  </section>
+
+  <section class="story" id="s-overflow">
+    <h1>Overflow menu</h1>
+    <p class="lede">Vertical ⋮, borderless until hover. The menu holds everything that isn't the primary.</p>
+    <div class="canvas">
+      <div style="display:flex;gap:26px;align-items:flex-start;">
+        <button class="kebab" style="border-color:var(--line-2);background:var(--elevated);">⋮</button>
+        <div style="background:var(--elevated);border:1px solid var(--line);border-radius:var(--r-sm);padding:4px;display:flex;flex-direction:column;min-width:190px;">
+          <span style="padding:8px 10px;font-size:13px;">Open profile</span>
+          <span style="padding:8px 10px;font-size:13px;">Copy availability link</span>
+          <span style="padding:8px 10px;font-size:13px;">Remove from this listing</span>
+          <span style="padding:8px 10px;font-size:13px;color:var(--red);">Pass on Marisa…</span>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>Listing headers use the same component: Edit listing… · Mark filled · Close listing / Reopen. "Pass on [name]…" confirms, archives as rejected, and queues the update email — passing always requires outreach.</p></div>
+  </section>
+
+  <section class="story" id="s-vote-bar">
+    <h1>Vote bar</h1>
+    <p class="lede">The Inbox footer: would you live with them?</p>
+    <div class="canvas">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:12.5px;font-weight:600;">Would you live with them?</span>
+        <button class="votepill">1</button><button class="votepill">2</button><button class="votepill">3</button>
+        <button class="votepill on">4</button><button class="votepill">5</button>
+        <button class="btn" style="color:var(--red);border-color:var(--red);background:transparent;">Veto</button>
+        <span style="flex:1;min-width:120px;"><input style="width:100%;background:var(--elevated);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px;" placeholder="One line on why (optional)"></span>
+        <button class="btn" style="background:var(--accent);border-color:var(--accent);color:var(--accent-ink);border-radius:999px;">Cast vote</button>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li>The tally is blind until you cast — the one place the system deliberately withholds information.</li>
+        <li>Veto is separate from the scale and requires a note; it auto-archives with an update email owed.</li>
+        <li>Lime marks the selection — its only job in the system.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-see-more">
+    <h1>See-more bar</h1>
+    <p class="lede">A quiet, full-width drawer handle under each shortlist.</p>
+    <div class="canvas" style="padding:10px 26px;">
+      <button class="morebar">See other qualified applicants (23) <span>▾</span></button>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>Contains candidates a recruiter removed (one-tap re-add) and Inbox applicants who'd qualify once they pass review — pipeline visibility without cluttering the working set.</p></div>
+  </section>
+
+  <section class="story" id="s-two-tier">
+    <h1>Two-tier rail</h1>
+    <p class="lede">The right side of every row: one primary on top, quiet context beneath, fixed column width.</p>
+    <div class="canvas">
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
+        <span class="stack"><button class="btn">Reach out</button></span>
+        <span class="stack"><button class="btn amber">Follow up</button><span class="ctx">sent 3d ago</span></span>
+        <span class="stack"><button class="btn green">Reply</button><span class="ctx">replied 2h ago</span></span>
+        <span class="stack"><button class="btn blue">Review availability</button><span class="ctx">1 window offered</span></span>
+        <span class="stack"><span class="pair"><button class="btn blue">Schedule a visit</button><button class="btn green icon" aria-label="Watch">▶</button></span><span class="ctx">Fri, Jul 25 · 9:00 AM · Sam</span></span>
+        <span class="stack"><span class="chip blue" style="text-align:center;">Fri, Jul 25 · 9:00 AM</span><span class="ctx">with Sam</span></span>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>An icon secondary may split the column with the primary — alignment holds because the pair shares the same 172px. A chip in the top slot means the state is passive: someone else's move. The profile footer reuses this exact component at 200px.</p></div>
+  </section>
+
+  <section class="story" id="s-row-states">
+    <h1>Row states</h1>
+    <p class="lede">Active means your move; passive means the chip tells you whose it is. Every passive state carries its escalation rule.</p>
+    <div class="canvas" style="padding:10px;">
+      <div class="tblwrap"><table class="vx">
+        <tr><th>State</th><th>Top tier</th><th>Context tier</th><th>Logic</th></tr>
+        <tr><td>First contact</td><td>Reach out (grey)</td><td>—</td><td>No email either direction</td></tr>
+        <tr><td>Waiting on them</td><td>Follow up (amber when stale)</td><td>sent 3h ago</td><td>Last email out; escalates after ~3 quiet days</td></tr>
+        <tr><td>Invite promised</td><td>Follow up</td><td>invite promised · sent 6h ago</td><td>Outbound reads like manual scheduling; the calendar sweep picks up the invite</td></tr>
+        <tr><td>They replied</td><td>Reply (green)</td><td>replied 2h ago</td><td>Inbound, no windows extracted</td></tr>
+        <tr><td>Availability in hand</td><td>Review availability (blue)</td><td>N windows offered</td><td>Windows parsed, nothing booked — opens the schedule modal</td></tr>
+        <tr><td>Call scheduled</td><td>chip: Fri, Jul 25 · 9:00 AM</td><td>with Sam</td><td>Passive; flips to Join near start, "Notes on the way…" after</td></tr>
+        <tr><td>Recording landed</td><td>Schedule a visit (blue) + ▶</td><td>call time · housemate</td><td>Watch stays one tap away but is never the primary again</td></tr>
+        <tr><td>Terminal</td><td>chip: withdrew / update queued / accepted</td><td>—</td><td>Leaves Openings; rejection feeds the update-email queue</td></tr>
+      </table></div>
+    </div>
+  </section>
+
+  <section class="story" id="s-schedule-modal">
+    <h1>Schedule modal</h1>
+    <p class="lede">"Schedule a call with Marisa" — the availability review, booking, and coverage handoff in one surface.</p>
+    <div class="canvas" style="padding:18px;">
+      <div style="background:var(--elevated);border:1px solid var(--line);border-radius:16px;max-width:560px;padding:18px 20px;">
+        <b style="font-size:16px;">Schedule a call with Marisa</b>
+        <p style="font-size:12px;color:var(--ink-3);margin:10px 0 6px;">Here's her availability:</p>
+        <p style="font-size:12.5px;margin:0 0 6px;">Sat, Jul 25 · 09:00–12:00</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="chip" style="background:var(--accent);color:var(--accent-ink);">9:00 AM</span>
+          <span class="chip gray">9:30 AM</span><span class="chip gray">10:00 AM</span><span class="chip gray">10:30 AM</span><span class="chip gray">11:00 AM</span>
+        </div>
+        <p style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 6px;">How we read it</p>
+        <ul style="margin:0;padding-left:16px;font-size:12px;color:var(--ink-2);display:flex;flex-direction:column;gap:5px;">
+          <li>Marisa wrote on Jul 22: "…could we do like July 25, morning your time, evening mine? and could we do it over ig?"</li>
+          <li>Read as: +9h from PT — morning PT is her evening · Instagram requested — the invite defaults to Google Meet</li>
+        </ul>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line);margin-top:16px;padding-top:12px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--ink-3);">Doesn't work with your schedule? <button class="lnk">Ask the house on Discord</button></span>
+          <span style="display:inline-flex;align-items:center;gap:10px;"><span style="font-size:10.5px;color:var(--ink-3);max-width:200px;text-align:right;">Invites will be sent to both of you, with an email introduction.</span><button class="btn" style="background:var(--accent);border-color:var(--accent);color:var(--accent-ink);border-radius:999px;">Confirm Sat, Jul 25, 9:00 AM</button></span>
+        </div>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>Select-then-confirm: a slot highlights, the primary re-labels with the exact time. Two bullets max in the read-out — the quote and one interpretation. The coverage ask is the secondary path, phrased as a goal.</p></div>
+  </section>
+
+  <section class="story" id="s-listing-header">
+    <h1>Listing header</h1>
+    <p class="lede">Room, kind, one meta line. Everything else hides behind ⋮.</p>
+    <div class="canvas" style="padding:18px;">
+      <div style="background:var(--elevated);border:1px solid var(--line);border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span><b style="font-size:16px;">DMT Room</b> <span class="chip blue">Resident trial</span><br><span style="font-size:12px;color:var(--ink-2);">Opens Oct 1, 2026 · <b>$1,900/mo all-in</b></span></span>
+        <span style="display:inline-flex;align-items:center;gap:10px;"><button class="kebab">⋮</button><span style="font-size:12px;color:var(--ink-3);">7 applicants</span></span>
+      </div>
+    </div>
+    <div class="notes"><h3>Notes</h3><p>The all-in number sums rent + dues + groceries; the breakdown lives on hover. No trial boilerplate, no free-text notes in the header — those belong to the edit modal. Menu: Edit listing… · Mark filled · Close listing (Reopen when closed).</p></div>
+  </section>
+
+  <section class="story" id="s-profile">
+    <h1>Profile</h1>
+    <p class="lede">One overlay, three tabs, and a footer that runs the same state machine as the rows.</p>
+    <div class="canvas" style="padding:18px;">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:560px;">
+        <div style="display:flex;gap:20px;border-bottom:1px solid var(--line);padding-bottom:8px;font-size:13.5px;">
+          <b style="border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:-9px;">Profile</b>
+          <span style="color:var(--ink-2);">Emails</span><span style="color:var(--ink-2);">Call</span>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+          <span class="stack" style="width:200px;"><span class="pair"><button class="btn blue">Schedule a visit</button><button class="btn green icon">▶</button></span></span>
+          <span style="display:flex;flex-direction:column;gap:5px;"><button class="lnk">Add to another listing</button><button class="lnk danger">Not a fit…</button></span>
+          <span class="chip blue">Priest · 9/1 ✕</span>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li>Votes render only during review; afterwards a one-line recap ("Review: 3 votes · avg 4.3").</li>
+        <li>Long answers clamp to six lines with More/Less; heard-from is a quiet "Via" fact, not a bubble.</li>
+        <li>The Call tab holds the recording, AI summary, and comments with "comment at current time" stamps.</li>
+        <li>Confirmed move-in replaces the parsed date outright — green, ✓, attributed — with the raw answer on hover.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-stage-machine">
+    <h1>Stage machine</h1>
+    <p class="lede">The visual system sits on deterministic, server-side rules — never client opinion.</p>
+    <div class="canvas" style="padding:10px 22px;">
+      <div class="rule"><span class="n">1</span><div><b>Inbox → Candidates</b><span>3+ votes averaging ≥ 3.5. One veto (note required) auto-archives with an update email owed. Budget under $1,500/mo auto-archives at load.</span></div></div>
+      <div class="rule"><span class="n">2</span><div><b>Candidates → Openings</b><span>Auto-placement into every open listing whose dates genuinely line up (track match, budget covers rent, window overlap — no padding). Removals are tombstoned; the sweep never re-adds.</span></div></div>
+      <div class="rule"><span class="n">3</span><div><b>Openings → Screening</b><span>Availability parsed from replies (thread-matched, any sender address); calls booked in-app, via a Discord claim, or picked up automatically from the shared calendar.</span></div></div>
+      <div class="rule"><span class="n">4</span><div><b>Recruiter-confirmed dates win</b><span>A confirmed window replaces parsed text everywhere — display, filters, placement — and is exact: no "flexible" escape hatch.</span></div></div>
+      <div class="rule"><span class="n">5</span><div><b>Passing requires outreach</b><span>Every rejection queues an update email. "Archived" without one is reserved for history imports.</span></div></div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var stories = document.querySelectorAll('.story');
+  var links = document.querySelectorAll('[data-story]');
+  var crumb = document.getElementById('crumb');
+  function groupOf(link) {
+    var g = link.closest('.grp');
+    return g ? g.querySelector('button').textContent.replace('▼', '').trim() : '';
+  }
+  function show(name) {
+    var found = false;
+    stories.forEach(function (s) {
+      var on = s.id === 's-' + name;
+      s.classList.toggle('on', on);
+      if (on) found = true;
+    });
+    if (!found) { show('introduction'); return; }
+    links.forEach(function (l) {
+      var on = l.dataset.story === name;
+      l.classList.toggle('on', on);
+      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + l.textContent;
+    });
+    window.scrollTo(0, 0);
+  }
+  links.forEach(function (l) {
+    l.addEventListener('click', function () { setTimeout(function () { show(l.dataset.story); }, 0); });
+  });
+  document.querySelectorAll('[data-grp] > button').forEach(function (b) {
+    b.addEventListener('click', function () { b.parentElement.classList.toggle('closed'); });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.replace('#', '') || 'introduction'); });
+  show(location.hash.replace('#', '') || 'introduction');
+})();
+</script>
+</body>
+</html>
