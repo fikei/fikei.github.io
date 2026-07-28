@@ -4,5 +4,5 @@
 -- unmatched_notified_at stamps the one-time "couldn't match this call" DM
 -- so the cron never nags twice.
 ALTER TABLE recruit_recorded_events
-  ADD COLUMN IF NOT EXISTS applicant_id UUID REFERENCES recruit_applicants(id),
+  ADD COLUMN IF NOT EXISTS applicant_id TEXT REFERENCES recruit_applicants(id),
   ADD COLUMN IF NOT EXISTS unmatched_notified_at TIMESTAMPTZ;
