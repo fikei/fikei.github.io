@@ -1,285 +1,62 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CTRL Design System</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
-  <link rel="icon" type="image/x-icon" href="/images/icons/favicons/favicon.ico">
-  <link rel="manifest" href="/images/icons/favicons/site.webmanifest">
-  <link rel="stylesheet" href="tokens.css">
-  <link rel="stylesheet" href="components.css">
-  <style>
-    .preview {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: var(--space-6);
-    }
-    .section {
-      margin-bottom: var(--space-8);
-      padding-bottom: var(--space-8);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .section:last-child {
-      border-bottom: none;
-    }
-    .section__title {
-      font-family: var(--font-serif);
-      font-size: var(--text-xl);
-      font-weight: normal;
-      margin-bottom: var(--space-4);
-    }
-    .section__subtitle {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-wider);
-      color: var(--fg-muted);
-      margin-bottom: var(--space-3);
-      margin-top: var(--space-6);
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-3);
-      align-items: center;
-      margin-bottom: var(--space-4);
-    }
-    .swatch {
-      width: 48px;
-      height: 48px;
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: flex-end;
-      padding: var(--space-1);
-    }
-    .swatch span {
-      font-size: 8px;
-      color: var(--fg-muted);
-    }
-    .theme-toggle-demo {
-      position: fixed;
-      bottom: var(--space-4);
-      left: var(--space-4);
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ctrl.rodeo — design systems</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --elevated: #1f2630;
+  --ink: #f0f6fc; --ink-2: rgba(240,246,252,0.72); --ink-3: rgba(240,246,252,0.5);
+  --line: rgba(240,246,252,0.12); --accent: #5CB2FF;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #FAFAF9; --surface: #F4F4F2; --elevated: #FFFFFF; --ink: #0E0F0C; --ink-2: #454745; --ink-3: #6A6C6A; --line: rgba(14,15,12,0.12); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.55 -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 72px 24px 96px; }
+.kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; }
+h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 10px; }
+.lede { color: var(--ink-2); max-width: 56ch; margin: 0 0 36px; }
+a.sys {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 22px; margin-bottom: 12px; color: var(--ink); text-decoration: none;
+}
+a.sys:hover { border-color: var(--accent); }
+a.sys b { font-size: 16px; }
+a.sys .d { grid-column: 1; font-size: 13px; color: var(--ink-2); max-width: 52ch; }
+a.sys .arr { grid-row: 1 / 3; color: var(--ink-3); font-size: 18px; }
+a.sys .tag { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 48px; font-size: 12px; color: var(--ink-3); }
+</style>
 </head>
 <body>
-  <div class="preview">
-    <header class="section">
-      <h1 style="font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: normal; margin-bottom: var(--space-2);">
-        CTRL Design System
-      </h1>
-      <p class="text-muted text-sm">
-        A minimal, high-contrast design language for ctrl.rodeo projects.
-      </p>
-    </header>
+<div class="wrap">
+  <p class="kicker">ctrl.rodeo</p>
+  <h1>Design systems</h1>
+  <p class="lede">The single home for how ctrl.rodeo products look, speak, and decide. Product systems live here; when a rule appears in a product system, it wins over the global one for that product.</p>
 
-    <!-- Colors -->
-    <section class="section">
-      <h2 class="section__title">Colors</h2>
+  <a class="sys" href="/design-system/recruiting/">
+    <span><b>Agape recruiting</b> <span class="tag">· product · v3.19</span></span>
+    <span class="d">Principles, tokens, voice, row anatomy, states, and the decision log for /applications. Storybook-style stories.</span>
+    <span class="arr">→</span>
+  </a>
 
-      <p class="section__subtitle">Core</p>
-      <div class="row">
-        <div class="swatch" style="background: var(--color-black);"><span style="color:#fff;">black</span></div>
-        <div class="swatch" style="background: var(--color-white);"><span style="color:#000;">white</span></div>
-      </div>
+  <a class="sys" href="/design-system/ctrl.html">
+    <span><b>CTRL</b> <span class="tag">· global</span></span>
+    <span class="d">The original high-contrast, monospace-first language behind Boards, Events, Soundscape, Systemic, and Favicon.</span>
+    <span class="arr">→</span>
+  </a>
 
-      <p class="section__subtitle">Grays</p>
-      <div class="row">
-        <div class="swatch" style="background: var(--gray-100);"><span style="color:#fff;">100</span></div>
-        <div class="swatch" style="background: var(--gray-200);"><span style="color:#fff;">200</span></div>
-        <div class="swatch" style="background: var(--gray-300);"><span style="color:#fff;">300</span></div>
-        <div class="swatch" style="background: var(--gray-400);"><span style="color:#fff;">400</span></div>
-        <div class="swatch" style="background: var(--gray-500);"><span style="color:#fff;">500</span></div>
-        <div class="swatch" style="background: var(--gray-600);"><span style="color:#fff;">600</span></div>
-        <div class="swatch" style="background: var(--gray-700);"><span style="color:#000;">700</span></div>
-        <div class="swatch" style="background: var(--gray-800);"><span style="color:#000;">800</span></div>
-        <div class="swatch" style="background: var(--gray-900);"><span style="color:#000;">900</span></div>
-      </div>
+  <a class="sys" href="/design-system/widgets.html">
+    <span><b>Widget audit</b> <span class="tag">· tooling</span></span>
+    <span class="d">The stoplight audit of AI-generated widgets (green = ok, yellow = needs dev action, orange = review, red = blocked).</span>
+    <span class="arr">→</span>
+  </a>
 
-      <p class="section__subtitle">Status</p>
-      <div class="row">
-        <div class="swatch" style="background: var(--color-success);"><span style="color:#000;">success</span></div>
-        <div class="swatch" style="background: var(--color-error);"><span style="color:#fff;">error</span></div>
-        <div class="swatch" style="background: var(--color-warning);"><span style="color:#000;">warning</span></div>
-      </div>
-    </section>
-
-    <!-- Typography -->
-    <section class="section">
-      <h2 class="section__title">Typography</h2>
-
-      <p class="section__subtitle">Font Families</p>
-      <p style="font-family: var(--font-mono); margin-bottom: var(--space-2);">Courier New — Monospace (Primary)</p>
-      <p style="font-family: var(--font-serif); margin-bottom: var(--space-2);">Georgia — Serif (Display)</p>
-      <p style="font-family: var(--font-sans); margin-bottom: var(--space-2);">Space Grotesk — Sans (Alternative)</p>
-
-      <p class="section__subtitle">Sizes</p>
-      <p style="font-size: var(--text-2xs);">8px — text-2xs</p>
-      <p style="font-size: var(--text-xs);">10px — text-xs (buttons, labels)</p>
-      <p style="font-size: var(--text-sm);">12px — text-sm (body)</p>
-      <p style="font-size: var(--text-base);">14px — text-base</p>
-      <p style="font-size: var(--text-lg);">18px — text-lg (headings)</p>
-      <p style="font-size: var(--text-xl);">24px — text-xl</p>
-    </section>
-
-    <!-- Buttons -->
-    <section class="section">
-      <h2 class="section__title">Buttons</h2>
-
-      <p class="section__subtitle">Variants</p>
-      <div class="row">
-        <button class="btn">Default</button>
-        <button class="btn btn--filled">Filled</button>
-        <button class="btn btn--danger">Danger</button>
-        <button class="btn btn--ghost">Ghost</button>
-        <button class="btn" disabled>Disabled</button>
-      </div>
-
-      <p class="section__subtitle">Sizes</p>
-      <div class="row">
-        <button class="btn btn--sm">Small</button>
-        <button class="btn">Default</button>
-        <button class="btn btn--lg">Large</button>
-      </div>
-
-      <p class="section__subtitle">Full Width</p>
-      <button class="btn btn--block">Block Button</button>
-    </section>
-
-    <!-- Inputs -->
-    <section class="section">
-      <h2 class="section__title">Inputs</h2>
-
-      <p class="section__subtitle">Text Input</p>
-      <input type="text" class="input" placeholder="Enter text..." style="margin-bottom: var(--space-3);">
-
-      <p class="section__subtitle">Textarea</p>
-      <textarea class="input textarea" placeholder="Enter longer text..."></textarea>
-
-      <p class="section__subtitle">Select</p>
-      <select class="input select">
-        <option>Option 1</option>
-        <option>Option 2</option>
-        <option>Option 3</option>
-      </select>
-    </section>
-
-    <!-- Tokens -->
-    <section class="section">
-      <h2 class="section__title">Tokens / Tags</h2>
-      <div class="row">
-        <button class="token">All</button>
-        <button class="token token--active">Active</button>
-        <button class="token">Watch</button>
-        <button class="token">Read</button>
-        <button class="token">Wear</button>
-      </div>
-    </section>
-
-    <!-- Cards -->
-    <section class="section">
-      <h2 class="section__title">Cards</h2>
-      <div class="row" style="align-items: stretch;">
-        <div class="card" style="flex: 1;">
-          <p class="text-sm">Static card with content.</p>
-        </div>
-        <div class="card card--interactive" style="flex: 1;">
-          <p class="text-sm">Interactive card (hover me).</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Toggle -->
-    <section class="section">
-      <h2 class="section__title">Toggle Switch</h2>
-      <div class="row">
-        <button class="toggle" id="toggle1">
-          <div class="toggle__knob"></div>
-        </button>
-        <span class="text-sm text-muted">Off</span>
-
-        <button class="toggle toggle--active">
-          <div class="toggle__knob"></div>
-        </button>
-        <span class="text-sm text-muted">On</span>
-      </div>
-    </section>
-
-    <!-- Tabs -->
-    <section class="section">
-      <h2 class="section__title">Tabs</h2>
-      <div class="tabs">
-        <button class="tab tab--active">Overview</button>
-        <button class="tab">Details</button>
-        <button class="tab">Settings</button>
-      </div>
-    </section>
-
-    <!-- Status -->
-    <section class="section">
-      <h2 class="section__title">Status Indicators</h2>
-      <div class="row">
-        <div class="status">
-          <span class="status__dot"></span>
-          Inactive
-        </div>
-        <div class="status status--success">
-          <span class="status__dot"></span>
-          Connected
-        </div>
-        <div class="status status--error">
-          <span class="status__dot"></span>
-          Error
-        </div>
-        <div class="status status--success status--blink">
-          <span class="status__dot"></span>
-          Live
-        </div>
-      </div>
-    </section>
-
-    <!-- Toast -->
-    <section class="section">
-      <h2 class="section__title">Toast</h2>
-      <div style="position: relative; height: 80px;">
-        <div style="position: absolute; bottom: 0; right: 0; display: flex; flex-direction: column; gap: var(--space-2);">
-          <div class="toast">Changes saved</div>
-          <div class="toast toast--error">Something went wrong</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Spinner -->
-    <section class="section">
-      <h2 class="section__title">Loading</h2>
-      <div class="row">
-        <div class="spinner"></div>
-        <span class="text-sm text-muted">Loading...</span>
-      </div>
-    </section>
-  </div>
-
-  <!-- Theme Toggle -->
-  <button class="toggle theme-toggle-demo" id="themeToggle">
-    <div class="toggle__knob"></div>
-  </button>
-
-  <script>
-    // Theme toggle
-    const themeToggle = document.getElementById('themeToggle');
-    themeToggle.onclick = () => {
-      document.documentElement.classList.toggle('light');
-      themeToggle.classList.toggle('toggle--active');
-    };
-
-    // Interactive toggle demo
-    document.getElementById('toggle1').onclick = function() {
-      this.classList.toggle('toggle--active');
-    };
-  </script>
+  <footer>Tokens for CTRL products: tokens.css · components.css. The recruiting system is self-contained.</footer>
+</div>
 </body>
 </html>

@@ -1,6 +1,21 @@
+# ctrl.rodeo design systems
+
+> Centralized home for every product's design system: **https://ctrl.rodeo/design-system/**
+
+| System | Scope | Where |
+|---|---|---|
+| Hub | Landing that indexes all systems | `index.html` |
+| CTRL | Global — Boards, Events, Soundscape, Systemic, Favicon | `ctrl.html` |
+| Agape recruiting | Product — /applications (Storybook-style stories) | `recruiting/index.html` · behavior source of truth: `docs/ux/recruiting-row-states.md` |
+| Widget audit | Tooling stoplight | `widgets.html` |
+
+Product systems override the global system for their product. New products add a folder here and a card on the hub.
+
+---
+
 # CTRL Design System
 
-> Minimal, high-contrast design system powering all ctrl.rodeo products.
+> Minimal, high-contrast design system powering ctrl.rodeo products.
 
 **Status**: 🟢 Active
 **Last Updated**: 2026-02-09
