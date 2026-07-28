@@ -292,6 +292,42 @@ export async function dmUser(discordUserId: string, content: string): Promise<vo
   })
 }
 
+// Ops contact for last-resort alerts when Discord posting fails everywhere.
+const ALERT_DISCORD_USER_ID = Deno.env.get('ALERT_DISCORD_USER_ID') || '853782600082522152' // Ian
+
+// Post with a fallback ladder so a broken channel can never fail silently
+// (the #recruiting-society permissions outage went unnoticed for hours
+// because alerts posted into the channel that was broken): primary channel →
+// the other recruiting channel with a ⚠️ prefix → DM the ops contact.
+// Throws if every rung fails, so callers don't stamp state as posted.
+export async function postResilient(channelId: string, payload: Record<string, unknown>, label: string): Promise<void> {
+  const fallback = channelId === NOTES_CHANNEL_ID ? CLAIMS_CHANNEL_ID : NOTES_CHANNEL_ID
+  try {
+    await discordFetch(`/channels/${channelId}/messages`, { method: 'POST', body: JSON.stringify(payload) })
+    return
+  } catch (err) {
+    console.warn(`[discord] ${label}: post to ${channelId} failed: ${(err as Error).message}`)
+  }
+  try {
+    await discordFetch(`/channels/${fallback}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        content: `⚠️ Posted here because <#${channelId}> rejected it — check the bot's permissions there.${typeof payload.content === 'string' ? `\n${payload.content}` : ''}`,
+      }),
+    })
+    return
+  } catch (err) {
+    console.warn(`[discord] ${label}: fallback post to ${fallback} failed: ${(err as Error).message}`)
+  }
+  try {
+    await dmUser(ALERT_DISCORD_USER_ID, `🚨 Discord posting is failing in both recruiting channels (${label}). Check the bot's permissions.`)
+  } catch (err) {
+    console.error(`[discord] ${label}: even the alert DM failed: ${(err as Error).message}`)
+  }
+  throw new Error(`all posting fallbacks failed for ${label}`)
+}
+
 // Post the recording + summary back to the claims channel after a call ends.
 export async function postRecordingNote(
   firstName: string, applicantId: string, residentName: string,
@@ -303,16 +339,13 @@ export async function postRecordingNote(
     videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
     `📋 [Full profile](${appLink(applicantId)})`,
   ]
-  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({
-      embeds: [{
-        title: `${firstName} × ${residentName} — Intro Call notes`,
-        description: lines.join('\n').slice(0, 4000),
-        color: 0x9b59b6,
-      }],
-    }),
-  })
+  await postResilient(NOTES_CHANNEL_ID, {
+    embeds: [{
+      title: `${firstName} × ${residentName} — Intro Call notes`,
+      description: lines.join('\n').slice(0, 4000),
+      color: 0x9b59b6,
+    }],
+  }, `intro-call notes (${firstName})`)
 }
 
 // Notes for a non-applicant meeting hosted by the shared account.
@@ -324,25 +357,19 @@ export async function postMeetingNote(
     '',
     videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
   ]
-  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({
-      embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
-    }),
-  })
+  await postResilient(NOTES_CHANNEL_ID, {
+    embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
+  }, `meeting notes (${title})`)
 }
 
 // "Happening now" — announce a starting call so housemates can drop in.
 export async function postLiveCall(title: string, when: string, meetLink: string | null): Promise<void> {
-  await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({
-      embeds: [{
-        description: `🎥 **Join — ${title}** · ${when}${meetLink ? `\n[▶ Tap to join the call](${meetLink})` : ''}`,
-        color: 0xe74c3c,
-      }],
-    }),
-  })
+  await postResilient(NOTES_CHANNEL_ID, {
+    embeds: [{
+      description: `🎥 **Join — ${title}** · ${when}${meetLink ? `\n[▶ Tap to join the call](${meetLink})` : ''}`,
+      color: 0xe74c3c,
+    }],
+  }, `live-call post (${title})`)
 }
 
 // Persistent "Get sign-in link" helper message for phone sign-in — tapping
@@ -368,10 +395,7 @@ export async function postSigninMessage(channelId: string): Promise<any> {
 // One channel nudge for a post nobody claimed within 96h.
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
-  await discordFetch(`/channels/${channelId}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({
-      content: `⏰ **${firstName}**'s Agape Intro Call has been unclaimed for 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
-    }),
-  })
+  await postResilient(channelId, {
+    content: `⏰ **${firstName}**'s Agape Intro Call has been unclaimed for 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
+  }, `stuck nudge (${firstName})`)
 }
