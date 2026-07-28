@@ -128,3 +128,10 @@ Browser Discord OAuth is hostile on phones (users aren't logged into discord.com
 - **Gate unchanged** — `discord-membership` v1.3.0 reads the Discord id from provider identity *or* `app_metadata`, then runs the same guild + channel-permission check. The link only mints a session; access is still decided by the Recruiting Society channel gate.
 - **Guard** — shadow emails never receive calendar invites; claims from a shadow account without a real profile email fail into the existing ⚠️ manual-booking DM path.
 - **Webview nudge** — the app gate detects Discord/Instagram/FB/Android-webview UAs and points users to "Open in browser" or the bot button (app v3.20.0).
+
+## Out-of-band call attachment (v1.10.0 / app v3.21.0, 2026-07-28)
+
+Calls scheduled outside the app already get picked up and recorded when the shared calendar is involved; the remaining gap was silent non-attachment. Now:
+
+- **Unmatched-call DM** — the cron sweep DMs housemate attendees when an upcoming swept call has a guest that matches no applicant ("link it" + deep link). House-internal meetings (all attendees known) are stamped and never nag. One DM per event (`unmatched_notified_at`, migration 133).
+- **Link modal** — `?link=<gcal_event_id>` opens an applicant picker; linking clones the recorded event into `recruit_screenings` (Watch chip, notes land on the profile) via `recruit-gmail link-recording`, and stamps `applicant_id` on the recorded event.

@@ -13,8 +13,8 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.9.0'
-console.log(`[recruit-discord] v${VERSION} — screening claims + bot-issued magic-link sign-in`)
+const VERSION = '1.10.0'
+console.log(`[recruit-discord] v${VERSION} — screening claims + magic-link sign-in + unmatched-call link nudges`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -449,6 +449,73 @@ async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<numb
   return created
 }
 
+// DM housemates on swept calls with an unrecognized external guest: the call
+// got a recording bot but no applicant attachment, so someone should either
+// link it or know it's house-internal. One DM per event (unmatched_notified_at).
+async function notifyUnmatchedCalls(client: ReturnType<typeof db>): Promise<number> {
+  const { dmUser } = await import('../_shared/discord.ts')
+  const { SHARED_EMAIL } = await import('../_shared/recruit-schedule.ts')
+  const { data: rows } = await client.from('recruit_recorded_events')
+    .select('gcal_event_id, title, starts_at, meet_link')
+    .is('applicant_id', null).is('unmatched_notified_at', null)
+    .gt('starts_at', new Date().toISOString()).limit(10)
+  if (!rows?.length) return 0
+
+  let token: string
+  try { token = await sharedAccessToken(client) } catch { return 0 }
+  const botEmail = (Deno.env.get('RECALL_BOT_EMAIL') || '').toLowerCase()
+  // Known internal addresses: profile group emails + login emails of members.
+  const { data: profs } = await client.from('recruit_profiles').select('user_id, group_email')
+  const { data: members } = await client.from('user_discord_membership').select('user_id, discord_user_id')
+  const discordByUser = new Map((members || []).map(m => [m.user_id, m.discord_user_id]))
+  const internal = new Map<string, string | null>() // email -> discord id (null = internal, not DM-able)
+  internal.set(SHARED_EMAIL.toLowerCase(), null)
+  if (botEmail) internal.set(botEmail, null)
+  for (const p of (profs || [])) {
+    if (p.group_email) internal.set(String(p.group_email).toLowerCase(), discordByUser.get(p.user_id) || null)
+  }
+  for (const m of (members || [])) {
+    try {
+      const { data: au } = await client.auth.admin.getUserById(m.user_id)
+      const em = (au?.user?.email || '').toLowerCase()
+      if (em.includes('@') && !em.endsWith('@signin.ctrl.rodeo')) internal.set(em, m.discord_user_id)
+    } catch { /* best effort */ }
+  }
+
+  let notified = 0
+  for (const r of (rows || [])) {
+    try {
+      const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(r.gcal_event_id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) continue
+      const ev = await resp.json()
+      // deno-lint-ignore no-explicit-any
+      const emails = ((ev.attendees || []) as any[]).map(a => String(a.email || '').toLowerCase()).filter(Boolean)
+      const hasGuest = emails.some(e => !internal.has(e))
+      if (!hasGuest) {
+        // House-internal meeting — nothing to link, never notify.
+        await client.from('recruit_recorded_events')
+          .update({ unmatched_notified_at: new Date().toISOString() }).eq('gcal_event_id', r.gcal_event_id)
+        continue
+      }
+      const housemateDiscordIds = [...new Set(emails.map(e => internal.get(e)).filter(Boolean))] as string[]
+      for (const did of housemateDiscordIds.slice(0, 3)) {
+        await dmUser(did,
+          `🔗 Your call **${r.title || 'Agape call'}** (${slotWhen(new Date(r.starts_at))}) has a guest I can't match to an applicant.\n` +
+          `It'll be recorded either way — if it's an applicant call, link it so notes land on their profile:\n` +
+          `https://ctrl.rodeo/applications/?link=${encodeURIComponent(r.gcal_event_id)}`)
+      }
+      await client.from('recruit_recorded_events')
+        .update({ unmatched_notified_at: new Date().toISOString() }).eq('gcal_event_id', r.gcal_event_id)
+      if (housemateDiscordIds.length) notified++
+    } catch (err) {
+      console.warn(`[unmatched] notify failed for ${r.gcal_event_id}: ${(err as Error).message}`)
+    }
+  }
+  return notified
+}
+
 // Calls whose end time passed flip scheduled -> completed so the app stops
 // showing them as upcoming (the Watch chip takes over once notes land).
 async function completePastCalls(client: ReturnType<typeof db>): Promise<number> {
@@ -603,6 +670,8 @@ serve(async (req) => {
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
       const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
+      const unmatched = await notifyUnmatchedCalls(client)
+      if (unmatched) console.log(`[unmatched] ${unmatched} link-nudge DM(s) sent`)
       const live = await announceLiveCalls(client)
       await completePastCalls(client)
       const sent = await remindUpcoming(client)
