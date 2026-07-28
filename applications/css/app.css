@@ -543,6 +543,12 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   .inbox-row__review { display: none; } /* whole row is tappable on phones */
   .review__foot { gap: var(--space-2); }
   .review__btn { padding-inline: var(--space-2); font-size: var(--font-size-small); }
+  /* Openings rows: the fixed 172px CTA column (its buttons are hidden here
+     anyway) starved the name column into one-letter-per-line wraps. */
+  .inbox-row__actions .cta-stack { width: auto; }
+  .inbox-row__actions .cta-context { display: none; }
+  .inbox-row__grip { display: none; } /* drag-reorder is a desktop affordance */
+  .inbox-row__title { overflow-wrap: break-word; }
 }
 
 /* Social profile photo layered over the initials; broken loads self-remove. */
