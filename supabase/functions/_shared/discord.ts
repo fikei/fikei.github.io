@@ -393,6 +393,14 @@ export async function postSigninMessage(channelId: string): Promise<any> {
 }
 
 // One channel nudge for a post nobody claimed within 96h.
+// Plain embed post to any channel (new-application pings etc.).
+export async function postChannelEmbed(channelId: string, description: string, color = 0x378add): Promise<any> {
+  return await discordFetch(`/channels/${channelId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ embeds: [{ description, color }] }),
+  })
+}
+
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
   await postResilient(channelId, {

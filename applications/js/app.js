@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.22.1';
+const VERSION = '3.23.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -66,6 +66,8 @@ let applicants = [];          // newest first; each carries .stage
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let votes = {};               // applicant_id -> recruit_votes rows
 let placements = [];          // recruit_listing_candidates rows
+let claimPosts = {};          // applicant_id -> { status, posted_at }
+let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let pendingVote = null;       // { score, veto } while the vote bar is open
 let commentCounts = {};       // applicant_id -> n
@@ -403,12 +405,26 @@ function openingsCta(a) {
   const phase = callPhase(sc);
   const stack = (top, ctx) => `<span class="cta-stack">${top}${ctx ? `<span class="cta-context">${ctx}</span>` : ''}</span>`;
   const when = sc?.at ? `${fmtSlot(sc.at)}${sc.with ? ` · ${esc(sc.with)}` : ''}` : '';
-  if (phase === 'watch') return stack(
-    `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Watch the recorded intro call" data-open-call="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`, when);
+  if (phase === 'watch') {
+    const dv = decisionVotes[a.id] || [];
+    const mine = dv.find(v => v.voter_id === me?.id);
+    const decCtx = mine
+      ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
+      : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
+    return stack(
+      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Watch the recorded intro call" data-open-call="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
+      `${decCtx}${when ? ` · ${when}` : ''}`);
+  }
   if (phase === 'processing') return stack(processingChip(), when);
   if (phase === 'live') return stack(joinBtn(sc) || processingChip(), when);
   if (phase === 'scheduled') {
     return stack(`<span class="decision-chip decision-chip--outreach" title="Intro call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`, sc.with ? `with ${esc(sc.with)}` : '');
+  }
+  const claim = claimPosts[a.id];
+  if (sc?.availability && claim && (claim.status === 'open' || claim.status === 'manual')) {
+    const days = Math.max(0, Math.round((Date.now() - new Date(claim.postedAt).getTime()) / 86400000));
+    return stack(`<span class="decision-chip decision-chip--outreach">◆ sent to housemates</span>`,
+      `unclaimed ${days === 0 ? 'today' : `${days}d`} · <button type="button" class="cta-link" data-avail-review="${a.id}">book it yourself</button>`);
   }
   if (sc?.availability) return stack(
     `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review availability</button>`,
@@ -419,7 +435,9 @@ function openingsCta(a) {
     // "I'll send an invite" reads as manual scheduling — say so instead of
     // nagging; a shared-account invite gets picked up by the calendar sweep.
     const promised = /\b(invite|calendar|schedul|let'?s (chat|talk|meet)|talk (soon|then|tomorrow))\b/i.test(st.lastSnippet || '');
-    return stack(`<button class="btn btn--sm inbox-row__review cta-std cta--amber" data-email="${a.id}">Follow up</button>`,
+    // Waiting is passive until ~3 quiet days; then the clock arms Follow up.
+    const stale = Date.now() - new Date(st.lastAt).getTime() > 3 * 86400000;
+    return stack(`<button class="btn btn--sm inbox-row__review cta-std ${stale ? 'cta--amber' : ''}" data-email="${a.id}">Follow up</button>`,
       `${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`);
   }
   return stack(`<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`, '');
@@ -473,7 +491,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, cpRes, dvRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
@@ -482,8 +500,14 @@ async function loadAll() {
     sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
+    sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
+    sb.from('recruit_decision_votes').select('*'),
   ]);
   placements = pRes.data || [];
+  claimPosts = {};
+  for (const c of (cpRes.data || [])) claimPosts[c.applicant_id] = { status: c.status, postedAt: c.posted_at };
+  decisionVotes = {};
+  for (const d of (dvRes.data || [])) (decisionVotes[d.applicant_id] ||= []).push(d);
   votes = {};
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
@@ -506,6 +530,8 @@ async function loadAll() {
     for (const row of (data || [])) settings[row.key] = row.value;
     const box = document.getElementById('pref-couples');
     if (box) box.checked = settings.open_to_couples !== false;
+    const ap = document.getElementById('pref-autopost');
+    if (ap) ap.checked = settings.discord_auto_post === true;
   });
   if (aRes.error) throw aRes.error;
   applicants = (aRes.data || []).map(r => ({
@@ -516,6 +542,7 @@ async function loadAll() {
     movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url, scheduleToken: r.schedule_token,
     stage: r.stage || 'review',
     moveinFrom: r.move_in_from, moveinTo: r.move_in_to, moveinSetBy: r.move_in_set_by_name,
+    updateSentAt: r.update_email_sent_at, updateSkippedAt: r.update_email_skipped_at,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -592,7 +619,8 @@ function qualifiesFor(a, l) {
     return r.hi >= startMonth && r.lo <= endMonth;
   }
   const norm = normalizeMoveIn(a);
-  if (/flexible/i.test(norm || '')) return true;
+  // Bare "Flexible" rides any window; "month + flexible" means that month ±1.
+  if (/^Flexible$/i.test(norm || '')) return true;
   if (/^ASAP/.test(norm || '')) {
     const now = new Date();
     const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -600,7 +628,8 @@ function qualifiesFor(a, l) {
   }
   const range = moveInRange(a);
   if (!range) return false; // no parseable dates — can't confirm they line up
-  return range.hi >= startMonth && range.lo <= endMonth;
+  const flexPad = /flexible/i.test(norm || '') ? 1 : 0;
+  return monthShift(range.hi, flexPad) >= startMonth && monthShift(range.lo, -flexPad) <= endMonth;
 }
 
 const activePlacements = id => placements.filter(p => p.applicant_id === id && p.status === 'active');
@@ -667,16 +696,83 @@ async function removePlacement(applicantId, listingId) {
 /* ---------- outreach email drafts ---------- */
 let emailApplicantId = null;
 
-async function openEmailModal(applicantId) {
+let emailMode = 'outreach';   // 'outreach' | 'update' (rejection queue)
+let emailKind = null;         // typed draft override, e.g. 'visit'
+
+async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
   emailApplicantId = applicantId;
-  document.getElementById('email-title').textContent = `Email ${fullName(a)}`;
+  emailMode = 'outreach';
+  emailKind = kind || null;
+  document.getElementById('email-send').textContent = 'Send via Agape Gmail';
+  document.getElementById('email-title').textContent = kind === 'visit' ? `Invite ${a.first} to visit` : `Email ${fullName(a)}`;
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   document.getElementById('email-status').textContent = 'Drafting from their application, the listing, and any flags…';
   document.getElementById('email-modal').hidden = false;
   await generateEmail(applicantId);
+}
+
+/* Rejection-queue editor: drafts via draft_update, sends via send-update
+   (which stamps the queue state server-side). */
+/* Batch: draft + send every pending update, sequentially with progress. */
+async function sendAllUpdates(btn) {
+  const pending = applicants.filter(x => x.stage === 'rejected' && !x.updateSentAt && !x.updateSkippedAt);
+  if (!pending.length) return;
+  if (!confirm(`Send update emails to ${pending.length} applicant${pending.length === 1 ? '' : 's'}? Each gets an individually drafted community note.`)) return;
+  btn.disabled = true;
+  let done = 0;
+  const { data } = await sb.auth.getSession();
+  const token = data?.session?.access_token;
+  for (const a of pending) {
+    try {
+      btn.textContent = `Sending ${done + 1}/${pending.length}…`;
+      const dr = await (await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'draft_update', applicantId: a.id }),
+      })).json();
+      if (dr.error) throw new Error(dr.error);
+      await gmailCall({ action: 'send-update', applicantId: a.id, subject: dr.subject, body: dr.body });
+      a.updateSentAt = new Date().toISOString(); a.stage = 'archived';
+      done++;
+    } catch (e) {
+      toast(`${fullName(a)}: ${e.message}`);
+    }
+  }
+  toast(`${done}/${pending.length} update${pending.length === 1 ? '' : 's'} sent`);
+  renderRailCounts(); renderApplicants();
+}
+
+async function openUpdateEmail(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  emailApplicantId = applicantId;
+  emailMode = 'update';
+  emailKind = null;
+  document.getElementById('email-title').textContent = `Update for ${fullName(a)}`;
+  document.getElementById('email-subject').value = '';
+  document.getElementById('email-body').value = '';
+  document.getElementById('email-send').textContent = 'Send update';
+  document.getElementById('email-status').textContent = 'Drafting the community update…';
+  document.getElementById('email-modal').hidden = false;
+  try {
+    const { data } = await sb.auth.getSession();
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data?.session?.access_token}` },
+      body: JSON.stringify({ action: 'draft_update', applicantId }),
+    });
+    const out = await resp.json();
+    if (out.error) throw new Error(out.error);
+    if (emailApplicantId !== applicantId) return;
+    document.getElementById('email-subject').value = out.subject || 'An update from Agape';
+    document.getElementById('email-body').value = out.body || '';
+    document.getElementById('email-status').textContent = 'Edit freely, then send.';
+  } catch (e) {
+    document.getElementById('email-status').textContent = `Draft failed: ${e.message}`;
+  }
 }
 
 async function generateEmail(applicantId) {
@@ -687,7 +783,7 @@ async function generateEmail(applicantId) {
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action: 'draft_email', applicantId }),
+      body: JSON.stringify({ action: 'draft_email', applicantId, ...(emailKind ? { emailType: emailKind } : {}) }),
     });
     const out = await resp.json();
     if (out.error) throw new Error(out.error);
@@ -972,6 +1068,7 @@ function stageChip(a) {
     const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}` : (decisions[a.id]?.note || 'Did not pass review');
     return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
   }
+  if (a.updateSentAt) return `<span class="decision-chip decision-chip--outreach" title="Update email sent">Update sent ${fmtDate(a.updateSentAt)}</span>`;
   return `<span class="decision-chip decision-chip--pass">Archived</span>`;
 }
 
@@ -1212,7 +1309,42 @@ function renderApplicants() {
       <span class="listing-head__actions">${listingMenuHtml(l)}</span>`;
   };
 
-  const outreachChrome = '';
+  // Archive: the update-email tray sits above the list. Openings: draft
+  // listings detected from occupancy gaps sit above the shortlists.
+  let outreachChrome = '';
+  if (view === 'archive') {
+    const pending = applicants.filter(x => x.stage === 'rejected' && !x.updateSentAt && !x.updateSkippedAt);
+    if (pending.length) {
+      outreachChrome = `<div class="update-tray">
+        <div class="update-tray__head">
+          <b>${pending.length} applicant${pending.length === 1 ? '' : 's'} haven't been told yet</b>
+          <button type="button" class="btn btn--sm cta--amber" data-send-all-updates>Send all ${pending.length}</button>
+        </div>
+        ${pending.map(x => `<div class="update-tray__row">
+          <span class="update-tray__who">${esc(fullName(x))}</span>
+          <span class="update-tray__why">${voteStats(x.id).veto ? `vetoed by ${esc(voteStats(x.id).veto.voter_name || 'a housemate')}` : (decisions[x.id]?.note || 'did not pass review')}</span>
+          <button type="button" class="cta-link" data-update-edit="${x.id}">Edit email</button>
+          <button type="button" class="cta-link" data-update-skip="${x.id}">Skip</button>
+        </div>`).join('')}
+      </div>`;
+    }
+  }
+  if (view === 'openings') {
+    const drafts = listings.filter(l => l.status === 'draft');
+    if (drafts.length) {
+      outreachChrome = drafts.map(l => {
+        const room = rooms.find(r => r.id === l.room_id);
+        return `<div class="draft-card">
+          <span class="draft-card__text"><b>Draft — ${esc(room?.name || 'Room')}, ${l.kind === 'resident' ? `opens ${fmtDay(l.starts_on)}` : `${fmtDay(l.starts_on)} – ${l.ends_on ? fmtDay(l.ends_on) : 'TBD'}`}</b>
+          <span>Detected from the occupancy calendar · invisible to bucketing until opened</span></span>
+          <span class="draft-card__actions">
+            <button type="button" class="cta-link" data-delete-listing="${l.id}">Dismiss</button>
+            <button type="button" class="btn btn--sm" data-open-draft="${l.id}">Open listing</button>
+          </span>
+        </div>`;
+      }).join('');
+    }
+  }
   const doneListings = view === 'openings' ? listings.filter(l => l.status !== 'open') : [];
   const doneDrawer = doneListings.length ? `
     <details class="occupants__past">
@@ -1308,9 +1440,82 @@ function rowMenuHtml(a, listingId) {
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
       <button type="button" class="listing-menu__item" data-remove-placement="${a.id}|${esc(listingId)}">Remove from this listing</button>
+      ${screeningState[a.id]?.watch ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
       <button type="button" class="listing-menu__item listing-menu__item--danger" data-pass-row="${a.id}">Pass on ${esc(a.first)}…</button>
     </span>
   </span>`;
+}
+
+/* Occupancy-gap sweep: stretches of 28+ days with nothing scheduled in the
+   next six months become DRAFT listings (invisible to bucketing until a
+   human opens them). Dedup: skip when any listing for the room starts
+   within 21 days of the gap. */
+async function syncDraftListings() {
+  if (!houseLoaded) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const horizon = addMonthsIso(today.slice(0, 7) + '-01', 6);
+  let created = 0;
+  for (const r of rooms) {
+    const covered = stays.filter(x => x.room_id === r.id)
+      .map(x => [x.starts_on, x.ends_on || '9999-12-31'])
+      .filter(([a, b]) => a <= horizon && b >= today)
+      .sort((x, y) => x[0].localeCompare(y[0]));
+    const gaps = [];
+    let cursor = today;
+    for (const [a, b] of covered) {
+      if (a > cursor) gaps.push([cursor, isoAddDays(a, -1)]);
+      if (b >= cursor) cursor = isoAddDays(b, 1);
+      if (cursor > horizon) break;
+    }
+    if (cursor <= horizon) gaps.push([cursor, null]); // open-ended
+    for (const [gs, ge] of gaps) {
+      const days = ge ? Math.round((new Date(ge) - new Date(gs)) / 86400000) : 999;
+      if (days < 28) continue;
+      const near = listings.some(l => l.room_id === r.id &&
+        Math.abs(new Date(l.starts_on) - new Date(gs)) < 21 * 86400000);
+      if (near) continue;
+      const rec = {
+        room_id: r.id, kind: ge && days <= 95 ? 'sublet' : 'resident',
+        starts_on: gs, ends_on: ge && days <= 95 ? ge : null,
+        status: 'draft', source: 'gap',
+        notes: `Auto-detected occupancy gap (${fmtDay(gs)}${ge ? ` – ${fmtDay(ge)}` : ' onward'}).`,
+        created_by: me.id, created_by_name: 'auto',
+      };
+      const { data, error } = await sb.from('recruit_listings').insert(rec).select().single();
+      if (!error && data) { listings.push(data); created++; }
+    }
+  }
+  return created;
+}
+
+/* Post-screening decision sheet: yes / no + note, one row per housemate. */
+async function giveDecision(applicantId, verdict) {
+  const note = (document.getElementById('gd-note')?.value || '').trim();
+  const { data, error } = await sb.from('recruit_decision_votes').upsert({
+    applicant_id: applicantId, voter_id: me.id, voter_name: me.name,
+    verdict, note, updated_at: new Date().toISOString(),
+  }, { onConflict: 'applicant_id,voter_id' }).select().single();
+  if (error) { toast(`Decision failed: ${error.message}`); return; }
+  decisionVotes[applicantId] = [...(decisionVotes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
+  document.getElementById('gd-modal').hidden = true;
+  toast(`Decision saved — ${(decisionVotes[applicantId] || []).length} in`);
+  if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+  if (!document.getElementById('review').hidden) renderReview();
+}
+
+function openGiveDecision(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  const modal = document.getElementById('gd-modal');
+  const dv = decisionVotes[applicantId] || [];
+  const mine = dv.find(v => v.voter_id === me?.id);
+  document.getElementById('gd-title').textContent = `Would you accept ${a.first}?`;
+  document.getElementById('gd-tally').innerHTML = mine || dv.length
+    ? dv.map(v => `<span class="chip-line">${esc(v.voter_name || 'Housemate')} · <b>${v.verdict}</b>${v.note ? ` — ${esc(v.note)}` : ''}</span>`).join('')
+    : '<span class="notes__empty">You\'re first — others see the tally after they decide.</span>';
+  document.getElementById('gd-note').value = mine?.note || '';
+  modal.dataset.applicant = applicantId;
+  modal.hidden = false;
 }
 
 /* Drag-to-reorder applicants inside each listing group; shared house state. */
@@ -2976,6 +3181,8 @@ async function _checkMembershipAndEnter() {
     loadHouse().then(async () => {
       const added = await syncAutoPlacements();
       if (added) toast(`${added} auto-placement${added === 1 ? '' : 's'} added across open listings`);
+      const drafted = await syncDraftListings();
+      if (drafted) toast(`${drafted} draft listing${drafted === 1 ? '' : 's'} detected from occupancy gaps`);
       renderRailCounts();
       if (VIEWS[view]?.kind === 'applicants') renderApplicants();
     });
@@ -3133,7 +3340,7 @@ function init() {
     const rtab = e.target.closest('[data-review-tab]');
     if (rtab) { reviewTab = rtab.dataset.reviewTab; renderReview(); return; }
     const em = e.target.closest('[data-email]');
-    if (em) { openEmailModal(em.dataset.email); return; }
+    if (em) { openEmailModal(em.dataset.email, em.dataset.emailKind || null); return; }
     const so = e.target.closest('[data-second-opinion]');
     if (so) { requestSecondOpinion(so.dataset.secondOpinion, so); return; }
     const et = e.target.closest('[data-email-toggle]');
@@ -3180,6 +3387,27 @@ function init() {
     }
     const ar = e.target.closest('[data-avail-review]');
     if (ar) { openAvailModal(ar.dataset.availReview); return; }
+    const gd = e.target.closest('[data-give-decision]');
+    if (gd) { openGiveDecision(gd.dataset.giveDecision); return; }
+    const ue = e.target.closest('[data-update-edit]');
+    if (ue) { openUpdateEmail(ue.dataset.updateEdit); return; }
+    const us = e.target.closest('[data-update-skip]');
+    if (us) {
+      const a = applicants.find(x => x.id === us.dataset.updateSkip);
+      if (a && confirm(`Skip the update email for ${fullName(a)}? They're archived without one.`)) {
+        sb.rpc('recruit_skip_update', { p_applicant: a.id }).then(({ error }) => {
+          if (error) { toast(`Skip failed: ${error.message}`); return; }
+          a.updateSkippedAt = new Date().toISOString(); a.stage = 'archived';
+          toast(`${fullName(a)} archived without an update`);
+          renderRailCounts(); renderApplicants();
+        });
+      }
+      return;
+    }
+    const sa = e.target.closest('[data-send-all-updates]');
+    if (sa) { sendAllUpdates(sa); return; }
+    const od2 = e.target.closest('[data-open-draft]');
+    if (od2) { updateListingStatus(od2.dataset.openDraft, 'open'); return; }
     const oc = e.target.closest('[data-open-call]');
     if (oc) {
       openReview(oc.dataset.openCall);
@@ -3312,6 +3540,18 @@ function init() {
   document.getElementById('menu-theme').onclick = () =>
     applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
+  document.getElementById('pref-autopost').onchange = async (e) => {
+    const value = e.target.checked;
+    settings.discord_auto_post = value;
+    const { error } = await sb.from('recruit_settings').upsert({
+      key: 'discord_auto_post', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+    });
+    if (error) { toast(`Save failed: ${error.message}`); e.target.checked = !value; settings.discord_auto_post = !value; }
+    else toast(value ? 'Coverage asks now post to Discord automatically' : 'Coverage asks are manual again');
+  };
+  document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
+  document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
+  document.getElementById('gd-no').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'no');
   document.getElementById('pref-couples').onchange = async (e) => {
     const value = e.target.checked;
     settings.open_to_couples = value;
@@ -3338,16 +3578,25 @@ function init() {
     const btn = document.getElementById('email-send');
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
+      const sentFor = emailApplicantId;
       await gmailCall({
-        action: 'send', applicantId: emailApplicantId,
+        action: emailMode === 'update' ? 'send-update' : 'send', applicantId: sentFor,
         subject: document.getElementById('email-subject').value,
         body: document.getElementById('email-body').value,
       });
-      toast('Sent from live.at.agapesf@gmail.com');
-      delete emailsCache[emailApplicantId];
+      if (emailMode === 'update') {
+        const a = applicants.find(x => x.id === sentFor);
+        if (a) { a.updateSentAt = new Date().toISOString(); a.stage = 'archived'; }
+        toast('Update sent — archived clean');
+        renderRailCounts();
+        if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+      } else {
+        toast('Sent from live.at.agapesf@gmail.com');
+      }
+      delete emailsCache[sentFor];
       closeEmailModal();
     } catch (e) { toast(`Send failed: ${e.message}`); }
-    btn.disabled = false; btn.textContent = 'Send via Agape Gmail';
+    btn.disabled = false; btn.textContent = emailMode === 'update' ? 'Send update' : 'Send via Agape Gmail';
   };
   document.getElementById('email-copy').onclick = async () => {
     const text = `Subject: ${document.getElementById('email-subject').value}\n\n${document.getElementById('email-body').value}`;

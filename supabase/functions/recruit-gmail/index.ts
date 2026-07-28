@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.12.1'
+const VERSION = '1.13.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage } from '../_shared/discord.ts'
+import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +103,14 @@ Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "ne
       needs_human: Boolean(obj.needs_human) && !windows.length,
     }
   } catch { return NO_EXTRACTION }
+}
+
+// The manual→auto claim cutover is a settings toggle, not a deploy.
+async function autoPostEnabled(client: ReturnType<typeof db>): Promise<boolean> {
+  try {
+    const { data } = await client.from('recruit_settings').select('value').eq('key', 'discord_auto_post').maybeSingle()
+    return data?.value === true
+  } catch { return false }
 }
 
 // After availability lands, post/refresh the claimable message in
@@ -213,6 +221,44 @@ serve(async (req) => {
       return json(acct ? { connected: true, ...acct } : { connected: false })
     }
 
+    if (action === 'send-update') {
+      // Rejection-queue send: same pipe as 'send', plus stamps
+      // update_email_sent_at and closes the stage to 'archived'.
+      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
+      if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
+      const subject = String(body.subject || '').slice(0, 300)
+      const text = String(body.body || '').slice(0, 10000)
+      if (!subject || !text) return json({ error: 'Subject and body required' }, 400)
+      const at = await accessToken(client)
+      const encSubject = `=?UTF-8?B?${b64url(subject).replace(/-/g, '+').replace(/_/g, '/')}?=`
+      const raw = [
+        `From: Agape <${SHARED_EMAIL}>`,
+        `To: ${applicant.email}`,
+        `Subject: ${encSubject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        '',
+        text,
+      ].join('\r\n')
+      const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: b64url(raw) }),
+      })
+      const sent = await resp.json()
+      if (!resp.ok) return json({ error: `Send failed: ${JSON.stringify(sent).slice(0, 180)}` }, 500)
+      await client.from('recruit_emails').upsert({
+        applicant_id: applicant.id, gmail_id: sent.id, thread_id: sent.threadId,
+        direction: 'out', subject, snippet: text.slice(0, 180), body_text: text,
+        from_email: SHARED_EMAIL, to_email: applicant.email,
+        sent_by_name: 'update queue', sent_at: new Date().toISOString(),
+      }, { onConflict: 'gmail_id' })
+      await client.from('recruit_applicants')
+        .update({ update_email_sent_at: new Date().toISOString(), stage: 'archived' })
+        .eq('id', applicant.id)
+      return json({ sent: true })
+    }
+
     if (action === 'send') {
       const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
       if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
@@ -301,9 +347,7 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
-            // Auto-post to Discord is off for now — a recruiter triggers the
-            // claim post from the app (claim-preview/claim-post actions).
-            // await postClaim(client, applicant.id, extraction)
+            if (await autoPostEnabled(client)) await postClaim(client, applicant.id, extraction)
           }
         }
       }
@@ -523,8 +567,7 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
-            // manual-trigger era: no auto post (see claim-preview/claim-post)
-            // await postClaim(client, applicantId, extraction)
+            if (await autoPostEnabled(client)) await postClaim(client, applicantId, extraction)
           }
         }
       }
@@ -556,7 +599,7 @@ serve(async (req) => {
             applicant_id: r.applicant_id, windows: extraction.windows,
             source_gmail_id: r.gmail_id, updated_at: new Date().toISOString(),
           })
-          // manual-trigger era: no auto post (see claim-preview/claim-post)
+          if ((extraction.windows.length || extraction.needs_human) && await autoPostEnabled(client)) await postClaim(client, r.applicant_id, extraction)
           backfilled++
           console.log(`availability backfill: ${r.applicant_id} → ${extraction.windows.length} windows`)
         }
@@ -609,9 +652,48 @@ serve(async (req) => {
         console.warn(`calendar sweep failed: ${(err as Error).message}`)
       }
 
+      // Phase B: ping the Recruiting Society channel about new applications —
+      // stage 'review', no votes yet, never pinged. One post per applicant;
+      // a batch of 4+ collapses into a single digest.
+      let pinged = 0
+      try {
+        const pingChannel = Deno.env.get('RECRUITING_PING_CHANNEL_ID') || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || ''
+        if (pingChannel) {
+          const { data: fresh } = await client.from('recruit_applicants')
+            .select('id, first_name, last_name, residency, move_in, why_agape')
+            .eq('stage', 'review').is('discord_ping_at', null)
+            .order('submitted_at', { ascending: false }).limit(12)
+          const { data: votedRows } = await client.from('recruit_votes').select('applicant_id')
+          const voted = new Set((votedRows || []).map((v) => v.applicant_id))
+          const toPing = (fresh || []).filter((a) => !voted.has(a.id))
+          const appLink = (id: string) => `https://ctrl.rodeo/applications/?a=${encodeURIComponent(id)}`
+          if (toPing.length > 3) {
+            const lines = toPing.map((a) => `• [${a.first_name} ${a.last_name || ''}](${appLink(a.id)})`).join('\n')
+            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`)
+          } else {
+            for (const a of toPing) {
+              const track = /short/i.test(a.residency || '') ? 'Sublet' : 'Full-time'
+              const why = (a.why_agape || '').trim().replace(/\s+/g, ' ').slice(0, 140)
+              await postChannelEmbed(pingChannel,
+                `📥 **${a.first_name} ${a.last_name || ''}** applied — ${track}${a.move_in ? ` · ${String(a.move_in).slice(0, 60)}` : ''}\n` +
+                (why ? `_${why}_\n` : '') +
+                `[Read + vote](${appLink(a.id)})`)
+            }
+          }
+          if (toPing.length) {
+            await client.from('recruit_applicants')
+              .update({ discord_ping_at: new Date().toISOString() })
+              .in('id', toPing.map((a) => a.id))
+            pinged = toPing.length
+          }
+        }
+      } catch (err) {
+        console.warn(`new-application ping failed: ${(err as Error).message}`)
+      }
+
       await remindStuckPosts(client)
       console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills`)
-      return json({ matched, replied: [...replied], manualPickups, backfilled })
+      return json({ matched, replied: [...replied], manualPickups, backfilled, pinged })
     }
 
     return json({ error: 'Unknown action' }, 400)
