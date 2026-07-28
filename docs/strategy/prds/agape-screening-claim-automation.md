@@ -118,3 +118,13 @@ Expected: `windows: [{date: 2026-07-25, start: 09:00, end: 12:00}]`, `platform: 
 - Claim is first-write-wins via `UPDATE ... WHERE status='open'`; the 3s interaction deadline is met by ACKing with DEFERRED_UPDATE_MESSAGE and doing GCal/edit/DM/email in `EdgeRuntime.waitUntil`. Calendar failure after a claim never reopens the post (no double-booking) — the post flips to a ⚠️ state and the claimer is DM'd to book manually.
 - App-side booking (`schedule` action in /applications) also closes any open claim post for that applicant.
 - The 96h stuck nudge piggybacks on `recruit-gmail scan` (no new cron).
+
+## Mobile sign-in: bot-issued magic links (v1.9.0, 2026-07-28)
+
+Browser Discord OAuth is hostile on phones (users aren't logged into discord.com in Safari) and structurally broken in in-app webviews (sandboxed storage kills the PKCE round-trip). Housemates already live in the Discord app, so the bot now issues sign-in links directly:
+
+- **"Get sign-in link" button** — persistent message in the recruiting channel (posted via `POST recruit-discord/signin-post`, recruiting-member JWT). Tap → ephemeral one-time link (`?signin=<token>`, 10-min TTL, single use, sha256-at-rest in `recruit_signin_tokens`, migration 132).
+- **Redeem** — `POST recruit-discord/redeem` exchanges the token for `{token_hash, email}`; the app calls `verifyOtp` to mint the session. Existing accounts (past desktop OAuth) are matched via `user_discord_membership`; first-timers get a shadow account (`discord-<id>@signin.ctrl.rodeo`) with the Discord id in `app_metadata`.
+- **Gate unchanged** — `discord-membership` v1.3.0 reads the Discord id from provider identity *or* `app_metadata`, then runs the same guild + channel-permission check. The link only mints a session; access is still decided by the Recruiting Society channel gate.
+- **Guard** — shadow emails never receive calendar invites; claims from a shadow account without a real profile email fail into the existing ⚠️ manual-booking DM path.
+- **Webview nudge** — the app gate detects Discord/Instagram/FB/Android-webview UAs and points users to "Open in browser" or the bot button (app v3.20.0).

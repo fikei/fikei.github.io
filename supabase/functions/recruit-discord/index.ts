@@ -13,8 +13,8 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.8.2'
-console.log(`[recruit-discord] v${VERSION} — screening-claim interactions + DM reminders`)
+const VERSION = '1.9.0'
+console.log(`[recruit-discord] v${VERSION} — screening claims + bot-issued magic-link sign-in`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -23,8 +23,14 @@ import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel, slo
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
+// CORS needed only by the browser-facing routes (/redeem, /signin-post);
+// harmless on Discord-signed interaction responses.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
+  new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 function db() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -95,7 +101,10 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     const { data: authUser, error: authErr } = await client.auth.admin.getUserById(opts.userId)
     // Google Group address preferred — it's the email residents actually read.
     const housemateEmail = (rp?.group_email || authUser?.user?.email || '').toLowerCase().trim()
-    if (authErr || !housemateEmail.includes('@')) throw new Error('Could not resolve your account email')
+    // Shadow magic-link accounts have a synthetic email — invites would bounce.
+    if (authErr || !housemateEmail.includes('@') || housemateEmail.endsWith('@signin.ctrl.rodeo')) {
+      throw new Error('Could not resolve your real email — set your name/email in the app profile first')
+    }
 
     const { screening, meetLink, applicant } = await scheduleScreening(client, {
       applicantId, startsAt, housemateUserId: opts.userId, housemateName, housemateEmail,
@@ -176,6 +185,98 @@ async function handleClaim(interaction: Record<string, any>): Promise<Response> 
   else work.catch(() => { /* logged inside */ })
 
   return json(DEFERRED_UPDATE)
+}
+
+// ---- bot-issued magic-link sign-in ----
+// The "Get sign-in link" button (posted via /signin-post) lives in a
+// recruiting channel, so tapping it proves channel access; the link itself
+// only mints a session — the app's discord-membership gate still runs the
+// real channel-permission check afterwards.
+
+const SIGNIN_TTL_MS = 10 * 60_000
+const APP_URL = 'https://ctrl.rodeo/applications/'
+// Shadow email for members who've never OAuth'd on desktop; deterministic so
+// repeat sign-ins land on the same account.
+const shadowEmail = (discordUserId: string) => `discord-${discordUserId}@signin.ctrl.rodeo`
+
+async function sha256Hex(s: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function handleSigninButton(interaction: Record<string, any>): Promise<Response> {
+  const discordUserId = interaction.member?.user?.id || interaction.user?.id
+  const discordUsername = interaction.member?.user?.username || interaction.user?.username || null
+  if (!discordUserId || !interaction.guild_id) return json(ephemeral('Could not identify you.'))
+
+  const raw = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '')
+  const client = db()
+  const { error } = await client.from('recruit_signin_tokens').insert({
+    token_hash: await sha256Hex(raw), discord_user_id: discordUserId, discord_username: discordUsername,
+  })
+  if (error) return json(ephemeral('Could not mint a link — try again in a minute.'))
+
+  return json(ephemeral(
+    `🔑 Your one-time sign-in link (10 min, single use):\n${APP_URL}?signin=${raw}\n` +
+    `Opens the applicant inbox already signed in — any browser works.`,
+  ))
+}
+
+// POST /redeem  { token } → { token_hash, email } for supabase-js verifyOtp.
+// Unauthenticated by design: the token is the credential (single-use, 10-min).
+async function handleRedeem(req: Request): Promise<Response> {
+  const { token } = await req.json().catch(() => ({} as Record<string, unknown>))
+  if (typeof token !== 'string' || token.length < 32) return json({ error: 'bad token' }, 400)
+  const client = db()
+  const { data: row } = await client.from('recruit_signin_tokens')
+    .update({ used_at: new Date().toISOString() })
+    .eq('token_hash', await sha256Hex(token)).is('used_at', null)
+    .gte('created_at', new Date(Date.now() - SIGNIN_TTL_MS).toISOString())
+    .select().maybeSingle()
+  if (!row) return json({ error: 'Link expired or already used — get a fresh one from the Discord button.' }, 401)
+
+  // Prefer the member's existing account (from a past desktop OAuth sign-in).
+  const { data: membership } = await client.from('user_discord_membership')
+    .select('user_id').eq('discord_user_id', row.discord_user_id).maybeSingle()
+
+  let email: string | null = null
+  if (membership?.user_id) {
+    const { data: au } = await client.auth.admin.getUserById(membership.user_id)
+    email = au?.user?.email || null
+  }
+  if (!email) {
+    email = shadowEmail(row.discord_user_id)
+    const { error: createErr } = await client.auth.admin.createUser({
+      email, email_confirm: true,
+      app_metadata: { discord_user_id: row.discord_user_id, discord_username: row.discord_username },
+      user_metadata: { username: row.discord_username },
+    })
+    // "already registered" is fine — repeat shadow sign-in.
+    if (createErr && !/already/i.test(createErr.message)) return json({ error: createErr.message }, 500)
+  }
+
+  const { data: link, error: linkErr } = await client.auth.admin.generateLink({ type: 'magiclink', email })
+  if (linkErr || !link?.properties?.hashed_token) return json({ error: linkErr?.message || 'link generation failed' }, 500)
+  return json({ token_hash: link.properties.hashed_token, email })
+}
+
+// POST /signin-post  (user JWT, recruiting member) → post the button message.
+async function handleSigninPost(req: Request): Promise<Response> {
+  const client = db()
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+  const { data: userData, error: userErr } = await client.auth.getUser(token)
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401)
+  const { data: membership } = await client.from('user_discord_membership')
+    .select('is_recruiting_member').eq('user_id', userData.user.id).maybeSingle()
+  if (!membership?.is_recruiting_member) return json({ error: 'Not a recruiting member' }, 403)
+
+  const { postSigninMessage, NOTES_CHANNEL_ID } = await import('../_shared/discord.ts')
+  const body = await req.json().catch(() => ({} as Record<string, unknown>))
+  const channelId = typeof body.channelId === 'string' && body.channelId
+    ? body.channelId
+    : (Deno.env.get('RECRUITING_CHANNEL_ID') || NOTES_CHANNEL_ID)
+  const message = await postSigninMessage(channelId)
+  return json({ posted: true, channelId, messageId: message?.id || null })
 }
 
 // DM each claimer ~an hour before their interview. Invoked by pg_cron every
@@ -483,6 +584,7 @@ async function processRecordings(client: ReturnType<typeof db>): Promise<number>
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     // Cron path: interview reminders (header auth, not Discord-signed).
     // Auth: X-Cron-Secret when CRON_SECRET is configured, else the one-time
@@ -509,13 +611,20 @@ serve(async (req) => {
       return json({ bots, live, reminded: sent, recorded })
     }
 
+    const pathname = new URL(req.url).pathname
+    if (pathname.endsWith('/redeem')) return await handleRedeem(req)
+    if (pathname.endsWith('/signin-post')) return await handleSigninPost(req)
+
     const body = await req.text()
     if (!(await verifySignature(req, body))) {
       return json({ error: 'invalid request signature' }, 401)
     }
     const interaction = JSON.parse(body)
     if (interaction.type === 1) return json(PONG)
-    if (interaction.type === 3) return await handleClaim(interaction)
+    if (interaction.type === 3) {
+      if (String(interaction.data?.custom_id || '') === 'signin') return await handleSigninButton(interaction)
+      return await handleClaim(interaction)
+    }
     return json(ephemeral('Unsupported interaction.'))
   } catch (err) {
     console.error('[recruit-discord] error:', (err as Error).message)

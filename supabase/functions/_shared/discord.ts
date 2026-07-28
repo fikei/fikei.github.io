@@ -345,6 +345,26 @@ export async function postLiveCall(title: string, when: string, meetLink: string
   })
 }
 
+// Persistent "Get sign-in link" helper message for phone sign-in — tapping
+// the button gets an ephemeral one-time link (handled in recruit-discord).
+export async function postSigninMessage(channelId: string): Promise<any> {
+  return await discordFetch(`/channels/${channelId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      embeds: [{
+        description: '📱 **Applicant inbox — sign in from your phone**\n' +
+          'Tap below for a one-time sign-in link. No password, no Discord OAuth dance — ' +
+          'works in any browser. Links expire after 10 minutes.',
+        color: 0x5865f2,
+      }],
+      components: [{
+        type: 1,
+        components: [{ type: 2, style: 1, label: 'Get sign-in link', custom_id: 'signin' }],
+      }],
+    }),
+  })
+}
+
 // One channel nudge for a post nobody claimed within 96h.
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'

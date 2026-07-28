@@ -20,8 +20,8 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.2.0'
-console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification`)
+const VERSION = '1.3.0'
+console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -51,7 +51,15 @@ interface DiscordIdentity {
 function findDiscordIdentity(user: Record<string, unknown>): DiscordIdentity | null {
   const identities = (user.identities || []) as Array<Record<string, unknown>>
   const identity = identities.find(i => i.provider === 'discord')
-  if (!identity) return null
+  if (!identity) {
+    // Bot magic-link accounts (recruit-discord /redeem) carry their Discord id
+    // in app_metadata instead of a provider identity.
+    const meta = (user.app_metadata || {}) as Record<string, unknown>
+    if (meta.discord_user_id) {
+      return { discordUserId: String(meta.discord_user_id), username: meta.discord_username ? String(meta.discord_username) : null }
+    }
+    return null
+  }
   const data = (identity.identity_data || {}) as Record<string, unknown>
   const discordUserId = String(identity.id || data.provider_id || data.sub || '')
   if (!discordUserId) return null
