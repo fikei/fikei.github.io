@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.33.1';
+const VERSION = '3.33.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -454,7 +454,7 @@ function openingsCta(a) {
       ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
       : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
     return stack(
-      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Play in the docked player — Expand opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
+      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
   }
   if (phase === 'done') {
