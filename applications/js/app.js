@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.34.0';
+const VERSION = '3.35.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1612,7 +1612,9 @@ function gpStop() {
 
 function initGlobalPlayer() {
   const v = gpVideo();
-  if (!v) return;
+  // The markup must precede this script; a silent return here once cost an
+  // afternoon of "the button does nothing".
+  if (!v) { console.error('[applications] #gplayer missing at init — player disabled'); return; }
   wireSpeedBar('gp-video');
   wirePip('gp-video');
   v.addEventListener('play', gpSyncPlacement);
