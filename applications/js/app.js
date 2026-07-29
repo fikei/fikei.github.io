@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.32.1';
+const VERSION = '3.33.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -434,7 +434,7 @@ function processingChip() {
 function watchBtn(sc, applicantId) {
   // Opens the Call tab on their profile (video + summary + comments) —
   // not a detached modal.
-  if (applicantId) return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded intro call" data-open-call="${applicantId}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
+  if (applicantId) return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded intro call" data-play-mini="${applicantId}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
   return `<button class="btn btn--sm inbox-row__review cta-std btn--watch" title="Watch the recorded intro call" onclick="event.stopPropagation();openWatch('${sc.watch}')"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button>`;
 }
 
@@ -454,7 +454,7 @@ function openingsCta(a) {
       ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
       : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
     return stack(
-      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Watch the recorded intro call" data-open-call="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
+      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Play in the docked player — Expand opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
   }
   if (phase === 'done') {
@@ -1462,61 +1462,6 @@ function wirePip(videoId) {
   });
 }
 
-/* Dock the player bottom-right once it scrolls out of its container while
-   playing, so the call keeps running while you read notes and comment on it.
-   A placeholder holds the layout height so nothing jumps. */
-function wireMiniPlayer(videoId, scrollRoot) {
-  const video = document.getElementById(videoId);
-  const wrap = video?.closest('.video-wrap');
-  if (!video || !wrap) return;
-  let dismissed = false;
-  const setMini = on => {
-    if (wrap.classList.contains('is-mini') === on) return;
-    if (on) {
-      const ph = document.createElement('div');
-      ph.className = 'video-slot';
-      ph.style.height = `${wrap.offsetHeight}px`;
-      wrap.parentNode.insertBefore(ph, wrap);
-      wrap.classList.add('is-mini');
-    } else {
-      wrap.classList.remove('is-mini');
-      const ph = wrap.previousElementSibling;
-      if (ph?.classList.contains('video-slot')) ph.remove();
-    }
-  };
-  // Rect-based rather than IntersectionObserver: the observer is suspended
-  // while a tab is backgrounded and its thresholds never report the
-  // fully-scrolled-past state, so geometry on scroll is more predictable.
-  const bounds = () => (scrollRoot ? scrollRoot.getBoundingClientRect() : { top: 0, bottom: window.innerHeight });
-  const evaluate = () => {
-    if (wrap.classList.contains('is-mini')) {
-      // While docked the wrap is fixed; the placeholder it left behind is
-      // what tells us whether we've scrolled back to it.
-      const ph = wrap.previousElementSibling?.classList.contains('video-slot') ? wrap.previousElementSibling : null;
-      const pr = ph?.getBoundingClientRect();
-      const b = bounds();
-      if (pr && pr.bottom > b.top + 56 && pr.top < b.bottom - 56) setMini(false);
-      if (video.paused || video.ended) setMini(false);
-      return;
-    }
-    const r = wrap.getBoundingClientRect();
-    const b = bounds();
-    const gone = r.bottom < b.top + 56 || r.top > b.bottom - 56;
-    setMini(gone && !video.paused && !video.ended && !dismissed);
-  };
-  (scrollRoot || window).addEventListener('scroll', evaluate, { passive: true });
-  window.addEventListener('resize', evaluate);
-  video.addEventListener('timeupdate', evaluate);
-  video.addEventListener('pause', () => setMini(false));
-  video.addEventListener('play', () => { dismissed = false; evaluate(); });
-  wrap.querySelector('[data-mini-close]')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dismissed = true;
-    video.pause();
-    setMini(false);
-  });
-}
-
 function wireSpeedBar(videoId) {
   const wrap = document.querySelector(`[data-speed-for="${videoId}"]`);
   const video = document.getElementById(videoId);
@@ -1547,6 +1492,130 @@ function wireSpeedBar(videoId) {
   // Setting src resets playbackRate, so re-apply once metadata lands.
   video.addEventListener('loadedmetadata', () => { video.playbackRate = savedRate(); });
   apply(savedRate());
+}
+
+/* ---------- app-level player ----------------------------------------------
+   One <video> for the whole app. It is moved into the Call tab's mount while
+   that tab is open and docked bottom-right the rest of the time, so a call
+   keeps playing while you navigate. Moves are synchronous (remove + insert in
+   one task) — the spec only pauses a media element that stays detached. */
+
+const gp = { applicantId: null, screeningId: null, title: '', loading: false };
+
+function gpEl() { return document.getElementById('gplayer'); }
+function gpVideo() { return document.getElementById('gp-video'); }
+function gpPlaying() { const v = gpVideo(); return v && !v.paused && !v.ended && v.currentSrc; }
+
+function gpSetMode(mode) {
+  const el = gpEl();
+  if (!el) return;
+  el.classList.toggle('is-mini', mode === 'mini');
+  el.classList.toggle('is-inline', mode === 'inline');
+  el.classList.toggle('is-hidden', mode === 'hidden');
+}
+
+/* Where should the player live right now? Inline when its own applicant's
+   Call tab is open and scrolled into view; docked while it plays anywhere
+   else; hidden when nothing is playing. */
+function gpSyncPlacement() {
+  const el = gpEl();
+  if (!el || !gp.applicantId) return;
+  const mount = document.getElementById('call-player-mount');
+  const reviewOpen = !document.getElementById('review')?.hidden;
+  const onItsCallTab = reviewOpen && reviewTab === 'call' && queue[qIndex] === gp.applicantId && mount;
+
+  let inline = false;
+  if (onItsCallTab) {
+    const scroller = document.querySelector('.review__scroll');
+    const m = mount.getBoundingClientRect();
+    const b = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const visible = m.bottom > b.top + 56 && m.top < b.bottom - 56;
+    // Keep the mount's height while docked so the tab doesn't collapse.
+    if (mount.offsetHeight > 40) mount.style.minHeight = `${mount.offsetHeight}px`;
+    inline = visible || !gpPlaying();
+  }
+
+  if (inline) {
+    if (el.parentElement !== mount) mount.appendChild(el);
+    gpSetMode('inline');
+  } else {
+    if (el.parentElement !== document.body) document.body.appendChild(el);
+    gpSetMode(gpPlaying() ? 'mini' : 'hidden');
+  }
+}
+
+/* Point the player at an applicant's recording. Returns false when there is
+   nothing streamable. Does not autoplay unless asked. */
+async function gpLoad(applicantId, { autoplay = false } = {}) {
+  const sc = screeningState[applicantId] || {};
+  if (!sc.watch || sc.watchExternal) return false;
+  const a = applicants.find(x => x.id === applicantId);
+  const title = a ? fullName(a) : 'Intro call';
+  if (gp.screeningId === sc.watch && gpVideo()?.currentSrc) {
+    gp.applicantId = applicantId;
+    if (autoplay) { try { await gpVideo().play(); } catch { /* gesture required */ } }
+    gpSyncPlacement();
+    return true;
+  }
+  gp.applicantId = applicantId;
+  gp.screeningId = sc.watch;
+  gp.title = title;
+  gp.loading = true;
+  document.getElementById('gp-title').textContent = title;
+  gpSetMode(autoplay ? 'mini' : 'inline');
+  try {
+    const out = await gmailCall({ action: 'recording-link', screeningId: sc.watch });
+    const v = gpVideo();
+    if (!out.url || !v) throw new Error('Recording unavailable');
+    v.src = out.url;
+    v.playbackRate = savedRate();
+    if (autoplay) { try { await v.play(); } catch { /* gesture required */ } }
+  } catch (e) {
+    gp.loading = false;
+    toast(`Recording unavailable: ${e.message}`);
+    gpSetMode('hidden');
+    return false;
+  }
+  gp.loading = false;
+  gpSyncPlacement();
+  return true;
+}
+
+/* Row ▶ — start straight into the docked player, no navigation. */
+async function gpPlayMini(applicantId) {
+  const ok = await gpLoad(applicantId, { autoplay: true });
+  if (ok) gpSyncPlacement();
+}
+
+function gpStop() {
+  const v = gpVideo();
+  try { v.pause(); } catch { /* not started */ }
+  v?.removeAttribute('src');
+  gp.applicantId = null;
+  gp.screeningId = null;
+  document.body.appendChild(gpEl());
+  gpSetMode('hidden');
+}
+
+function initGlobalPlayer() {
+  const v = gpVideo();
+  if (!v) return;
+  wireSpeedBar('gp-video');
+  wirePip('gp-video');
+  v.addEventListener('play', gpSyncPlacement);
+  v.addEventListener('pause', gpSyncPlacement);
+  v.addEventListener('ended', gpSyncPlacement);
+  v.addEventListener('loadedmetadata', () => { v.playbackRate = savedRate(); });
+  window.addEventListener('resize', gpSyncPlacement);
+  // The review pane scrolls independently of the page.
+  document.addEventListener('scroll', gpSyncPlacement, { capture: true, passive: true });
+  document.getElementById('gp-close').addEventListener('click', gpStop);
+  document.getElementById('gp-expand').addEventListener('click', () => {
+    if (!gp.applicantId) return;
+    openReview(gp.applicantId);
+    reviewTab = 'call';
+    renderReview();
+  });
 }
 
 /* ---------- recording viewer: video + call notes + house comments ---------- */
@@ -1620,10 +1689,8 @@ async function loadCallPanel(a) {
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
     ${streamable
-      ? `<div class="video-wrap">
-           <div class="mini-bar"><span class="mini-bar__title">Intro call</span><button type="button" data-mini-close aria-label="Close mini player">✕</button></div>
-           ${speedOverlayHtml('call-video')}<video id="call-video" class="call-video" controls playsinline></video></div>
-         <p class="email-modal__status" id="call-status">Fetching recording…</p>`
+      ? `<div id="call-player-mount" class="call-player-mount"></div>
+         <p class="email-modal__status" id="call-status"></p>`
       : row.external_recording_url
         // These hosts block cross-origin embedding, so this opens out rather
         // than pretending to be a player.
@@ -1643,12 +1710,9 @@ async function loadCallPanel(a) {
       </form>
     </section>`;
   loadComments(a.id).then(() => { if (queue[qIndex] === a.id && reviewTab === 'call') renderNotes(a.id); });
-  wireSpeedBar('call-video');
-  wirePip('call-video');
-  wireMiniPlayer('call-video', document.querySelector('.review__scroll'));
   document.getElementById('notes-form-call')?.addEventListener('submit', (ev) => { ev.preventDefault(); postNote(a.id); });
   document.getElementById('call-stamp')?.addEventListener('click', () => {
-    const v = document.getElementById('call-video');
+    const v = gpVideo();
     const t = v?.currentTime || 0;
     const stamp = `[${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}] `;
     const input = document.getElementById('notes-input');
@@ -1656,16 +1720,13 @@ async function loadCallPanel(a) {
     input?.focus();
   });
   if (streamable) {
-    try {
-      const out = await gmailCall({ action: 'recording-link', screeningId: sc.watch });
-      const v = document.getElementById('call-video');
-      const st = document.getElementById('call-status');
-      if (v && out.url) { v.src = out.url; if (st) st.textContent = ''; }
-      else if (st) st.textContent = 'Recording unavailable';
-    } catch (e) {
-      const st = document.getElementById('call-status');
-      if (st) st.textContent = `Recording unavailable: ${e.message}`;
-    }
+    const st = document.getElementById('call-status');
+    if (gp.applicantId !== a.id) { if (st) st.textContent = 'Fetching recording…'; }
+    const ok = await gpLoad(a.id);
+    if (st) st.textContent = ok ? '' : 'Recording unavailable';
+  } else {
+    // Another call may be docked; leaving this tab must not strand it.
+    gpSyncPlacement();
   }
 }
 
@@ -2790,6 +2851,7 @@ function openReview(id) {
 function closeReview() {
   document.getElementById('review').hidden = true;
   document.body.style.overflow = '';
+  gpSyncPlacement(); // a playing call follows you out to the list
   const url = new URL(location); url.searchParams.delete('a');
   history.replaceState(null, '', url);
   render();
@@ -3995,7 +4057,7 @@ function init() {
     const slot = e.target.closest('[data-slot]');
     if (slot) { scheduleSlot(slot.dataset.slotApplicant, slot.dataset.slot, slot); return; }
     const rtab = e.target.closest('[data-review-tab]');
-    if (rtab) { reviewTab = rtab.dataset.reviewTab; renderReview(); return; }
+    if (rtab) { reviewTab = rtab.dataset.reviewTab; renderReview(); gpSyncPlacement(); return; }
     const em = e.target.closest('[data-email]');
     if (em) { openEmailModal(em.dataset.email, em.dataset.emailKind || null); return; }
     const so = e.target.closest('[data-second-opinion]');
@@ -4108,6 +4170,8 @@ function init() {
     if (sa) { sendAllUpdates(sa); return; }
     const od2 = e.target.closest('[data-open-draft]');
     if (od2) { updateListingStatus(od2.dataset.openDraft, 'open'); return; }
+    const pm = e.target.closest('[data-play-mini]');
+    if (pm) { e.stopPropagation(); gpPlayMini(pm.dataset.playMini); return; }
     const oc = e.target.closest('[data-open-call]');
     if (oc) {
       openReview(oc.dataset.openCall);
