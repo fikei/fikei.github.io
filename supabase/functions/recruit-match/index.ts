@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.9.0'
+const VERSION = '1.10.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -329,29 +329,64 @@ serve(async (req) => {
     }
 
     if (body.action === 'draft_update' && body.applicantId) {
-      // Rejection-queue draft. Unsigned community voice; never discloses
-      // votes, vetoes, or auto-flags.
-      const { data: applicant } = await client.from('recruit_applicants').select('first_name, why_agape').eq('id', String(body.applicantId)).maybeSingle()
+      // Standard rejection note: a fixed community template the reviewer edits
+      // before sending (sending is always optional). Only the middle paragraph
+      // is written per-applicant, grounded in their own survey answers, so the
+      // voice and the promises stay identical for everyone. Never discloses
+      // reviews, verdicts, or auto-flags.
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('first_name, why_agape, about, gifts, residency')
+        .eq('id', String(body.applicantId)).maybeSingle()
       if (!applicant) return new Response(JSON.stringify({ error: 'Unknown applicant' }), { status: 404, headers: jsonHeaders })
-      const why = (applicant.why_agape || '').replace(/\s+/g, ' ').slice(0, 300)
-      const prompt = `Write a short, kind update email from the Agape community (a 13-bedroom co-op near Dolores Park, SF) to ${applicant.first_name}, who applied to live here and will not be moving forward.
 
-Hard rules:
-- Warm, human, and brief (under 100 words). Thank them genuinely for the care in their application${why ? ` (they wrote: "${why}")` : ''}.
-- Do NOT give reasons, feedback, or specifics about the decision. Do not say "unfortunately" more than once, do not apologize repeatedly.
-- Leave the door open gently (things shift; they're welcome to apply again down the road) without promising anything.
-- Sign off as "the Agape community" — no individual name.
-- Subject: short and neutral, e.g. "An update from Agape".
+      const { data: nl } = await client.from('recruit_settings').select('value').eq('key', 'newsletter_url').maybeSingle()
+      const newsletterUrl = typeof nl?.value === 'string' ? nl.value : (nl?.value as any)?.toString?.() || ''
 
-Return exactly:
-SUBJECT: <subject>
-BODY:
-<body>`
-      const text = await callClaudeRaw('claude-haiku-4-5-20251001', 'You write brief, warm community emails. Follow the format exactly.', prompt, 400)
-      const m = text.match(/SUBJECT:\s*(.+)\n+BODY:\n?([\s\S]+)/)
-      const subject = (m?.[1] || 'An update from Agape').trim().slice(0, 200)
-      const bodyText = (m?.[2] || text).trim().slice(0, 4000)
-      return new Response(JSON.stringify({ subject, body: bodyText }), { headers: jsonHeaders })
+      const survey = [
+        applicant.why_agape && `Why Agape: ${String(applicant.why_agape).replace(/\s+/g, ' ').slice(0, 400)}`,
+        applicant.about && `About them: ${String(applicant.about).replace(/\s+/g, ' ').slice(0, 400)}`,
+        applicant.gifts && `Gifts they offered to share: ${String(applicant.gifts).replace(/\s+/g, ' ').slice(0, 300)}`,
+      ].filter(Boolean).join('\n')
+
+      // One paragraph, their words back to them. If Claude is unavailable the
+      // template still sends — it just loses the personal middle.
+      let personal = ''
+      if (survey) {
+        try {
+          const raw = await callClaudeRaw(
+            'claude-haiku-4-5-20251001',
+            'You write two or three warm, specific sentences. No greeting, no sign-off, no bullet points. Return only the sentences.',
+            `Someone applied to live at Agape, a 13-bedroom co-op near Dolores Park in San Francisco, and is not moving forward. Write TWO OR THREE sentences for the middle of their update email that show we actually read what they wrote.
+
+Their application said:
+${survey}
+
+Rules:
+- Name something specific and true from their answers — an interest, a craft, something they offered to share.
+- Do not evaluate them, rank them, hint at reasons, or explain the decision.
+- Do not promise a future spot, a call, or a reconsideration.
+- No greeting and no sign-off, just the sentences. Under 60 words.`,
+            300,
+          )
+          personal = String(raw || '').trim().replace(/^["']|["']$/g, '').slice(0, 600)
+        } catch (err) {
+          console.error(`[recruit-match] personal paragraph failed: ${(err as Error).message}`)
+        }
+      }
+
+      const cta = newsletterUrl
+        ? `\n\nIf you'd like to hear when we're open again, along with the occasional dinner, workshop, or open house, you can join our list here:\n${newsletterUrl}`
+        : ''
+
+      const subject = 'An update from Agape'
+      const bodyText = `Hi ${applicant.first_name},\n\n` +
+        `Thank you for applying to Agape, and for the care you put into your answers. ` +
+        `We're not able to offer you a room this time.\n` +
+        (personal ? `\n${personal}\n` : '') +
+        `\nOur rooms open up unpredictably, and the house changes with them, so this isn't a closed door — you're welcome to apply again down the road.${cta}\n\n` +
+        `Warmly,\nthe Agape community`
+
+      return new Response(JSON.stringify({ subject, body: bodyText, personalized: Boolean(personal) }), { headers: jsonHeaders })
     }
 
     if (body.action === 'second_opinion' && body.applicantId) {

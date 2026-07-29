@@ -1039,37 +1039,43 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   gap: var(--space-2) var(--space-3);
 }
 .vote-bar__q { font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
-.vote-bar__scores { display: inline-flex; gap: var(--space-2); }
-.vote-bar__score {
-  width: 44px; height: 44px; border-radius: var(--radius-pill);
-  border: 1px solid var(--border); background: var(--bg-surface);
-  font-size: var(--font-size-body); font-weight: var(--fw-semibold);
-  color: var(--fg); cursor: pointer;
+/* Three verdicts, one decides. Each carries its own tint so the destructive
+   one never looks like the neutral one; only the selected chip fills in. */
+.vote-bar__verdicts { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
+.vote-bar__verdict {
+  height: 36px; padding: 0 var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border);
+  background: var(--bg-surface); color: var(--fg-muted);
+  font-size: var(--font-size-small); font-weight: var(--fw-semibold);
+  cursor: pointer; transition: background 80ms ease, color 80ms ease, box-shadow 80ms ease;
 }
-.vote-bar__score:hover { background: var(--bg-overlay); }
-.vote-bar__score.is-on { background: #9FE870; border-color: #9FE870; color: #163300; }
-.vote-bar__veto {
-  height: 44px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
-  border: 1px solid rgba(168, 32, 13, 0.35); background: none;
-  color: var(--error); font-size: var(--font-size-small); font-weight: var(--fw-semibold);
-  cursor: pointer;
-}
-.vote-bar__veto:hover { background: rgba(168, 32, 13, 0.10); }
-.vote-bar__veto.is-on { background: rgba(168, 32, 13, 0.16); box-shadow: inset 0 0 0 1.5px var(--error); }
+.vote-bar__verdict:hover { background: var(--bg-overlay); color: var(--fg); }
+.vote-bar__verdict.is-on { color: var(--fg); }
+.vote-bar__verdict.is-not-fit.is-on { background: rgba(168, 32, 13, 0.16); box-shadow: inset 0 0 0 1.5px var(--error); }
+.vote-bar__verdict.is-needs-input.is-on { background: var(--bg-overlay); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.vote-bar__verdict.is-forward.is-on { background: #9FE870; border-color: #9FE870; color: #163300; }
 .vote-bar__note { flex: 1 1 180px; min-width: 0; height: 44px; }
 .vote-bar__cast { height: 44px; border-radius: var(--radius-pill); }
+.vote-bar__cast[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Verdict label on a past review, in the reviews thread. */
+.verdict-tag {
+  display: inline-block; padding: 0 6px; border-radius: var(--radius-xs);
+  font-size: var(--font-size-tiny, 11px); font-weight: var(--fw-semibold);
+  background: var(--bg-overlay); color: var(--fg-muted);
+}
+.verdict-tag.is-not-fit { background: rgba(168, 32, 13, 0.16); color: var(--error); }
+.verdict-tag.is-forward { background: rgba(159, 232, 112, 0.18); color: #7FC24E; }
 @media (max-width: 720px) {
   .vote-bar__q { flex-basis: 100%; }
-  .vote-bar__scores { flex: 1; justify-content: space-between; }
-  .vote-bar__score { width: 40px; height: 40px; }
+  .vote-bar__verdicts { flex-basis: 100%; }
+  .vote-bar__verdict { flex: 1; }
   .vote-bar__note { flex-basis: 100%; order: 5; }
   .vote-bar__cast { flex: 1; order: 6; }
 }
 
 .decision-chip--vote { background: var(--bg-surface); color: var(--fg-muted); }
 .vote-summary { margin: 0 0 var(--space-3); font-size: var(--font-size-small); font-weight: var(--fw-semibold); color: var(--fg-muted); }
-.vote-score { font-weight: var(--fw-semibold); color: var(--fg); }
-.vote-score--veto { color: var(--error); }
 
 /* --- v3.1: room costs in the drawer --- */
 .occ-drawer__section {

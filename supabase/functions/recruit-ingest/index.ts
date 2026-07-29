@@ -19,7 +19,7 @@
 // timestamp, and inserts ignore duplicates — so resending the whole sheet is
 // a safe backfill, not a mess of copies.
 
-const VERSION = '1.2.1'
+const VERSION = '1.3.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -129,7 +129,10 @@ function deriveId(first: string, last: string, submittedAt: Date): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const isPull = new URL(req.url).pathname.endsWith('/pull')
+    const path = new URL(req.url).pathname
+    const isPull = path.endsWith('/pull')
+    const isPeek = path.endsWith('/peek')
+    const isReviewImport = path.endsWith('/review-comments')
     const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const body = await req.json().catch(() => ({}))
     const dryRun = body.dryRun === true
@@ -146,6 +149,157 @@ serve(async (req) => {
       authed = Boolean(burned)
     }
     if (!authed) return json({ error: 'bad or missing x-ingest-secret / x-cron-nonce' }, 401)
+
+    // Column map for the review columns, so the importer can be written
+    // against what the sheet actually holds. Header names and per-column
+    // fill counts only — no applicant content leaves here.
+    if (isPeek) {
+      const at = await sharedAccessToken(client)
+      const meta = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`,
+        { headers: { Authorization: `Bearer ${at}` } },
+      ).then((r) => r.json())
+      const tabs: string[] = (meta.sheets || []).map((sh: any) => sh.properties?.title).filter(Boolean)
+      const out: Record<string, unknown> = { tabs }
+      for (const tab of tabs) {
+        const resp = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}`,
+          { headers: { Authorization: `Bearer ${at}` } },
+        )
+        if (!resp.ok) { out[tab] = { error: resp.status }; continue }
+        const values: string[][] = (await resp.json()).values || []
+        const headers = values[0] || []
+        out[tab] = {
+          rows: Math.max(0, values.length - 1),
+          columns: headers.map((h, i) => ({
+            header: h,
+            filled: values.slice(1).filter((r) => String(r[i] ?? '').trim()).length,
+          })).filter((c) => c.header),
+        }
+      }
+        return json(out)
+    }
+
+    /* Import the house's review comments off the application sheet.
+       These are Google comment threads, so each one carries its author — which
+       is how a review written by someone who has never opened /applications
+       still lands under their name. Needs the drive.readonly scope. */
+    if (isReviewImport) {
+      const at = await sharedAccessToken(client)
+      const cResp = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${SHEET_ID}/comments` +
+        '?fields=comments(id,author/displayName,content,anchor,quotedFileContent/value,resolved,createdTime,replies(author/displayName,content,createdTime))&pageSize=100',
+        { headers: { Authorization: `Bearer ${at}` } },
+      )
+      const cText = await cResp.text()
+      if (!cResp.ok) {
+        if (cResp.status === 403 && /scope|insufficient/i.test(cText)) {
+          return json({ error: 'the shared Google account has not granted access to comments yet — reconnect it from the /applications rail footer' }, 502)
+        }
+        return json({ error: `comments unreadable (HTTP ${cResp.status}): ${cText.slice(0, 220)}` }, 502)
+      }
+      // deno-lint-ignore no-explicit-any
+      const threads: any[] = JSON.parse(cText).comments || []
+
+      // Sheet rows in order, so a comment anchored to row N resolves to the
+      // applicant that row produced.
+      const sheetRows = await readSheet(client)
+      const emailOf = (r: Record<string, unknown>) => {
+        const k = Object.keys(r).find((h) => /e-?mail/i.test(h))
+        return k ? String(r[k] || '').trim().toLowerCase() : ''
+      }
+      const { data: appRows } = await client.from('recruit_applicants').select('id, email, first_name, last_name')
+      const byEmail = new Map((appRows || []).map((a: any) => [String(a.email || '').toLowerCase(), a]))
+
+      // Author display name -> roster email. "K Storey-Fisher" and "Kate
+      // Storey-Fisher" are the same person, so match on surname plus first
+      // initial rather than the exact string.
+      const { data: roster } = await client.from('recruit_group_roster').select('email, full_name')
+      const key = (n: string) => {
+        const parts = String(n || '').toLowerCase().replace(/[^a-z\s-]/g, '').trim().split(/\s+/)
+        if (!parts.length) return ''
+        return `${parts[0][0]}|${parts[parts.length - 1]}`
+      }
+      const rosterByKey = new Map((roster || []).map((r: any) => [key(r.full_name), r]))
+
+      const applied: unknown[] = []
+      const unmatched: unknown[] = []
+
+      for (const t of threads) {
+        const authorName = t.author?.displayName || ''
+        const rosterHit = rosterByKey.get(key(authorName))
+        // Every reply is part of the same person's read, but the thread's own
+        // author owns the verdict; replies are appended to the body.
+        const bodyParts = [String(t.content || '').trim(),
+          ...(t.replies || []).map((r: any) => `${r.author?.displayName || 'reply'}: ${String(r.content || '').trim()}`)]
+        const body = bodyParts.filter(Boolean).join('\n').slice(0, 4000)
+        if (!body) continue
+
+        // Resolve the applicant: the anchor's row number first, then the
+        // quoted cell text (an email, or a name).
+        let applicant: any = null
+        const rowNum = Number((String(t.anchor || '').match(/[A-Z]+(\d+)/) || [])[1] || 0)
+        if (rowNum > 1 && sheetRows[rowNum - 2]) applicant = byEmail.get(emailOf(sheetRows[rowNum - 2])) || null
+        if (!applicant) {
+          const quoted = String(t.quotedFileContent?.value || '').trim()
+          const em = quoted.match(/[\w.+-]+@[\w-]+\.[\w.]+/)
+          if (em) applicant = byEmail.get(em[0].toLowerCase()) || null
+          if (!applicant && quoted) {
+            const q = quoted.toLowerCase()
+            applicant = (appRows || []).find((a: any) =>
+              q === `${a.first_name} ${a.last_name}`.toLowerCase().trim() ||
+              q === String(a.email || '').toLowerCase()) || null
+          }
+        }
+        if (!applicant) { unmatched.push({ author: authorName, body: body.slice(0, 120), anchor: t.anchor || null }); continue }
+
+        // Does the comment point at a decision? Only unmistakable language
+        // counts; anything softer stays a comment for a human to read.
+        const low = body.toLowerCase()
+        const verdict =
+          /\b(not a fit|no thanks|hard (no|pass)|pass on|reject|decline|don'?t think .{0,20}fit|not for us)\b/.test(low) ? 'not_fit'
+          : /\b(move forward|move ahead|let'?s (meet|talk|screen|interview)|schedule|yes[!.]?$|would love|great fit|strong (yes|fit))\b/.test(low) ? 'forward'
+          : null
+
+        const row: Record<string, unknown> = {
+          applicant_id: applicant.id,
+          author_name: rosterHit?.full_name || authorName || 'A housemate',
+          author_email: rosterHit?.email || null,
+          body,
+          source: 'sheet',
+          created_at: t.createdTime || new Date().toISOString(),
+        }
+        // Same author, same applicant, same words = already imported. Checked
+        // rather than upserted: the key includes the body, which is too long
+        // to carry a unique index worth maintaining.
+        const { data: dupe } = await client.from('recruit_comments')
+          .select('id').eq('applicant_id', applicant.id).eq('source', 'sheet')
+          .eq('author_name', row.author_name).eq('body', body).maybeSingle()
+        if (!dryRun && !dupe) await client.from('recruit_comments').insert(row)
+        if (verdict && !dryRun) {
+          await client.from('recruit_votes').upsert({
+            applicant_id: applicant.id, voter_id: null,
+            voter_email: rosterHit?.email || null,
+            voter_name: rosterHit?.full_name || authorName || 'A housemate',
+            verdict, note: body.slice(0, 500), score: null, veto: false,
+            updated_at: t.createdTime || new Date().toISOString(),
+          }, { onConflict: 'applicant_id,voter_email' })
+        }
+        applied.push({
+          alreadyImported: Boolean(dupe),
+          applicant: `${applicant.first_name} ${applicant.last_name}`.trim(),
+          author: row.author_name, authorEmail: row.author_email, verdict, body: body.slice(0, 160),
+        })
+      }
+
+      const summary = `${applied.length} review comment${applied.length === 1 ? '' : 's'} from the application sheet`
+      if (!dryRun && applied.length) {
+        await postChannelEmbed(AUTOMATION_CHANNEL_ID,
+          `📝 **${summary}**\n${applied.filter((x: any) => x.verdict).length} pointed to a decision.`,
+          0x378add, summary)
+      }
+      return json({ dryRun, imported: applied.length, withVerdict: applied.filter((x: any) => x.verdict).length, applied, unmatched })
+    }
 
     let rows: Array<Record<string, unknown>>
     if (isPull) {
