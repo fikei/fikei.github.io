@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.32.0';
+const VERSION = '3.32.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1468,26 +1468,47 @@ function wirePip(videoId) {
 function wireMiniPlayer(videoId, scrollRoot) {
   const video = document.getElementById(videoId);
   const wrap = video?.closest('.video-wrap');
-  if (!video || !wrap || !window.IntersectionObserver) return;
+  if (!video || !wrap) return;
   let dismissed = false;
   const setMini = on => {
     if (wrap.classList.contains('is-mini') === on) return;
     if (on) {
-      wrap.style.setProperty('--mini-h', `${wrap.offsetHeight}px`);
+      const ph = document.createElement('div');
+      ph.className = 'video-slot';
+      ph.style.height = `${wrap.offsetHeight}px`;
+      wrap.parentNode.insertBefore(ph, wrap);
       wrap.classList.add('is-mini');
     } else {
       wrap.classList.remove('is-mini');
+      const ph = wrap.previousElementSibling;
+      if (ph?.classList.contains('video-slot')) ph.remove();
     }
   };
-  // Threshold 0 fires on full exit/entry; a partial threshold alone never
-  // reports the fully-scrolled-past state.
-  const obs = new IntersectionObserver(([entry]) => {
-    const watching = !video.paused && !video.ended;
-    setMini(!entry.isIntersecting && watching && !dismissed);
-  }, { root: scrollRoot || null, threshold: 0 });
-  obs.observe(wrap);
+  // Rect-based rather than IntersectionObserver: the observer is suspended
+  // while a tab is backgrounded and its thresholds never report the
+  // fully-scrolled-past state, so geometry on scroll is more predictable.
+  const bounds = () => (scrollRoot ? scrollRoot.getBoundingClientRect() : { top: 0, bottom: window.innerHeight });
+  const evaluate = () => {
+    if (wrap.classList.contains('is-mini')) {
+      // While docked the wrap is fixed; the placeholder it left behind is
+      // what tells us whether we've scrolled back to it.
+      const ph = wrap.previousElementSibling?.classList.contains('video-slot') ? wrap.previousElementSibling : null;
+      const pr = ph?.getBoundingClientRect();
+      const b = bounds();
+      if (pr && pr.bottom > b.top + 56 && pr.top < b.bottom - 56) setMini(false);
+      if (video.paused || video.ended) setMini(false);
+      return;
+    }
+    const r = wrap.getBoundingClientRect();
+    const b = bounds();
+    const gone = r.bottom < b.top + 56 || r.top > b.bottom - 56;
+    setMini(gone && !video.paused && !video.ended && !dismissed);
+  };
+  (scrollRoot || window).addEventListener('scroll', evaluate, { passive: true });
+  window.addEventListener('resize', evaluate);
+  video.addEventListener('timeupdate', evaluate);
   video.addEventListener('pause', () => setMini(false));
-  video.addEventListener('play', () => { dismissed = false; });
+  video.addEventListener('play', () => { dismissed = false; evaluate(); });
   wrap.querySelector('[data-mini-close]')?.addEventListener('click', (e) => {
     e.stopPropagation();
     dismissed = true;
