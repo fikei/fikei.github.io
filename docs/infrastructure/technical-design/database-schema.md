@@ -332,7 +332,9 @@ See `supabase/migrations/005_systemic_ai.sql` for full definitions. These suppor
 
 ---
 
-## Notion Sync Tables (Migration 006)
+## Notion Sync Tables (Migration 006) — deprecated 2026-07-29
+
+> The notion-sync pipeline (edge function + GitHub Actions workflow) was removed; these tables remain in the Ops project but are unused.
 
 **Source**: `supabase/migrations/006_notion_sync_state.sql`
 

@@ -4,6 +4,15 @@ Changes to the Notion sync system, GitHub Actions workflows, and operations infr
 
 ---
 
+## [2026-07-29] - Deprecated AI Agent Automation + Notion Sync
+
+### Removed
+- **`agent-automation.yml` workflow** — 18 of the last 100 runs failed, all in the notion-sync job (curl exit 6: the Ops Supabase host no longer resolves). The remaining jobs (on-push, on-pull-request, daily-synthesis, weekly-improvement, friday-doc-cleanup, manual-trigger) only echoed logs or auto-filed noise issues; Claude Code sessions handle this work directly now. `scrape-events.yml` is the only remaining workflow.
+- **`notion-sync` edge function** (`supabase/functions/notion-sync/`) and `notion-structure.json` — GitHub → Notion doc sync is discontinued. Sync guide archived at `docs/infrastructure/archive/NOTION-SYNC-GUIDE.md`; PRD archived at `docs/strategy/prds/archive/notion-sync-platform.md`.
+- Migration 006 sync tables remain in the Ops project but are unused. GitHub secrets `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `NOTION_API_KEY`, `ANTHROPIC_API_KEY` are no longer referenced and can be deleted from repo settings.
+
+---
+
 ## [2026-02-06] - Content Sync Pipeline & Dedup
 
 ### Fixed

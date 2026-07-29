@@ -45,7 +45,6 @@
 | Page load time | <2s | ~1.5s | ✅ |
 | Link enrichment | <3s | ~2s | ✅ |
 | Widget generation | <5s | ~3s | ✅ |
-| Notion sync | <30s | ~15s | ✅ |
 
 ### Usage
 
@@ -93,7 +92,6 @@
 
 ```bash
 # View Supabase function logs
-supabase functions logs notion-sync
 supabase functions logs agent-handler
 supabase functions logs enrich-link
 
@@ -109,12 +107,6 @@ gh run view <run-id> --log
 ### Manual Checks
 
 ```bash
-# Test Notion sync
-curl -X POST "$SUPABASE_URL/functions/v1/notion-sync" \
-  -H "Authorization: Bearer $SERVICE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"action": "sync-structure"}'
-
 # Test link enrichment
 curl -X POST "$SUPABASE_URL/functions/v1/enrich-link" \
   -H "Authorization: Bearer $ANON_KEY" \
@@ -130,7 +122,6 @@ curl -X POST "$SUPABASE_URL/functions/v1/enrich-link" \
 |---------|--------|---------|
 | GitHub Pages | 99.9% | ✅ |
 | Supabase | 99.9% | ✅ |
-| Notion API | 99.5% | ✅ |
 
 ---
 

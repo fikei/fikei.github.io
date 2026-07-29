@@ -104,10 +104,6 @@ supabase functions deploy recruit-gmail
 supabase functions deploy recruit-availability --no-verify-jwt   # public schedule-token picker
 supabase functions deploy recruit-discord --no-verify-jwt        # Discord interactions (Ed25519-signed)
 
-# Ops project functions
-supabase link --project-ref ycilriwjnmcelkspmfmg
-supabase functions deploy notion-sync
-
 # Systemic project functions
 supabase link --project-ref atdqdfpdeytfuvvpsasz
 supabase functions deploy systemic-analyze
@@ -127,7 +123,6 @@ supabase secrets set NOTION_API_KEY=ntn_...
 ```bash
 supabase functions logs enrich-link --tail
 supabase functions logs generate-widget --tail
-supabase functions logs notion-sync --tail
 ```
 
 ### Function Rollback
@@ -145,7 +140,6 @@ supabase functions deploy {function-name}
 | `generate-widget` | Boards | AI widget generation | 2026-02-05 |
 | `categorize` | Boards | AI pin categorization | Previous |
 | `agent-handler` | Boards | AI agent orchestration | 2026-02-04 |
-| `notion-sync` | Ops | GitHub ↔ Notion documentation sync | 2026-02-04 |
 | `systemic-analyze` | Systemic | Design system analysis | Previous |
 | `systemic-fetch` | Systemic | Design system data fetching | Previous |
 | `recruit-gmail` | Boards | Shared-inbox applicant email pipe + availability extraction + Discord claim posts | — |
@@ -160,39 +154,11 @@ supabase functions deploy {function-name}
 
 ## GitHub Actions: Automation
 
-### Workflow: `agent-automation.yml`
+### Workflow: `scrape-events.yml`
 
-A single workflow file (881 lines) handles all automation.
+The only active workflow — scheduled event scraping for the Events pipeline. Trigger manually with `gh workflow run scrape-events.yml`.
 
-| Trigger | What Runs |
-|---------|-----------|
-| Push to `main`, `master`, `claude/*` | Notion sync (structure + content), security scan |
-| Pull request opened/synced | Documentation standards check |
-| Daily (9 AM UTC) | Chief of Staff synthesis issue |
-| Weekly (Friday 4 PM UTC) | Continuous improvement analysis issue |
-| Manual dispatch | Run specific agent |
-
-### Key Jobs
-
-**notion-sync** — The most complex job. On every push:
-1. Checks out repo with `depth=2` (for `git diff`)
-2. Detects changed `.md` files
-3. Syncs page structure to Notion (creates/deletes pages)
-4. Cleans up orphaned Notion pages (AI-created only)
-5. Syncs changed file contents (SHA-256 hash comparison, retry with backoff)
-
-**on-push** — Security scan: greps for hardcoded secrets in `supabase/` and `.env` files.
-
-**on-pull-request** — Checks PR description length, looks for PRD links.
-
-### Required Secrets
-
-| Secret | Purpose | Set In |
-|--------|---------|--------|
-| `SUPABASE_URL` | Ops project URL | GitHub Secrets |
-| `SUPABASE_SERVICE_KEY` | Full-access key for sync | GitHub Secrets |
-| `NOTION_API_KEY` | Notion integration token | GitHub Secrets |
-| `ANTHROPIC_API_KEY` | Claude API (for agents) | GitHub Secrets |
+> **Deprecated (2026-07-29):** `agent-automation.yml` (AI Agent Workforce + Notion sync) was removed. The notion-sync job had been failing (dead Ops Supabase host), and the remaining jobs only emitted logs or auto-filed noise issues. The `notion-sync` edge function and `notion-structure.json` were removed with it; the sync guide is archived at `archive/NOTION-SYNC-GUIDE.md`. Doc workflows now run in Claude Code sessions directly.
 
 ---
 
@@ -233,19 +199,11 @@ Accessed via `Deno.env.get('KEY')`:
 | `LADDER_ANTHROPIC_API_KEY` | Ladder functions (console key `ladder-jobs`; falls back to `ANTHROPIC_API_KEY` if unset) |
 | `OPENAI_API_KEY` | generate-widget (fallback) |
 | `SUPABASE_URL` | All functions (auto-set by Supabase) |
-| `SUPABASE_SERVICE_ROLE_KEY` | enrich-link, notion-sync (bypasses RLS) |
-| `NOTION_API_KEY` | notion-sync |
+| `SUPABASE_SERVICE_ROLE_KEY` | enrich-link (bypasses RLS) |
 
 ### GitHub Actions
 
-Set in repository Settings → Secrets:
-
-| Variable | Required By |
-|----------|-------------|
-| `SUPABASE_URL` | notion-sync job |
-| `SUPABASE_SERVICE_KEY` | notion-sync job |
-| `NOTION_API_KEY` | notion-sync job |
-| `ANTHROPIC_API_KEY` | agent jobs (console key `agents-automation`) |
+Set in repository Settings → Secrets. The `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `NOTION_API_KEY` / `ANTHROPIC_API_KEY` secrets were used by the removed `agent-automation.yml` workflow and can be deleted from repo settings.
 
 ### Client-Side
 

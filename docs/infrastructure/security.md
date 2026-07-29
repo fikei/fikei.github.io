@@ -61,13 +61,9 @@ All tables have RLS enabled. Policies enforce user isolation.
 
 **Known issue**: Systemic tables (`migration 005`) have overly permissive policies allowing public INSERT/UPDATE. These should be restricted to authenticated users or admin only.
 
-### Notion Sync Tables
+### Notion Sync Tables (deprecated 2026-07-29)
 
-| Table | Anon | Authenticated | Service Role |
-|-------|------|---------------|-------------|
-| All sync tables | No access | No access | Full |
-
-Sync tables are only accessed by the `notion-sync` edge function using the service role key.
+The `notion-sync` edge function and its GitHub Actions workflow were removed; the sync tables (migration 006) remain in the Ops project but are unused.
 
 ---
 
@@ -153,7 +149,7 @@ Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type
 |--------|-----------|----------|
 | `ANTHROPIC_API_KEY` | Supabase Secrets + GitHub Secrets | 2026-02-04 |
 | `OPENAI_API_KEY` | Supabase Secrets | Previous |
-| `NOTION_API_KEY` | Supabase Secrets + GitHub Secrets | 2026-02-04 |
+| `NOTION_API_KEY` | Unused since 2026-07-29 (notion-sync removed) — safe to delete | 2026-02-04 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase (auto-managed) + GitHub Secrets | N/A |
 | `SUPABASE_ANON_KEY` | Client code (public by design) | N/A |
 

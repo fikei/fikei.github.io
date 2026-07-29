@@ -280,57 +280,6 @@ Analyzes uploaded images using Claude Vision to extract products, URLs, and cont
 
 ---
 
-## Edge Functions (Ops Project)
-
-Base URL: `https://ycilriwjnmcelkspmfmg.supabase.co/functions/v1`
-
-### POST /notion-sync
-
-Syncs documentation from GitHub to Notion. Used by GitHub Actions.
-
-**Auth**: Service role key only
-
-**Request — Sync Structure**:
-```json
-{
-  "action": "sync-structure",
-  "structure": { ... },
-  "rootPageId": "notion-page-id"
-}
-```
-
-**Request — Update Page**:
-```json
-{
-  "action": "update-page",
-  "pagePath": "docs/execution/BUGS.md",
-  "content": "# Bugs\n...",
-  "contentHash": "abc123..."
-}
-```
-
-**Request — Check Changes**:
-```json
-{
-  "action": "check-changes",
-  "pages": [
-    { "path": "docs/execution/BUGS.md", "hash": "abc123..." }
-  ]
-}
-```
-
-**Request — Cleanup**:
-```json
-{
-  "action": "cleanup",
-  "dryRun": true
-}
-```
-
-**Source**: `supabase/functions/notion-sync/index.ts`
-
----
-
 ## REST API (Direct Supabase)
 
 The client also calls Supabase's REST API directly (not edge functions) for CRUD operations.
