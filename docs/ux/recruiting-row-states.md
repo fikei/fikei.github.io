@@ -230,3 +230,20 @@ Now exactly one active placement per applicant, enforced by a partial unique ind
 **Every placement is now a move.** `addPlacement()` drops the previous active row before inserting, which turns all four call sites into moves at once without each having to know. Copy follows: *Add* → **Move here** on the accordion when they're already placed, *Add to another listing* → **Move to a different listing** in the review foot.
 
 Reconciling the two existing duplicates preferred a manual placement over an auto one — a recruiter chose it — then fell back to the same date-fit ordering.
+
+## Amendment — v3.40 (one reviewer, three verdicts)
+
+The Inbox is no longer a group vote. One housemate's read decides, and every review requires a comment.
+
+| Verdict | What happens | Row state |
+|---|---|---|
+| **Not a fit** | Archived immediately; an update email is owed | `Not a fit` chip, tooltip names the reviewer |
+| **Needs input** | Stays in the Inbox, explicitly asking for another read | `Needs input` chip, tooltip names who asked |
+| **Move forward** | Candidates, plus auto-placement into every listing they qualify for | leaves the Inbox |
+
+- **The review bar is select-then-confirm.** Picking a verdict arms the bar and focuses the comment; the confirm button then names the consequence ("Archive them", "Ask for another read", "Move forward") rather than saying "Save". It stays disabled until a verdict is picked, and the comment is required — a review with no why is rejected client-side and by a CHECK constraint.
+- **Verdict tints:** not a fit reads in the error tint, move forward in the accent green, needs input in a neutral overlay. Only the selected chip fills in.
+- **No scores, no averages, no veto.** Nothing is hidden until you vote any more, because there is no tally to anchor against; the reviews thread shows each verdict with its comment.
+- **Reopening softens rather than deletes.** A decisive verdict becomes "needs input" and keeps its comment, since the trigger would otherwise send the applicant straight back out.
+- **The rejection email is offered, never forced.** Archiving surfaces "Write their update" with "Skip the email" beside it; the draft is a fixed community template plus one paragraph written from the applicant's own survey answers, and an optional newsletter link. Closing the editor leaves it unsent.
+- **Reviews can arrive from the application sheet.** Comment threads on the sheet import as reviews attributed to their author's roster email, so a review written by someone who has never opened the app still shows under their name — and becomes editable by them the moment their sign-in maps to that email. Imported rows are labelled "from the application sheet".

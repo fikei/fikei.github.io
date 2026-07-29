@@ -3,13 +3,14 @@
    the discord-membership edge fn). Applicants, votes, shared decisions, and
    house notes live in Supabase behind RLS (migrations 108 + 120).
 
-   v3 funnel: Inbox (collective 1–5 votes, veto rejects) → Candidates →
+   v4 funnel: Inbox (one reviewer decides: not a fit / needs input /
+   move forward, comment required) → Candidates →
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.39.1';
+const VERSION = '3.40.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -95,7 +96,7 @@ const VIEWS = {
 const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings' };
 
 let sb = null;                // supabase client (from CtrlAuth)
-let me = null;                // { id, name }
+let me = null;                // { id, name, groupEmail }
 let applicants = [];          // newest first; each carries .stage
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let votes = {};               // applicant_id -> recruit_votes rows
@@ -105,7 +106,7 @@ let claimPosts = {};          // applicant_id -> { status, posted_at }
 let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
-let pendingVote = null;       // { score, veto } while the vote bar is open
+let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
@@ -1147,7 +1148,7 @@ async function openUpdateEmail(applicantId) {
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   document.getElementById('email-send').textContent = 'Send update';
-  document.getElementById('email-status').textContent = 'Drafting the community update…';
+  document.getElementById('email-status').textContent = 'Writing a draft you can edit — sending is optional.';
   document.getElementById('email-modal').hidden = false;
   try {
     const { data } = await sb.auth.getSession();
@@ -1161,7 +1162,8 @@ async function openUpdateEmail(applicantId) {
     if (emailApplicantId !== applicantId) return;
     document.getElementById('email-subject').value = out.subject || 'An update from Agape';
     document.getElementById('email-body').value = out.body || '';
-    document.getElementById('email-status').textContent = 'Edit freely, then send.';
+    document.getElementById('email-status').textContent =
+      'Yours to edit. Close this to leave it unsent — they stay archived either way.';
   } catch (e) {
     document.getElementById('email-status').textContent = `Draft failed: ${e.message}`;
   }
@@ -1229,24 +1231,33 @@ function attachmentLabel(rec) {
   return `${room?.name || 'Room'} — ${l.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(l.starts_on)}`;
 }
 
-/* ---------- votes + stage machine ---------- */
-/* Thresholds come from recruit_settings (tunable without a deploy). */
-const voteMin = () => Number(settings.vote_min_count) || 3;
-const votePassAvg = () => Number(settings.vote_pass_avg) || 3.5;
+/* ---------- reviews + stage machine ---------- */
+/* One reviewer decides. Three verdicts, a comment on each, and the DB trigger
+   moves the applicant on the most recent decisive one (migration 140). */
+const VERDICTS = {
+  not_fit: { label: 'Not a fit', title: 'Archives them — an update email is owed', cls: 'is-not-fit' },
+  needs_input: { label: 'Needs input', title: 'Stays in the Inbox, flagged for another housemate to read', cls: 'is-needs-input' },
+  forward: { label: 'Move forward', title: 'Moves them to Candidates and into every listing they qualify for', cls: 'is-forward' },
+};
 
-const myVote = id => (votes[id] || []).find(v => v.voter_id === me?.id) || null;
+const myVote = id => (votes[id] || []).find(v =>
+  (me?.id && v.voter_id === me.id) || (me?.groupEmail && v.voter_email && v.voter_email === me.groupEmail)) || null;
 
+/* Reviews newest-first, plus the one that decided the stage. */
 function voteStats(id) {
-  const list = votes[id] || [];
-  const scored = list.filter(v => !v.veto && v.score != null);
-  const avg = scored.length ? scored.reduce((s, v) => s + v.score, 0) / scored.length : null;
+  const list = [...(votes[id] || [])].sort((x, y) =>
+    new Date(y.updated_at || y.created_at) - new Date(x.updated_at || x.created_at));
+  const decisive = list.find(v => v.verdict === 'not_fit' || v.verdict === 'forward') || null;
   return {
+    list,
     n: list.length,
-    scored: scored.length,
-    avg,
-    veto: list.find(v => v.veto) || null,
+    decisive,
+    notFit: decisive?.verdict === 'not_fit' ? decisive : null,
+    needsInput: list.filter(v => v.verdict === 'needs_input'),
   };
 }
+
+const reviewerName = v => v.voter_name || v.voter_email || 'a housemate';
 
 /* Manual stage moves go through the RPC — recruit_applicants is read-only
    to clients; vote-driven moves happen in the DB trigger. */
@@ -1258,32 +1269,36 @@ async function setStage(id, stage) {
   return true;
 }
 
-/* Upsert my vote, then pick up whatever stage the DB trigger computed. */
+/* Save my review, then pick up whatever stage the DB trigger computed. The
+   comment is required on every verdict — it's the record of why, and for
+   "Not a fit" it becomes the reason on the archived record. */
 async function castVote(applicantId) {
   const a = applicants.find(x => x.id === applicantId);
-  if (!a || !pendingVote) return;
+  if (!a || !pendingVerdict) return;
   const note = (document.getElementById('vote-note')?.value || '').trim();
-  const { score, veto } = pendingVote;
-  if (!veto && !score) { toast('Pick a score — or veto'); return; }
-  if (veto && note.length < 3) { toast('A veto needs a short why'); return; }
+  if (!VERDICTS[pendingVerdict]) { toast('Pick a verdict first'); return; }
+  if (note.length < 3) { toast('Add a comment — every review needs a why'); return; }
   const { data, error } = await sb.from('recruit_votes').upsert({
     applicant_id: applicantId, voter_id: me.id, voter_name: me.name,
-    score: veto ? null : score, veto, note,
+    verdict: pendingVerdict, score: null, veto: false, note,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'applicant_id,voter_id' }).select().single();
-  if (error) { toast(`Vote failed: ${error.message}`); return; }
+  if (error) { toast(`Review failed: ${error.message}`); return; }
   votes[applicantId] = [...(votes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
+  // "Not a fit" is a recruiter decision too, so Archive and the update tray
+  // can show the reason in the reviewer's own words.
+  if (pendingVerdict === 'not_fit') await saveDecision(applicantId, 'pass', 'fit', me.name, note);
   const { data: fresh } = await sb.from('recruit_applicants').select('stage').eq('id', applicantId).single();
   const before = a.stage;
   if (fresh) a.stage = fresh.stage;
-  pendingVote = null;
-  const st = voteStats(applicantId);
-  if (a.stage === 'rejected') toast(`${fullName(a)} vetoed — auto-archived, update email queued`);
+  const verdict = pendingVerdict;
+  pendingVerdict = null;
+  if (verdict === 'not_fit') toast(`${fullName(a)} archived — update email queued`);
   else if (a.stage === 'candidate' && before !== 'candidate') {
     if (!houseLoaded) await loadHouse();
     const added = await syncAutoPlacements();
-    toast(`${fullName(a)} passed review → Candidates${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
-  } else toast(`Vote saved — ${st.scored}/${voteMin()} votes${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}`);
+    toast(`${fullName(a)} moved forward → Candidates${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
+  } else toast(`Saved — flagged for another housemate to read`);
   renderRailCounts();
   renderReview();
 }
@@ -1361,8 +1376,9 @@ async function render() {
 /* ---------- applicants render ---------- */
 function matchesView(a) {
   const out = a.stage !== 'rejected' && a.stage !== 'archived';
-  // A standing veto means archived — never show them here, whatever the stage says.
-  if (view === 'inbox') return a.stage === 'review' && !voteStats(a.id).veto;
+  // A "not a fit" verdict means archived — never show them here, whatever the
+  // stage column says.
+  if (view === 'inbox') return a.stage === 'review' && !voteStats(a.id).notFit;
   // Saved for future stays a candidate — visible in Candidates with its chip,
   // absent from Openings until the return date brings them back.
   if (view === 'candidates') return a.stage === 'candidate';
@@ -1449,18 +1465,16 @@ function decisionChip(id) {
    call state in Screening, the recruiter decision elsewhere. */
 function voteChip(a) {
   const st = voteStats(a.id);
-  if (st.veto) return `<span class="decision-chip decision-chip--pass" title="Vetoed by ${esc(st.veto.voter_name || 'a housemate')}">Vetoed</span>`;
-  if (!st.scored) return '';
-  // The average stays blind until you've cast your own vote.
-  if (!myVote(a.id)) return `<span class="decision-chip decision-chip--vote" title="${voteMin()} votes needed — tally shows after you vote">${st.scored}/${voteMin()} votes</span>`;
-  const passing = st.scored >= voteMin() && st.avg >= votePassAvg();
-  return `<span class="decision-chip decision-chip--vote ${passing ? 'decision-chip--outreach' : ''}" title="${st.scored} of ${voteMin()} votes needed · passing average is ${votePassAvg()}">${st.scored}/${voteMin()} · avg ${st.avg.toFixed(1)}</span>`;
+  if (st.notFit) return `<span class="decision-chip decision-chip--pass" title="${esc(reviewerName(st.notFit))} marked them not a fit">Not a fit</span>`;
+  if (!st.needsInput.length) return '';
+  const who = st.needsInput.map(reviewerName).join(', ');
+  return `<span class="decision-chip decision-chip--vote" title="${esc(who)} asked for another housemate to read this">Needs input</span>`;
 }
 
 function stageChip(a) {
   if (a.stage === 'rejected') {
     const st = voteStats(a.id);
-    const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}` : (decisions[a.id]?.note || 'Did not pass review');
+    const why = st.notFit ? `Not a fit — ${reviewerName(st.notFit)}: “${st.notFit.note}”` : (decisions[a.id]?.note || 'Did not pass review');
     return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
   }
   if (decisions[a.id]?.reason === 'dropped-out') return `<span class="decision-chip decision-chip--vote" title="They withdrew — no update email owed">Dropped out</span>`;
@@ -1877,7 +1891,7 @@ function renderApplicants() {
   document.getElementById('page-sub').textContent =
     (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
     ` applicant${(filtered ? viewList.length : list.length) === 1 ? '' : 's'}` +
-    (view === 'inbox' ? ` gathering votes · ${voteMin()} needed, one veto rejects` :
+    (view === 'inbox' ? ' waiting on a review · one read decides' :
      view === 'candidates' ? ' passed review — waiting for a room' : '');
 
   const host = document.getElementById('view-root');
@@ -1948,7 +1962,7 @@ function renderApplicants() {
         </div>
         ${pending.map(x => `<div class="update-tray__row">
           <span class="update-tray__who">${esc(fullName(x))}</span>
-          <span class="update-tray__why">${voteStats(x.id).veto ? `vetoed by ${esc(voteStats(x.id).veto.voter_name || 'a housemate')}` : (decisions[x.id]?.note || 'did not pass review')}</span>
+          <span class="update-tray__why">${voteStats(x.id).notFit ? `not a fit — ${esc(reviewerName(voteStats(x.id).notFit))}` : (decisions[x.id]?.note || 'did not pass review')}</span>
           <button type="button" class="cta-link" data-update-edit="${x.id}">Edit email</button>
           <button type="button" class="cta-link" data-update-skip="${x.id}">Skip</button>
         </div>`).join('')}
@@ -2997,7 +3011,7 @@ function openReview(id) {
   }
   qIndex = Math.max(0, queue.indexOf(id));
   reviewTab = 'profile';
-  pendingVote = null;
+  pendingVerdict = null;
   moveinEditing = false;
   if (!viewedIds.has(id)) {
     viewedIds.add(id);
@@ -3026,7 +3040,7 @@ function step(delta) {
   const next = qIndex + delta;
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
-  pendingVote = null;
+  pendingVerdict = null;
   moveinEditing = false;
   hideHoldSheet();
   renderReview();
@@ -3065,7 +3079,7 @@ function renderReview() {
   const archived = a.stage === 'rejected' || a.stage === 'archived';
   const archiveBanner = () => {
     const st = voteStats(a.id);
-    const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}${st.veto.note ? ` — “${st.veto.note}”` : ''}`
+    const why = st.notFit ? `Not a fit — ${reviewerName(st.notFit)}${st.notFit.note ? `: “${st.notFit.note}”` : ''}`
       : rec?.note || (rec?.reason ? reasonLabel(rec.reason) : 'Did not pass review');
     return `<div class="decision-banner decision-banner--pass">
       <div class="decision-banner__text">
@@ -3185,44 +3199,36 @@ async function saveMoveIn(id, clear = false) {
   renderReview();
 }
 
-/* House votes in the review body. The tally stays hidden until you've cast
-   yours — no anchoring. */
+/* Reviews in the review body. Every review carries its comment, so this reads
+   as a short thread rather than a tally. */
 function voteSectionHtml(a) {
-  if (a.stage !== 'review') {
-    const st = voteStats(a.id);
-    if (!st.n) return '';
-    return `<p class="vote-recap">Review: ${st.scored} vote${st.scored === 1 ? '' : 's'}${st.avg ? ` · avg ${st.avg.toFixed(1)}` : ''}${st.veto ? ' · vetoed' : ''}</p>`;
-  }
-  const list = votes[a.id] || [];
-  const mine = myVote(a.id);
   const st = voteStats(a.id);
-  let body;
-  if (!list.length) {
-    body = `<p class="notes__empty">No votes yet — be the first.</p>`;
-  } else if (!mine && a.stage === 'review') {
-    body = `<p class="notes__empty">${list.length} vote${list.length === 1 ? '' : 's'} cast — the tally appears after you cast yours.</p>`;
-  } else {
-    const summary = st.veto
-      ? `Vetoed — auto-archived, update email queued.`
-      : st.scored
-        ? `${st.scored}/${voteMin()} votes · avg ${st.avg.toFixed(1)} · ${st.scored >= voteMin() && st.avg >= votePassAvg() ? 'passing' : `needs avg ≥ ${votePassAvg()}`}`
-        : '';
-    body = `${summary ? `<p class="vote-summary">${esc(summary)}</p>` : ''}
-      <ul class="notes__list">${list.map(v => `
-        <li class="note">
-          <span class="avatar">${esc((v.voter_name || '?')[0].toUpperCase())}</span>
-          <div class="note__body-wrap">
-            <div class="note__meta">
-              <span class="note__author">${esc(v.voter_name || 'Housemate')}</span>
-              <span class="note__time">${v.veto ? '<span class="vote-score vote-score--veto">Veto</span>' : `<span class="vote-score">${v.score}/5</span>`} · ${relTime(v.updated_at || v.created_at)}</span>
-            </div>
-            ${v.note ? `<p class="note__body">${esc(v.note)}</p>` : ''}
-          </div>
-        </li>`).join('')}</ul>`;
+  if (!st.n) {
+    return a.stage === 'review'
+      ? `<section class="review__section notes">
+           <div class="notes__head"><h3 class="review__section-title">Reviews</h3></div>
+           <p class="notes__empty">No review yet — yours decides.</p>
+         </section>`
+      : '';
   }
+  const rows = st.list.map(v => {
+    const badge = VERDICTS[v.verdict]
+      ? `<span class="verdict-tag ${VERDICTS[v.verdict].cls}">${VERDICTS[v.verdict].label}</span>`
+      : (v.veto ? '<span class="verdict-tag is-not-fit">Not a fit</span>' : '');
+    return `<li class="note">
+      <span class="avatar">${esc(reviewerName(v)[0].toUpperCase())}</span>
+      <div class="note__body-wrap">
+        <div class="note__meta">
+          <span class="note__author">${esc(reviewerName(v))}</span>
+          <span class="note__time">${badge} · ${relTime(v.updated_at || v.created_at)}${v.voter_email && !v.voter_id ? ' · from the application sheet' : ''}</span>
+        </div>
+        ${v.note ? `<p class="note__body">${esc(v.note)}</p>` : ''}
+      </div>
+    </li>`;
+  }).join('');
   return `<section class="review__section notes">
-    <div class="notes__head"><h3 class="review__section-title">House votes</h3></div>
-    ${body}
+    <div class="notes__head"><h3 class="review__section-title">Reviews</h3></div>
+    <ul class="notes__list">${rows}</ul>
   </section>`;
 }
 
@@ -3234,19 +3240,24 @@ function renderReviewFoot(a) {
   const keepNote = document.getElementById('vote-note')?.value ?? null;
   if (a.stage === 'review') {
     const mine = myVote(a.id);
-    const sel = pendingVote || (mine ? { score: mine.score, veto: mine.veto } : { score: null, veto: false });
+    const sel = pendingVerdict || mine?.verdict || null;
+    // Select-then-confirm: picking a verdict arms the bar, the comment is
+    // required, and the confirm button names what will happen.
+    const confirmLabel = sel === 'not_fit' ? 'Archive them'
+      : sel === 'forward' ? 'Move forward'
+      : sel === 'needs_input' ? 'Ask for another read'
+      : 'Save review';
     foot.innerHTML = `
       <div class="vote-bar">
         <span class="vote-bar__q">Would you live with them?</span>
-        <span class="vote-bar__scores">
-          ${[1, 2, 3, 4, 5].map(n =>
-            `<button type="button" class="vote-bar__score ${!sel.veto && sel.score === n ? 'is-on' : ''}" data-vote-score="${n}" aria-label="Vote ${n}">${n}</button>`).join('')}
+        <span class="vote-bar__verdicts">
+          ${Object.entries(VERDICTS).map(([k, v]) =>
+            `<button type="button" class="vote-bar__verdict ${v.cls} ${sel === k ? 'is-on' : ''}" data-verdict="${k}" title="${esc(v.title)}">${v.label}</button>`).join('')}
         </span>
-        <button type="button" class="vote-bar__veto ${sel.veto ? 'is-on' : ''}" data-vote-veto>${sel.veto ? 'Veto — tap to undo' : 'Veto'}</button>
         <input type="text" class="listing-status vote-bar__note" id="vote-note" maxlength="500"
-          placeholder="${sel.veto ? 'Why the veto? (required)' : 'One line on why (optional)'}"
+          placeholder="Your comment (required)"
           value="${esc(keepNote ?? mine?.note ?? '')}">
-        <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote>${mine ? 'Update vote' : 'Cast vote'}</button>
+        <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
       </div>`;
   } else if (a.stage === 'candidate') {
     const pills = activePlacements(a.id).map(p => {
@@ -3274,25 +3285,37 @@ function renderReviewFoot(a) {
         </span>`;
     }
   } else {
-    foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Inbox</button>`;
+    // Archived. The update email is offered here, at the moment it's owed, and
+    // is always optional — skipping archives them with nothing sent.
+    const owed = a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt;
+    foot.innerHTML = `
+      ${owed ? `<span class="foot-cta"><button class="btn btn--accent review__btn" data-update-edit="${a.id}">Write their update</button></span>` : ''}
+      <span class="foot-links">
+        ${owed ? `<button type="button" class="cta-link" data-update-skip="${a.id}">Skip the email</button>` : ''}
+        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Inbox</button>
+      </span>`;
   }
 }
 
 async function reopenApplicant(id) {
   const a = applicants.find(x => x.id === id);
   if (!a) return;
-  // A veto is archival, so reopening has to clear it — otherwise they'd sit in
-  // the Inbox with a standing veto that can never resolve.
+  // A decisive verdict is what put them here, so reopening has to soften it —
+  // otherwise the trigger sends them straight back. The comment survives: it
+  // becomes a "needs input" note, which is what reopening actually means.
   const st0 = voteStats(id);
-  if (st0.veto) {
-    if (!confirm(`${fullName(a)} was vetoed by ${st0.veto.voter_name || 'a housemate'}. Reopening clears that veto so the house can review them again. Continue?`)) return;
-    const { error } = await sb.from('recruit_votes').delete().eq('applicant_id', id).eq('veto', true);
-    if (error) { toast(`Couldn't clear the veto: ${error.message}`); return; }
-    votes[id] = (votes[id] || []).filter(v => !v.veto);
+  if (st0.decisive) {
+    const { error } = await sb.from('recruit_votes')
+      .update({ verdict: 'needs_input', updated_at: new Date().toISOString() })
+      .eq('applicant_id', id).in('verdict', ['not_fit', 'forward']);
+    if (error) { toast(`Couldn't reopen: ${error.message}`); return; }
+    votes[id] = (votes[id] || []).map(v =>
+      v.verdict === 'not_fit' || v.verdict === 'forward' ? { ...v, verdict: 'needs_input' } : v);
   }
   if (await setStage(id, 'review')) {
-    const st = voteStats(id);
-    toast(st0.veto ? 'Reopened — the veto was cleared' : 'Reopened — back in the Inbox');
+    toast(st0.decisive
+      ? `Reopened — ${reviewerName(st0.decisive)}'s comment is kept as needing input`
+      : 'Reopened — back in the Inbox');
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
@@ -3774,14 +3797,16 @@ function stopDictation() {
 /* ---------- export ---------- */
 function exportCsv() {
   const cols = ['first', 'last', 'email', 'ts_iso', 'residency', 'movein', 'budget', 'source'];
-  const head = [...cols, 'stage', 'votes', 'vote_avg', 'vetoed', 'decision', 'reason', 'decision_note', 'decided_by', 'decided_at', 'notes'];
+  const head = [...cols, 'stage', 'reviews', 'verdict', 'reviewed_by', 'review_comment', 'decision', 'reason', 'decision_note', 'decided_by', 'decided_at', 'notes'];
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [head.join(',')];
   for (const a of applicants) {
     const rec = decisions[a.id] || {};
     const st = voteStats(a.id);
-    lines.push([...cols.map(c => q(a[c])), q(a.stage), q(st.n || 0), q(st.avg ? st.avg.toFixed(2) : ''),
-      q(st.veto ? (st.veto.voter_name || 'yes') : ''), q(DECISION_LABELS[rec.d] || ''),
+    const top = st.decisive || st.list[0];
+    lines.push([...cols.map(c => q(a[c])), q(a.stage), q(st.n || 0),
+      q(top ? (VERDICTS[top.verdict]?.label || '') : ''), q(top ? reviewerName(top) : ''), q(top?.note || ''),
+      q(DECISION_LABELS[rec.d] || ''),
       q(rec.reason ? reasonLabel(rec.reason) : ''), q(rec.note || ''),
       q(rec.byName || ''), q(rec.at || ''), q(commentCounts[a.id] || 0)].join(','));
   }
@@ -4060,9 +4085,15 @@ async function _checkMembershipAndEnter() {
     }
     // in — identify self, load data, render
     const user = window.CtrlAuth.getUser();
-    me = { id: user.id, name: status.discordUsername || user.email || 'Housemate' };
-    sb.from('recruit_profiles').select('display_name').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => { if (data?.display_name) { me.name = data.display_name; renderRailUser(); } });
+    me = { id: user.id, name: status.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
+    // group_email ties this account to its roster identity, which is how a
+    // review imported from the sheet becomes yours once you sign in.
+    sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data?.display_name) me.name = data.display_name;
+        if (data?.group_email) me.groupEmail = data.group_email;
+        if (data) renderRailUser();
+      });
     fetch(`${SUPABASE_URL}/functions/v1/recruit-gmail`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
@@ -4201,24 +4232,16 @@ function init() {
     if (fclear) { filters = { track: 'all', month: 'any', budget: 'any' }; renderApplicants(); return; }
     const review = e.target.closest('[data-review]');
     if (review) { openReview(review.dataset.review); return; }
-    const vs = e.target.closest('[data-vote-score]');
-    if (vs) {
-      pendingVote = { score: +vs.dataset.voteScore, veto: false };
+    const vd = e.target.closest('[data-verdict]');
+    if (vd) {
+      pendingVerdict = pendingVerdict === vd.dataset.verdict ? null : vd.dataset.verdict;
       renderReviewFoot(applicants.find(x => x.id === queue[qIndex]));
-      return;
-    }
-    const vv = e.target.closest('[data-vote-veto]');
-    if (vv) {
-      pendingVote = { score: pendingVote?.score || null, veto: !(pendingVote?.veto ?? myVote(queue[qIndex])?.veto) };
-      renderReviewFoot(applicants.find(x => x.id === queue[qIndex]));
+      document.getElementById('vote-note')?.focus();
       return;
     }
     const cv = e.target.closest('[data-cast-vote]');
     if (cv) {
-      if (!pendingVote) {
-        const mine = myVote(queue[qIndex]);
-        pendingVote = mine ? { score: mine.score, veto: mine.veto } : null;
-      }
+      if (!pendingVerdict) pendingVerdict = myVote(queue[qIndex])?.verdict || null;
       castVote(queue[qIndex]);
       return;
     }
