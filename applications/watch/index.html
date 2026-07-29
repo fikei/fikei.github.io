@@ -26,16 +26,33 @@
     .foot a { color: var(--accent); }
     .state { padding: 40px 0; text-align: center; color: var(--fg-muted); }
 
-    /* Playback controls: browsers bury (or omit) speed on mobile, so surface it. */
-    .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .tools__label { font-size: 13px; color: var(--fg-muted); margin-right: 2px; }
-    .rate {
-      background: transparent; color: var(--fg-muted); border: 1px solid var(--border);
-      border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+    /* Playback controls ride on the player itself — browsers bury speed in a
+       menu and iOS omits it. Fade with the native controls on hover/touch. */
+    .overlay {
+      position: absolute; top: 10px; right: 10px; z-index: 2;
+      display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease;
     }
-    .rate:hover { border-color: #3a4150; color: var(--fg); }
-    .rate[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pip { margin-left: auto; }
+    .player:hover .overlay, .player:focus-within .overlay, .player.is-touched .overlay { opacity: 1; }
+    .ov-btn {
+      background: rgba(12, 14, 19, 0.78); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 13px; line-height: 1.2;
+      cursor: pointer; backdrop-filter: blur(6px);
+    }
+    .ov-btn:hover { background: rgba(12, 14, 19, 0.95); }
+    .speed { position: relative; }
+    .speed-menu {
+      position: absolute; top: calc(100% + 6px); right: 0; min-width: 92px;
+      background: rgba(12, 14, 19, 0.96); border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 10px; padding: 4px; display: none; flex-direction: column;
+      backdrop-filter: blur(6px);
+    }
+    .speed-menu.is-open { display: flex; }
+    .speed-menu button {
+      background: transparent; border: 0; color: #cfd5e1; text-align: left;
+      padding: 6px 10px; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .speed-menu button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .speed-menu button[aria-checked="true"] { color: #fff; font-weight: 600; }
 
     /* Mini player: the shell goes fixed, a placeholder holds the page height
        so nothing jumps. Scrolling back up re-docks it inline. */
@@ -46,7 +63,7 @@
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); border: 1px solid var(--border);
     }
     .player.is-mini video { border-radius: 0; }
-    .player.is-mini .tools { display: none; }
+    .player.is-mini .overlay { display: none; }
     .mini-bar {
       display: none; align-items: center; gap: 8px;
       background: var(--surface); padding: 6px 8px 6px 12px; font-size: 12px; color: var(--fg-muted);
@@ -99,13 +116,33 @@
       // ---- speed ----
       const saved = parseFloat(localStorage.getItem(RATE_KEY));
       const startRate = RATES.includes(saved) ? saved : 1;
-      const buttons = [...document.querySelectorAll('.rate')];
+      const speedBtn = document.getElementById('speed-btn');
+      const speedMenu = document.getElementById('speed-menu');
+      const buttons = [...speedMenu.querySelectorAll('[data-rate]')];
       const applyRate = rate => {
         video.playbackRate = rate;
         localStorage.setItem(RATE_KEY, String(rate));
-        buttons.forEach(b => b.setAttribute('aria-pressed', String(parseFloat(b.dataset.rate) === rate)));
+        speedBtn.textContent = `${rate}\u00d7`;
+        buttons.forEach(b => b.setAttribute('aria-checked', String(parseFloat(b.dataset.rate) === rate)));
       };
-      buttons.forEach(b => b.addEventListener('click', () => applyRate(parseFloat(b.dataset.rate))));
+      const closeMenu = () => { speedMenu.classList.remove('is-open'); speedBtn.setAttribute('aria-expanded', 'false'); };
+      speedBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const open = speedMenu.classList.toggle('is-open');
+        speedBtn.setAttribute('aria-expanded', String(open));
+      });
+      buttons.forEach(b => b.addEventListener('click', e => {
+        e.stopPropagation();
+        applyRate(parseFloat(b.dataset.rate));
+        closeMenu();
+      }));
+      document.addEventListener('click', closeMenu);
+      // Touch has no hover: reveal the overlay on tap, hide it with the menu.
+      player.addEventListener('touchstart', () => {
+        player.classList.add('is-touched');
+        clearTimeout(player._ovTimer);
+        player._ovTimer = setTimeout(() => player.classList.remove('is-touched'), 3500);
+      }, { passive: true });
       applyRate(startRate);
       // Some browsers reset rate when new media loads.
       video.addEventListener('loadedmetadata', () => { video.playbackRate = startRate; });
@@ -178,7 +215,7 @@
           return;
         }
         const rateButtons = RATES.map(r =>
-          `<button type="button" class="rate" data-rate="${r}" aria-pressed="false">${r}×</button>`).join('');
+          `<button type="button" role="menuitemradio" data-rate="${r}" aria-checked="false">${r}×</button>`).join('');
         root.innerHTML = `
           <h1>${esc(data.title)}</h1>
           <p class="when">${esc(fmtWhen(data.when))}</p>
@@ -190,12 +227,14 @@
                   <button type="button" id="mini-expand">Back to page</button>
                   <button type="button" id="mini-close" aria-label="Close mini player">✕</button>
                 </div>
-                <video id="v" controls playsinline preload="metadata" src="${esc(data.url)}"></video>
-                <div class="tools">
-                  <span class="tools__label">Speed</span>
-                  ${rateButtons}
-                  <button type="button" class="rate pip" id="pip">Pop out</button>
+                <div class="overlay">
+                  <span class="speed">
+                    <button type="button" class="ov-btn" id="speed-btn" aria-haspopup="true" aria-expanded="false">1&times;</button>
+                    <span class="speed-menu" id="speed-menu" role="menu">${rateButtons}</span>
+                  </span>
+                  <button type="button" class="ov-btn" id="pip" title="Pop out into a floating window">&#9974;</button>
                 </div>
+                <video id="v" controls playsinline preload="metadata" src="${esc(data.url)}"></video>
               </div>
             </div>`
             : `<p class="state">${esc(data.reason || 'No recording available for this call.')}</p>`}
