@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.36.2';
+const VERSION = '3.38.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -748,6 +748,29 @@ function qualifiesFor(a, l) {
 }
 
 const activePlacements = id => placements.filter(p => p.applicant_id === id && p.status === 'active');
+const activePlacement = id => activePlacements(id)[0] || null;
+
+/* Of the open listings an applicant qualifies for, the one they actually fit
+   best: closest start date to their confirmed move-in, then earliest start,
+   then lowest id so the choice is stable run to run. Same ordering migration
+   139 used to reconcile the duplicates, so the sweep and the backfill agree.
+   A tombstoned listing is a recruiter's "not here" and is never re-picked. */
+function bestListingFor(a) {
+  const target = a.moveinFrom ? new Date(a.moveinFrom).getTime() : null;
+  const tombstoned = new Set(placements
+    .filter(p => p.applicant_id === a.id && p.status === 'removed')
+    .map(p => p.listing_id));
+  return listings
+    .filter(l => l.status === 'open' && !tombstoned.has(l.id) && qualifiesFor(a, l))
+    .sort((x, y) => {
+      if (target !== null) {
+        const dx = Math.abs(new Date(x.starts_on).getTime() - target);
+        const dy = Math.abs(new Date(y.starts_on).getTime() - target);
+        if (dx !== dy) return dx - dy;
+      }
+      return x.starts_on.localeCompare(y.starts_on) || String(x.id).localeCompare(String(y.id));
+    })[0] || null;
+}
 
 /* Insert missing placements for every candidate AND prune auto rows that no
    longer qualify (rule changes, edited listings, stage moves). Never touches
@@ -759,10 +782,12 @@ async function syncAutoPlacements() {
   // A saved-for-future candidate keeps the stage but is off the board until
   // their date lands, so they're excluded here as well as in matchesView.
   for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason)) {
-    for (const l of listings.filter(l => l.status === 'open')) {
-      if (!have.has(`${a.id}:${l.id}`) && qualifiesFor(a, l)) {
-        fresh.push({ applicant_id: a.id, listing_id: l.id, source: 'auto' });
-      }
+    // One listing each. Someone already placed is left alone — the sweep
+    // must never yank a person out from under whoever is working them.
+    if (activePlacements(a.id).length) continue;
+    const best = bestListingFor(a);
+    if (best && !have.has(`${a.id}:${best.id}`)) {
+      fresh.push({ applicant_id: a.id, listing_id: best.id, source: 'auto' });
     }
   }
   const stale = placements.filter(p => {
@@ -787,7 +812,21 @@ async function syncAutoPlacements() {
   return (data || []).length;
 }
 
+/* An applicant belongs to exactly ONE listing (migration 139). Placing them
+   somewhere therefore MOVES them — the previous active placement is dropped
+   first, or the unique index would reject the insert. Deleted rather than
+   tombstoned: a tombstone means "never here again", and a move says nothing
+   of the kind. */
 async function addPlacement(applicantId, listingId, source = 'manual') {
+  const prior = placements.filter(p =>
+    p.applicant_id === applicantId && p.status === 'active' && p.listing_id !== listingId);
+  if (prior.length) {
+    const { error: delErr } = await sb.from('recruit_listing_candidates')
+      .delete().in('id', prior.map(p => p.id));
+    if (delErr) { toast(`Couldn't move them: ${delErr.message}`); return null; }
+    const gone = new Set(prior.map(p => p.id));
+    placements = placements.filter(p => !gone.has(p.id));
+  }
   const { data, error } = await sb.from('recruit_listing_candidates').upsert({
     applicant_id: applicantId, listing_id: listingId, source,
     status: 'active', added_by_name: me?.name || null, updated_at: new Date().toISOString(),
@@ -1979,7 +2018,7 @@ function renderApplicants() {
               ${noteBubble(a.id)}
               ${view === 'openings'
                 ? `${openingsCta(a)}${rowMenuHtml(a, g.key)}`
-                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn btn--sm inbox-row__review" data-review="${a.id}">Review <span aria-hidden="true">→</span></button>` : ''}`}
+                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn btn--sm inbox-row__review inbox-row__review--go" data-review="${a.id}">Review <span aria-hidden="true">→</span></button>` : ''}`}
             </span>
           </li>`).join('')}
       </ul>`}
@@ -2009,7 +2048,7 @@ function othersAccordion(listingId) {
           </button>
           <span class="inbox-row__actions">
             ${a.stage === 'review' ? (voteChip(a) || '<span class="note-count">gathering votes</span>') : (removed ? '<span class="note-count" title="Removed from this listing by a recruiter">removed</span>' : '')}
-            ${a.stage === 'candidate' ? `<button class="btn btn--sm inbox-row__review" data-add-placement="${a.id}|${esc(listingId)}">Add</button>` : ''}
+            ${a.stage === 'candidate' ? `<button class="btn btn--sm inbox-row__review" title="${activePlacements(a.id).length ? 'Moves them here from their current listing' : 'Place them on this listing'}" data-add-placement="${a.id}|${esc(listingId)}">${activePlacements(a.id).length ? 'Move here' : 'Add'}</button>` : ''}
           </span>
         </li>`;
       }).join('')}
@@ -2145,14 +2184,10 @@ async function movePlacement(applicantId, fromListingId, toListingId) {
     toast(`${a.first} is already on that listing`);
     return;
   }
+  // addPlacement clears the previous placement itself now — one listing per
+  // applicant is the invariant, so every placement is a move.
   const added = await addPlacement(applicantId, toListingId, 'manual');
   if (!added) return;
-  const src = placements.find(p => p.applicant_id === applicantId && p.listing_id === fromListingId);
-  if (src) {
-    const { error } = await sb.from('recruit_listing_candidates').delete().eq('id', src.id);
-    if (error) { toast(`Move half-finished: ${error.message}`); }
-    else placements = placements.filter(p => p.id !== src.id);
-  }
   const room = rooms.find(r => r.id === to.room_id);
   toast(`${a.first} moved to ${room?.name || 'the other listing'}${qualifiesFor(a, to) ? '' : " — they don't auto-qualify there, so it'll stick"}`);
   renderRailCounts();
@@ -3140,7 +3175,7 @@ function renderReviewFoot(a) {
         ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
         <span class="foot-cta">${openingsCta(a)}</span>
         <span class="foot-links">
-          <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to a listing'}</button>
+          <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     }
@@ -3535,7 +3570,7 @@ async function _openDecisionSheet(d) {
   const rec = decisions[a.id];
   pendingReason = (rec?.d === d ? rec.reason : null) || null;
   document.getElementById('decision-sheet-title').textContent =
-    d === 'outreach' ? 'Add to a listing' : d === 'hold' ? 'Future fit — why not now?' : 'Not a fit — why?';
+    d === 'outreach' ? 'Which listing?' : d === 'hold' ? 'Future fit — why not now?' : 'Not a fit — why?';
   renderDecisionOptions();
 
   // Outreach targets a specific open listing, or General interest.
@@ -4047,7 +4082,7 @@ function init() {
     if (addPl) {
       const [aid, lid] = addPl.dataset.addPlacement.split('|');
       addPlacement(aid, lid, 'manual').then(row => {
-        if (row) { toast('Added to the listing'); renderRailCounts(); renderApplicants(); }
+        if (row) { toast('Placed on this listing'); renderRailCounts(); renderApplicants(); }
       });
       return;
     }

@@ -219,3 +219,14 @@ The ⋮ entry was gated on a recording existing (`screeningState.watch`); it now
 - **A veto always means archived.** Vetoed applicants can never appear in the Inbox: the view filter drops them defensively, and Reopen clears the standing veto (with a confirm naming who vetoed) rather than returning someone to the Inbox with an unresolvable veto attached.
 - **Reload shows a spinner, never the sign-in card.** The gate card is hidden while a session is restoring or loading; any gate message reveals it again so a failure can't spin forever.
 - **New-application Discord pings carry buttons** — "Open the inbox", plus "Review <name>" on single-applicant pings.
+## v3.37 — one listing per applicant
+
+A candidate used to be auto-placed into **every** open listing they qualified for, so the same person appeared under three rooms and three housemates could each believe they were handling them. A shortlist that contains everyone isn't a shortlist.
+
+Now exactly one active placement per applicant, enforced by a partial unique index (`migration 139`) rather than by convention — the auto-sweep, the accordion, drag-and-drop, and the outreach sheet all write to this table, and only an index covers every path. Tombstones are exempt: a person may be `removed` from many listings over time, they just can't be **active** in more than one.
+
+**Which listing the sweep picks**, in order: closest start date to their confirmed move-in, then earliest start, then lowest id so the choice is stable run to run. A listing they've been tombstoned from is never re-picked. Anyone already placed is left alone — the sweep must never pull someone out from under whoever is working them.
+
+**Every placement is now a move.** `addPlacement()` drops the previous active row before inserting, which turns all four call sites into moves at once without each having to know. Copy follows: *Add* → **Move here** on the accordion when they're already placed, *Add to another listing* → **Move to a different listing** in the review foot.
+
+Reconciling the two existing duplicates preferred a manual placement over an auto one — a recruiter chose it — then fell back to the same date-fit ordering.
