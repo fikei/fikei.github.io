@@ -22,10 +22,43 @@
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-top: 24px; }
     .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
     .summary { white-space: pre-wrap; font-size: 15px; }
-    .muted { color: var(--fg-muted); }
     .foot { margin-top: 28px; font-size: 13px; color: var(--fg-muted); }
     .foot a { color: var(--accent); }
     .state { padding: 40px 0; text-align: center; color: var(--fg-muted); }
+
+    /* Playback controls: browsers bury (or omit) speed on mobile, so surface it. */
+    .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .tools__label { font-size: 13px; color: var(--fg-muted); margin-right: 2px; }
+    .rate {
+      background: transparent; color: var(--fg-muted); border: 1px solid var(--border);
+      border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .rate:hover { border-color: #3a4150; color: var(--fg); }
+    .rate[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pip { margin-left: auto; }
+
+    /* Mini player: the shell goes fixed, a placeholder holds the page height
+       so nothing jumps. Scrolling back up re-docks it inline. */
+    .player { position: relative; }
+    .player.is-mini {
+      position: fixed; right: 16px; bottom: 16px; z-index: 60;
+      width: min(360px, 62vw); border-radius: 12px; overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); border: 1px solid var(--border);
+    }
+    .player.is-mini video { border-radius: 0; }
+    .player.is-mini .tools { display: none; }
+    .mini-bar {
+      display: none; align-items: center; gap: 8px;
+      background: var(--surface); padding: 6px 8px 6px 12px; font-size: 12px; color: var(--fg-muted);
+    }
+    .player.is-mini .mini-bar { display: flex; }
+    .mini-bar__title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mini-bar button {
+      background: transparent; border: 0; color: var(--fg-muted); cursor: pointer;
+      font: inherit; font-size: 12px; padding: 3px 7px; border-radius: 6px;
+    }
+    .mini-bar button:hover { background: #222732; color: var(--fg); }
+    @media (max-width: 520px) { .player.is-mini { width: min(260px, 70vw); right: 10px; bottom: 10px; } }
   </style>
 </head>
 <body>
@@ -36,6 +69,8 @@
 
   <script>
     const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+    const RATES = [0.75, 1, 1.25, 1.5, 1.75, 2];
+    const RATE_KEY = 'agape:watchRate';
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     function fmtWhen(iso) {
@@ -55,6 +90,82 @@
         .replace(/^[-*]\s+(.+)$/gm, '• $1');
     }
 
+    function wirePlayer(title) {
+      const video = document.getElementById('v');
+      const player = document.getElementById('player');
+      const placeholder = document.getElementById('player-slot');
+      if (!video) return;
+
+      // ---- speed ----
+      const saved = parseFloat(localStorage.getItem(RATE_KEY));
+      const startRate = RATES.includes(saved) ? saved : 1;
+      const buttons = [...document.querySelectorAll('.rate')];
+      const applyRate = rate => {
+        video.playbackRate = rate;
+        localStorage.setItem(RATE_KEY, String(rate));
+        buttons.forEach(b => b.setAttribute('aria-pressed', String(parseFloat(b.dataset.rate) === rate)));
+      };
+      buttons.forEach(b => b.addEventListener('click', () => applyRate(parseFloat(b.dataset.rate))));
+      applyRate(startRate);
+      // Some browsers reset rate when new media loads.
+      video.addEventListener('loadedmetadata', () => { video.playbackRate = startRate; });
+
+      // ---- mini player ----
+      let dismissed = false;
+      const setMini = on => {
+        if (player.classList.contains('is-mini') === on) return;
+        if (on) {
+          placeholder.style.height = `${player.offsetHeight}px`;
+          player.classList.add('is-mini');
+        } else {
+          player.classList.remove('is-mini');
+          placeholder.style.height = '';
+        }
+      };
+      const observer = new IntersectionObserver(([entry]) => {
+        // Dock only while actually watching — a paused video scrolling away
+        // is just a page you've moved past.
+        const watching = !video.paused && !video.ended;
+        setMini(!entry.isIntersecting && watching && !dismissed);
+      }, { threshold: 0.35 });
+      observer.observe(placeholder);
+
+      // Pausing in the mini player returns it inline; so does scrolling back.
+      video.addEventListener('pause', () => setMini(false));
+      video.addEventListener('play', () => { dismissed = false; });
+
+      document.getElementById('mini-expand').addEventListener('click', () => {
+        setMini(false);
+        placeholder.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      document.getElementById('mini-close').addEventListener('click', () => {
+        dismissed = true;
+        video.pause();
+        setMini(false);
+      });
+      document.getElementById('mini-title').textContent = title;
+
+      // ---- picture-in-picture: keeps playing when you leave the tab ----
+      const pipBtn = document.getElementById('pip');
+      if (!document.pictureInPictureEnabled || video.disablePictureInPicture) {
+        pipBtn.hidden = true;
+      } else {
+        pipBtn.addEventListener('click', async () => {
+          try {
+            if (document.pictureInPictureElement) await document.exitPictureInPicture();
+            else await video.requestPictureInPicture();
+          } catch { /* browser declined — the inline player still works */ }
+        });
+        // Leaving the tab mid-play pops out automatically where allowed;
+        // browsers that require a gesture just decline and nothing breaks.
+        document.addEventListener('visibilitychange', async () => {
+          if (document.hidden && !video.paused && !document.pictureInPictureElement) {
+            try { await video.requestPictureInPicture(); } catch { /* declined */ }
+          }
+        });
+      }
+    }
+
     (async () => {
       const root = document.getElementById('root');
       const token = new URLSearchParams(location.search).get('t') || '';
@@ -66,15 +177,32 @@
           root.innerHTML = '<p class="state">This recording link is no longer valid. Ask in the Recruiting Society channel for a fresh one.</p>';
           return;
         }
+        const rateButtons = RATES.map(r =>
+          `<button type="button" class="rate" data-rate="${r}" aria-pressed="false">${r}×</button>`).join('');
         root.innerHTML = `
           <h1>${esc(data.title)}</h1>
           <p class="when">${esc(fmtWhen(data.when))}</p>
-          ${data.url
-            ? `<video controls playsinline preload="metadata" src="${esc(data.url)}"></video>`
+          ${data.url ? `
+            <div id="player-slot">
+              <div class="player" id="player">
+                <div class="mini-bar">
+                  <span class="mini-bar__title" id="mini-title"></span>
+                  <button type="button" id="mini-expand">Back to page</button>
+                  <button type="button" id="mini-close" aria-label="Close mini player">✕</button>
+                </div>
+                <video id="v" controls playsinline preload="metadata" src="${esc(data.url)}"></video>
+                <div class="tools">
+                  <span class="tools__label">Speed</span>
+                  ${rateButtons}
+                  <button type="button" class="rate pip" id="pip">Pop out</button>
+                </div>
+              </div>
+            </div>`
             : `<p class="state">${esc(data.reason || 'No recording available for this call.')}</p>`}
           ${data.summary ? `<div class="card"><h2>Call summary</h2><div class="summary">${mdLite(data.summary)}</div></div>` : ''}
           <p class="foot">Anyone with this link can watch. Housemates: open the
             <a href="/applications/">applicant inbox</a> for notes, votes, and the full profile.</p>`;
+        if (data.url) wirePlayer(data.title || 'Agape call');
       } catch {
         root.innerHTML = '<p class="state">Couldn’t load the recording. Try again in a minute.</p>';
       }

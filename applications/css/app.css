@@ -1421,3 +1421,14 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
   .inbox-row__actions .cta-stack { width: auto; align-items: flex-end; }
   .inbox-row__actions .cta-pair { width: auto; }
 }
+
+/* --- v3.29.0: playback-speed row under call recordings --- */
+.speed-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: var(--space-2); }
+.speed-bar__label { font-size: var(--font-size-caption); color: var(--fg-subtle); margin-right: 2px; }
+.speed-bar__btn {
+  background: transparent; color: var(--fg-subtle);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 10px; font: inherit; font-size: var(--font-size-caption); cursor: pointer;
+}
+.speed-bar__btn:hover { border-color: var(--border-strong); color: var(--fg); }
+.speed-bar__btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); }
