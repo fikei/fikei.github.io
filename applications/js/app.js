@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.40.1';
+const VERSION = '3.40.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1095,6 +1095,14 @@ let emailKind = null;         // typed draft override, e.g. 'visit'
 async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
+  // Outreach is off for anyone who has been archived. Inviting someone to pick
+  // a time right after turning them down is the worst thing this app could
+  // send, so the drafter is unreachable for them rather than merely unused.
+  if (a.stage === 'rejected' || a.stage === 'archived') {
+    toast(`${fullName(a)} is archived — the only email left is their update`);
+    if (a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt) openUpdateEmail(applicantId);
+    return;
+  }
   emailApplicantId = applicantId;
   emailMode = 'outreach';
   emailKind = kind || null;
@@ -1170,6 +1178,11 @@ async function openUpdateEmail(applicantId) {
 }
 
 async function generateEmail(applicantId) {
+  const subject = applicants.find(x => x.id === applicantId);
+  if (subject && (subject.stage === 'rejected' || subject.stage === 'archived')) {
+    document.getElementById('email-status').textContent = 'Archived — no outreach for them.';
+    return;
+  }
   document.getElementById('email-status').textContent = 'Drafting…';
   try {
     const { data } = await sb.auth.getSession();
@@ -3588,6 +3601,11 @@ let availSelected = null;    // ISO of the slot picked in the modal, pre-confirm
 
 async function openAvailModal(applicantId) {
   const a = applicants.find(x => x.id === applicantId);
+  // Scheduling is outreach: off for anyone archived.
+  if (a && (a.stage === 'rejected' || a.stage === 'archived')) {
+    toast(`${fullName(a)} is archived — scheduling is off for them`);
+    return;
+  }
   if (!a) return;
   availApplicantId = applicantId;
   availSelected = null;
