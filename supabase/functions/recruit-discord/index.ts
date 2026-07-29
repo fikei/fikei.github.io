@@ -13,12 +13,12 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.13.0'
+const VERSION = '1.14.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + magic-link sign-in + unmatched-call link nudges`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { scheduleScreening, sendIntroEmail, sharedAccessToken } from '../_shared/recruit-schedule.ts'
+import { scheduleScreening, sendIntroEmail, sharedAccessToken, sweepCalendars, HOUSE_CALENDAR_ID, SHARED_EMAIL } from '../_shared/recruit-schedule.ts'
 import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
@@ -408,16 +408,29 @@ async function scheduleCalendarBots(client: ReturnType<typeof db>): Promise<numb
   try { token = await sharedAccessToken(client) } catch { return 0 }
   const now = new Date()
   const timeMax = new Date(now.getTime() + 7 * 24 * 3600 * 1000)
-  const resp = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=50&timeMin=${encodeURIComponent(now.toISOString())}&timeMax=${encodeURIComponent(timeMax.toISOString())}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  )
-  if (!resp.ok) { console.warn(`[recall] calendar sweep failed: ${resp.status}`); return 0 }
-  const events = (await resp.json()).items || []
+  // Every calendar we book on, not just primary. Screenings now land on the
+  // house calendar, and a bot sweep that only watched primary would silently
+  // stop recording the moment bookings moved.
+  const events: any[] = []
+  for (const calendarId of sweepCalendars()) {
+    const resp = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?singleEvents=true&orderBy=startTime&maxResults=50&timeMin=${encodeURIComponent(now.toISOString())}&timeMax=${encodeURIComponent(timeMax.toISOString())}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    if (!resp.ok) { console.warn(`[recall] calendar sweep failed for ${calendarId}: ${resp.status}`); continue }
+    events.push(...((await resp.json()).items || []))
+  }
   // deno-lint-ignore no-explicit-any
   const meetOf = (ev: any) => ev.hangoutLink || ev.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || null
+  // organizer.self is only true on the account's own calendar — on a shared
+  // group calendar the organizer is the calendar itself, so ours would all
+  // be filtered out. Accept either.
   // deno-lint-ignore no-explicit-any
-  const candidates = events.filter((ev: any) => ev.status !== 'cancelled' && ev.organizer?.self && meetOf(ev) && ev.start?.dateTime)
+  const isOurs = (ev: any) => ev.organizer?.self ||
+    String(ev.organizer?.email || '').toLowerCase() === HOUSE_CALENDAR_ID.toLowerCase() ||
+    String(ev.creator?.email || '').toLowerCase() === SHARED_EMAIL.toLowerCase()
+  // deno-lint-ignore no-explicit-any
+  const candidates = events.filter((ev: any) => ev.status !== 'cancelled' && isOurs(ev) && meetOf(ev) && ev.start?.dateTime)
   if (!candidates.length) return 0
 
   // deno-lint-ignore no-explicit-any

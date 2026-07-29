@@ -408,6 +408,13 @@ function avatarHtml(a, large) {
 function callPhase(sc) {
   if (!sc) return null;
   if (sc.watch) return 'watch';
+  // Finished, nothing to watch. Distinct from 'processing' (which means a
+  // recording is still landing) — this call may simply never have been
+  // recorded, so the row should move on rather than wait forever.
+  if (sc.done && !sc.at) {
+    const overFor = Date.now() - new Date(sc.doneAt).getTime();
+    return overFor > 6 * 3600000 ? 'done' : 'processing';
+  }
   if (sc.at) {
     const now = Date.now();
     const start = new Date(sc.at).getTime();
@@ -449,6 +456,18 @@ function openingsCta(a) {
     return stack(
       `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Watch the recorded intro call" data-open-call="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
+  }
+  if (phase === 'done') {
+    // Same move as after a watched call — the decision is the point, the
+    // recording was only ever an aid — plus a way to supply one.
+    const dv = decisionVotes[a.id] || [];
+    const mine = dv.find(v => v.voter_id === me?.id);
+    const decCtx = mine
+      ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
+      : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
+    return stack(
+      `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button>`,
+      `${decCtx} · no recording — <button type="button" class="cta-link" data-add-recording="${a.id}">add a link</button>`);
   }
   if (phase === 'processing') return stack(processingChip(), when);
   if (phase === 'live') return stack(joinBtn(sc) || processingChip(), when);
@@ -561,12 +580,32 @@ async function loadAll() {
       continue;
     }
     if (s.status === 'scheduled') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), at: s.starts_at, ends: s.ends_at, with: s.housemate_name, link: s.meet_link };
-    // A finished recording adds a Watch state to the row (fresh link on click).
+    // A call that already happened. Calendar-swept rows land here directly
+    // (the sweep inserts past events as 'completed'), and without this the
+    // row falls through to the availability branch below and offers to book
+    // a call that is already over.
+    if (s.status === 'completed') screeningState[s.applicant_id] = {
+      ...(screeningState[s.applicant_id] || {}),
+      done: s.id, doneAt: s.ends_at || s.starts_at, with: s.housemate_name,
+    };
+    // A finished recording adds a Watch state to the row (fresh link on
+    // click). Recall's own capture and a pasted link (tldv etc.) are equally
+    // watchable — the Call tab knows which player to use.
     if (s.recall_status === 'done') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), watch: s.id };
+    if (s.external_recording_url) screeningState[s.applicant_id] = {
+      ...(screeningState[s.applicant_id] || {}),
+      watch: s.id, watchExternal: s.external_recording_url,
+    };
   }
   for (const av of (avRes.data || [])) {
-    // empty windows = a processed non-scheduling reply — no Pick a time
-    if (Array.isArray(av.windows) && av.windows.length) screeningState[av.applicant_id] ||= { availability: true, nWindows: av.windows.length };
+    // Availability is the weakest signal there is — it must never overwrite
+    // a booked or finished call. `||=` guards the object, but a row whose
+    // only state is `done` still needs the windows recorded without the
+    // availability CTA winning.
+    if (!Array.isArray(av.windows) || !av.windows.length) continue;
+    const st = screeningState[av.applicant_id];
+    if (!st) { screeningState[av.applicant_id] = { availability: true, nWindows: av.windows.length }; continue; }
+    if (!st.at && !st.done && !st.watch) { st.availability = true; st.nWindows = av.windows.length; }
   }
   emailState = {};
   emailsCache = {};
@@ -1469,6 +1508,9 @@ async function loadCallPanel(a) {
   const host = () => document.getElementById('call-panel');
   if (!host()) return;
   const sc = screeningState[a.id] || {};
+  // sc.watch covers both our own captures and pasted links; only the former
+  // can actually be played inline.
+  const streamable = Boolean(sc.watch) && !sc.watchExternal;
   let row = null;
   if (sc.watch) {
     ({ data: row } = await sb.from('recruit_screenings')
@@ -1487,7 +1529,7 @@ async function loadCallPanel(a) {
   }
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
-    ${sc.watch
+    ${streamable
       ? `<video id="call-video" class="call-video" controls playsinline></video>
          ${speedBarHtml('call-video')}
          <p class="email-modal__status" id="call-status">Fetching recording…</p>`
@@ -1501,7 +1543,7 @@ async function loadCallPanel(a) {
     <section class="review__section notes">
       <div class="notes__head">
         <h3 class="review__section-title">Comments</h3>
-        ${sc.watch ? `<button type="button" class="btn btn--sm" id="call-stamp" title="Prefix your comment with the video's current time">Comment at current time</button>` : ''}
+        ${streamable ? `<button type="button" class="btn btn--sm" id="call-stamp" title="Prefix your comment with the video's current time">Comment at current time</button>` : ''}
       </div>
       <div id="notes-body"><p class="notes__empty">Loading comments…</p></div>
       <form class="notes__form" id="notes-form-call">
@@ -1520,7 +1562,7 @@ async function loadCallPanel(a) {
     if (input && !input.value.startsWith(stamp)) input.value = stamp + input.value;
     input?.focus();
   });
-  if (sc.watch) {
+  if (streamable) {
     try {
       const out = await gmailCall({ action: 'recording-link', screeningId: sc.watch });
       const v = document.getElementById('call-video');
@@ -2740,7 +2782,7 @@ function renderReview() {
     <div class="review-tabs">
       <button class="review-tabs__tab ${reviewTab === 'profile' ? 'is-on' : ''}" data-review-tab="profile">Profile</button>
       <button class="review-tabs__tab ${reviewTab === 'emails' ? 'is-on' : ''}" data-review-tab="emails">Emails${(emailsCache[a.id] || []).length ? ` (${emailsCache[a.id].length})` : ''}</button>
-      ${(screeningState[a.id]?.watch || screeningState[a.id]?.at) ? `<button class="review-tabs__tab ${reviewTab === 'call' ? 'is-on' : ''}" data-review-tab="call">Call</button>` : ''}
+      ${(screeningState[a.id]?.watch || screeningState[a.id]?.at || screeningState[a.id]?.done) ? `<button class="review-tabs__tab ${reviewTab === 'call' ? 'is-on' : ''}" data-review-tab="call">Call</button>` : ''}
     </div>
     ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : `
     ${voteSectionHtml(a)}

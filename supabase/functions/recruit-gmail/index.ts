@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.17.0'
+const VERSION = '1.18.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -104,6 +104,154 @@ Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "ne
       needs_human: Boolean(obj.needs_human) && !windows.length,
     }
   } catch { return NO_EXTRACTION }
+}
+
+/* Some calls get agreed entirely in the email thread — "Tuesday at 3 works!"
+   — and no invite is ever sent. Nothing downstream sees them: no calendar
+   event, so no Meet link, so no recording bot, and the row keeps showing
+   "Review availability" for a call that's already on the books.
+
+   This reads the tail of a thread and reports a time only when BOTH sides
+   have converged on one. Deliberately strict: the cost of a false positive
+   is a wrong calendar invite landing in an applicant's inbox. */
+interface AgreedTime {
+  agreed: boolean
+  starts_at: string | null   // ISO 8601 with offset
+  minutes: number | null
+  quote: string | null       // the sentence that settles it
+  confidence: 'high' | 'medium' | 'low'
+}
+const NO_AGREEMENT: AgreedTime = { agreed: false, starts_at: null, minutes: null, quote: null, confidence: 'low' }
+
+async function detectAgreedTime(thread: Array<{ direction: string; sent_at: string; body_text: string | null; snippet: string | null }>): Promise<AgreedTime> {
+  const key = Deno.env.get('RECRUIT_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('LADDER_ANTHROPIC_API_KEY')
+  if (!key || thread.length < 2) return NO_AGREEMENT
+  const transcript = thread.map((m) =>
+    `[${m.direction === 'out' ? 'AGAPE' : 'APPLICANT'} · ${m.sent_at}]\n${(m.body_text || m.snippet || '').slice(0, 1500)}`,
+  ).join('\n\n---\n\n')
+
+  const prompt = `Today is ${new Date().toLocaleDateString('en-CA', { timeZone: TZ })} (${TZ}). Below is an email thread between Agape (a San Francisco co-living house) and a housing applicant.
+
+Decide whether they have MUTUALLY AGREED on one specific date and time for a call, with no invite yet sent.
+
+Say agreed=true ONLY when all of these hold:
+- One specific date AND clock time is settled (not a range, not "sometime Tuesday", not a list of options).
+- Both sides have expressed assent — one proposed it and the other accepted, or one confirmed a time the other named.
+- The time is in the future.
+Say agreed=false for: offered availability nobody accepted yet, a proposal with no reply, a time that already passed, vague agreement ("looking forward to chatting!"), or anything you are unsure about. When in doubt, false — a wrong answer sends a real applicant a wrong calendar invite.
+
+Return JSON:
+{"agreed": bool,
+ "starts_at": "YYYY-MM-DDTHH:MM:SS-07:00" (Pacific offset) or null,
+ "minutes": integer duration if stated, else 30,
+ "quote": the exact sentence that settles it, or null,
+ "confidence": "high" | "medium" | "low"}
+
+THREAD START
+${transcript.slice(0, 12000)}
+THREAD END
+One JSON object. No prose.`
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+      system: 'You detect firmly-agreed meeting times in email threads. You are conservative: unless both parties clearly settled on one specific date and time, you answer agreed=false. Respond with a single JSON object only.',
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  })
+  if (!resp.ok) { console.warn(`detectAgreedTime: anthropic ${resp.status}`); return NO_AGREEMENT }
+  const data = await resp.json()
+  const out = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('')
+  try {
+    const o = JSON.parse(out.trim().replace(/^```json?\s*|\s*```$/g, ''))
+    if (!o.agreed || !o.starts_at) return NO_AGREEMENT
+    const when = new Date(o.starts_at)
+    if (isNaN(when.getTime())) return NO_AGREEMENT
+    return {
+      agreed: true,
+      starts_at: when.toISOString(),
+      minutes: Number(o.minutes) > 0 && Number(o.minutes) <= 180 ? Number(o.minutes) : 30,
+      quote: o.quote ? String(o.quote).slice(0, 300) : null,
+      confidence: ['high', 'medium', 'low'].includes(o.confidence) ? o.confidence : 'low',
+    }
+  } catch { return NO_AGREEMENT }
+}
+
+/* Turn email-agreed times into real calendar events, so the Meet link
+   exists and the recording bot has something to join. Runs inside the scan,
+   which the 20-minute cron drives.
+
+   OFF until switched on, because the invite is a real email to a real
+   applicant chosen by a model. Enable with:
+     insert into recruit_settings(key, value) values ('email_autoschedule', 'true')
+       on conflict (key) do update set value = 'true';
+   Pass dryRun to see what it WOULD book without touching anything. */
+async function scheduleFromEmail(client: ReturnType<typeof db>, dryRun = false): Promise<{ made: number; proposals: any[] }> {
+  const { data: flag } = await client.from('recruit_settings')
+    .select('value').eq('key', 'email_autoschedule').maybeSingle()
+  if (!dryRun && flag?.value !== true) return { made: 0, proposals: [] }
+
+  // Live applicants with inbound mail and no call on the books.
+  const { data: live } = await client.from('recruit_applicants')
+    .select('id, first_name, last_name, email')
+    .in('stage', ['review', 'candidate'])
+  if (!live?.length) return { made: 0, proposals: [] }
+  const { data: booked } = await client.from('recruit_screenings')
+    .select('applicant_id').eq('kind', 'intro_call').in('status', ['scheduled', 'completed'])
+  const haveCall = new Set((booked || []).map((r) => r.applicant_id))
+
+  let made = 0
+  const proposals: any[] = []
+  for (const a of live) {
+    if (haveCall.has(a.id) || !a.email?.includes('@')) continue
+    const { data: thread } = await client.from('recruit_emails')
+      .select('direction, sent_at, body_text, snippet')
+      .eq('applicant_id', a.id).order('sent_at', { ascending: false }).limit(6)
+    if (!thread?.length) continue
+    const msgs = thread.slice().reverse()
+    // Needs a real back-and-forth: one side talking to itself isn't a deal.
+    if (!msgs.some((m) => m.direction === 'in') || !msgs.some((m) => m.direction === 'out')) continue
+
+    const hit = await detectAgreedTime(msgs)
+    if (!hit.agreed || hit.confidence === 'low' || !hit.starts_at) continue
+    const when = new Date(hit.starts_at)
+    if (when.getTime() < Date.now() || when.getTime() > Date.now() + 60 * 86400000) continue
+    proposals.push({ applicant: `${a.first_name} ${a.last_name || ''}`.trim(), startsAt: when.toISOString(), minutes: hit.minutes, confidence: hit.confidence, quote: hit.quote })
+    if (dryRun) continue
+
+    try {
+      const result = await scheduleScreening(client, {
+        applicantId: a.id,
+        startsAt: when,
+        minutes: hit.minutes || 30,
+        housemateUserId: null as unknown as string,
+        housemateName: 'agreed by email',
+        housemateEmail: '',
+      })
+      made++
+      console.log(`[autoschedule] ${a.first_name} @ ${when.toISOString()} (${hit.confidence}) — ${hit.quote || 'no quote'}`)
+      try {
+        const { postResilient, NOTES_CHANNEL_ID: NOTES } = await import('../_shared/discord.ts')
+        await postResilient(NOTES, {
+          embeds: [{
+            title: `Calendar invite sent — ${a.first_name} ${a.last_name || ''}`.trim(),
+            description: [
+              `A time was agreed over email, so the call is now on the house calendar and the recording bot will join.`,
+              hit.quote ? `> ${hit.quote}` : null,
+              result.meetLink ? `[Meet link](${result.meetLink})` : null,
+              `If this is wrong, cancel the event on the calendar — nothing else was sent.`,
+            ].filter(Boolean).join('\n\n'),
+            color: 0x1D9E75,
+          }],
+        }, 'autoschedule')
+      } catch { /* Discord down never blocks scheduling */ }
+    } catch (err) {
+      console.warn(`[autoschedule] ${a.id} failed: ${(err as Error).message}`)
+    }
+  }
+  return { made, proposals }
 }
 
 // The manual→auto claim cutover is a settings toggle, not a deploy.
@@ -223,7 +371,12 @@ serve(async (req) => {
     // open. Same secretless handshake recruit-discord/remind uses — a
     // one-time nonce minted by the pg_cron tick, delete-on-use (migration
     // 123), with X-Cron-Secret honoured if CRON_SECRET is ever configured.
-    const isCron = new URL(req.url).pathname.endsWith('/scan')
+    const reqUrl = new URL(req.url)
+    const isCron = reqUrl.pathname.endsWith('/scan')
+    // /scan?dry=1 — report what email-autoschedule WOULD book and change
+    // nothing else. Read-only, same nonce gate; exists so the detector can be
+    // audited before anyone turns it on.
+    const cronDryRun = isCron && reqUrl.searchParams.get('dry') === '1'
     if (isCron) {
       const secret = Deno.env.get('CRON_SECRET')
       let authorized = Boolean(secret) && req.headers.get('x-cron-secret') === secret
@@ -252,7 +405,7 @@ serve(async (req) => {
     }
 
     const body = isCron ? {} as Record<string, unknown> : await req.json().catch(() => ({}))
-    const action = isCron ? 'scan' : (body as any).action
+    const action = isCron ? (cronDryRun ? 'autoschedule-preview' : 'scan') : (body as any).action
 
     if (action === 'auth-url') {
       const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
@@ -553,6 +706,12 @@ serve(async (req) => {
           .update({ resolved_applicant_id: applicantId }).eq('url', url)
       }
       return json({ attached: true, screeningId })
+    }
+
+    if (action === 'autoschedule-preview') {
+      // What the email-agreed-time detector WOULD book. Reads only.
+      const out = await scheduleFromEmail(client, true)
+      return json({ proposals: out.proposals })
     }
 
     if (action === 'recording-leads') {
@@ -988,8 +1147,15 @@ serve(async (req) => {
       }
 
       await remindStuckPosts(client)
-      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills`)
-      return json({ matched, replied: [...replied], manualPickups, backfilled, pinged })
+      // Last: calls agreed purely in email get a real calendar event, so the
+      // Meet link exists and the bot cron has something to join. Runs after
+      // the calendar sweep so anything already on a calendar is known.
+      let autoScheduled = 0
+      try { autoScheduled = (await scheduleFromEmail(client)).made } catch (err) {
+        console.warn(`email autoschedule failed: ${(err as Error).message}`)
+      }
+      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills, ${autoScheduled} scheduled from email`)
+      return json({ matched, replied: [...replied], manualPickups, backfilled, pinged, autoScheduled })
     }
 
     return json({ error: 'Unknown action' }, 400)
