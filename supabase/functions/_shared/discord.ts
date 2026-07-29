@@ -427,6 +427,43 @@ export async function postMeetingNote(
   }, `meeting notes (${title})`)
 }
 
+// One-shot repair for notes posted before capability links existed: their
+// 🎥 line still points at a Recall presigned URL that expired within hours.
+// Rewrites that line in place (editing beats reposting — the notes keep their
+// position in channel history). resolve() maps an applicant id to its share
+// token; posts we can't resolve are left untouched.
+export async function relinkRecordingPosts(
+  // Meeting-style notes carry no profile link, so the title is the only
+  // handle we have on them — the resolver gets both.
+  resolve: (applicantId: string | null, title: string) => Promise<string | null>,
+  limit = 100,
+): Promise<{ scanned: number; updated: number; skipped: string[] }> {
+  const messages = await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages?limit=${limit}`, { method: 'GET' })
+  const skipped: string[] = []
+  let updated = 0
+  for (const msg of (messages || [])) {
+    const embed = (msg.embeds || [])[0]
+    const desc: string = embed?.description || ''
+    // Only touch posts whose recording line is a stale non-watch link.
+    if (!/🎥 \[Recording\]\(/.test(desc)) continue
+    const idMatch = desc.match(/\/applications\/\?a=([0-9a-zA-Z-]+)/)?.[1]
+    const applicantId = idMatch ? decodeURIComponent(idMatch) : null
+    const token = await resolve(applicantId, String(embed?.title || ''))
+    if (!token) { skipped.push(`${msg.id}: ${embed?.title || 'untitled'} — no archived recording`); continue }
+    const fixed = desc.replace(
+      /🎥 \[Recording\]\([^)]*\)(\s*_\([^)]*\)_)?/,
+      `🎥 [Watch the recording](${watchLink(token)})`,
+    )
+    if (fixed === desc) { skipped.push(`${msg.id}: line not matched`); continue }
+    await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages/${msg.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ embeds: [{ ...embed, description: fixed.slice(0, 4000) }] }),
+    })
+    updated++
+  }
+  return { scanned: (messages || []).length, updated, skipped }
+}
+
 // "Happening now" — announce a starting call so housemates can drop in.
 export async function postLiveCall(title: string, when: string, meetLink: string | null): Promise<void> {
   await postResilient(NOTES_CHANNEL_ID, {

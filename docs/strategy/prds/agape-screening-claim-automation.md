@@ -148,3 +148,5 @@ Discord recording posts carried Recall's presigned URL, which expired within hou
 - **`recruit-watch`** (`verify_jwt = false`) validates the token shape, resolves screening *or* recorded event, and returns title/when/summary plus a 6-hour signed URL. Bad, revoked, and unknown tokens are all a flat 404.
 - **Deliberate trade-off:** anyone with the link can watch, with no Discord sign-in — chosen so links work from phones and forwarded messages. The app's own Watch button remains membership-gated; only the shared link bypasses it.
 - Ordering matters: the archive upload now happens *before* the Discord post, since the post links to our copy.
+
+**Repairing old posts:** `recruit-gmail relink-recordings` (recruiting-member JWT) scans the notes channel and rewrites any 🎥 line still pointing at an expired Recall URL, editing the message in place so notes keep their position in channel history. Matching is by profile link, then applicant first name, then recorded-event title; posts with no archived recording are reported in `skipped` and left untouched. Idempotent — a second run updates nothing.
