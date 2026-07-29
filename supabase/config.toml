@@ -10,3 +10,8 @@ verify_jwt = false
 # Ed25519 request signatures, not JWTs.
 [functions.recruit-discord]
 verify_jwt = false
+
+# recruit-watch serves recordings by capability link (the share_token is the
+# credential) — no user JWT involved.
+[functions.recruit-watch]
+verify_jwt = false

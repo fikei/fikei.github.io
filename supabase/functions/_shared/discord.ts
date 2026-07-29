@@ -110,6 +110,12 @@ function appLink(applicantId: string): string {
   return `https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`
 }
 
+// Capability link to our archived copy — Recall's presigned URLs died within
+// hours, so recording posts point here instead. The token is the credential.
+function watchLink(shareToken: string): string {
+  return `https://ctrl.rodeo/applications/watch/?t=${encodeURIComponent(shareToken)}`
+}
+
 // "her/his/their application" from the applicant's own pronouns field;
 // neutral "their" whenever unstated or ambiguous.
 function possessive(pronouns: string | null | undefined): string {
@@ -331,12 +337,12 @@ export async function postResilient(channelId: string, payload: Record<string, u
 // Post the recording + summary back to the claims channel after a call ends.
 export async function postRecordingNote(
   firstName: string, applicantId: string, residentName: string,
-  summary: string | null, videoUrl: string | null,
+  summary: string | null, shareToken: string | null,
 ): Promise<void> {
   const lines = [
     summary || '_No transcript captured (captions may have been off)._',
     '',
-    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+    shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
     `📋 [Full profile](${appLink(applicantId)})`,
   ]
   await postResilient(NOTES_CHANNEL_ID, {
@@ -350,12 +356,12 @@ export async function postRecordingNote(
 
 // Notes for a non-applicant meeting hosted by the shared account.
 export async function postMeetingNote(
-  title: string, summary: string | null, videoUrl: string | null,
+  title: string, summary: string | null, shareToken: string | null,
 ): Promise<void> {
   const lines = [
     summary || '_No transcript captured (captions may have been off)._',
     '',
-    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+    shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
   ]
   await postResilient(NOTES_CHANNEL_ID, {
     embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
