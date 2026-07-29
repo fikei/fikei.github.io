@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.28.0';
+const VERSION = '3.29.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1383,6 +1383,43 @@ function screeningChip(a) {
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
 }
 
+/* Playback-speed row for a <video>. Browsers bury speed in a menu (and iOS
+   omits it), so surface it; the choice sticks across calls. */
+const PLAY_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2];
+const RATE_KEY = 'agape:watchRate';
+
+function savedRate() {
+  const r = parseFloat(localStorage.getItem(RATE_KEY));
+  return PLAY_RATES.includes(r) ? r : 1;
+}
+
+function speedBarHtml(videoId) {
+  const cur = savedRate();
+  return `<div class="speed-bar" data-speed-for="${videoId}">
+    <span class="speed-bar__label">Speed</span>
+    ${PLAY_RATES.map(r => `<button type="button" class="speed-bar__btn" data-rate="${r}" aria-pressed="${r === cur}">${r}×</button>`).join('')}
+  </div>`;
+}
+
+function wireSpeedBar(videoId) {
+  const bar = document.querySelector(`[data-speed-for="${videoId}"]`);
+  const video = document.getElementById(videoId);
+  if (!bar || !video) return;
+  const apply = rate => {
+    video.playbackRate = rate;
+    localStorage.setItem(RATE_KEY, String(rate));
+    bar.querySelectorAll('.speed-bar__btn').forEach(b =>
+      b.setAttribute('aria-pressed', String(parseFloat(b.dataset.rate) === rate)));
+  };
+  bar.addEventListener('click', e => {
+    const btn = e.target.closest('.speed-bar__btn');
+    if (btn) apply(parseFloat(btn.dataset.rate));
+  });
+  // Setting src resets playbackRate, so re-apply once metadata lands.
+  video.addEventListener('loadedmetadata', () => { video.playbackRate = savedRate(); });
+  apply(savedRate());
+}
+
 /* ---------- recording viewer: video + call notes + house comments ---------- */
 let watchApplicantId = null;
 
@@ -1451,7 +1488,9 @@ async function loadCallPanel(a) {
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
     ${sc.watch
-      ? `<video id="call-video" class="call-video" controls playsinline></video><p class="email-modal__status" id="call-status">Fetching recording…</p>`
+      ? `<video id="call-video" class="call-video" controls playsinline></video>
+         ${speedBarHtml('call-video')}
+         <p class="email-modal__status" id="call-status">Fetching recording…</p>`
       : row.external_recording_url
         // These hosts block cross-origin embedding, so this opens out rather
         // than pretending to be a player.
@@ -1471,6 +1510,7 @@ async function loadCallPanel(a) {
       </form>
     </section>`;
   loadComments(a.id).then(() => { if (queue[qIndex] === a.id && reviewTab === 'call') renderNotes(a.id); });
+  wireSpeedBar('call-video');
   document.getElementById('notes-form-call')?.addEventListener('submit', (ev) => { ev.preventDefault(); postNote(a.id); });
   document.getElementById('call-stamp')?.addEventListener('click', () => {
     const v = document.getElementById('call-video');
@@ -1518,6 +1558,7 @@ async function openWatch(screeningId) {
     if (!out.url) throw new Error('recording not available');
     video.src = out.url;
     status.textContent = '';
+    wireSpeedBar('watch-video');
   } catch (e) {
     status.textContent = `Recording unavailable: ${e.message}`;
   }
