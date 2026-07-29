@@ -19,7 +19,7 @@
 // timestamp, and inserts ignore duplicates — so resending the whole sheet is
 // a safe backfill, not a mess of copies.
 
-const VERSION = '1.1.0'
+const VERSION = '1.2.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -47,7 +47,9 @@ async function readSheet(client: any): Promise<Array<Record<string, unknown>>> {
       throw new Error('the shared Google account has not granted the Sheets scope yet — reconnect it from the /applications rail footer')
     }
     if (resp.status === 403 || resp.status === 404) {
-      throw new Error(`the shared account cannot read the sheet — share it with live.at.agapesf@gmail.com as Viewer (HTTP ${resp.status})`)
+      // Include Google's own words — "cannot read the sheet" and "wrong
+      // account" look identical from the outside otherwise.
+      throw new Error(`sheet unreadable by the shared account (HTTP ${resp.status}): ${text.slice(0, 220)}`)
     }
     throw new Error(`Sheets API ${resp.status}: ${text.slice(0, 200)}`)
   }
@@ -178,12 +180,40 @@ serve(async (req) => {
       })
     }
 
-    if (dryRun) return json({ dryRun: true, source: isPull ? 'sheet' : 'push', rowsRead: rows.length, wouldInsert: prepared, skipped })
-    if (!prepared.length) return json({ inserted: 0, skipped })
+    /* Dedupe by EMAIL, not just by id. Two things make id-only dedupe unsafe:
+       the original manual import slugged accents and apostrophes differently
+       (Lagelée, D'Avignon, Prud'homme), and people re-apply — the same person
+       appears twice in the sheet. One row per email address is the model the
+       funnel actually wants; a genuine re-applicant is better handled by a
+       recruiter reopening the existing row than by a second row competing with
+       it. Within a batch, the most recent application wins. */
+    const byEmail = new Map<string, Record<string, string>>()
+    for (const r of prepared.sort((a, b) => b.submitted_at.localeCompare(a.submitted_at))) {
+      const key = r.email.toLowerCase()
+      if (!byEmail.has(key)) byEmail.set(key, r)
+      else skipped.push(`re-application in the same batch: ${r.email}`)
+    }
+    const { data: existing } = await client.from('recruit_applicants').select('id, email')
+    const knownEmails = new Set((existing || []).map((e) => String(e.email || '').toLowerCase()))
+    const knownIds = new Set((existing || []).map((e) => e.id))
+    const fresh: Array<Record<string, string>> = []
+    for (const r of byEmail.values()) {
+      if (knownEmails.has(r.email.toLowerCase())) { skipped.push(`already an applicant: ${r.email}`); continue }
+      if (knownIds.has(r.id)) { skipped.push(`already an applicant (id): ${r.id}`); continue }
+      fresh.push(r)
+    }
+
+    if (dryRun) {
+      return json({
+        dryRun: true, source: isPull ? 'sheet' : 'push', rowsRead: rows.length,
+        wouldInsert: fresh, alreadyPresent: byEmail.size - fresh.length, skipped,
+      })
+    }
+    if (!fresh.length) return json({ inserted: 0, rowsRead: rows.length, alreadyPresent: byEmail.size, skipped })
 
     // ignoreDuplicates: resending the sheet is a backfill, not a mess.
     const { data, error } = await client.from('recruit_applicants')
-      .upsert(prepared, { onConflict: 'id', ignoreDuplicates: true })
+      .upsert(fresh, { onConflict: 'id', ignoreDuplicates: true })
       .select('id, first_name, last_name')
     if (error) return json({ error: `insert failed: ${error.message}` }, 500)
 
@@ -201,8 +231,8 @@ serve(async (req) => {
         console.warn(`[recruit-ingest] audit post failed: ${(err as Error).message}`)
       }
     }
-    console.log(`[recruit-ingest] ${created.length} created, ${prepared.length - created.length} already present, ${skipped.length} skipped`)
-    return json({ inserted: created.length, source: isPull ? 'sheet' : 'push', rowsRead: rows.length, ids: created.map((c) => c.id), duplicates: prepared.length - created.length, skipped })
+    console.log(`[recruit-ingest] ${created.length} created, ${byEmail.size - fresh.length} already present, ${skipped.length} skipped`)
+    return json({ inserted: created.length, source: isPull ? 'sheet' : 'push', rowsRead: rows.length, ids: created.map((c) => c.id), alreadyPresent: byEmail.size - fresh.length, skipped })
   } catch (err) {
     console.error(`[recruit-ingest] ${(err as Error).message}`)
     return json({ error: (err as Error).message }, 500)

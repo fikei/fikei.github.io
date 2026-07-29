@@ -2,7 +2,7 @@
 
 **One line:** the application spreadsheet pushes each new row to the `recruit-ingest` edge function on submit, so applicants appear in `/applications` Inbox without a manual import.
 
-Status: **live, API pull on an hourly cron** (`recruit-ingest` v1.1.0, migration 131) · one blocker: the shared Google account needs a reconnect to grant the Sheets scope.
+Status: **live and verified** — `recruit-ingest` v1.2.0, migration 131, hourly at :07. First real run (2026-07-29) read 119 rows, ingested the 7 applications that arrived after the last manual import, and recognized 109 as already present.
 
 ---
 
@@ -20,7 +20,9 @@ Google Sheets has no native webhook, so the two options are an Apps Script trigg
 
 An hour of latency costs nothing: the applicant has just filled in a form and isn't waiting on us. The push endpoint stays available for a Fillout-style webhook if real-time ever matters.
 
-Because the pull is **idempotent**, re-reading the entire sheet every hour is free: ids derive from name + submission timestamp and inserts ignore duplicates.
+Because the pull is **idempotent**, re-reading the entire sheet every hour is free.
+
+**Dedupe is by email, not just by id.** Id-only dedupe turned out to be unsafe on real data: the original manual import slugged accents and apostrophes differently (Lagelée, D'Avignon, Prud'homme, O'Brien), so those rows would have been ingested a second time under new ids. People also re-apply — the same address appears twice in the sheet. One row per email is the model the funnel wants; the trade-off is that a genuine re-applicant in a later season is skipped and reported in `skipped[]` rather than creating a second row that competes with the first. A recruiter reopening the existing row is the intended path.
 
 ## The endpoint
 
@@ -41,7 +43,7 @@ body:    { "rows": [ { "<sheet header>": "<value>", ... } ] }
 
 - **Cron** (migration 131): `recruit_application_ingest_tick`, hourly at :07, one-time-nonce auth (same handshake as the reminder cron).
 - **Endpoint**: `POST /functions/v1/recruit-ingest/pull` — reads `RECRUIT_SHEET_ID` / `RECRUIT_SHEET_RANGE` (defaults to the Jan 2026+ responses sheet, tab `Form Responses 1`) with the shared account's token.
-- **Prereqs**: the sheet is shared with `live.at.agapesf@gmail.com` (already true), and that account has granted `spreadsheets.readonly` — added to recruit-gmail's consent screen, so **reconnecting the shared Gmail from the /applications rail footer grants it**. Until then the pull returns a plain-English 502 saying exactly that.
+- **Prereqs, all satisfied 2026-07-29**: the sheet is shared with `live.at.agapesf@gmail.com`; that account has granted `spreadsheets.readonly` (reconnect from the /applications rail footer re-grants it if the token is ever lost); and **the Google Sheets API is enabled in the `add-to-calendar-477919` GCP project** (project number 845688740681 — the one the shared account's OAuth client lives in). That last one is the non-obvious failure: without it every call returns 403 with a message about the API being disabled, which reads like a sharing problem.
 
 ## Optional: real-time push via Apps Script
 
