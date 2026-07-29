@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.36.1';
+const VERSION = '3.37.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2383,6 +2383,42 @@ function openOccDrawer(next) {
   renderOccDrawer();
 }
 
+/* Trial milestones. A trial candidate gets a check-in once they're a month
+   in, and a house decision a month before their sublet ends — far enough out
+   that either side can still make other plans. Both are suggestions the
+   drawer prefills; the house can move either date. */
+function trialCheckinDefault(startsOn) {
+  return startsOn ? addMonthsIso2(startsOn, 1) : '';
+}
+function trialDecisionDefault(endsOn) {
+  return endsOn ? addMonthsIso2(endsOn, -1) : '';
+}
+/* addMonthsIso() snaps to the first of the month (the timeline needs that);
+   milestones keep the day-of-month, clamped when the target month is short. */
+function addMonthsIso2(iso, n) {
+  const d = new Date(iso + 'T12:00');
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return d.toISOString().slice(0, 10);
+}
+
+function trialFieldsHtml(s) {
+  return `<div class="occ-drawer__trial" data-trial-fields hidden>
+    <div class="occ-drawer__section">Trial milestones</div>
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">Check-in
+        <input type="date" name="checkin_on" class="listing-status" value="${s.checkin_on || ''}">
+      </label>
+      <label class="listing-form__field">Decision
+        <input type="date" name="decision_on" class="listing-status" value="${s.decision_on || ''}">
+      </label>
+    </div>
+    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. #recruiting-automation gets a reminder a week ahead of each.</p>
+  </div>`;
+}
+
 function stayFormHtml(s, roomId) {
   const isNew = !s.id;
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
@@ -2404,6 +2440,7 @@ function stayFormHtml(s, roomId) {
       </label>
     </div>
     <label class="occ-drawer__ongoing"><input type="checkbox" name="ongoing" ${s.id && !s.ends_on ? 'checked' : ''}> Ongoing — no move-out date yet</label>
+    ${trialFieldsHtml(s)}
     <p class="listing-form__error" data-form-error></p>
     <div class="decision-sheet__actions seg-form__actions">
       ${!isNew ? `<button type="button" class="listing-form__delete" data-stay-delete="${s.id}">Remove stay</button>` : ''}
@@ -2496,7 +2533,38 @@ function renderOccDrawer() {
     const ends = hostWrap.querySelector('input[name="ends_on"]');
     ends.disabled = e.target.checked;
     if (e.target.checked) ends.value = '';
+    syncTrialFields(hostWrap);
   });
+  const form = hostWrap.querySelector('[data-stay-form]');
+  if (form) {
+    for (const sel of ['select[name="kind"]', 'input[name="starts_on"]', 'input[name="ends_on"]']) {
+      form.querySelector(sel)?.addEventListener('change', () => syncTrialFields(hostWrap));
+    }
+    syncTrialFields(hostWrap);
+  }
+}
+
+/* Show the milestone block only for trial candidates, and keep the suggested
+   dates in step with the stay window until someone edits them by hand. */
+function syncTrialFields(hostWrap) {
+  const block = hostWrap.querySelector('[data-trial-fields]');
+  if (!block) return;
+  const kind = hostWrap.querySelector('select[name="kind"]')?.value;
+  block.hidden = kind !== 'candidate';
+  if (block.hidden) return;
+  const startsOn = hostWrap.querySelector('input[name="starts_on"]')?.value || '';
+  const endsOn = hostWrap.querySelector('input[name="ongoing"]')?.checked
+    ? '' : (hostWrap.querySelector('input[name="ends_on"]')?.value || '');
+  const checkin = block.querySelector('input[name="checkin_on"]');
+  const decision = block.querySelector('input[name="decision_on"]');
+  if (!checkin.dataset.touched) checkin.value = trialCheckinDefault(startsOn);
+  if (!decision.dataset.touched) decision.value = trialDecisionDefault(endsOn);
+  for (const el of [checkin, decision]) {
+    if (!el.dataset.wired) {
+      el.dataset.wired = '1';
+      el.addEventListener('input', () => { el.dataset.touched = '1'; });
+    }
+  }
 }
 
 async function onStaySave(e) {
@@ -2511,6 +2579,9 @@ async function onStaySave(e) {
     kind: fd.get('kind'),
     starts_on: fd.get('starts_on'),
     ends_on: fd.get('ongoing') ? null : (fd.get('ends_on') || null),
+    // Milestones belong to a trial; switching a stay to any other kind clears them.
+    checkin_on: fd.get('kind') === 'candidate' ? (fd.get('checkin_on') || null) : null,
+    decision_on: fd.get('kind') === 'candidate' ? (fd.get('decision_on') || null) : null,
   };
   if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
   if (rec.ends_on && rec.ends_on < rec.starts_on) { err.textContent = '"Through" must be at or after "From".'; return; }
@@ -2519,6 +2590,21 @@ async function onStaySave(e) {
     if (rec.kind === 'resident' || rec.kind === 'shared') rec.ends_on = null; // residents default open-ended
     else { err.textContent = 'Sublets and trials need an end date (or tick "Ongoing").'; return; }
   }
+  for (const [field, label] of [['checkin_on', 'Check-in'], ['decision_on', 'Decision']]) {
+    const v = rec[field];
+    if (!v) continue;
+    if (v < rec.starts_on || (rec.ends_on && v > rec.ends_on)) {
+      err.textContent = `${label} has to fall inside the trial (${fmtDay(rec.starts_on)} – ${rec.ends_on ? fmtDay(rec.ends_on) : 'ongoing'}).`;
+      return;
+    }
+  }
+  if (rec.checkin_on && rec.decision_on && rec.decision_on < rec.checkin_on) {
+    err.textContent = 'The decision comes after the check-in.'; return;
+  }
+  // A moved milestone is a new milestone — let its reminder fire again.
+  const prev = stays.find(s => s.id === id);
+  if (prev && prev.checkin_on !== rec.checkin_on) rec.checkin_reminded_at = null;
+  if (prev && prev.decision_on !== rec.decision_on) rec.decision_reminded_at = null;
   if (id === 'new') {
     const { data, error } = await sb.from('recruit_stays').insert(rec).select().single();
     if (error) { err.textContent = error.message; return; }
@@ -2543,6 +2629,14 @@ async function deleteStay(id) {
   occDrawer = null;
   toast('Stay removed');
   renderOccupancy();
+}
+
+/* " · decision Oct 1" — the next unmet trial milestone, or nothing. */
+function nextMilestoneLabel(s, todayIso) {
+  if (s.kind !== 'candidate') return '';
+  const next = [['check-in', s.checkin_on], ['decision', s.decision_on]]
+    .filter(([, d]) => d && d >= todayIso).sort((a, b) => a[1].localeCompare(b[1]))[0];
+  return next ? ` · ${next[0]} ${fmtShort(next[1])}` : '';
 }
 
 /* --- current + past occupants --- */
@@ -2578,7 +2672,7 @@ function occupantsHtml() {
             <span class="avatar">${esc((s.occupant[0] || '?').toUpperCase())}</span>
             <span class="inbox-row__text">
               <span class="inbox-row__title">${esc(s.occupant)}</span>
-              <span class="inbox-row__sub">${esc(room?.name || '')} · ${esc(room?.floor || '')} · ${s.ends_on ? `through ${fmtShort(s.ends_on)}` : 'ongoing'}</span>
+              <span class="inbox-row__sub">${esc(room?.name || '')} · ${esc(room?.floor || '')} · ${s.ends_on ? `through ${fmtShort(s.ends_on)}` : 'ongoing'}${esc(nextMilestoneLabel(s, todayIso))}</span>
             </span>
             <span class="inbox-row__actions">
               <span class="listing-kind listing-kind--${s.kind === 'candidate' ? 'trial' : (s.kind === 'resident' ? 'resident' : 'sublet')}">${KIND_LABELS[s.kind]}</span>
