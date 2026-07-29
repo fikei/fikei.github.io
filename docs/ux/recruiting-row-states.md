@@ -212,6 +212,13 @@ This narrows the two-tier rule stated above: the context tier may hold a seconda
 
 The ⋮ entry was gated on a recording existing (`screeningState.watch`); it now also shows for a finished call with no recording (`.done`), which is exactly the case where the row link used to be the only way in.
 
+## Amendment — v3.34–3.36
+
+- **Inbox action reads "Review →"** and matches Ladder's recommendation rows exactly: `btn btn--sm inbox-row__review`, small type, 36px target, quiet `--bg-surface` fill, and the trailing arrow (`aria-hidden`, so screen readers just hear "Review").
+- **The blue dot is context-dependent.** In the Inbox it means *you personally haven't opened this application yet* — tracked per housemate in `recruit_applicant_views`, so it clears on your account only and stays cleared across devices. Everywhere else it keeps its original meaning: *they replied and it's waiting on you*. Tooltips say which.
+- **A veto always means archived.** Vetoed applicants can never appear in the Inbox: the view filter drops them defensively, and Reopen clears the standing veto (with a confirm naming who vetoed) rather than returning someone to the Inbox with an unresolvable veto attached.
+- **Reload shows a spinner, never the sign-in card.** The gate card is hidden while a session is restoring or loading; any gate message reveals it again so a failure can't spin forever.
+- **New-application Discord pings carry buttons** — "Open the inbox", plus "Review <name>" on single-applicant pings.
 ## v3.37 — one listing per applicant
 
 A candidate used to be auto-placed into **every** open listing they qualified for, so the same person appeared under three rooms and three housemates could each believe they were handling them. A shortlist that contains everyone isn't a shortlist.
