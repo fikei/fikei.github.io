@@ -71,23 +71,30 @@ export async function getBotResult(botId: string): Promise<BotResult> {
 }
 
 // Copy a finished recording into the permanent recruit-recordings bucket.
-// Streams straight from Recall's presigned URL into Storage (no buffering —
-// hour-long Meets exceed edge-function memory). Returns the storage path.
-export async function archiveVideoToStorage(videoUrl: string, path: string): Promise<string> {
+// Uses a signed upload URL (the token authenticates, so this works whether the
+// project's service key is a JWT or an sb_secret) and streams Recall's bytes
+// straight through — hour-long Meets exceed edge-function memory if buffered.
+export async function archiveVideoToStorage(
+  // deno-lint-ignore no-explicit-any
+  client: any,
+  videoUrl: string,
+  path: string,
+): Promise<string> {
+  const { data: signed, error: signErr } = await client.storage
+    .from('recruit-recordings').createSignedUploadUrl(path, { upsert: true })
+  if (signErr || !signed?.signedUrl) throw new Error(`signed upload url: ${signErr?.message || 'none'}`)
+
   const src = await fetch(videoUrl)
   if (!src.ok || !src.body) throw new Error(`video download ${src.status}`)
-  const resp = await fetch(
-    `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/recruit-recordings/${path}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        'Content-Type': src.headers.get('content-type') || 'video/mp4',
-        'x-upsert': 'true',
-      },
-      body: src.body,
-    },
-  )
+  const resp = await fetch(signed.signedUrl, {
+    method: 'PUT',
+    // Force video/mp4 — Recall serves binary/octet-stream, which Safari/iOS
+    // refuses to play in a <video> tag.
+    headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' },
+    body: src.body,
+    // Deno requires duplex on a streamed request body; without it fetch throws.
+    duplex: 'half',
+  } as RequestInit & { duplex: string })
   if (!resp.ok) throw new Error(`storage upload ${resp.status}: ${(await resp.text()).slice(0, 150)}`)
   return path
 }
