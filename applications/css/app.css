@@ -1446,3 +1446,24 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .vspeed__menu button[aria-checked="true"] { color: #fff; font-weight: var(--fw-medium); }
 /* Touch has no hover — keep it visible on small screens. */
 @media (hover: none) { .vspeed { opacity: 1; } }
+
+/* --- v3.31.0: pop-out + docking mini player on the in-app players --- */
+.vchrome { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 6px; opacity: 0; transition: opacity 140ms ease; }
+.video-wrap:hover .vchrome, .video-wrap:focus-within .vchrome { opacity: 1; }
+@media (hover: none) { .vchrome { opacity: 1; } }
+.vspeed { position: static; }
+.vspeed__menu { right: 0; }
+.vpip { line-height: 1.2; }
+
+/* Docked player: fixed bottom-right while the call keeps playing. The
+   placeholder height keeps the Call tab from collapsing underneath it. */
+.video-wrap.is-mini { position: fixed; right: 16px; bottom: 16px; z-index: 90; width: min(340px, 60vw); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 18px 40px rgba(0,0,0,.5); border: 1px solid var(--border-strong); background: #000; }
+.video-wrap.is-mini::after { content: ''; }
+.video-wrap.is-mini + * { margin-top: 0; }
+.video-wrap.is-mini .vchrome { display: none; }
+.mini-bar { display: none; align-items: center; gap: 8px; background: var(--bg-surface); padding: 5px 6px 5px 10px; font-size: var(--font-size-caption); color: var(--fg-subtle); }
+.video-wrap.is-mini .mini-bar { display: flex; }
+.mini-bar__title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-bar button { background: transparent; border: 0; color: var(--fg-subtle); cursor: pointer; font: inherit; padding: 2px 6px; border-radius: 6px; }
+.mini-bar button:hover { background: var(--bg-overlay); color: var(--fg); }
+@media (max-width: 520px) { .video-wrap.is-mini { width: min(250px, 68vw); right: 10px; bottom: 10px; } }
