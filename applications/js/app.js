@@ -457,7 +457,7 @@ function openingsCta(a) {
     const mine = dv.find(v => v.voter_id === me?.id);
     const decCtx = mine
       ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
-      : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
+      : (dv.length ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours isn't` : 'no decisions yet');
     return stack(
       `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
@@ -469,7 +469,7 @@ function openingsCta(a) {
     const mine = dv.find(v => v.voter_id === me?.id);
     const decCtx = mine
       ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
-      : `<button type="button" class="cta-link" data-give-decision="${a.id}">give your decision</button>${dv.length ? ` · ${dv.length} in` : ''}`;
+      : (dv.length ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours isn't` : 'no decisions yet');
     return stack(
       `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button>`,
       `${decCtx} · no recording — <button type="button" class="cta-link" data-add-recording="${a.id}">add a link</button>`);
@@ -2027,7 +2027,7 @@ function rowMenuHtml(a, listingId) {
     <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
-      ${screeningState[a.id]?.watch ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
+      ${(screeningState[a.id]?.watch || screeningState[a.id]?.done) ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
       <button type="button" class="listing-menu__item" data-add-recording="${a.id}">Add recording link…</button>
       <span class="listing-menu__rule" aria-hidden="true"></span>
       <button type="button" class="listing-menu__item" data-open-remove="${a.id}|${esc(listingId)}">Remove…</button>

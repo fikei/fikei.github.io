@@ -114,7 +114,7 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 - **Phase B live**: scan pings the recruiting channel about new review-stage applicants (one post each; 4+ collapse to a digest; `discord_ping_at` dedup). Archive shows the **update tray** — pending rejections with Edit email / Skip and **Send all** (individually drafted community notes via `draft_update`, sent via `send-update` which stamps `update_email_sent_at` and archives clean).
 - **Draft listings**: 28+ day occupancy gaps in the next six months become `status='draft'` listings (dashed cards atop Openings; Open listing / Dismiss). Bucketing only sees `open`.
 - **Awaiting claim** is a real row state: coverage ask posted → `◆ sent to housemates` chip + `unclaimed Nd · book it yourself` context.
-- **Give decision**: post-screening yes/no + note per housemate (`recruit_decision_votes`); the watch-state context tier carries `give your decision` / `N decisions in`; also in the row ⋮. Tally is advisory — moving the person stays human.
+- **Give decision**: post-screening yes/no + note per housemate (`recruit_decision_votes`); the watch-state context tier carries `give your decision` / `N decisions in`; also in the row ⋮. Tally is advisory — moving the person stays human. *Amended in v3.36 — see below.*
 - **Follow-up staleness** implemented: grey under 3 quiet days, amber after.
 - **Schedule a visit** drafts a visit-specific invite (`emailType: 'visit'`).
 - **Flexible dial**: bare "Flexible" rides any window; "month + flexible" = that month ±1.
@@ -203,3 +203,11 @@ Anything a housemate can read — Discord posts, DMs, audit lines, in-app copy �
 | no concrete times could be read | didn't name specific times |
 
 **The test is whether the reader can act on it, not whether the word sounds technical.** "Check the bot's permissions" stays — it names the fix. "Rejected it" goes — it only describes our internals. Same logic keeps technical detail in function logs and in the ops DM that fires when posting fails everywhere.
+
+## v3.36 — one home per action
+
+`give your decision` sat in the row's context tier **and** in the row ⋮, which put the same action in two places a few pixels apart. The context tier now carries only the tally — `2 decisions in — yours counted` / `2 decisions in — yours isn't` / `no decisions yet` — and the action lives solely in the ⋮.
+
+This narrows the two-tier rule stated above: the context tier may hold a secondary action as a text link **only when that link is the tier's own explanation**. `no recording — add a link` earns its place, because the caption exists to say why there's no Watch button and the link is the remedy. A bare duplicate of a menu item does not.
+
+The ⋮ entry was gated on a recording existing (`screeningState.watch`); it now also shows for a finished call with no recording (`.done`), which is exactly the case where the row link used to be the only way in.
