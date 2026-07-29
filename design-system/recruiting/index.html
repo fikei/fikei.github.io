@@ -192,7 +192,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
       <a href="#chips" data-story="chips">Chips &amp; badges</a>
       <a href="#note-bubble" data-story="note-bubble">Note bubble</a>
       <a href="#overflow" data-story="overflow">Overflow menu</a>
-      <a href="#vote-bar" data-story="vote-bar">Vote bar</a>
+      <a href="#vote-bar" data-story="vote-bar">Review bar</a>
       <a href="#see-more" data-story="see-more">See-more bar</a>
     </div>
   </div>
@@ -251,7 +251,8 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
-      <div class="dec"><span class="d">Jul 22</span><br><b>Collective votes replaced the single decider.</b><p>Culture fit is the house's call; the app's job is quorum, blindness until you've voted, and a hard veto.</p></div>
+      <div class="dec"><span class="d">Jul 29</span><br><b>The single decider came back — with three options and a required comment.</b><p>Quorum stalled: 58 applications sat waiting for a third vote that never came. One read now decides (not a fit / needs input / move forward), and the comment is the accountability that the tally used to pretend to be. "Needs input" is the honest version of a hung vote.</p></div>
+      <div class="dec"><span class="d">Jul 22</span><br><b>Collective votes replaced the single decider.</b><p>Culture fit is the house's call; the app's job is quorum, blindness until you've voted, and a hard veto. <em>Superseded Jul 29.</em></p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>AI suggestions replaced by deterministic placement.</b><p>A candidate is in every listing they qualify for, by rule. Confidence percentages were deleted — dates either line up or they don't.</p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>Discord posts are manual-with-preview, for now.</b><p>A human sees the exact message before the house does. Auto-posting is a cutover we'll earn, not a default.</p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>Pick-a-time beat the Discord post as the schedule primary.</b><p>Self-serve booking is the fast path; coverage is the fallback, so it reads as one ("Ask for coverage").</p></div>
@@ -437,24 +438,25 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
   </section>
 
   <section class="story" id="s-vote-bar">
-    <h1>Vote bar</h1>
-    <p class="lede">The Inbox footer: would you live with them?</p>
+    <h1>Review bar</h1>
+    <p class="lede">The Inbox footer: one read decides, and it has to say why.</p>
     <div class="canvas">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:12.5px;font-weight:600;">Would you live with them?</span>
-        <button class="votepill">1</button><button class="votepill">2</button><button class="votepill">3</button>
-        <button class="votepill on">4</button><button class="votepill">5</button>
-        <button class="btn" style="color:var(--red);border-color:var(--red);background:transparent;">Veto</button>
-        <span style="flex:1;min-width:120px;"><input style="width:100%;background:var(--elevated);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px;" placeholder="One line on why (optional)"></span>
-        <button class="btn" style="background:var(--accent);border-color:var(--accent);color:var(--accent-ink);border-radius:999px;">Cast vote</button>
+        <button class="btn" style="border-radius:999px;color:var(--red);box-shadow:inset 0 0 0 1.5px var(--red);background:rgba(168,32,13,0.16);">Not a fit</button>
+        <button class="btn" style="border-radius:999px;">Needs input</button>
+        <button class="btn" style="border-radius:999px;">Move forward</button>
+        <span style="flex:1;min-width:120px;"><input style="width:100%;background:var(--elevated);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px;" placeholder="Your comment (required)"></span>
+        <button class="btn" style="background:var(--accent);border-color:var(--accent);color:var(--accent-ink);border-radius:999px;">Archive them</button>
       </div>
     </div>
     <div class="notes">
       <h3>Notes</h3>
       <ul>
-        <li>The tally is blind until you cast — the one place the system deliberately withholds information.</li>
-        <li>Veto is separate from the scale and requires a note; it auto-archives with an update email owed.</li>
-        <li>Lime marks the selection — its only job in the system.</li>
+        <li>Select-then-confirm. Picking a verdict arms the bar and focuses the comment; the confirm button then names the consequence — "Archive them", "Ask for another read", "Move forward" — never "Save".</li>
+        <li>The comment is required on all three, client-side and by a CHECK constraint. A verdict with no why isn't a review.</li>
+        <li>Three tints, three meanings: the error tint for not a fit, lime for move forward, a neutral overlay for needs input. Only the selected chip fills in.</li>
+        <li>No scores, no averages, no blindness — there's no tally left to anchor against.</li>
       </ul>
     </div>
   </section>
@@ -559,7 +561,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <div class="notes">
       <h3>Notes</h3>
       <ul>
-        <li>Votes render only during review; afterwards a one-line recap ("Review: 3 votes · avg 4.3").</li>
+        <li>Reviews render as a short thread — each verdict with its comment and author, imported ones labelled "from the application sheet".</li>
         <li>Long answers clamp to six lines with More/Less; heard-from is a quiet "Via" fact, not a bubble.</li>
         <li>The Call tab holds the recording, AI summary, and comments with "comment at current time" stamps.</li>
         <li>Confirmed move-in replaces the parsed date outright — green, ✓, attributed — with the raw answer on hover.</li>
@@ -592,11 +594,11 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Stage machine</h1>
     <p class="lede">The visual system sits on deterministic, server-side rules — never client opinion.</p>
     <div class="canvas" style="padding:10px 22px;">
-      <div class="rule"><span class="n">1</span><div><b>Inbox → Candidates</b><span>3+ votes averaging ≥ 3.5. One veto (note required) auto-archives with an update email owed. Budget under $1,500/mo auto-archives at load.</span></div></div>
+      <div class="rule"><span class="n">1</span><div><b>Inbox → Candidates</b><span>One review decides, comment required. "Move forward" → Candidates; "Not a fit" → Archive with an update email owed; "Needs input" holds them in the Inbox. The most recent decisive verdict wins, so re-reviewing is how you change your mind. Budget under $1,500/mo auto-archives at load.</span></div></div>
       <div class="rule"><span class="n">2</span><div><b>Candidates → Openings</b><span>Auto-placement into every open listing whose dates genuinely line up (track match, budget covers rent, window overlap — no padding). Removals are tombstoned; the sweep never re-adds.</span></div></div>
       <div class="rule"><span class="n">3</span><div><b>Openings → Screening</b><span>Availability parsed from replies (thread-matched, any sender address); calls booked in-app, via a Discord claim, or picked up automatically from the shared calendar.</span></div></div>
       <div class="rule"><span class="n">4</span><div><b>Recruiter-confirmed dates win</b><span>A confirmed window replaces parsed text everywhere — display, filters, placement — and is exact: no "flexible" escape hatch.</span></div></div>
-      <div class="rule"><span class="n">5</span><div><b>Passing requires outreach</b><span>Every rejection queues an update email. "Archived" without one is reserved for history imports.</span></div></div>
+      <div class="rule"><span class="n">5</span><div><b>The update email is offered, not owed by force</b><span>Archiving queues an update and surfaces "Write their update" beside "Skip the email" — a fixed community template plus one paragraph drawn from their own survey answers, and an optional newsletter link. Outreach is closed for archived people at every layer, including a 409 from the send endpoint: we never invite someone to book a time after turning them down.</span></div></div>
     </div>
   </section>
 
