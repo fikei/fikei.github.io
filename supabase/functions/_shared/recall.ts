@@ -70,6 +70,28 @@ export async function getBotResult(botId: string): Promise<BotResult> {
   }
 }
 
+// Copy a finished recording into the permanent recruit-recordings bucket.
+// Streams straight from Recall's presigned URL into Storage (no buffering —
+// hour-long Meets exceed edge-function memory). Returns the storage path.
+export async function archiveVideoToStorage(videoUrl: string, path: string): Promise<string> {
+  const src = await fetch(videoUrl)
+  if (!src.ok || !src.body) throw new Error(`video download ${src.status}`)
+  const resp = await fetch(
+    `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/recruit-recordings/${path}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': src.headers.get('content-type') || 'video/mp4',
+        'x-upsert': 'true',
+      },
+      body: src.body,
+    },
+  )
+  if (!resp.ok) throw new Error(`storage upload ${resp.status}: ${(await resp.text()).slice(0, 150)}`)
+  return path
+}
+
 // Download a transcript and flatten it to "Speaker: text" lines. Recall's
 // transcript JSON is a list of participant segments with word arrays.
 export async function fetchTranscriptText(transcriptUrl: string): Promise<string> {
