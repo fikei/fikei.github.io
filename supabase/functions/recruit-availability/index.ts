@@ -12,7 +12,7 @@ console.log(`[recruit-availability] v${VERSION} — public applicant availabilit
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { upsertClaimMessage } from '../_shared/discord.ts'
+import { upsertScreenerScheduler } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +62,7 @@ serve(async (req) => {
       try {
         const { data: full } = await client.from('recruit_applicants')
           .select('why_agape, pronouns').eq('id', applicant.id).maybeSingle()
-        await upsertClaimMessage(client, {
+        await upsertScreenerScheduler(client, {
           applicantId: applicant.id, firstName: applicant.first_name,
           whyLine: full?.why_agape || null, pronouns: full?.pronouns || null,
           windows, platform: null, timezoneNote: null, needsHuman: false,

@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.26.0';
+const VERSION = '3.27.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -458,7 +458,7 @@ function openingsCta(a) {
   if (sc?.availability && claim && (claim.status === 'open' || claim.status === 'manual')) {
     const days = Math.max(0, Math.round((Date.now() - new Date(claim.postedAt).getTime()) / 86400000));
     return stack(`<span class="decision-chip decision-chip--outreach">◆ sent to housemates</span>`,
-      `unclaimed ${days === 0 ? 'today' : `${days}d`} · <button type="button" class="cta-link" data-avail-review="${a.id}">book it yourself</button>`);
+      `no screener yet · ${days === 0 ? 'sent today' : `${days}d`} · <button type="button" class="cta-link" data-avail-review="${a.id}">book it yourself</button>`);
   }
   if (sc?.availability) return stack(
     `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review availability</button>`,
@@ -2937,28 +2937,28 @@ function schedulingHtml(a) {
           <span class="avail-card__slots">${windowSlots(w).map(d =>
             `<button type="button" class="chip" data-slot="${d.toISOString()}" data-slot-applicant="${a.id}">${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</button>`).join('') || '<span class="notes__empty">window already passed</span>'}</span>
         </div>`).join('')}
-      <p class="avail-card__discord">…or <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Send to housemates to claim…</button>
-        <span class="notes__empty">first housemate to claim a slot runs the call (manual for now)</span></p>
+      <p class="avail-card__discord">…or <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Ask for coverage…</button>
+        <span class="notes__empty">first housemate to sign up runs the screener (manual for now)</span></p>
     </div>`);
   } else if (!screenings.length) {
-    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.${emailState[a.id]?.lastDir === 'in' ? ` <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Send to housemates to claim…</button>` : ''}</p>`);
+    parts.push(`<p class="notes__empty">No availability captured yet — when they reply with days/times, windows appear here automatically.${emailState[a.id]?.lastDir === 'in' ? ` <button type="button" class="btn btn--sm btn--discord" data-claim-preview="${a.id}"><svg class="btn-discord__icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Ask for coverage…</button>` : ''}</p>`);
   }
   return parts.join('');
 }
 
-/* ---------- manual Discord claim trigger (preview → post) ---------- */
-let claimCtx = null; // { applicantId, extraction } while the modal is open
+/* ---------- screener scheduler: manual Discord trigger (preview → post) ---------- */
+let schedulerCtx = null; // { applicantId, extraction } while the modal is open
 
-async function openClaimPreview(applicantId) {
-  claimCtx = { applicantId, extraction: null };
+async function openSchedulerPreview(applicantId) {
+  schedulerCtx = { applicantId, extraction: null };
   document.getElementById('claim-modal').hidden = false;
-  document.getElementById('claim-status').textContent = 'Reading their reply and composing the post…';
+  document.getElementById('claim-status').textContent = 'Reading their reply and composing the screener scheduler…';
   document.getElementById('claim-preview-body').innerHTML = '';
   document.getElementById('claim-post-btn').disabled = true;
   try {
-    const out = await gmailCall({ action: 'claim-preview', applicantId });
-    if (claimCtx?.applicantId !== applicantId) return; // closed meanwhile
-    claimCtx.extraction = out.extraction;
+    const out = await gmailCall({ action: 'scheduler-preview', applicantId });
+    if (schedulerCtx?.applicantId !== applicantId) return; // closed meanwhile
+    schedulerCtx.extraction = out.extraction;
     const emb = out.preview?.embeds?.[0] || {};
     document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-automation:';
     document.getElementById('claim-preview-body').innerHTML = `
@@ -2973,19 +2973,19 @@ async function openClaimPreview(applicantId) {
   }
 }
 
-function closeClaimModal() {
-  claimCtx = null;
+function closeSchedulerModal() {
+  schedulerCtx = null;
   document.getElementById('claim-modal').hidden = true;
 }
 
-async function postClaimFromModal() {
-  if (!claimCtx?.extraction) return;
+async function postSchedulerFromModal() {
+  if (!schedulerCtx?.extraction) return;
   const btn = document.getElementById('claim-post-btn');
   btn.disabled = true; btn.textContent = 'Posting…';
   try {
-    const out = await gmailCall({ action: 'claim-post', applicantId: claimCtx.applicantId, extraction: claimCtx.extraction });
-    toast(out.posted ? 'Posted to #recruiting-automation — first claim wins' : 'Already claimed — not reposted');
-    closeClaimModal();
+    const out = await gmailCall({ action: 'scheduler-post', applicantId: schedulerCtx.applicantId, extraction: schedulerCtx.extraction });
+    toast(out.posted ? 'Screener scheduler posted — first housemate to sign up runs it' : 'A screener already signed up — not reposted');
+    closeSchedulerModal();
   } catch (e) {
     toast(`Post failed: ${e.message}`);
   }
@@ -3010,7 +3010,7 @@ async function openAvailModal(applicantId) {
   try {
     const [avRes, out] = await Promise.all([
       sb.from('recruit_availability').select('windows, source_gmail_id, updated_at').eq('applicant_id', applicantId).maybeSingle(),
-      gmailCall({ action: 'claim-preview', applicantId }).catch(() => ({})),
+      gmailCall({ action: 'scheduler-preview', applicantId }).catch(() => ({})),
     ]);
     const av = avRes.data;
     let srcEmail = null;
@@ -3753,7 +3753,7 @@ function init() {
       return;
     }
     const cp = e.target.closest('[data-claim-preview]');
-    if (cp) { openClaimPreview(cp.dataset.claimPreview); return; }
+    if (cp) { openSchedulerPreview(cp.dataset.claimPreview); return; }
     const pt = e.target.closest('[data-pick-time]');
     if (pt) {
       openReview(pt.dataset.pickTime);
@@ -3903,14 +3903,14 @@ function init() {
   document.getElementById('remove-cancel').onclick = hideRemoveSheet;
   document.getElementById('remove-submit').onclick = submitRemove;
 
-  document.getElementById('claim-close').onclick = closeClaimModal;
-  document.getElementById('claim-cancel').onclick = closeClaimModal;
-  document.getElementById('claim-post-btn').onclick = postClaimFromModal;
+  document.getElementById('claim-close').onclick = closeSchedulerModal;
+  document.getElementById('claim-cancel').onclick = closeSchedulerModal;
+  document.getElementById('claim-post-btn').onclick = postSchedulerFromModal;
   document.getElementById('avail-close').onclick = closeAvailModal;
   document.getElementById('avail-ask-coverage').onclick = () => {
     const id = availApplicantId;
     closeAvailModal();
-    if (id) openClaimPreview(id);
+    if (id) openSchedulerPreview(id);
   };
   document.getElementById('email-close').onclick = closeEmailModal;
   document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
@@ -3965,7 +3965,7 @@ function init() {
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
     if (e.key === 'Escape') {
       if (!document.getElementById('email-modal').hidden) closeEmailModal();
-      else if (!document.getElementById('claim-modal').hidden) closeClaimModal();
+      else if (!document.getElementById('claim-modal').hidden) closeSchedulerModal();
       else if (!document.getElementById('listing-modal').hidden) closeListingModal();
       else if (!document.getElementById('decision-sheet').hidden) hideDecisionSheet();
       else closeReview();

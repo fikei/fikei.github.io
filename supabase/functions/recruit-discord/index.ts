@@ -19,7 +19,7 @@ console.log(`[recruit-discord] v${VERSION} — screening claims + magic-link sig
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendIntroEmail, sharedAccessToken } from '../_shared/recruit-schedule.ts'
-import { editClaimMessageClaimed, editClaimMessageFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
+import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -111,14 +111,14 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     })
 
     const applicantName = `${applicant.first_name} ${applicant.last_name || ''}`.trim()
-    await editClaimMessageClaimed(claimPost, opts.discordUserId, applicantName, applicantId, slotWhen(startsAt))
+    await editSchedulerSignedUp(claimPost, opts.discordUserId, applicantName, applicantId, slotWhen(startsAt))
 
     const platform = claimPost.platform as { kind?: string; handle?: string } | null
     const platformLine = platform?.kind
       ? `\nHeads up: they asked for ${platform.kind}${platform.handle ? ` (@${platform.handle})` : ''} — default is the Meet link, but feel free to DM them about it.`
       : ''
     await dmUser(opts.discordUserId,
-      `✅ You claimed **${applicantName}**'s Agape Intro Call — ${slotWhen(startsAt)}.\n` +
+      `✅ You're screening **${applicantName}** — Agape intro call — ${slotWhen(startsAt)}.\n` +
       `Calendar invites are out to you both. Meet: ${meetLink || '(see calendar invite)'}${platformLine}`)
 
     try {
@@ -131,7 +131,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     // Never reopen the post (avoids double-booking) — flag it and tell the claimer.
     console.error(`[recruit-discord] claim finish failed for ${applicantId}: ${(err as Error).message}`)
     try {
-      await editClaimMessageFailed(claimPost, opts.discordUserId, applicantId, slotWhen(startsAt))
+      await editSchedulerFailed(claimPost, opts.discordUserId, applicantId, slotWhen(startsAt))
     } catch { /* best effort */ }
     try {
       await dmUser(opts.discordUserId,
