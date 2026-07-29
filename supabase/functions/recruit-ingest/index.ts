@@ -19,7 +19,7 @@
 // timestamp, and inserts ignore duplicates — so resending the whole sheet is
 // a safe backfill, not a mess of copies.
 
-const VERSION = '1.2.0'
+const VERSION = '1.2.1'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -225,8 +225,8 @@ serve(async (req) => {
       try {
         const names = created.map((c) => `${c.first_name} ${c.last_name || ''}`.trim()).join(', ')
         await postChannelEmbed(AUTOMATION_CHANNEL_ID,
-          `📥 **${created.length} application${created.length === 1 ? '' : 's'} ingested** from the sheet\n${names.slice(0, 800)}`,
-          0x6a6c6a, `${created.length} applications ingested`)
+          `📥 **${created.length} new application${created.length === 1 ? '' : 's'}**\n${names.slice(0, 800)}`,
+          0x6a6c6a, `${created.length} new application${created.length === 1 ? '' : 's'}`)
       } catch (err) {
         console.warn(`[recruit-ingest] audit post failed: ${(err as Error).message}`)
       }

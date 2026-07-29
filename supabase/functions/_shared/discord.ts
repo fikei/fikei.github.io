@@ -173,7 +173,7 @@ export function buildMessage(input: ScreenerSchedulerInput, slots: Slot[]): Reco
   let description: string
   if (manual) {
     description =
-      `**${input.firstName}** replied about scheduling, but no concrete times could be read.\n\n` +
+      `**${input.firstName}** wrote back about scheduling, but didn't name specific times.\n\n` +
       considerationsBlock +
       `See ${poss} [application](${appLink(input.applicantId)}) — read the thread and coordinate by email.`
   } else {
@@ -326,7 +326,7 @@ export async function dmUser(discordUserId: string, content: string): Promise<vo
   await discordFetch(`/channels/${channel.id}/messages`, {
     method: 'POST', body: JSON.stringify({ content }),
   })
-  await auditMirror('Direct message', content.split('\n')[0], { dmTo: discordUserId })
+  await auditMirror('Message sent', content.split('\n')[0], { dmTo: discordUserId })
 }
 
 /* Audit mirror: a one-line record of every automated message, posted to
@@ -404,7 +404,7 @@ export async function postResilient(channelId: string, payload: Record<string, u
       method: 'POST',
       body: JSON.stringify({
         ...payload,
-        content: `⚠️ Posted here because <#${channelId}> rejected it — check the bot's permissions there.${typeof payload.content === 'string' ? `\n${payload.content}` : ''}`,
+        content: `⚠️ Posting this in <#${channelId}> didn't work, so it's here instead.${typeof payload.content === 'string' ? `\n${payload.content}` : ''}`,
       }),
     })
     return
@@ -503,7 +503,7 @@ export async function postLiveCall(title: string, when: string, meetLink: string
 // Persistent "Get sign-in link" helper message for phone sign-in — tapping
 // the button gets an ephemeral one-time link (handled in recruit-discord).
 export async function postSigninMessage(channelId: string): Promise<any> {
-  await auditMirror('Sign-in helper posted', 'Persistent phone sign-in message', { channelId })
+  await auditMirror('Phone sign-in message posted', 'Housemates can get a sign-in link from it any time', { channelId })
   return await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: JSON.stringify({
