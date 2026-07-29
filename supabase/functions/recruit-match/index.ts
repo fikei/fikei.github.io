@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.10.0'
+const VERSION = '1.10.1'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -362,9 +362,10 @@ Their application said:
 ${survey}
 
 Rules:
-- Name something specific and true from their answers — an interest, a craft, something they offered to share.
-- Do not evaluate them, rank them, hint at reasons, or explain the decision.
-- Do not promise a future spot, a call, or a reconsideration.
+- Speak ONLY to what they told us about themselves — an interest, a craft, something they offered to share. Name it specifically.
+- Never mention the decision, the outcome, the room, the house's choice, or "at this time". The sentences around yours already carry that; repeating it makes the email read like a form letter.
+- Do not use the words "application", "applied", "process", "review", or "considered".
+- Do not evaluate them, rank them, hint at reasons, or promise a future spot.
 - No greeting and no sign-off, just the sentences. Under 60 words.`,
             300,
           )

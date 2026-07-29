@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.40.0';
+const VERSION = '3.40.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -4565,7 +4565,15 @@ function init() {
     if (id) openSchedulerPreview(id);
   };
   document.getElementById('email-close').onclick = closeEmailModal;
-  document.getElementById('email-regen').onclick = () => emailApplicantId && generateEmail(emailApplicantId);
+  // Regenerate has to respect which editor you're in. In the rejection queue
+  // it must redraft the update — routing it to the outreach drafter produced a
+  // warm invite, complete with a booking link, one click away from being sent
+  // to someone who was just archived.
+  document.getElementById('email-regen').onclick = () => {
+    if (!emailApplicantId) return;
+    if (emailMode === 'update') openUpdateEmail(emailApplicantId);
+    else generateEmail(emailApplicantId);
+  };
   document.getElementById('email-send').onclick = async () => {
     if (!gmailStatus.connected) { toast('Connect the shared Gmail first (Emails tab)'); return; }
     const btn = document.getElementById('email-send');
