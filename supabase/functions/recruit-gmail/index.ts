@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.16.0'
+const VERSION = '1.16.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -165,7 +165,13 @@ function classifyEvent(ev: any): 'intro_call' | 'visit' | 'house_event' {
   const title = String(ev.summary || '').toLowerCase()
   if (/\b(intro call|screening|phone screen|intro chat)\b/.test(title)) return 'intro_call'
   if (/\b(visit|tour|open house|walkthrough|come by|stop by)\b/.test(title)) return 'visit'
-  if (ev.hangoutLink || ev.conferenceData) return 'intro_call'
+  // A video link is NOT sufficient on its own — the house calendar is full
+  // of social events that happen to have a Meet link, and one of them
+  // ("Peloton man doing what he Peloton can") sailed straight through the
+  // first version of this rule. A screening is a small meeting: applicant,
+  // a housemate or two, maybe the recording bot.
+  const attendees = (ev.attendees || []).filter((x: any) => !x.resource).length
+  if ((ev.hangoutLink || ev.conferenceData) && attendees > 0 && attendees <= 4) return 'intro_call'
   return 'house_event'
 }
 
@@ -834,6 +840,11 @@ serve(async (req) => {
       // screenings row (deduped by event id, so app-booked calls are skipped).
       let manualPickups = 0
       try {
+        // People who left the funnel don't need their calendar mined. This
+        // also stops long-dead test records from collecting house events.
+        const { data: goneRows } = await client.from('recruit_applicants')
+          .select('id').in('stage', ['rejected', 'archived'])
+        const gone = new Set((goneRows || []).map((r) => r.id))
         const { data: altRows } = await client.from('recruit_emails').select('applicant_id, from_email').eq('direction', 'in')
         const altByEmail = new Map<string, string>()
         for (const r of (altRows || [])) {
@@ -868,7 +879,7 @@ serve(async (req) => {
               aid = byEmail.get(em) || altByEmail.get(em) || null
               if (aid) break
             }
-            if (!aid) continue
+            if (!aid || gone.has(aid)) continue
             if (seenIds.has(ev.id)) continue
             seenIds.add(ev.id)
             const past = new Date(ev.end?.dateTime || ev.start.dateTime) < new Date()

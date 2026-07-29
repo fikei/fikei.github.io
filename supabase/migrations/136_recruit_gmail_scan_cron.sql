@@ -16,6 +16,15 @@
 -- The cron path is /scan (recruit-gmail v1.16.0), which forces action='scan'
 -- and skips the Discord-membership gate the app's calls go through.
 --
+-- The Authorization header is the PUBLIC anon key, and it is not the auth
+-- for this endpoint — the nonce is. Supabase's function gateway rejects any
+-- request with no Authorization header before the function ever runs
+-- (UNAUTHORIZED_NO_AUTH_HEADER), so a nonce-only request never arrives.
+-- recruit-discord sidesteps this with verify_jwt = false; recruit-gmail
+-- can't take that route, because every one of its other actions relies on
+-- a real user JWT plus the Discord-membership gate. Sending the anon key
+-- satisfies the gateway and changes nothing about who can run the sweep.
+--
 -- 20 minutes, not 15: it shares the shared-Gmail token and Google's quota
 -- with the reminder tick, and offsetting them keeps the two off each other.
 -- ============================================
@@ -41,6 +50,9 @@ select cron.schedule(
     url := 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recruit-gmail/scan',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
+      -- Public anon key: satisfies the function gateway only. The nonce below
+      -- is what actually authorizes the sweep.
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI',
       'X-Cron-Nonce', (select nonce::text from n)
     ),
     body := '{}'::jsonb,
