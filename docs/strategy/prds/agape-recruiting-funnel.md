@@ -13,7 +13,7 @@ Status: **Phase A shipped (v3.0.0, migration 120); auto-placement shipped early 
 
 ## The funnel
 
-1. **Someone applies** → lands in Review (`stage = 'review'`).
+1. **Someone applies** → the sheet pushes the row to `recruit-ingest` on submit and they land in the Inbox (`stage = 'review'`) automatically — see [recruiting-sheet-ingest.md](../../infrastructure/recruiting-sheet-ingest.md).
 2. **Application review** — quality of character + culture fit, judged collectively:
    - 3+ Recruiting Society members score 1–5 ("would you live with them?").
    - A single veto rejects — **auto-archived** immediately, update email owed.
