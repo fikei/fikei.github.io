@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CTRL Design System</title>
+  <title>CTRL — design system</title>
   <link rel="apple-touch-icon" sizes="180x180" href="/images/icons/favicons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/images/icons/favicons/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/images/icons/favicons/favicon-16x16.png">
@@ -12,83 +12,159 @@
   <link rel="stylesheet" href="tokens.css">
   <link rel="stylesheet" href="components.css">
   <style>
-    .preview {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: var(--space-6);
+    /* Storybook shell (same layout as /design-system/recruiting/), themed
+       in CTRL's own language: monospace chrome, borders over fills. */
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); }
+    .sb-app { display: grid; grid-template-columns: 248px minmax(0,1fr); min-height: 100vh; }
+    @media (max-width: 760px) { .sb-app { grid-template-columns: 1fr; } .sb-side { position: static !important; height: auto !important; border-right: 0 !important; border-bottom: var(--border-thin) solid var(--border); } }
+
+    .sb-side {
+      background: var(--bg-surface); border-right: var(--border-thin) solid var(--border);
+      padding: var(--space-4) var(--space-3) var(--space-8); position: sticky; top: 0; height: 100vh; overflow-y: auto;
     }
-    .section {
-      margin-bottom: var(--space-8);
-      padding-bottom: var(--space-8);
-      border-bottom: 1px solid var(--border-subtle);
+    .sb-brand { display: block; padding: var(--space-1) var(--space-2) var(--space-4); }
+    .sb-brand b { font-family: var(--font-serif); font-size: var(--text-lg); font-weight: normal; display: block; }
+    .sb-brand span { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.12em; }
+    .sb-brand a { font-family: var(--font-mono); font-size: var(--text-2xs); display: block; margin-top: var(--space-1); color: var(--color-link); text-decoration: none; }
+    .sb-grp { margin-top: var(--space-4); }
+    .sb-grp > button {
+      width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+      font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--fg-muted); padding: var(--space-2); display: flex; justify-content: space-between; align-items: center;
     }
-    .section:last-child {
-      border-bottom: none;
+    .sb-grp > button .tw { transition: transform 120ms ease; font-size: 8px; }
+    .sb-grp.closed > button .tw { transform: rotate(-90deg); }
+    .sb-grp.closed .sb-items { display: none; }
+    .sb-items { display: flex; flex-direction: column; margin-top: 2px; }
+    .sb-items a {
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted);
+      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5);
+      text-decoration: none; border-left: var(--border-thin) solid transparent;
     }
-    .section__title {
-      font-family: var(--font-serif);
-      font-size: var(--text-xl);
-      font-weight: normal;
-      margin-bottom: var(--space-4);
+    .sb-items a:hover { color: var(--fg); background: var(--bg-elevated); }
+    .sb-items a.on { color: var(--fg); border-left-color: var(--fg); background: var(--bg-elevated); }
+
+    .sb-main { padding: 0 0 var(--space-8); }
+    .sb-topbar {
+      position: sticky; top: 0; z-index: 30; background: var(--bg);
+      border-bottom: var(--border-thin) solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+      padding: var(--space-2) var(--space-6);
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-muted);
     }
-    .section__subtitle {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      text-transform: uppercase;
-      letter-spacing: var(--tracking-wider);
-      color: var(--fg-muted);
-      margin-bottom: var(--space-3);
-      margin-top: var(--space-6);
+    .sb-topbar .crumb b { color: var(--fg); font-weight: normal; }
+    .sb-story { display: none; padding: var(--space-6) var(--space-6) 0; max-width: 860px; }
+    .sb-story.on { display: block; }
+    .sb-story h1 { font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: normal; margin: 0 0 var(--space-1); }
+    .sb-lede { color: var(--fg-muted); font-size: var(--text-sm); margin: 0 0 var(--space-5); max-width: 64ch; }
+    .sb-canvas {
+      background: var(--bg-surface); border: var(--border-thin) solid var(--border);
+      padding: var(--space-6); margin: 0 0 var(--space-1); position: relative;
     }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-3);
-      align-items: center;
-      margin-bottom: var(--space-4);
-    }
-    .swatch {
-      width: 48px;
-      height: 48px;
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: flex-end;
-      padding: var(--space-1);
-    }
-    .swatch span {
-      font-size: 8px;
-      color: var(--fg-muted);
-    }
-    .theme-toggle-demo {
-      position: fixed;
-      bottom: var(--space-4);
-      left: var(--space-4);
-    }
+    .sb-canvas::after { content: 'CANVAS'; position: absolute; top: var(--space-2); right: var(--space-3); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--fg-muted); }
+    .sb-notes { padding: var(--space-4) 2px; }
+    .sb-notes h3 { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); margin: 0 0 var(--space-2); font-weight: normal; }
+    .sb-notes p, .sb-notes li { max-width: 66ch; color: var(--fg-muted); font-size: var(--text-sm); }
+    .sb-notes p { margin: 0 0 var(--space-2); }
+    .sb-notes b { color: var(--fg); font-weight: normal; border-bottom: var(--border-thin) solid var(--fg); }
+    .sb-notes ul { padding-left: var(--space-4); margin: 0 0 var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+
+    .sb-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-4); }
+    .sb-row:last-child { margin-bottom: 0; }
+    .sb-sub { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-muted); margin: var(--space-5) 0 var(--space-2); }
+    .sb-sub:first-child { margin-top: 0; }
+    .swatch { width: 48px; height: 48px; border: var(--border-thin) solid var(--border-subtle); display: flex; align-items: flex-end; padding: var(--space-1); }
+    .swatch span { font-family: var(--font-mono); font-size: 8px; color: var(--fg-muted); }
+    .sb-theme { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--fg-muted); }
   </style>
 </head>
 <body>
-  <div class="preview">
-    <header class="section">
-      <h1 style="font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: normal; margin-bottom: var(--space-2);">
-        CTRL Design System
-      </h1>
-      <p class="text-muted text-sm">
-        A minimal, high-contrast design language for ctrl.rodeo projects.
-      </p>
-    </header>
 
-    <!-- Colors -->
-    <section class="section">
-      <h2 class="section__title">Colors</h2>
+<div class="sb-app">
+<aside class="sb-side">
+  <span class="sb-brand"><b>CTRL</b><span>design system · global</span><a href="/design-system/">← all design systems</a></span>
+  <div class="sb-grp" data-grp>
+    <button type="button">Getting started <span class="tw">▼</span></button>
+    <div class="sb-items">
+      <a href="#introduction" data-story="introduction">Introduction</a>
+      <a href="#principles" data-story="principles">Principles</a>
+    </div>
+  </div>
+  <div class="sb-grp" data-grp>
+    <button type="button">Foundations <span class="tw">▼</span></button>
+    <div class="sb-items">
+      <a href="#colors" data-story="colors">Colors</a>
+      <a href="#typography" data-story="typography">Typography</a>
+    </div>
+  </div>
+  <div class="sb-grp" data-grp>
+    <button type="button">Components <span class="tw">▼</span></button>
+    <div class="sb-items">
+      <a href="#buttons" data-story="buttons">Buttons</a>
+      <a href="#inputs" data-story="inputs">Inputs</a>
+      <a href="#tokens" data-story="tokens">Tokens &amp; tags</a>
+      <a href="#cards" data-story="cards">Cards</a>
+      <a href="#toggle" data-story="toggle">Toggle</a>
+      <a href="#tabs" data-story="tabs">Tabs</a>
+      <a href="#status" data-story="status">Status</a>
+      <a href="#toast" data-story="toast">Toast</a>
+      <a href="#loading" data-story="loading">Loading</a>
+    </div>
+  </div>
+</aside>
 
-      <p class="section__subtitle">Core</p>
-      <div class="row">
+<main class="sb-main">
+  <div class="sb-topbar">
+    <span class="crumb" id="crumb"><b>Getting started</b> / Introduction</span>
+    <label class="sb-theme">light
+      <button class="toggle" id="themeToggle" aria-label="Toggle theme"><div class="toggle__knob"></div></button>
+    </label>
+  </div>
+
+  <section class="sb-story" id="s-introduction">
+    <h1>Introduction</h1>
+    <p class="sb-lede">The global design language for ctrl.rodeo — Boards, Events, Soundscape, Systemic, and Favicon. Minimal, high-contrast, monospace-first. Product systems (like <a href="/design-system/recruiting/" style="color:var(--color-link);">Agape recruiting</a>) override this one for their product.</p>
+    <div class="sb-canvas">
+      <div class="sb-row">
+        <button class="btn btn--filled">Filled</button>
+        <button class="btn">Default</button>
+        <button class="token token--active">Active</button>
+        <div class="status status--success"><span class="status__dot"></span> Connected</div>
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <div class="sb-notes">
+      <h3>Notes</h3>
+      <p>Everything on this page renders from the shipped <b>tokens.css</b> and <b>components.css</b> — the specimens are the real components, not mockups.</p>
+    </div>
+  </section>
+
+  <section class="sb-story" id="s-principles">
+    <h1>Principles</h1>
+    <p class="sb-lede">The five commitments behind the aesthetic.</p>
+    <div class="sb-notes">
+      <ul>
+        <li><b>High contrast</b> — pure black and white as primary colors.</li>
+        <li><b>Monospace-first</b> — technical, code-like; serif only for display headings.</li>
+        <li><b>Minimal</b> — borders over fills, function over decoration.</li>
+        <li><b>Dark-first</b> — dark mode default with an optional light mode (the toggle in the top bar).</li>
+        <li><b>Accessible</b> — clear visual hierarchy, readable text at small sizes.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sb-story" id="s-colors">
+    <h1>Colors</h1>
+    <p class="sb-lede">Black, white, a gray ramp, and status hues. Nothing decorative.</p>
+    <div class="sb-canvas">
+      <p class="sb-sub">Core</p>
+      <div class="sb-row">
         <div class="swatch" style="background: var(--color-black);"><span style="color:#fff;">black</span></div>
         <div class="swatch" style="background: var(--color-white);"><span style="color:#000;">white</span></div>
       </div>
-
-      <p class="section__subtitle">Grays</p>
-      <div class="row">
+      <p class="sb-sub">Grays</p>
+      <div class="sb-row">
         <div class="swatch" style="background: var(--gray-100);"><span style="color:#fff;">100</span></div>
         <div class="swatch" style="background: var(--gray-200);"><span style="color:#fff;">200</span></div>
         <div class="swatch" style="background: var(--gray-300);"><span style="color:#fff;">300</span></div>
@@ -99,187 +175,207 @@
         <div class="swatch" style="background: var(--gray-800);"><span style="color:#000;">800</span></div>
         <div class="swatch" style="background: var(--gray-900);"><span style="color:#000;">900</span></div>
       </div>
-
-      <p class="section__subtitle">Status</p>
-      <div class="row">
+      <p class="sb-sub">Status</p>
+      <div class="sb-row">
         <div class="swatch" style="background: var(--color-success);"><span style="color:#000;">success</span></div>
         <div class="swatch" style="background: var(--color-error);"><span style="color:#fff;">error</span></div>
         <div class="swatch" style="background: var(--color-warning);"><span style="color:#000;">warning</span></div>
       </div>
-    </section>
+    </div>
+    <div class="sb-notes"><h3>Notes</h3><p>Accent hues (<b>--accent-cyan</b>, <b>--accent-green</b>, <b>--accent-amber</b>, <b>--accent-magenta</b>) and platform brand colors exist in tokens.css for data surfaces — never for chrome.</p></div>
+  </section>
 
-    <!-- Typography -->
-    <section class="section">
-      <h2 class="section__title">Typography</h2>
+  <section class="sb-story" id="s-typography">
+    <h1>Typography</h1>
+    <p class="sb-lede">Monospace carries the interface; serif is reserved for display.</p>
+    <div class="sb-canvas">
+      <p class="sb-sub">Families</p>
+      <p style="font-family: var(--font-mono); margin: 0 0 var(--space-2);">Courier New — monospace (primary)</p>
+      <p style="font-family: var(--font-serif); margin: 0 0 var(--space-2);">Georgia — serif (display)</p>
+      <p style="font-family: var(--font-sans); margin: 0 0 var(--space-2);">Space Grotesk — sans (alternative)</p>
+      <p class="sb-sub">Sizes</p>
+      <p style="font-size: var(--text-2xs); margin: 0 0 var(--space-1);">8px — text-2xs</p>
+      <p style="font-size: var(--text-xs); margin: 0 0 var(--space-1);">10px — text-xs (buttons, labels)</p>
+      <p style="font-size: var(--text-sm); margin: 0 0 var(--space-1);">12px — text-sm (body)</p>
+      <p style="font-size: var(--text-base); margin: 0 0 var(--space-1);">14px — text-base</p>
+      <p style="font-size: var(--text-lg); margin: 0 0 var(--space-1);">18px — text-lg (headings)</p>
+      <p style="font-size: var(--text-xl); margin: 0;">24px — text-xl</p>
+    </div>
+  </section>
 
-      <p class="section__subtitle">Font Families</p>
-      <p style="font-family: var(--font-mono); margin-bottom: var(--space-2);">Courier New — Monospace (Primary)</p>
-      <p style="font-family: var(--font-serif); margin-bottom: var(--space-2);">Georgia — Serif (Display)</p>
-      <p style="font-family: var(--font-sans); margin-bottom: var(--space-2);">Space Grotesk — Sans (Alternative)</p>
-
-      <p class="section__subtitle">Sizes</p>
-      <p style="font-size: var(--text-2xs);">8px — text-2xs</p>
-      <p style="font-size: var(--text-xs);">10px — text-xs (buttons, labels)</p>
-      <p style="font-size: var(--text-sm);">12px — text-sm (body)</p>
-      <p style="font-size: var(--text-base);">14px — text-base</p>
-      <p style="font-size: var(--text-lg);">18px — text-lg (headings)</p>
-      <p style="font-size: var(--text-xl);">24px — text-xl</p>
-    </section>
-
-    <!-- Buttons -->
-    <section class="section">
-      <h2 class="section__title">Buttons</h2>
-
-      <p class="section__subtitle">Variants</p>
-      <div class="row">
+  <section class="sb-story" id="s-buttons">
+    <h1>Buttons</h1>
+    <p class="sb-lede">Bordered rectangles; the filled variant is the single point of emphasis.</p>
+    <div class="sb-canvas">
+      <p class="sb-sub">Variants</p>
+      <div class="sb-row">
         <button class="btn">Default</button>
         <button class="btn btn--filled">Filled</button>
         <button class="btn btn--danger">Danger</button>
         <button class="btn btn--ghost">Ghost</button>
         <button class="btn" disabled>Disabled</button>
       </div>
-
-      <p class="section__subtitle">Sizes</p>
-      <div class="row">
+      <p class="sb-sub">Sizes</p>
+      <div class="sb-row">
         <button class="btn btn--sm">Small</button>
         <button class="btn">Default</button>
         <button class="btn btn--lg">Large</button>
       </div>
+      <p class="sb-sub">Full width</p>
+      <button class="btn btn--block">Block button</button>
+    </div>
+    <div class="sb-notes"><h3>Notes</h3><p>One filled button per view. Ghost for tertiary actions inside cards and toolbars.</p></div>
+  </section>
 
-      <p class="section__subtitle">Full Width</p>
-      <button class="btn btn--block">Block Button</button>
-    </section>
-
-    <!-- Inputs -->
-    <section class="section">
-      <h2 class="section__title">Inputs</h2>
-
-      <p class="section__subtitle">Text Input</p>
+  <section class="sb-story" id="s-inputs">
+    <h1>Inputs</h1>
+    <p class="sb-lede">Bordered fields, no fills, monospace text.</p>
+    <div class="sb-canvas">
+      <p class="sb-sub">Text input</p>
       <input type="text" class="input" placeholder="Enter text..." style="margin-bottom: var(--space-3);">
-
-      <p class="section__subtitle">Textarea</p>
+      <p class="sb-sub">Textarea</p>
       <textarea class="input textarea" placeholder="Enter longer text..."></textarea>
-
-      <p class="section__subtitle">Select</p>
+      <p class="sb-sub">Select</p>
       <select class="input select">
         <option>Option 1</option>
         <option>Option 2</option>
         <option>Option 3</option>
       </select>
-    </section>
+    </div>
+  </section>
 
-    <!-- Tokens -->
-    <section class="section">
-      <h2 class="section__title">Tokens / Tags</h2>
-      <div class="row">
+  <section class="sb-story" id="s-tokens">
+    <h1>Tokens &amp; tags</h1>
+    <p class="sb-lede">Filter chips — the active one inverts.</p>
+    <div class="sb-canvas">
+      <div class="sb-row">
         <button class="token">All</button>
         <button class="token token--active">Active</button>
         <button class="token">Watch</button>
         <button class="token">Read</button>
         <button class="token">Wear</button>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Cards -->
-    <section class="section">
-      <h2 class="section__title">Cards</h2>
-      <div class="row" style="align-items: stretch;">
-        <div class="card" style="flex: 1;">
-          <p class="text-sm">Static card with content.</p>
-        </div>
-        <div class="card card--interactive" style="flex: 1;">
-          <p class="text-sm">Interactive card (hover me).</p>
-        </div>
+  <section class="sb-story" id="s-cards">
+    <h1>Cards</h1>
+    <p class="sb-lede">Bordered surfaces; interactive cards respond on hover.</p>
+    <div class="sb-canvas">
+      <div class="sb-row" style="align-items: stretch;">
+        <div class="card" style="flex: 1;"><p class="text-sm">Static card with content.</p></div>
+        <div class="card card--interactive" style="flex: 1;"><p class="text-sm">Interactive card (hover me).</p></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Toggle -->
-    <section class="section">
-      <h2 class="section__title">Toggle Switch</h2>
-      <div class="row">
-        <button class="toggle" id="toggle1">
-          <div class="toggle__knob"></div>
-        </button>
+  <section class="sb-story" id="s-toggle">
+    <h1>Toggle</h1>
+    <p class="sb-lede">Binary state, knob slides, no color change beyond inversion.</p>
+    <div class="sb-canvas">
+      <div class="sb-row">
+        <button class="toggle" id="toggle1"><div class="toggle__knob"></div></button>
         <span class="text-sm text-muted">Off</span>
-
-        <button class="toggle toggle--active">
-          <div class="toggle__knob"></div>
-        </button>
+        <button class="toggle toggle--active"><div class="toggle__knob"></div></button>
         <span class="text-sm text-muted">On</span>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Tabs -->
-    <section class="section">
-      <h2 class="section__title">Tabs</h2>
+  <section class="sb-story" id="s-tabs">
+    <h1>Tabs</h1>
+    <p class="sb-lede">Underline carries the selection.</p>
+    <div class="sb-canvas">
       <div class="tabs">
         <button class="tab tab--active">Overview</button>
         <button class="tab">Details</button>
         <button class="tab">Settings</button>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Status -->
-    <section class="section">
-      <h2 class="section__title">Status Indicators</h2>
-      <div class="row">
-        <div class="status">
-          <span class="status__dot"></span>
-          Inactive
-        </div>
-        <div class="status status--success">
-          <span class="status__dot"></span>
-          Connected
-        </div>
-        <div class="status status--error">
-          <span class="status__dot"></span>
-          Error
-        </div>
-        <div class="status status--success status--blink">
-          <span class="status__dot"></span>
-          Live
-        </div>
+  <section class="sb-story" id="s-status">
+    <h1>Status</h1>
+    <p class="sb-lede">A dot plus a word. Live states blink.</p>
+    <div class="sb-canvas">
+      <div class="sb-row">
+        <div class="status"><span class="status__dot"></span> Inactive</div>
+        <div class="status status--success"><span class="status__dot"></span> Connected</div>
+        <div class="status status--error"><span class="status__dot"></span> Error</div>
+        <div class="status status--success status--blink"><span class="status__dot"></span> Live</div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Toast -->
-    <section class="section">
-      <h2 class="section__title">Toast</h2>
+  <section class="sb-story" id="s-toast">
+    <h1>Toast</h1>
+    <p class="sb-lede">Bottom-right, self-dismissing, one line.</p>
+    <div class="sb-canvas">
       <div style="position: relative; height: 80px;">
         <div style="position: absolute; bottom: 0; right: 0; display: flex; flex-direction: column; gap: var(--space-2);">
           <div class="toast">Changes saved</div>
           <div class="toast toast--error">Something went wrong</div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- Spinner -->
-    <section class="section">
-      <h2 class="section__title">Loading</h2>
-      <div class="row">
+  <section class="sb-story" id="s-loading">
+    <h1>Loading</h1>
+    <p class="sb-lede">A spinner and a word. Nothing skeletal.</p>
+    <div class="sb-canvas">
+      <div class="sb-row">
         <div class="spinner"></div>
         <span class="text-sm text-muted">Loading...</span>
       </div>
-    </section>
-  </div>
+    </div>
+  </section>
 
-  <!-- Theme Toggle -->
-  <button class="toggle theme-toggle-demo" id="themeToggle">
-    <div class="toggle__knob"></div>
-  </button>
+</main>
+</div>
 
-  <script>
-    // Theme toggle
-    const themeToggle = document.getElementById('themeToggle');
-    themeToggle.onclick = () => {
-      document.documentElement.classList.toggle('light');
-      themeToggle.classList.toggle('toggle--active');
-    };
+<script>
+(function () {
+  var stories = document.querySelectorAll('.sb-story');
+  var links = document.querySelectorAll('[data-story]');
+  var crumb = document.getElementById('crumb');
+  function groupOf(link) {
+    var g = link.closest('.sb-grp');
+    return g ? g.querySelector('button').textContent.replace('▼', '').trim() : '';
+  }
+  function show(name) {
+    var found = false;
+    stories.forEach(function (s) {
+      var on = s.id === 's-' + name;
+      s.classList.toggle('on', on);
+      if (on) found = true;
+    });
+    if (!found) { show('introduction'); return; }
+    links.forEach(function (l) {
+      var on = l.dataset.story === name;
+      l.classList.toggle('on', on);
+      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + l.textContent;
+    });
+    window.scrollTo(0, 0);
+  }
+  links.forEach(function (l) {
+    l.addEventListener('click', function () { setTimeout(function () { show(l.dataset.story); }, 0); });
+  });
+  document.querySelectorAll('[data-grp] > button').forEach(function (b) {
+    b.addEventListener('click', function () { b.parentElement.classList.toggle('closed'); });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.replace('#', '') || 'introduction'); });
+  show(location.hash.replace('#', '') || 'introduction');
 
-    // Interactive toggle demo
-    document.getElementById('toggle1').onclick = function() {
-      this.classList.toggle('toggle--active');
-    };
-  </script>
+  var themeToggle = document.getElementById('themeToggle');
+  themeToggle.onclick = function () {
+    document.documentElement.classList.toggle('light');
+    themeToggle.classList.toggle('toggle--active');
+  };
+  document.getElementById('toggle1').onclick = function () {
+    this.classList.toggle('toggle--active');
+  };
+})();
+</script>
 </body>
 </html>
