@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.8.0'
+const VERSION = '1.9.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -222,6 +222,7 @@ async function draftEmail(applicant: any, listing: any, room: any, flags: any[],
       reply: `They wrote back last — respond directly and concretely to what they said (use the listing details below for pricing/dates if asked). If no call is booked yet, close with the call CTA — ${cta}. Under 140 words.`,
       post_call: `Their Intro Call with ${ctx.screening?.housemate_name || 'a housemate'} just happened. Thank them warmly, one specific human touch, and say the house will be in touch about next steps soon. Do NOT promise an outcome or timeline beyond "soon". Under 80 words.`,
       reschedule: `Their scheduled call fell through. Own it lightly (no blame either way) and reopen scheduling — ${cta}. Under 90 words.`,
+      visit: `Their intro call went well and we want to invite them to VISIT THE HOUSE in person (a house tour + hang, usually an evening; they'll meet more housemates). Warm and concrete: propose that they come by, ask for 2–3 evenings that work for them in the next two weeks. Do NOT promise an outcome — a visit is the next step, not an offer. Under 110 words.`,
     }
     const situationBrief = briefs[ctx.type] || briefs.follow_up
     const ctxPrompt = `Write the NEXT email in an ongoing thread from ${senderName} at Agape (13-bedroom co-op near Dolores Park, SF) to applicant ${applicant.first_name}.
@@ -325,6 +326,32 @@ serve(async (req) => {
       const draft = await draftEmail(applicant, listing, room, sug?.flags || [], prof?.discord_username || 'a housemate',
         { type, emails: emails || [], screening })
       return new Response(JSON.stringify({ ...draft, emailType: type, reason: cls.reason }), { headers: jsonHeaders })
+    }
+
+    if (body.action === 'draft_update' && body.applicantId) {
+      // Rejection-queue draft. Unsigned community voice; never discloses
+      // votes, vetoes, or auto-flags.
+      const { data: applicant } = await client.from('recruit_applicants').select('first_name, why_agape').eq('id', String(body.applicantId)).maybeSingle()
+      if (!applicant) return new Response(JSON.stringify({ error: 'Unknown applicant' }), { status: 404, headers: jsonHeaders })
+      const why = (applicant.why_agape || '').replace(/\s+/g, ' ').slice(0, 300)
+      const prompt = `Write a short, kind update email from the Agape community (a 13-bedroom co-op near Dolores Park, SF) to ${applicant.first_name}, who applied to live here and will not be moving forward.
+
+Hard rules:
+- Warm, human, and brief (under 100 words). Thank them genuinely for the care in their application${why ? ` (they wrote: "${why}")` : ''}.
+- Do NOT give reasons, feedback, or specifics about the decision. Do not say "unfortunately" more than once, do not apologize repeatedly.
+- Leave the door open gently (things shift; they're welcome to apply again down the road) without promising anything.
+- Sign off as "the Agape community" — no individual name.
+- Subject: short and neutral, e.g. "An update from Agape".
+
+Return exactly:
+SUBJECT: <subject>
+BODY:
+<body>`
+      const text = await callClaudeRaw('claude-haiku-4-5-20251001', 'You write brief, warm community emails. Follow the format exactly.', prompt, 400)
+      const m = text.match(/SUBJECT:\s*(.+)\n+BODY:\n?([\s\S]+)/)
+      const subject = (m?.[1] || 'An update from Agape').trim().slice(0, 200)
+      const bodyText = (m?.[2] || text).trim().slice(0, 4000)
+      return new Response(JSON.stringify({ subject, body: bodyText }), { headers: jsonHeaders })
     }
 
     if (body.action === 'second_opinion' && body.applicantId) {

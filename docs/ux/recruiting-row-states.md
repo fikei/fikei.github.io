@@ -108,3 +108,14 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 - **Review availability** (blue) replaces Pick a time; context tier shows `N windows offered`. Opens a modal: bookable slot chips per window, a **How we read it** bullet list (their verbatim snippet + date, timezone conversion note, platform request, the day-part mapping rules), and the secondary path at the bottom: *"Doesn't work with your schedule? Ask the house on Discord"* (→ claim-post preview).
 - **Post-screening primary is Schedule a visit** (blue, opens the email draft); Watch demotes to a small inline green ▶ icon beside it — an icon secondary doesn't violate the one-primary rule.
 - **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach).
+
+
+## v3.23 (2026-07-27) — the outstanding list
+- **Phase B live**: scan pings the recruiting channel about new review-stage applicants (one post each; 4+ collapse to a digest; `discord_ping_at` dedup). Archive shows the **update tray** — pending rejections with Edit email / Skip and **Send all** (individually drafted community notes via `draft_update`, sent via `send-update` which stamps `update_email_sent_at` and archives clean).
+- **Draft listings**: 28+ day occupancy gaps in the next six months become `status='draft'` listings (dashed cards atop Openings; Open listing / Dismiss). Bucketing only sees `open`.
+- **Awaiting claim** is a real row state: coverage ask posted → `◆ sent to housemates` chip + `unclaimed Nd · book it yourself` context.
+- **Give decision**: post-screening yes/no + note per housemate (`recruit_decision_votes`); the watch-state context tier carries `give your decision` / `N decisions in`; also in the row ⋮. Tally is advisory — moving the person stays human.
+- **Follow-up staleness** implemented: grey under 3 quiet days, amber after.
+- **Schedule a visit** drafts a visit-specific invite (`emailType: 'visit'`).
+- **Flexible dial**: bare "Flexible" rides any window; "month + flexible" = that month ±1.
+- **Auto-post toggle**: `discord_auto_post` setting (rail footer checkbox) — the manual→auto claim cutover without a deploy.
