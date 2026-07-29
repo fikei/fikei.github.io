@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.39.0';
+const VERSION = '3.39.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -4001,9 +4001,11 @@ async function signInWithDiscord() {
 }
 
 function setGate(sub, btnLabel, hint) {
-  // Showing a gate message means we've stopped: reveal the card even if we
-  // were mid-load, or the spinner would spin forever over a silent failure.
-  document.body.dataset.authState = 'out';
+  // A gate message with a button is terminal — we've stopped and need the
+  // reader to act, so reveal the card even if we were mid-load. Progress
+  // messages pass no button and stay behind the spinner: a returning housemate
+  // should never watch the sign-in card narrate its own loading.
+  if (btnLabel) document.body.dataset.authState = 'out';
   document.getElementById('gate-sub').textContent = sub;
   const btn = document.getElementById('gate-btn');
   document.getElementById('gate-btn-label').textContent = btnLabel || '';
