@@ -139,3 +139,12 @@ Calls scheduled outside the app already get picked up and recorded when the shar
 ## Permanent recording archive (v1.11.0 / recruit-gmail v1.14.0, 2026-07-29)
 
 Recall.ai purges bot media ~7 days after a call and its download links are short-lived presigned URLs — old Discord links died and older calls became unwatchable. Now every finished recording is streamed into the private `recruit-recordings` storage bucket (migration 134: `recording_path` on both recording tables). `recording-link` serves a 6-hour signed URL from the archive first, Recall as fallback; a backfill sweep on the cron tick rescues recordings processed before the archive existed and marks Recall-purged ones `media_expired`. Discord recording posts remain convenience links — the app is the durable viewer.
+
+## Capability watch links (recruit-watch v1.0.0, 2026-07-29)
+
+Discord recording posts carried Recall's presigned URL, which expired within hours ("old videos don't work"). Posts now link to `ctrl.rodeo/applications/watch/?t=<share_token>` — a public page that plays our archived copy.
+
+- **Token is the credential** (migration 135): 32 random bytes, unique index, minted when a recording archives; backfilled for existing calls. Revoke any link by setting `share_token = NULL`.
+- **`recruit-watch`** (`verify_jwt = false`) validates the token shape, resolves screening *or* recorded event, and returns title/when/summary plus a 6-hour signed URL. Bad, revoked, and unknown tokens are all a flat 404.
+- **Deliberate trade-off:** anyone with the link can watch, with no Discord sign-in — chosen so links work from phones and forwarded messages. The app's own Watch button remains membership-gated; only the shared link bypasses it.
+- Ordering matters: the archive upload now happens *before* the Discord post, since the post links to our copy.
