@@ -1,6 +1,12 @@
 // _shared/discord.ts
-// Discord REST helpers for the recruiting automations: claim posts, notes,
-// pings, DMs. Used by recruit-gmail, recruit-availability, recruit-discord.
+// Discord REST helpers for the recruiting automations: screener schedulers,
+// notes, pings, DMs. Used by recruit-gmail, recruit-availability, recruit-discord.
+//
+// Vocabulary (2026-07): the post that offers an applicant's open times is a
+// SCREENER SCHEDULER; a housemate SIGNS UP for a slot and becomes the
+// SCREENER. "Claim" survives only in storage (recruit_claim_posts, claimed_*)
+// and in Discord custom_ids — live posted buttons carry `claim|…`, so the
+// wire format is frozen for compatibility.
 //
 // Channel roles:
 //   #recruiting-automation — every automated message the app sends lands
@@ -117,7 +123,7 @@ export function deriveSlots(windows: Array<{ date: string; start: string; end: s
 
 // ---- claim message --------------------------------------------------------
 
-export interface ClaimPostInput {
+export interface ScreenerSchedulerInput {
   applicantId: string
   firstName: string
   whyLine: string | null
@@ -149,7 +155,7 @@ function possessive(pronouns: string | null | undefined): string {
 
 // Exported so the app can render a faithful preview before a human
 // triggers the post (auto-posting is off for now — manual first).
-export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<string, unknown> {
+export function buildMessage(input: ScreenerSchedulerInput, slots: Slot[]): Record<string, unknown> {
   const manual = input.needsHuman || !slots.length
   const poss = possessive(input.pronouns)
 
@@ -175,7 +181,7 @@ export function buildMessage(input: ClaimPostInput, slots: Slot[]): Record<strin
       `Can someone take this Intro Call with **${input.firstName}**?\n\n` +
       considerationsBlock +
       `See ${poss} [application](${appLink(input.applicantId)}).\n\n` +
-      `_Tap a time below to claim the call — you'll both receive an invite and be added to the email thread._`
+      `_Tap a time to sign up — you'll both receive an invite and be added to the email thread._`
   }
 
   const components: Array<Record<string, unknown>> = []
@@ -219,11 +225,11 @@ async function postOrPatch(channelId: string, messageId: string | null, payload:
 // in BOTH #recruiting-automation and #recruiting-society. Either copy is
 // claimable; both carry the same custom_ids so the claim handler is agnostic.
 // Returns the recruit_claim_posts row, or null when posting was skipped.
-export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promise<any | null> {
+export async function upsertScreenerScheduler(db: any, input: ScreenerSchedulerInput): Promise<any | null> {
   const { data: existing } = await db.from('recruit_claim_posts')
     .select('*').eq('applicant_id', input.applicantId).maybeSingle()
   if (existing?.status === 'claimed') {
-    console.log(`[discord] claim post for ${input.applicantId} already claimed — skipping repost`)
+    console.log(`[discord] screener scheduler for ${input.applicantId} already signed up — skipping repost`)
     return null
   }
 
@@ -253,12 +259,12 @@ export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promis
     reminded_at: null,
     updated_at: new Date().toISOString(),
   }).select().single()
-  if (error) throw new Error(`claim post upsert failed: ${error.message}`)
-  console.log(`[discord] claim post ${existing ? 'updated' : 'created'} for ${input.applicantId} (${slots.length} slots, ${status}, mirror=${Boolean(mirror)})`)
+  if (error) throw new Error(`screener scheduler upsert failed: ${error.message}`)
+  console.log(`[discord] screener scheduler ${existing ? 'updated' : 'created'} for ${input.applicantId} (${slots.length} slots, ${status}, mirror=${Boolean(mirror)})`)
   return row
 }
 
-// A claim post row's message targets: primary + mirror when present.
+// A scheduler row's message targets: primary + mirror when present.
 // deno-lint-ignore no-explicit-any
 function postTargets(post: any): Array<{ channelId: string; messageId: string }> {
   const targets = [{ channelId: post.discord_channel_id, messageId: post.discord_message_id }]
@@ -269,7 +275,7 @@ function postTargets(post: any): Array<{ channelId: string; messageId: string }>
 }
 
 // deno-lint-ignore no-explicit-any
-async function editClaimPostEverywhere(post: any, payload: Record<string, unknown>): Promise<void> {
+async function editSchedulerEverywhere(post: any, payload: Record<string, unknown>): Promise<void> {
   for (const t of postTargets(post)) {
     try {
       await discordFetch(`/channels/${t.channelId}/messages/${t.messageId}`, {
@@ -283,35 +289,35 @@ async function editClaimPostEverywhere(post: any, payload: Record<string, unknow
 
 // Close a claimed post (both copies): strip buttons, green announcement.
 // deno-lint-ignore no-explicit-any
-export async function editClaimMessageClaimed(
-  post: any, claimerDiscordId: string,
+export async function editSchedulerSignedUp(
+  post: any, screenerDiscordId: string,
   applicantName: string, applicantId: string, when: string,
 ): Promise<void> {
-  await editClaimPostEverywhere(post, {
+  await editSchedulerEverywhere(post, {
     embeds: [{
-      description: `✅ <@${claimerDiscordId}> will be interviewing **${applicantName}** on ${when} — [see the candidate background here](${appLink(applicantId)}).`,
+      description: `✅ <@${screenerDiscordId}> is screening **${applicantName}** on ${when} — [see the candidate background here](${appLink(applicantId)}).`,
       color: 0x2ecc71,
     }],
     components: [],
   })
 }
 
-// Mark a claimed post (both copies) that hit an error downstream.
+// Mark a signed-up scheduler (both copies) that hit an error downstream.
 // deno-lint-ignore no-explicit-any
-export async function editClaimMessageFailed(
-  post: any, claimerDiscordId: string,
+export async function editSchedulerFailed(
+  post: any, screenerDiscordId: string,
   applicantId: string, when: string,
 ): Promise<void> {
-  await editClaimPostEverywhere(post, {
+  await editSchedulerEverywhere(post, {
     embeds: [{
-      description: `⚠️ <@${claimerDiscordId}> claimed this interview (${when}) but the calendar invite failed — [book manually in the app](${appLink(applicantId)}).`,
+      description: `⚠️ <@${screenerDiscordId}> signed up for this screener (${when}) but the calendar invite failed — [book manually in the app](${appLink(applicantId)}).`,
       color: 0xe74c3c,
     }],
     components: [],
   })
 }
 
-/* DMs are audited as well: a claimer's confirmation is an automation the
+/* DMs are audited as well: a screener's confirmation is an automation the
    house should be able to see happened, without exposing the DM thread. */
 export async function dmUser(discordUserId: string, content: string): Promise<void> {
   const channel = await discordFetch('/users/@me/channels', {
@@ -492,6 +498,6 @@ export async function postChannelEmbed(channelId: string, description: string, c
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
   await postResilient(channelId, {
-    content: `⏰ **${firstName}**'s Agape Intro Call has been unclaimed for 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
+    content: `⏰ **${firstName}**'s Agape intro call still needs a screener after 4 days — anyone free? https://discord.com/channels/${guildId}/${channelId}/${messageId}`,
   }, `stuck nudge (${firstName})`)
 }

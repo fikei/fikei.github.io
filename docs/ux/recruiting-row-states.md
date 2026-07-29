@@ -185,3 +185,8 @@ The source placement is **deleted, not tombstoned** — a tombstone means "never
 ### Schema
 
 Migration 135: `recruit_applicants.exit_reason` (`future` | `opted_out` | `not_a_fit`), `exit_until` (DATE, only valid with `future`), `exit_note`, `exit_by_name`, `exit_at`. Writes go through the `recruit_set_exit` RPC — the table stays client-read-only, same pattern as `recruit_set_stage`. Passing a NULL reason clears the exit (that's Bring back now). "From this listing" is *not* recorded here — `recruit_listing_candidates.status` already holds that tombstone.
+
+## v3.27 — "claim" becomes "screener scheduler"
+The Discord post that offers an applicant's open times is a **screener scheduler**; a housemate **signs up** for a slot and becomes the **screener**. Row copy reads *"no screener yet · 2d"*, the app action stays **Ask for coverage**, and the preview modal is *"Ask housemates for coverage"* → **Post the scheduler**.
+
+"Claim" survives only where changing it would break things: the `recruit_claim_posts` table and `claimed_*` columns (a rename buys nothing), and Discord `custom_id`s — **live posted buttons carry `claim|…`, so that wire format is frozen**. The edge function accepts both `scheduler-preview`/`scheduler-post` and the legacy `claim-*` action names so a cached browser keeps working.

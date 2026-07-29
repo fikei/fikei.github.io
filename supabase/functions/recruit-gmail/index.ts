@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.16.1'
+const VERSION = '1.17.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
+import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,7 +121,7 @@ async function postClaim(client: ReturnType<typeof db>, applicantId: string, ext
     const { data: applicant } = await client.from('recruit_applicants')
       .select('first_name, why_agape, pronouns').eq('id', applicantId).maybeSingle()
     if (!applicant) return
-    await upsertClaimMessage(client, {
+    await upsertScreenerScheduler(client, {
       applicantId, firstName: applicant.first_name, whyLine: applicant.why_agape, pronouns: applicant.pronouns,
       windows: extraction.windows, platform: extraction.platform,
       timezoneNote: extraction.timezone_note, needsHuman: extraction.needs_human,
@@ -477,7 +477,7 @@ serve(async (req) => {
             .select('discord_user_id').eq('user_id', userData.user.id).maybeSingle()
           if (dm?.discord_user_id) {
             const applicantName = `${result.applicant.first_name} ${result.applicant.last_name || ''}`.trim()
-            await editClaimMessageClaimed(post, dm.discord_user_id, applicantName, applicantId, slotWhen(startsAt))
+            await editSchedulerSignedUp(post, dm.discord_user_id, applicantName, applicantId, slotWhen(startsAt))
           }
         }
       } catch (err) {
@@ -642,7 +642,10 @@ serve(async (req) => {
       return json({ recordings: data || [] })
     }
 
-    if (action === 'claim-preview' || action === 'claim-post') {
+    // 'scheduler-*' is the current vocabulary; 'claim-*' stays accepted so a
+    // browser holding a cached app.js keeps working after this rename.
+    if (action === 'scheduler-preview' || action === 'scheduler-post' || action === 'claim-preview' || action === 'claim-post') {
+      const isPreview = action === 'scheduler-preview' || action === 'claim-preview'
       // Manual Discord trigger: preview composes the exact message; post
       // sends it. The extraction rides back from preview to post so Haiku
       // runs once. Future cutover: re-enable the auto postClaim calls.
@@ -668,11 +671,11 @@ serve(async (req) => {
       }
       const slots = extraction.needs_human ? [] : deriveSlots(extraction.windows)
       const message = buildMessage(input, slots)
-      if (action === 'claim-preview') {
+      if (isPreview) {
         return json({ preview: message, slotLabels: slots.map((sl) => sl.label), extraction })
       }
-      const row = await upsertClaimMessage(client, input)
-      return json({ posted: !!row, alreadyClaimed: !row })
+      const row = await upsertScreenerScheduler(client, input)
+      return json({ posted: !!row, alreadySignedUp: !row, alreadyClaimed: !row })
     }
 
     if (action === 'archive-now') {
