@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.29.0';
+const VERSION = '3.30.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1393,28 +1393,44 @@ function savedRate() {
   return PLAY_RATES.includes(r) ? r : 1;
 }
 
-function speedBarHtml(videoId) {
+/* Speed rides on the player itself (top-right), not as a row beneath it. */
+function speedOverlayHtml(videoId) {
   const cur = savedRate();
-  return `<div class="speed-bar" data-speed-for="${videoId}">
-    <span class="speed-bar__label">Speed</span>
-    ${PLAY_RATES.map(r => `<button type="button" class="speed-bar__btn" data-rate="${r}" aria-pressed="${r === cur}">${r}×</button>`).join('')}
+  return `<div class="vspeed" data-speed-for="${videoId}">
+    <button type="button" class="vspeed__btn" aria-haspopup="true" aria-expanded="false">${cur}×</button>
+    <div class="vspeed__menu" role="menu">
+      ${PLAY_RATES.map(r => `<button type="button" role="menuitemradio" data-rate="${r}" aria-checked="${r === cur}">${r}×</button>`).join('')}
+    </div>
   </div>`;
 }
 
 function wireSpeedBar(videoId) {
-  const bar = document.querySelector(`[data-speed-for="${videoId}"]`);
+  const wrap = document.querySelector(`[data-speed-for="${videoId}"]`);
   const video = document.getElementById(videoId);
-  if (!bar || !video) return;
+  if (!wrap || !video) return;
+  const trigger = wrap.querySelector('.vspeed__btn');
+  const menu = wrap.querySelector('.vspeed__menu');
   const apply = rate => {
     video.playbackRate = rate;
     localStorage.setItem(RATE_KEY, String(rate));
-    bar.querySelectorAll('.speed-bar__btn').forEach(b =>
-      b.setAttribute('aria-pressed', String(parseFloat(b.dataset.rate) === rate)));
+    trigger.textContent = `${rate}×`;
+    menu.querySelectorAll('[data-rate]').forEach(b =>
+      b.setAttribute('aria-checked', String(parseFloat(b.dataset.rate) === rate)));
   };
-  bar.addEventListener('click', e => {
-    const btn = e.target.closest('.speed-bar__btn');
-    if (btn) apply(parseFloat(btn.dataset.rate));
+  const close = () => { menu.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); };
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = menu.classList.toggle('is-open');
+    trigger.setAttribute('aria-expanded', String(open));
   });
+  menu.addEventListener('click', e => {
+    const btn = e.target.closest('[data-rate]');
+    if (!btn) return;
+    e.stopPropagation();
+    apply(parseFloat(btn.dataset.rate));
+    close();
+  });
+  document.addEventListener('click', close);
   // Setting src resets playbackRate, so re-apply once metadata lands.
   video.addEventListener('loadedmetadata', () => { video.playbackRate = savedRate(); });
   apply(savedRate());
@@ -1488,8 +1504,7 @@ async function loadCallPanel(a) {
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
     ${sc.watch
-      ? `<video id="call-video" class="call-video" controls playsinline></video>
-         ${speedBarHtml('call-video')}
+      ? `<div class="video-wrap">${speedOverlayHtml('call-video')}<video id="call-video" class="call-video" controls playsinline></video></div>
          <p class="email-modal__status" id="call-status">Fetching recording…</p>`
       : row.external_recording_url
         // These hosts block cross-origin embedding, so this opens out rather
