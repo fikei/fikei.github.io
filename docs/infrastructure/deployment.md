@@ -229,3 +229,9 @@ Hardcoded in `boards/index.html` (public, by design):
 ---
 
 *Last updated: 2026-02-05*
+
+## recruit-ingest (application sheet → Inbox)
+```bash
+supabase functions deploy recruit-ingest --project-ref yfhudwakpgzswiylhfbh --no-verify-jwt
+```
+`--no-verify-jwt` is required: the caller is a Google Apps Script, authenticated by the `RECRUIT_INGEST_SECRET` header instead of a user JWT. Setup + the script to paste into the sheet: [recruiting-sheet-ingest.md](./recruiting-sheet-ingest.md).
