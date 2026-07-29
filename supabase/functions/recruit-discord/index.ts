@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.12.0'
+const VERSION = '1.13.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + magic-link sign-in + unmatched-call link nudges`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -285,6 +285,9 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
   const now = Date.now()
   const { data: upcoming } = await client.from('recruit_screenings')
     .select('id, applicant_id, housemate_user_id, housemate_email, starts_at, meet_link, gcal_event_id')
+    // Only intro calls get reminders — a swept house dinner is not a call
+    // anyone needs paging about (migration 137).
+    .eq('kind', 'intro_call')
     .eq('status', 'scheduled').is('reminder_sent_at', null)
     .gte('starts_at', new Date(now).toISOString())
     .lte('starts_at', new Date(now + 65 * 60000).toISOString())
@@ -359,6 +362,8 @@ async function scheduleMissingBots(client: ReturnType<typeof db>): Promise<numbe
   if (!recallEnabled()) return 0
   const { data: rows } = await client.from('recruit_screenings')
     .select('id, meet_link, starts_at')
+    // Never send a recording bot into a house event (migration 137).
+    .eq('kind', 'intro_call')
     .eq('status', 'scheduled').is('recall_bot_id', null)
     .not('meet_link', 'is', null)
     .gt('starts_at', new Date().toISOString()).limit(10)
@@ -583,6 +588,7 @@ async function announceLiveCalls(client: ReturnType<typeof db>): Promise<number>
   let posted = 0
   const { data: screenings } = await client.from('recruit_screenings')
     .select('id, applicant_id, housemate_name, starts_at, meet_link')
+    .eq('kind', 'intro_call')
     .eq('status', 'scheduled').is('live_posted_at', null)
     .gte('starts_at', from).lte('starts_at', to)
   for (const s of (screenings || [])) {

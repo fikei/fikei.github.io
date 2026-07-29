@@ -16,12 +16,12 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.15.0'
+const VERSION = '1.16.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
+import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
 import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
 
 const corsHeaders = {
@@ -153,6 +153,54 @@ async function remindStuckPosts(client: ReturnType<typeof db>): Promise<void> {
   }
 }
 
+/* Which kind of recruit_screenings row a calendar event becomes.
+   Only 'intro_call' drives the row state machine (Watch chips, recording
+   bots, coverage reminders), so the default has to be the inert one — a
+   house dinner misfiled as a call is a worse failure than a call misfiled
+   as an event, which a human can reclassify.
+
+   A video link is the strongest signal: intro calls are remote and
+   everything on the house calendar that isn't is, by definition, in person. */
+function classifyEvent(ev: any): 'intro_call' | 'visit' | 'house_event' {
+  const title = String(ev.summary || '').toLowerCase()
+  if (/\b(intro call|screening|phone screen|intro chat)\b/.test(title)) return 'intro_call'
+  if (/\b(visit|tour|open house|walkthrough|come by|stop by)\b/.test(title)) return 'visit'
+  if (ev.hangoutLink || ev.conferenceData) return 'intro_call'
+  return 'house_event'
+}
+
+/* Hosts we recognise as "this is a recording". Deliberately a allowlist:
+   scanning a chat channel for bare URLs would drag in every article anyone
+   ever shared. tldv is the one the house actually uses. */
+const RECORDING_HOSTS: Array<[RegExp, string]> = [
+  [/(^|\.)tldv\.io$/i, 'tldv'],
+  [/(^|\.)zoom\.us$/i, 'zoom'],
+  [/(^|\.)fathom\.video$/i, 'fathom'],
+  [/(^|\.)grain\.com$/i, 'grain'],
+  [/(^|\.)loom\.com$/i, 'loom'],
+  [/(^|\.)otter\.ai$/i, 'otter'],
+  [/(^|\.)drive\.google\.com$/i, 'drive'],
+  [/(^|\.)vimeo\.com$/i, 'vimeo'],
+]
+
+function sourceOf(url: string): string {
+  try {
+    const host = new URL(url).hostname
+    return RECORDING_HOSTS.find(([re]) => re.test(host))?.[1] || host.replace(/^www\./, '')
+  } catch { return 'link' }
+}
+
+function extractRecordingUrls(text: string): string[] {
+  const out = new Set<string>()
+  for (const raw of (text.match(/https?:\/\/[^\s<>()\[\]"']+/g) || [])) {
+    const url = raw.replace(/[.,;:]+$/, '')
+    try {
+      if (RECORDING_HOSTS.some(([re]) => re.test(new URL(url).hostname))) out.add(url)
+    } catch { /* not a URL we can parse */ }
+  }
+  return [...out]
+}
+
 function header(headers: Array<{ name: string; value: string }>, name: string): string {
   return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
 }
@@ -161,16 +209,43 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
     const client = db()
-    const { data: userData, error: userErr } = await client.auth.getUser(token)
-    if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401)
-    const { data: membership } = await client.from('user_discord_membership')
-      .select('is_recruiting_member, discord_username').eq('user_id', userData.user.id).maybeSingle()
-    if (!membership?.is_recruiting_member) return json({ error: 'Not a recruiting member' }, 403)
 
-    const body = await req.json().catch(() => ({}))
-    const action = body.action
+    // Cron path: /scan runs the same inbox+calendar sweep the app triggers,
+    // but on a schedule so row states stay current when nobody has the app
+    // open. Same secretless handshake recruit-discord/remind uses — a
+    // one-time nonce minted by the pg_cron tick, delete-on-use (migration
+    // 123), with X-Cron-Secret honoured if CRON_SECRET is ever configured.
+    const isCron = new URL(req.url).pathname.endsWith('/scan')
+    if (isCron) {
+      const secret = Deno.env.get('CRON_SECRET')
+      let authorized = Boolean(secret) && req.headers.get('x-cron-secret') === secret
+      const nonce = req.headers.get('x-cron-nonce')
+      if (!authorized && nonce && /^[0-9a-f-]{36}$/i.test(nonce)) {
+        const { data: burned } = await client.from('recruit_cron_nonce')
+          .delete().eq('nonce', nonce)
+          .gte('created_at', new Date(Date.now() - 10 * 60000).toISOString())
+          .select().maybeSingle()
+        authorized = Boolean(burned)
+      }
+      if (!authorized) return json({ error: 'unauthorized' }, 401)
+    }
+
+    const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+    let userData: any = null
+    let membership: any = null
+    if (!isCron) {
+      const u = await client.auth.getUser(token)
+      if (u.error || !u.data?.user) return json({ error: 'Not authenticated' }, 401)
+      userData = u.data
+      const m = await client.from('user_discord_membership')
+        .select('is_recruiting_member, discord_username').eq('user_id', userData.user.id).maybeSingle()
+      membership = m.data
+      if (!membership?.is_recruiting_member) return json({ error: 'Not a recruiting member' }, 403)
+    }
+
+    const body = isCron ? {} as Record<string, unknown> : await req.json().catch(() => ({}))
+    const action = isCron ? 'scan' : (body as any).action
 
     if (action === 'auth-url') {
       const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
@@ -450,6 +525,108 @@ serve(async (req) => {
       return json({ linked: true, applicantId, firstName: applicant.first_name })
     }
 
+    if (action === 'attach-recording') {
+      // Paste a tldv/Zoom/Drive link onto an applicant. p_url null detaches.
+      const url = body.url === null ? null : String(body.url || '').trim()
+      const applicantId = String(body.applicantId || '')
+      if (url && !/^https?:\/\//i.test(url)) return json({ error: 'Recording link must start with http(s)://' }, 400)
+      const { data: rp } = await client.from('recruit_profiles')
+        .select('display_name').eq('user_id', userData.user.id).maybeSingle()
+      const { data: screeningId, error } = await client.rpc('recruit_attach_recording', {
+        p_applicant: applicantId,
+        p_url: url,
+        p_source: url ? sourceOf(url) : null,
+        p_name: rp?.display_name || membership.discord_username || null,
+        p_screening: body.screeningId ? String(body.screeningId) : null,
+      })
+      if (error) return json({ error: error.message }, 400)
+      // Close out any Discord lead that pointed at this URL.
+      if (url) {
+        await client.from('recruit_recording_leads')
+          .update({ resolved_applicant_id: applicantId }).eq('url', url)
+      }
+      return json({ attached: true, screeningId })
+    }
+
+    if (action === 'recording-leads') {
+      const { data } = await client.from('recruit_recording_leads')
+        .select('*').is('resolved_applicant_id', null).is('dismissed_at', null)
+        .order('posted_at', { ascending: false }).limit(50)
+      return json({ leads: data || [] })
+    }
+
+    if (action === 'dismiss-lead') {
+      await client.from('recruit_recording_leads')
+        .update({ dismissed_at: new Date().toISOString() }).eq('id', String(body.leadId || ''))
+      return json({ dismissed: true })
+    }
+
+    if (action === 'scan-recordings') {
+      // Harvest recording links posted in the recruiting channels and guess
+      // who each one is about. Guesses are SUGGESTIONS — a wrong recording
+      // on someone's profile is worse than no recording, so nothing attaches
+      // without a human picking the applicant.
+      const { fetchChannelMessages, NOTES_CHANNEL_ID: NOTES, AUTOMATION_CHANNEL_ID } =
+        await import('../_shared/discord.ts')
+      const channels = [...new Set([
+        Deno.env.get('RECRUITING_PING_CHANNEL_ID') || NOTES,
+        AUTOMATION_CHANNEL_ID,
+      ].filter(Boolean))] as string[]
+      const sinceIso = new Date(Date.now() - 180 * 86400000).toISOString()
+
+      const { data: people } = await client.from('recruit_applicants')
+        .select('id, first_name, last_name')
+      const { data: existingLeads } = await client.from('recruit_recording_leads').select('url')
+      const seen = new Set((existingLeads || []).map((r) => r.url))
+      const { data: attached } = await client.from('recruit_screenings')
+        .select('external_recording_url').not('external_recording_url', 'is', null)
+      for (const r of (attached || [])) seen.add(r.external_recording_url)
+
+      let found = 0
+      for (const channelId of channels) {
+        let messages: any[] = []
+        try {
+          messages = await fetchChannelMessages(channelId, { limit: 400, sinceIso })
+        } catch (err) {
+          console.warn(`[recordings] cannot read channel ${channelId}: ${(err as Error).message}`)
+          continue
+        }
+        for (const m of messages) {
+          const text = [m.content || '', ...(m.embeds || []).flatMap((e: any) =>
+            [e.title, e.description, e.url, ...((e.fields || []).map((f: any) => `${f.name} ${f.value}`))])]
+            .filter(Boolean).join('\n')
+          for (const url of extractRecordingUrls(text)) {
+            if (seen.has(url)) continue
+            seen.add(url)
+            // Match on a full name first, then a distinctive first name —
+            // "Sam" in a channel with two Sams stays unattributed on purpose.
+            const hay = text.toLowerCase()
+            let suggested: string | null = null
+            for (const p of (people || [])) {
+              const full = `${p.first_name || ''} ${p.last_name || ''}`.trim().toLowerCase()
+              if (full && full.includes(' ') && hay.includes(full)) { suggested = p.id; break }
+            }
+            if (!suggested) {
+              const firstHits = (people || []).filter((p) => {
+                const f = String(p.first_name || '').toLowerCase()
+                return f.length > 2 && new RegExp(`\\b${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(hay)
+              })
+              if (firstHits.length === 1) suggested = firstHits[0].id
+            }
+            await client.from('recruit_recording_leads').upsert({
+              url, source: sourceOf(url), channel_id: channelId, message_id: m.id,
+              posted_at: m.timestamp, author_name: m.author?.global_name || m.author?.username || null,
+              context: text.replace(/\s+/g, ' ').slice(0, 400),
+              suggested_applicant_id: suggested,
+            }, { onConflict: 'url' })
+            found++
+          }
+        }
+      }
+      console.log(`[recordings] ${found} new link(s) across ${channels.length} channel(s)`)
+      return json({ found })
+    }
+
     if (action === 'unlinked-recordings') {
       // Feed for the app's link modal: swept calls with no applicant.
       const { data } = await client.from('recruit_recorded_events')
@@ -542,18 +719,33 @@ serve(async (req) => {
       // Thread fallback: people reply from addresses other than the one on
       // their application. Any message in a thread we've already matched
       // belongs to that applicant, regardless of From/To.
-      const { data: knownThreads } = await client.from('recruit_emails').select('thread_id, applicant_id')
+      const { data: knownThreads } = await client.from('recruit_emails').select('thread_id, applicant_id, gmail_id')
       const byThread = new Map((knownThreads || [])
         .filter((r) => r.thread_id)
         .map((r) => [r.thread_id, r.applicant_id]))
-      const list = await (await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent('newer_than:14d') + '&maxResults=60', {
-        headers: { Authorization: `Bearer ${at}` },
-      })).json()
+      // One set instead of a SELECT per message. This is what makes a wider
+      // window affordable: the old per-message existence check meant 60 round
+      // trips a run, so the cap had to stay small and mail older than the cap
+      // was simply never seen.
+      const knownIds = new Set((knownThreads || []).map((r) => r.gmail_id).filter(Boolean))
+      // Cron runs sweep wider than the app's opportunistic scan: a quiet
+      // stretch with nobody opening the app used to leave a permanent hole.
+      const windowDays = isCron ? 60 : 14
+      const pageCap = isCron ? 400 : 100
+      const messages: Array<{ id: string }> = []
+      let pageToken = ''
+      do {
+        const url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' +
+          encodeURIComponent(`newer_than:${windowDays}d`) + '&maxResults=100' +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '')
+        const page = await (await fetch(url, { headers: { Authorization: `Bearer ${at}` } })).json()
+        messages.push(...(page.messages || []))
+        pageToken = page.nextPageToken || ''
+      } while (pageToken && messages.length < pageCap)
       let matched = 0
       const replied = new Set<string>()
-      for (const m of (list.messages || [])) {
-        const { data: existing } = await client.from('recruit_emails').select('id').eq('gmail_id', m.id).maybeSingle()
-        if (existing) continue
+      for (const m of messages) {
+        if (knownIds.has(m.id)) continue
         const msg = await (await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`, {
           headers: { Authorization: `Bearer ${at}` },
         })).json()
@@ -648,33 +840,53 @@ serve(async (req) => {
           const m = String(r.from_email || '').toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+/)
           if (m) altByEmail.set(m[0], r.applicant_id)
         }
-        const timeMin = new Date().toISOString()
+        // Look back as well as forward: an event that already happened is
+        // exactly the thing the app failed to notice at the time.
+        const timeMin = new Date(Date.now() - 60 * 86400000).toISOString()
         const timeMax = new Date(Date.now() + 45 * 86400000).toISOString()
-        const cal = await (await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&maxResults=100`, {
-          headers: { Authorization: `Bearer ${at}` },
-        })).json()
-        for (const ev of (cal.items || [])) {
-          if (!ev.attendees?.length || !ev.start?.dateTime) continue
-          let aid: string | null = null
-          for (const att of ev.attendees) {
-            const em = String(att.email || '').toLowerCase()
-            aid = byEmail.get(em) || altByEmail.get(em) || null
-            if (aid) break
-          }
-          if (!aid) continue
-          const { data: existingEv } = await client.from('recruit_screenings').select('id').eq('gcal_event_id', ev.id).maybeSingle()
-          if (existingEv) continue
-          await client.from('recruit_screenings').insert({
-            applicant_id: aid,
-            starts_at: ev.start.dateTime,
-            ends_at: ev.end?.dateTime || ev.start.dateTime,
-            gcal_event_id: ev.id,
-            meet_link: ev.hangoutLink || null,
-            housemate_name: ev.organizer?.displayName || (ev.organizer?.email === SHARED_EMAIL ? 'the house' : ev.organizer?.email) || 'scheduled manually',
-            status: 'scheduled',
+        const { data: seenEvents } = await client.from('recruit_screenings')
+          .select('gcal_event_id').not('gcal_event_id', 'is', null)
+        const seenIds = new Set((seenEvents || []).map((r) => r.gcal_event_id))
+
+        for (const calendarId of sweepCalendars()) {
+          const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&maxResults=250`, {
+            headers: { Authorization: `Bearer ${at}` },
           })
-          manualPickups++
-          console.log(`manual screening picked up: ${aid} @ ${ev.start.dateTime}`)
+          if (!resp.ok) {
+            // A calendar the shared account can't read shouldn't kill the
+            // sweep for the ones it can.
+            console.warn(`[calendar] cannot read ${calendarId} (${resp.status}) — skipping`)
+            continue
+          }
+          const cal = await resp.json()
+          for (const ev of (cal.items || [])) {
+            if (!ev.attendees?.length || !ev.start?.dateTime) continue
+            if (ev.status === 'cancelled') continue
+            let aid: string | null = null
+            for (const att of ev.attendees) {
+              const em = String(att.email || '').toLowerCase()
+              aid = byEmail.get(em) || altByEmail.get(em) || null
+              if (aid) break
+            }
+            if (!aid) continue
+            if (seenIds.has(ev.id)) continue
+            seenIds.add(ev.id)
+            const past = new Date(ev.end?.dateTime || ev.start.dateTime) < new Date()
+            await client.from('recruit_screenings').insert({
+              applicant_id: aid,
+              starts_at: ev.start.dateTime,
+              ends_at: ev.end?.dateTime || ev.start.dateTime,
+              gcal_event_id: ev.id,
+              calendar_id: calendarId,
+              title: String(ev.summary || '').slice(0, 300),
+              kind: classifyEvent(ev),
+              meet_link: ev.hangoutLink || null,
+              housemate_name: ev.organizer?.displayName || (ev.organizer?.email === SHARED_EMAIL ? 'the house' : ev.organizer?.email) || 'scheduled manually',
+              status: past ? 'completed' : 'scheduled',
+            })
+            manualPickups++
+            console.log(`calendar pickup [${classifyEvent(ev)}] on ${calendarId}: ${aid} @ ${ev.start.dateTime}`)
+          }
         }
       } catch (err) {
         console.warn(`calendar sweep failed: ${(err as Error).message}`)

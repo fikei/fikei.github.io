@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.26.0';
+const VERSION = '3.27.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -103,6 +103,7 @@ let placements = [];          // recruit_listing_candidates rows
 let claimPosts = {};          // applicant_id -> { status, posted_at }
 let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
+let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVote = null;       // { score, veto } while the vote bar is open
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
@@ -529,9 +530,13 @@ async function loadAll() {
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
-    sb.from('recruit_emails').select('applicant_id, direction, sent_at, snippet').order('sent_at'),
+    // Full rows, not just the state columns: this is also what hydrates
+    // emailsCache so a profile can render its thread before any Gmail
+    // round-trip. body_text is the one heavy column and stays out — the
+    // background sync fills it in.
+    sb.from('recruit_emails').select('id, applicant_id, gmail_id, thread_id, direction, subject, snippet, from_email, to_email, sent_at').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
-    sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status').order('starts_at'),
+    sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status, kind, title, calendar_id').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
@@ -545,7 +550,16 @@ async function loadAll() {
   votes = {};
   for (const v of (vRes.data || [])) (votes[v.applicant_id] ||= []).push(v);
   screeningState = {};
+  houseEvents = {};
   for (const s of (scRes.data || [])) {
+    // Only intro calls drive the row state machine. Visits and house events
+    // come off the house calendar (migration 137) and belong on the profile,
+    // not in the Screening funnel — a dinner must never render a Watch chip
+    // or arm "Notes on the way…".
+    if ((s.kind || 'intro_call') !== 'intro_call') {
+      (houseEvents[s.applicant_id] ||= []).push(s);
+      continue;
+    }
     if (s.status === 'scheduled') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), at: s.starts_at, ends: s.ends_at, with: s.housemate_name, link: s.meet_link };
     // A finished recording adds a Watch state to the row (fresh link on click).
     if (s.recall_status === 'done') screeningState[s.applicant_id] = { ...(screeningState[s.applicant_id] || {}), watch: s.id };
@@ -555,11 +569,20 @@ async function loadAll() {
     if (Array.isArray(av.windows) && av.windows.length) screeningState[av.applicant_id] ||= { availability: true, nWindows: av.windows.length };
   }
   emailState = {};
+  emailsCache = {};
   for (const e of (eRes.data || [])) {
     const st = (emailState[e.applicant_id] ||= { lastDir: null, lastAt: null, lastSnippet: '', replies: 0 });
     st.lastDir = e.direction; st.lastAt = e.sent_at; st.lastSnippet = e.snippet || '';
     if (e.direction === 'in') st.replies++;
+    // Newest-first, matching what the sync action returns.
+    (emailsCache[e.applicant_id] ||= []).unshift(e);
   }
+  // Availability and screenings ride along too, so the Emails tab can draw
+  // its scheduling card from the first paint rather than after the sync.
+  availCache = {};
+  for (const av of (avRes.data || [])) availCache[av.applicant_id] = av;
+  screeningsCache = {};
+  for (const s of (scRes.data || [])) (screeningsCache[s.applicant_id] ||= []).push(s);
   sb.from('recruit_settings').select('*').then(({ data }) => {
     for (const row of (data || [])) settings[row.key] = row.value;
     const box = document.getElementById('pref-couples');
@@ -775,6 +798,60 @@ async function returnDueCandidates() {
     if (await setExit(a.id, null)) a.returnedFromFuture = true;
   }
   return due.length;
+}
+
+/* ---------- external recordings ----------
+   Calls recorded outside the pipeline (tldv, Zoom, Drive). Stored as a link,
+   opened in a new tab: none of these hosts allow cross-origin embedding, so
+   an inline player would just be a broken black box. */
+async function promptRecordingLink(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  const url = prompt(`Recording link for ${fullName(a)} (tldv, Zoom, Drive…):`, '');
+  if (url === null) return;                       // cancelled
+  const clean = url.trim();
+  if (clean && !/^https?:\/\//i.test(clean)) { toast('Link must start with http:// or https://'); return; }
+  try {
+    await gmailCall({ action: 'attach-recording', applicantId, url: clean || null });
+    toast(clean ? `Recording linked to ${a.first}` : 'Recording link removed');
+    if (!document.getElementById('review').hidden) renderReview();
+  } catch (e) { toast(`Couldn't attach: ${e.message}`); }
+}
+
+/* Links harvested from the recruiting channels that nobody has filed yet.
+   Suggestions only — a wrong recording on a profile is worse than none, so
+   attaching always takes a human confirming who it belongs to. */
+let recordingLeads = [];
+async function loadRecordingLeads() {
+  if (!gmailStatus.connected) return;
+  try {
+    const out = await gmailCall({ action: 'recording-leads' });
+    recordingLeads = out.leads || [];
+    if (view === 'screening') renderApplicants();
+  } catch (e) { console.warn('recording leads failed', e); }
+}
+
+function recordingLeadsHtml() {
+  if (view !== 'screening' || !recordingLeads.length) return '';
+  return `<div class="update-tray">
+    <div class="update-tray__head">
+      <b>${recordingLeads.length} recording link${recordingLeads.length === 1 ? '' : 's'} posted in Discord, unfiled</b>
+      <button type="button" class="btn btn--sm" data-rescan-recordings>Rescan</button>
+    </div>
+    ${recordingLeads.map(l => {
+      const who = l.suggested_applicant_id
+        ? applicants.find(x => x.id === l.suggested_applicant_id) : null;
+      return `<div class="update-tray__row">
+        <span class="update-tray__who">${esc(l.source || 'link')}${l.author_name ? ` · ${esc(l.author_name)}` : ''}</span>
+        <span class="update-tray__why">${esc(l.context || l.url)}</span>
+        ${who
+          ? `<button type="button" class="cta-link" data-file-lead="${esc(l.id)}|${esc(who.id)}">File under ${esc(who.first)}</button>`
+          : `<span class="note-count">no match — open a profile and use Add recording link</span>`}
+        <a class="cta-link" href="${esc(l.url)}" target="_blank" rel="noopener">Open</a>
+        <button type="button" class="cta-link" data-dismiss-lead="${esc(l.id)}">Dismiss</button>
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 /* ---------- the Remove sheet ----------
@@ -1358,18 +1435,29 @@ async function loadCallPanel(a) {
   let row = null;
   if (sc.watch) {
     ({ data: row } = await sb.from('recruit_screenings')
-      .select('id, housemate_name, starts_at, recording_summary')
+      .select('id, housemate_name, starts_at, recording_summary, external_recording_url, external_recording_source, external_recording_by_name')
       .eq('id', sc.watch).maybeSingle());
   } else {
     ({ data: row } = await sb.from('recruit_screenings')
-      .select('id, housemate_name, starts_at, recording_summary')
+      .select('id, housemate_name, starts_at, recording_summary, external_recording_url, external_recording_source, external_recording_by_name')
       .eq('applicant_id', a.id).order('starts_at', { ascending: false }).limit(1).maybeSingle());
   }
   if (queue[qIndex] !== a.id || reviewTab !== 'call' || !host()) return;
-  if (!row) { host().innerHTML = '<p class="notes__empty">No intro call yet.</p>'; return; }
+  if (!row) {
+    host().innerHTML = `<p class="notes__empty">No intro call yet.</p>
+      <p class="notes__empty"><button type="button" class="cta-link" data-add-recording="${a.id}">Add a recording link</button> — if the call happened on tldv or elsewhere.</p>`;
+    return;
+  }
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
-    ${sc.watch ? `<video id="call-video" class="call-video" controls playsinline></video><p class="email-modal__status" id="call-status">Fetching recording…</p>` : `<p class="notes__empty">The recording lands here after the call.</p>`}
+    ${sc.watch
+      ? `<video id="call-video" class="call-video" controls playsinline></video><p class="email-modal__status" id="call-status">Fetching recording…</p>`
+      : row.external_recording_url
+        // These hosts block cross-origin embedding, so this opens out rather
+        // than pretending to be a player.
+        ? `<p class="external-rec"><a class="btn btn--sm btn--watch" href="${esc(row.external_recording_url)}" target="_blank" rel="noopener">Watch on ${esc(row.external_recording_source || 'the host')}</a>
+             <span class="notes__empty">added${row.external_recording_by_name ? ` by ${esc(row.external_recording_by_name)}` : ''} · <button type="button" class="cta-link" data-add-recording="${a.id}">replace</button></span></p>`
+        : `<p class="notes__empty">The recording lands here after the call. <button type="button" class="cta-link" data-add-recording="${a.id}">Add a link</button> if it was recorded elsewhere.</p>`}
     ${row.recording_summary ? `<section class="review__section"><h3 class="review__section-title">Call summary</h3>${mdLite(row.recording_summary)}</section>` : ''}
     <section class="review__section notes">
       <div class="notes__head">
@@ -1542,7 +1630,7 @@ function renderApplicants() {
 
   // Archive: the update-email tray sits above the list. Openings: draft
   // listings detected from occupancy gaps sit above the shortlists.
-  let outreachChrome = '';
+  let outreachChrome = recordingLeadsHtml();
   if (view === 'archive') {
     const pending = applicants.filter(x => x.stage === 'rejected' && !x.updateSentAt && !x.updateSkippedAt);
     if (pending.length) {
@@ -1672,6 +1760,7 @@ function rowMenuHtml(a, listingId) {
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
       ${screeningState[a.id]?.watch ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
+      <button type="button" class="listing-menu__item" data-add-recording="${a.id}">Add recording link…</button>
       <span class="listing-menu__rule" aria-hidden="true"></span>
       <button type="button" class="listing-menu__item" data-open-remove="${a.id}|${esc(listingId)}">Remove…</button>
     </span>
@@ -2518,6 +2607,7 @@ function openReview(id) {
   hideHoldSheet();
   renderReview();
   resetScroll();
+  prefetchNextEmails();
 }
 
 function closeReview() {
@@ -2537,6 +2627,7 @@ function step(delta) {
   hideHoldSheet();
   renderReview();
   resetScroll();
+  prefetchNextEmails();
 }
 
 function resetScroll() {
@@ -2615,6 +2706,7 @@ function renderReview() {
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
+    ${houseEventsHtml(a)}
     <section class="review__section notes" id="notes">
       <div class="notes__head">
         <h3 class="review__section-title">House notes</h3>
@@ -2878,27 +2970,66 @@ async function loadEmailsPanel(a) {
     document.getElementById('gmail-connect').onclick = connectSharedGmail;
     return;
   }
-  host().innerHTML = `<p class="notes__empty">Syncing with the shared inbox…</p>`;
-  try {
-    const out = await gmailCall({ action: 'sync', applicantId: a.id });
-    emailsCache[a.id] = out.emails || [];
-    availCache[a.id] = out.availability || null;
-    screeningsCache[a.id] = out.screenings || [];
-    if (queue[qIndex] !== a.id || reviewTab !== 'emails' || !host()) return;
-    host().innerHTML = `
-      ${schedulingHtml(a)}
-      <div class="emails-toolbar">
-        <span class="notes__empty">${emailsCache[a.id].length} message${emailsCache[a.id].length === 1 ? '' : 's'} with ${esc(a.email)}</span>
-        <span class="emails-toolbar__actions">
-          ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
-          <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
-        </span>
-      </div>
-      ${emailsCache[a.id].length ? `<ul class="inbox-card email-list">${emailsCache[a.id].map(emailRow).join('')}</ul>`
-        : `<p class="inbox-empty">No emails yet — Compose starts the thread through the shared account.</p>`}`;
-  } catch (e) {
-    if (host()) host().innerHTML = `<p class="notes__empty">Email sync failed: ${esc(e.message)}</p>`;
-  }
+  // Cache-first: past emails are already in memory from loadAll, so the
+  // thread paints immediately and the Gmail round-trip only ever ADDS to
+  // what's on screen. The old behaviour blanked the panel and blocked on
+  // the network every single time the tab was opened.
+  paintEmailsPanel(a, emailSyncing.has(a.id) ? 'checking' : '');
+  syncEmails(a.id).then(changed => {
+    if (changed && queue[qIndex] === a.id && reviewTab === 'emails' && host()) paintEmailsPanel(a, '');
+    else if (queue[qIndex] === a.id && reviewTab === 'emails' && host()) setEmailsNote('');
+  }).catch(e => setEmailsNote(`couldn't reach the inbox — showing what we have (${e.message})`));
+}
+
+function setEmailsNote(text) {
+  const el = document.getElementById('emails-note');
+  if (el) el.textContent = text;
+}
+
+function paintEmailsPanel(a, note) {
+  const host = document.getElementById('emails-panel');
+  if (!host) return;
+  const rows = emailsCache[a.id] || [];
+  host.innerHTML = `
+    ${schedulingHtml(a)}
+    <div class="emails-toolbar">
+      <span class="notes__empty">${rows.length ? `${rows.length} message${rows.length === 1 ? '' : 's'} with ${esc(a.email)}` : esc(a.email || '')}
+        <span class="emails-note" id="emails-note">${esc(note === 'checking' ? 'checking for new…' : note)}</span></span>
+      <span class="emails-toolbar__actions">
+        ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
+        <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
+      </span>
+    </div>
+    ${rows.length ? `<ul class="inbox-card email-list">${rows.map(emailRow).join('')}</ul>`
+      : `<p class="inbox-empty">No emails yet — Compose starts the thread through the shared account.</p>`}`;
+}
+
+/* One in-flight sync per applicant; resolves true when anything changed.
+   Callers that just want the data warm can ignore the result. */
+const emailSyncing = new Map(); // applicant_id -> Promise<boolean>
+function syncEmails(applicantId) {
+  if (emailSyncing.has(applicantId)) return emailSyncing.get(applicantId);
+  const p = (async () => {
+    if (!gmailStatus.connected) return false;
+    const before = (emailsCache[applicantId] || []).length;
+    const out = await gmailCall({ action: 'sync', applicantId });
+    emailsCache[applicantId] = out.emails || emailsCache[applicantId] || [];
+    availCache[applicantId] = out.availability || null;
+    screeningsCache[applicantId] = out.screenings || [];
+    return (out.synced || 0) > 0 || emailsCache[applicantId].length !== before;
+  })();
+  emailSyncing.set(applicantId, p);
+  p.catch(() => {}).finally(() => emailSyncing.delete(applicantId));
+  return p;
+}
+
+/* Warm the next applicant in the queue while you read the current one, so
+   stepping through review never waits on Gmail. Silent by design. */
+function prefetchNextEmails() {
+  const next = queue[qIndex + 1];
+  if (!next || !gmailStatus.connected) return;
+  const a = applicants.find(x => x.id === next);
+  if (a?.email?.includes('@')) syncEmails(next).catch(() => {});
 }
 
 /* ---------- screening scheduler ---------- */
@@ -2917,8 +3048,30 @@ function windowSlots(w) {
   return slots.slice(0, 16);
 }
 
+/* Visits and house events swept off the house calendar. Read-only context:
+   "they came to dinner on the 4th" is exactly the thing that used to live
+   only in someone's head. Newest first, past ones included. */
+function houseEventsHtml(a) {
+  const evs = (houseEvents[a.id] || []).slice()
+    .sort((x, y) => (y.starts_at || '').localeCompare(x.starts_at || ''));
+  if (!evs.length) return '';
+  const label = { visit: 'Visited the house', house_event: 'House event' };
+  return `<div class="house-events">
+    <h4 class="house-events__title">On the house calendar</h4>
+    ${evs.map(e => {
+      const past = new Date(e.ends_at || e.starts_at) < new Date();
+      return `<div class="house-events__row">
+        <span class="decision-chip decision-chip--vote">${esc(label[e.kind] || 'Event')}</span>
+        <span class="house-events__what">${esc(e.title || 'Untitled')}</span>
+        <span class="house-events__when">${past ? '' : 'upcoming · '}${esc(fmtSlot(e.starts_at))}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function schedulingHtml(a) {
-  const screenings = (screeningsCache[a.id] || []).filter(x => x.status === 'scheduled');
+  const screenings = (screeningsCache[a.id] || [])
+    .filter(x => x.status === 'scheduled' && (x.kind || 'intro_call') === 'intro_call');
   const avail = availCache[a.id];
   const parts = [];
   for (const sc of screenings) {
@@ -3514,6 +3667,7 @@ async function _checkMembershipAndEnter() {
     });
     resolveAvatars(); // background — server resolves any unchecked profile photos
     scanInbox();      // background — badge replies without opening each thread
+    loadRecordingLeads(); // background — unfiled Discord recording links
     const autoFlagged = await applyAutoFlags();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
@@ -3686,6 +3840,38 @@ function init() {
       proseT.textContent = clamped ? 'More' : 'Less';
       return;
     }
+    const fileLead = e.target.closest('[data-file-lead]');
+    if (fileLead) {
+      const [leadId, aid] = fileLead.dataset.fileLead.split('|');
+      const lead = recordingLeads.find(l => l.id === leadId);
+      if (lead) {
+        gmailCall({ action: 'attach-recording', applicantId: aid, url: lead.url })
+          .then(() => {
+            recordingLeads = recordingLeads.filter(l => l.id !== leadId);
+            toast('Recording filed');
+            renderApplicants();
+          })
+          .catch(err => toast(`Couldn't file: ${err.message}`));
+      }
+      return;
+    }
+    const dismissLead = e.target.closest('[data-dismiss-lead]');
+    if (dismissLead) {
+      const id = dismissLead.dataset.dismissLead;
+      gmailCall({ action: 'dismiss-lead', leadId: id }).catch(() => {});
+      recordingLeads = recordingLeads.filter(l => l.id !== id);
+      renderApplicants();
+      return;
+    }
+    if (e.target.closest('[data-rescan-recordings]')) {
+      toast('Scanning the recruiting channels…');
+      gmailCall({ action: 'scan-recordings' })
+        .then(out => { toast(out.found ? `${out.found} new link${out.found === 1 ? '' : 's'}` : 'No new links'); return loadRecordingLeads(); })
+        .catch(err => toast(`Scan failed: ${err.message}`));
+      return;
+    }
+    const addRec = e.target.closest('[data-add-recording]');
+    if (addRec) { promptRecordingLink(addRec.dataset.addRecording); return; }
     const orm = e.target.closest('[data-open-remove]');
     if (orm) {
       const [aid, lid] = orm.dataset.openRemove.split('|');
@@ -3934,7 +4120,12 @@ function init() {
       } else {
         toast('Sent from live.at.agapesf@gmail.com');
       }
-      delete emailsCache[sentFor];
+      // Pull the sent message in rather than dropping the cache — clearing
+      // it would blank a thread the user is looking at.
+      syncEmails(sentFor).then(() => {
+        const a = applicants.find(x => x.id === sentFor);
+        if (a && queue[qIndex] === sentFor && reviewTab === 'emails') paintEmailsPanel(a, '');
+      }).catch(() => {});
       closeEmailModal();
     } catch (e) { toast(`Send failed: ${e.message}`); }
     btn.disabled = false; btn.textContent = emailMode === 'update' ? 'Send update' : 'Send via Agape Gmail';

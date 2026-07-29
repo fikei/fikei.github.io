@@ -1390,6 +1390,31 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 }
 .inbox-group.is-drop-target .inbox-empty--group { color: var(--accent); }
 
+/* Quiet background-sync note beside the message count. Never a spinner and
+   never a blank panel — the thread is already on screen. */
+.emails-note { color: var(--fg-subtle); font-style: italic; }
+.emails-note:not(:empty)::before { content: ' · '; font-style: normal; }
+
+/* --- v3.27.0: house-calendar events + external recordings --- */
+
+/* Calendar events that aren't intro calls: read-only profile context. */
+.house-events { margin-top: var(--space-4); }
+.house-events__title {
+  margin: 0 0 var(--space-2); font-size: var(--font-size-small);
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-subtle);
+}
+.house-events__row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 6px 0; font-size: var(--font-size-small);
+  border-bottom: 1px solid var(--border);
+}
+.house-events__row:last-child { border-bottom: 0; }
+.house-events__what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.house-events__when { color: var(--fg-subtle); white-space: nowrap; }
+
+/* Recording hosted elsewhere — a link out, never a fake inline player. */
+.external-rec { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+
 /* --- v3.22.1 (restored post-rebase): mobile CTA-column fix — must stay
    LAST so the cascade resolves in its favor. --- */
 @media (max-width: 480px) {

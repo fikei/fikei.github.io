@@ -358,6 +358,32 @@ const ALERT_DISCORD_USER_ID = Deno.env.get('ALERT_DISCORD_USER_ID') || '85378260
 // because alerts posted into the channel that was broken): primary channel →
 // the other recruiting channel with a ⚠️ prefix → DM the ops contact.
 // Throws if every rung fails, so callers don't stamp state as posted.
+/* Read recent messages from a channel. Needs the bot to hold "Read Message
+   History" there — it already posts to both recruiting channels, so this is
+   normally granted. Paginates backwards via `before`. */
+export async function fetchChannelMessages(
+  channelId: string,
+  opts: { limit?: number; sinceIso?: string } = {},
+): Promise<any[]> {
+  const want = Math.min(opts.limit ?? 200, 1000)
+  const since = opts.sinceIso ? new Date(opts.sinceIso).getTime() : 0
+  const out: any[] = []
+  let before = ''
+  while (out.length < want) {
+    const page: any[] = await discordFetch(
+      `/channels/${channelId}/messages?limit=100${before ? `&before=${before}` : ''}`,
+    )
+    if (!page.length) break
+    for (const m of page) {
+      if (since && new Date(m.timestamp).getTime() < since) return out
+      out.push(m)
+    }
+    before = page[page.length - 1].id
+    if (page.length < 100) break
+  }
+  return out
+}
+
 export async function postResilient(channelId: string, payload: Record<string, unknown>, label: string): Promise<void> {
   const fallback = channelId === NOTES_CHANNEL_ID ? AUTOMATION_CHANNEL_ID : NOTES_CHANNEL_ID
   try {
