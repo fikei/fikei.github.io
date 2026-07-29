@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.33.2';
+const VERSION = '3.34.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -412,6 +412,10 @@ function callPhase(sc) {
   // recording is still landing) — this call may simply never have been
   // recorded, so the row should move on rather than wait forever.
   if (sc.done && !sc.at) {
+    // "Notes on the way…" is a promise. Only make it when a bot is actually
+    // going to deliver — and give up on it after 6 hours, because a bot that
+    // hasn't produced anything by then isn't going to.
+    if (!sc.awaiting) return 'done';
     const overFor = Date.now() - new Date(sc.doneAt).getTime();
     return overFor > 6 * 3600000 ? 'done' : 'processing';
   }
@@ -428,7 +432,7 @@ function callPhase(sc) {
 }
 
 function processingChip() {
-  return `<span class="decision-chip decision-chip--vote" title="The call ended — recording and notes usually land within 30 minutes">Notes on the way…</span>`;
+  return `<span class="decision-chip decision-chip--vote" title="A recording bot was on this call — the recording and notes usually land within 30 minutes">Notes on the way…</span>`;
 }
 
 function watchBtn(sc, applicantId) {
@@ -555,7 +559,7 @@ async function loadAll() {
     // background sync fills it in.
     sb.from('recruit_emails').select('id, applicant_id, gmail_id, thread_id, direction, subject, snippet, from_email, to_email, sent_at').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
-    sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status, kind, title, calendar_id').order('starts_at'),
+    sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status, recall_bot_id, external_recording_url, kind, title, calendar_id').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
@@ -587,6 +591,10 @@ async function loadAll() {
     if (s.status === 'completed') screeningState[s.applicant_id] = {
       ...(screeningState[s.applicant_id] || {}),
       done: s.id, doneAt: s.ends_at || s.starts_at, with: s.housemate_name,
+      // Whether anything is still due to land. A call we never sent a bot to
+      // — anything booked outside the app, which is most of the swept ones —
+      // has no recording coming, ever.
+      awaiting: Boolean(s.recall_bot_id) && s.recall_status !== 'done' && s.recall_status !== 'failed',
     };
     // A finished recording adds a Watch state to the row (fresh link on
     // click). Recall's own capture and a pasted link (tldv etc.) are equally
@@ -1415,10 +1423,15 @@ function screeningChip(a) {
   const sc = screeningState[a.id];
   if (!sc) return '';
   const phase = callPhase(sc);
-  if (phase === 'watch') return watchBtn(sc);
+  // Pass the applicant so Watch opens the Call tab: a pasted link has no
+  // stream, and the detached modal can only play our own captures.
+  if (phase === 'watch') return watchBtn(sc, a.id);
   if (phase === 'processing') return processingChip();
   if (phase === 'live') return joinBtn(sc) || processingChip();
   if (phase === 'scheduled') return `<span class="decision-chip decision-chip--outreach" title="Intro Call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`;
+  // The call happened and nothing is coming. Without this it fell through to
+  // "Availability received" — describing a state two steps in the past.
+  if (phase === 'done') return `<span class="decision-chip decision-chip--vote" title="The call happened${sc.with ? ` with ${sc.with}` : ''} — no recording was captured">Call done · no recording</span>`;
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
 }
 
@@ -4176,7 +4189,21 @@ function init() {
     const od2 = e.target.closest('[data-open-draft]');
     if (od2) { updateListingStatus(od2.dataset.openDraft, 'open'); return; }
     const pm = e.target.closest('[data-play-mini]');
-    if (pm) { e.stopPropagation(); gpPlayMini(pm.dataset.playMini); return; }
+    if (pm) {
+      e.stopPropagation();
+      // A pasted link (tldv et al.) can't be played in the docked player —
+      // those hosts refuse to embed. Send Watch to the Call tab instead,
+      // which renders it as a link out.
+      const aid = pm.dataset.playMini;
+      if (screeningState[aid]?.watchExternal) {
+        openReview(aid);
+        reviewTab = 'call';
+        renderReview();
+        return;
+      }
+      gpPlayMini(aid);
+      return;
+    }
     const oc = e.target.closest('[data-open-call]');
     if (oc) {
       openReview(oc.dataset.openCall);
