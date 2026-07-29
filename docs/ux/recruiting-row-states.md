@@ -199,7 +199,7 @@ Anything a housemate can read — Discord posts, DMs, audit lines, in-app copy �
 | 7 applications ingested from the sheet | 7 new applications |
 | Direct message | Message sent |
 | Sign-in helper posted | Phone sign-in message posted |
-| Posted here because <#x> rejected it — check the bot's permissions | Posting this in <#x> didn't work, so it's here instead |
+| Posted here because <#x> **rejected it** — check the bot's permissions | Posting this in <#x> didn't work, so it's here instead — check the bot's permissions there |
 | no concrete times could be read | didn't name specific times |
 
-Technical detail still belongs in two places: function logs, and the ops DM that fires when posting fails everywhere (that one is for whoever fixes it).
+**The test is whether the reader can act on it, not whether the word sounds technical.** "Check the bot's permissions" stays — it names the fix. "Rejected it" goes — it only describes our internals. Same logic keeps technical detail in function logs and in the ops DM that fires when posting fails everywhere.

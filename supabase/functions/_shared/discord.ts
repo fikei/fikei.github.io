@@ -404,7 +404,7 @@ export async function postResilient(channelId: string, payload: Record<string, u
       method: 'POST',
       body: JSON.stringify({
         ...payload,
-        content: `⚠️ Posting this in <#${channelId}> didn't work, so it's here instead.${typeof payload.content === 'string' ? `\n${payload.content}` : ''}`,
+        content: `⚠️ Posting this in <#${channelId}> didn't work, so it's here instead — check the bot's permissions there.${typeof payload.content === 'string' ? `\n${payload.content}` : ''}`,
       }),
     })
     return
