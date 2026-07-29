@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.35.0';
+const VERSION = '3.36.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -100,6 +100,7 @@ let applicants = [];          // newest first; each carries .stage
 let decisions = {};           // applicant_id -> { d, reason, by, byName, at }
 let votes = {};               // applicant_id -> recruit_votes rows
 let placements = [];          // recruit_listing_candidates rows
+let viewedIds = new Set();    // applicants I've opened (recruit_applicant_views)
 let claimPosts = {};          // applicant_id -> { status, posted_at }
 let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
@@ -504,6 +505,12 @@ function openingsCta(a) {
 /* Blue response dot in the row's left gutter — sits beside the avatar,
    never on top of it. */
 function repliedDot(a) {
+  // Same blue dot, two meanings by context: in the Inbox it marks an
+  // application nobody on your account has opened yet; elsewhere it marks
+  // their reply waiting on you.
+  if (view === 'inbox') {
+    return viewedIds.has(a.id) ? '' : `<span class="replied-dot" title="New — you haven't opened this application yet"></span>`;
+  }
   const st = emailState[a.id];
   if (st?.lastDir !== 'in') return '';
   return `<span class="replied-dot" title="They replied — ${relTime(st.lastAt)}"></span>`;
@@ -549,7 +556,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, cpRes, dvRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, cpRes, dvRes, vwRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
@@ -562,10 +569,12 @@ async function loadAll() {
     sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status, recall_bot_id, external_recording_url, kind, title, calendar_id').order('starts_at'),
     sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
     sb.from('recruit_listing_candidates').select('*'),
+    sb.from('recruit_applicant_views').select('applicant_id'),
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
     sb.from('recruit_decision_votes').select('*'),
   ]);
   placements = pRes.data || [];
+  viewedIds = new Set((vwRes.data || []).map(v => v.applicant_id));
   claimPosts = {};
   for (const c of (cpRes.data || [])) claimPosts[c.applicant_id] = { status: c.status, postedAt: c.posted_at };
   decisionVotes = {};
@@ -1313,7 +1322,8 @@ async function render() {
 /* ---------- applicants render ---------- */
 function matchesView(a) {
   const out = a.stage !== 'rejected' && a.stage !== 'archived';
-  if (view === 'inbox') return a.stage === 'review';
+  // A standing veto means archived — never show them here, whatever the stage says.
+  if (view === 'inbox') return a.stage === 'review' && !voteStats(a.id).veto;
   // Saved for future stays a candidate — visible in Candidates with its chip,
   // absent from Openings until the return date brings them back.
   if (view === 'candidates') return a.stage === 'candidate';
@@ -1969,7 +1979,7 @@ function renderApplicants() {
               ${noteBubble(a.id)}
               ${view === 'openings'
                 ? `${openingsCta(a)}${rowMenuHtml(a, g.key)}`
-                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Vote</button>` : ''}`}
+                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Review</button>` : ''}`}
             </span>
           </li>`).join('')}
       </ul>`}
@@ -2860,6 +2870,12 @@ function openReview(id) {
   reviewTab = 'profile';
   pendingVote = null;
   moveinEditing = false;
+  if (!viewedIds.has(id)) {
+    viewedIds.add(id);
+    sb.from('recruit_applicant_views')
+      .upsert({ applicant_id: id, user_id: me.id, viewed_at: new Date().toISOString() }, { onConflict: 'applicant_id,user_id' })
+      .then(({ error }) => { if (error) console.warn('view mark failed', error.message); });
+  }
   document.getElementById('review').hidden = false;
   document.body.style.overflow = 'hidden';
   hideHoldSheet();
@@ -3136,9 +3152,18 @@ function renderReviewFoot(a) {
 async function reopenApplicant(id) {
   const a = applicants.find(x => x.id === id);
   if (!a) return;
+  // A veto is archival, so reopening has to clear it — otherwise they'd sit in
+  // the Inbox with a standing veto that can never resolve.
+  const st0 = voteStats(id);
+  if (st0.veto) {
+    if (!confirm(`${fullName(a)} was vetoed by ${st0.veto.voter_name || 'a housemate'}. Reopening clears that veto so the house can review them again. Continue?`)) return;
+    const { error } = await sb.from('recruit_votes').delete().eq('applicant_id', id).eq('veto', true);
+    if (error) { toast(`Couldn't clear the veto: ${error.message}`); return; }
+    votes[id] = (votes[id] || []).filter(v => !v.veto);
+  }
   if (await setStage(id, 'review')) {
     const st = voteStats(id);
-    toast(st.veto ? `Reopened — note: ${st.veto.voter_name || 'a housemate'}'s veto still stands until they change their vote` : 'Reopened — back in the Inbox');
+    toast(st0.veto ? 'Reopened — the veto was cleared' : 'Reopened — back in the Inbox');
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
@@ -3847,6 +3872,9 @@ async function signInWithDiscord() {
 }
 
 function setGate(sub, btnLabel, hint) {
+  // Showing a gate message means we've stopped: reveal the card even if we
+  // were mid-load, or the spinner would spin forever over a silent failure.
+  document.body.dataset.authState = 'out';
   document.getElementById('gate-sub').textContent = sub;
   const btn = document.getElementById('gate-btn');
   document.getElementById('gate-btn-label').textContent = btnLabel || '';
@@ -3981,6 +4009,14 @@ function init() {
 
   document.getElementById('gate-btn').onclick = signInWithDiscord;
   document.getElementById('gate-alt').onclick = () => window.CtrlAuth.openLoginModal();
+  // Nothing stored to restore and no redeem in flight? Then we're signed out
+  // for certain — show the card now instead of spinning for 2.5s.
+  const hasStoredSession = Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k));
+  if (!hasStoredSession && !new URLSearchParams(location.search).get('signin')
+      && !location.hash.includes('access_token')) {
+    document.body.dataset.authState = 'out';
+  }
+
   // If no signedin event lands shortly, we're signed out — show the gate.
   setTimeout(() => {
     if (document.body.dataset.authState === 'loading' && !window.CtrlAuth.getUser()) {

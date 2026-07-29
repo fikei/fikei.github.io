@@ -129,7 +129,18 @@ button { font: inherit; cursor: pointer; }
 .gate[hidden] { display: none; }
 .page[hidden] { display: none; }
 /* No gate flash while CtrlAuth restores an existing session. */
-body[data-auth-state="loading"] .gate { visibility: hidden; }
+/* Restoring a session, or signed in and loading: show a quiet spinner, never
+   the sign-in card — a returning housemate should never see "Continue with
+   Discord" flash past on reload. */
+.gate__spinner { display: none; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--fg-muted);
+  animation: gate-spin 0.7s linear infinite; }
+@keyframes gate-spin { to { transform: rotate(360deg); } }
+body[data-auth-state="loading"] .gate__card,
+body[data-auth-state="in"] .gate__card { display: none; }
+body[data-auth-state="loading"] .gate__spinner,
+body[data-auth-state="in"] .gate__spinner { display: block; }
+@media (prefers-reduced-motion: reduce) { .gate__spinner { animation-duration: 2.4s; } }
 .gate__card {
   width: 100%; max-width: 380px;
   background: var(--bg-elevated); border: 1px solid var(--border);
