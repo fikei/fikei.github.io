@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.34.0';
+const VERSION = '3.35.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -3857,6 +3857,9 @@ async function signInWithDiscord() {
 }
 
 function setGate(sub, btnLabel, hint) {
+  // Showing a gate message means we've stopped: reveal the card even if we
+  // were mid-load, or the spinner would spin forever over a silent failure.
+  document.body.dataset.authState = 'out';
   document.getElementById('gate-sub').textContent = sub;
   const btn = document.getElementById('gate-btn');
   document.getElementById('gate-btn-label').textContent = btnLabel || '';
@@ -3991,6 +3994,14 @@ function init() {
 
   document.getElementById('gate-btn').onclick = signInWithDiscord;
   document.getElementById('gate-alt').onclick = () => window.CtrlAuth.openLoginModal();
+  // Nothing stored to restore and no redeem in flight? Then we're signed out
+  // for certain — show the card now instead of spinning for 2.5s.
+  const hasStoredSession = Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k));
+  if (!hasStoredSession && !new URLSearchParams(location.search).get('signin')
+      && !location.hash.includes('access_token')) {
+    document.body.dataset.authState = 'out';
+  }
+
   // If no signedin event lands shortly, we're signed out — show the gate.
   setTimeout(() => {
     if (document.body.dataset.authState === 'loading' && !window.CtrlAuth.getUser()) {
