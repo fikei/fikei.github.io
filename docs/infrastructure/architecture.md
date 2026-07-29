@@ -66,18 +66,18 @@ ctrl.rodeo/
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 SUPABASE EDGE FUNCTIONS                      │
-│  ✅ agent-handler    │ ✅ notion-sync                        │
-│  ✅ enrich-link      │ ✅ generate-widget                    │
+│  ✅ agent-handler    │ ✅ enrich-link                        │
+│  ✅ generate-widget                                          │
 └────────────────────────────┬────────────────────────────────┘
                              │
-              ┌──────────────┼──────────────┐
-              ▼              ▼              ▼
-┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│    SUPABASE     │ │   CLAUDE    │ │     NOTION      │
-│   PostgreSQL    │ │   API       │ │     API         │
-│  ✅ Database    │ │ ✅ Haiku    │ │ ✅ Sync         │
-│  ✅ Auth        │ │ ⏳ Opus     │ │ ✅ Webhooks     │
-└─────────────────┘ └─────────────┘ └─────────────────┘
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+┌─────────────────┐               ┌─────────────┐
+│    SUPABASE     │               │   CLAUDE    │
+│   PostgreSQL    │               │   API       │
+│  ✅ Database    │               │ ✅ Haiku    │
+│  ✅ Auth        │               │ ⏳ Opus     │
+└─────────────────┘               └─────────────┘
 ```
 
 ---
@@ -98,7 +98,7 @@ ctrl.rodeo/
 | Function | Purpose | Status |
 |----------|---------|--------|
 | `agent-handler` | AI agent orchestration | ✅ |
-| `notion-sync` | Bidirectional sync | ✅ |
+| `notion-sync` | GitHub → Notion doc sync | ❌ Removed 2026-07-29 |
 | `enrich-link` | URL metadata extraction | ✅ |
 | `generate-widget` | AI recommendations | ✅ |
 
@@ -131,8 +131,8 @@ ctrl.rodeo/
 
 | Service | Purpose | Status |
 |---------|---------|--------|
-| Notion | Documentation sync | ✅ |
-| GitHub Actions | CI/CD automation | ✅ |
+| Notion | Documentation sync | ❌ Removed 2026-07-29 |
+| GitHub Actions | Event scraping (`scrape-events.yml`) | ✅ |
 
 ---
 
@@ -170,11 +170,6 @@ GitHub Action trigger
        ▼
 ┌──────────────┐
 │ Claude Haiku │ ──► Process with agent prompt
-└──────────────┘
-       │
-       ▼
-┌──────────────┐
-│ notion-sync  │ ──► Update Notion pages
 └──────────────┘
 ```
 

@@ -121,18 +121,6 @@ The app degrades gracefully without these.
 | **Cost** | $0 (free tier: 50 requests/hour) |
 | **If unavailable** | Template placeholder image used. Most images resolve through other strategies first. |
 
-### Notion API
-
-| Aspect | Details |
-|--------|---------|
-| **URL** | `https://api.notion.com/v1` |
-| **Used by** | `notion-sync` edge function (Ops project) |
-| **Auth** | `NOTION_API_KEY` (integration token) |
-| **Cost** | $0 (free personal workspace) |
-| **If unavailable** | Documentation sync fails. No impact on app functionality. GitHub Actions retry 3x with exponential backoff. |
-
----
-
 ## CDN Dependencies (Loaded at Page Load)
 
 | Resource | URL | Fallback |
@@ -153,7 +141,6 @@ The app degrades gracefully without these.
 | Domain (ctrl.rodeo) | ~$1.25 | ~$15/year | Registrar |
 | CORS Proxies | $0 | Free public services | None |
 | Google Fonts | $0 | Free | None |
-| Notion | $0 | Free personal | None |
 | **Total** | **~$4-16** | | |
 
 ### Per-Operation AI Costs

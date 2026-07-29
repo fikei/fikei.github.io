@@ -94,7 +94,6 @@ No preprocessor (Sass, Less). No PostCSS. No Tailwind. Pure CSS with custom prop
 | `enrich-wear` | Boards | TypeScript | Shopify JSON API |
 | `categorize` | Boards | TypeScript | Anthropic API (raw fetch) |
 | `agent-handler` | Boards | TypeScript | Anthropic API |
-| `notion-sync` | Ops | TypeScript | Notion API (raw fetch) |
 | `systemic-analyze` | Systemic | TypeScript | Anthropic SDK 0.39.0 |
 | `systemic-fetch` | Systemic | TypeScript | - |
 
@@ -130,7 +129,6 @@ No preprocessor (Sass, Less). No PostCSS. No Tailwind. Pure CSS with custom prop
 
 | Service | Endpoint | Auth | Used For |
 |---------|----------|------|----------|
-| **Notion** | `api.notion.com/v1` | Integration token | Documentation sync |
 | **SerpAPI** | `serpapi.com/search` | API key | Product image search (widgets) |
 | **Unsplash** | `api.unsplash.com/search/photos` | Access key | Image search fallback |
 | **Shopify** | `{domain}/search/suggest.json` | None (public) | Product data for 31 brands |
@@ -154,14 +152,9 @@ No preprocessor (Sass, Less). No PostCSS. No Tailwind. Pure CSS with custom prop
 
 **Runner**: `ubuntu-latest`
 
-### Workflow: `agent-automation.yml`
+### Workflow: `scrape-events.yml`
 
-| Trigger | Job |
-|---------|-----|
-| Push to main/master/claude/* | Notion sync, security scan |
-| Pull request | Documentation standards check |
-| Daily 9 AM UTC | Chief of Staff synthesis |
-| Weekly Friday 4 PM UTC | Continuous improvement |
+Scheduled event scraping for the Events pipeline. (`agent-automation.yml` — Notion sync + agent jobs — was removed 2026-07-29.)
 
 ---
 
@@ -201,7 +194,6 @@ Separate Node.js app, not part of the main Boards stack.
 | `CNAME` | Custom domain: `ctrl.rodeo` |
 | `.env.template` | Environment variable reference |
 | `.gitignore` | Ignore patterns for env, build, OS files |
-| `notion-structure.json` | Notion page hierarchy for sync |
 | `.claude/settings.json` | Claude Code agent configuration |
 | `site.webmanifest` | PWA manifest (favicons) |
 
@@ -232,21 +224,20 @@ Separate Node.js app, not part of the main Boards stack.
 │  Edge Functions (Deno + TypeScript)                           │
 │  ├── generate-widget  (Anthropic SDK 0.39.0)                │
 │  ├── enrich-link      (Anthropic API raw)                   │
-│  ├── categorize       (Anthropic API raw)                   │
-│  └── notion-sync      (Notion API raw)                      │
+│  └── categorize       (Anthropic API raw)                   │
 │                                                               │
 │  PostgreSQL (25+ tables, RLS enabled)                        │
 │  PostgREST (auto-generated REST API)                         │
 │  Auth (magic link, JWT sessions)                             │
 └──────────────────────────────────────────────────────────────┘
                        │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-   ┌────────────┐ ┌─────────┐ ┌──────────┐
-   │ Anthropic  │ │ Notion  │ │ SerpAPI  │
-   │ Claude 3   │ │ API     │ │ + others │
-   │ Haiku      │ │         │ │          │
-   └────────────┘ └─────────┘ └──────────┘
+          ┌────────────┴────────────┐
+          ▼                         ▼
+   ┌────────────┐            ┌──────────┐
+   │ Anthropic  │            │ SerpAPI  │
+   │ Claude 3   │            │ + others │
+   │ Haiku      │            │          │
+   └────────────┘            └──────────┘
 ```
 
 ---

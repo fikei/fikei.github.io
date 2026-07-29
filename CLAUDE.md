@@ -21,10 +21,9 @@ Personal curation platform — collect, organize, and build on everything that m
 2. **Show complete code blocks** with full paths. Don't summarize when exact text is needed.
 3. **End every response** with a "Next Steps" section (numbered steps + commands) or "No action needed."
 4. **Docs travel with code:** when a change affects plans, architecture, or UX docs, update the relevant files under `docs/` directly in the same PR. Plans live in `docs/execution/project-plan/`.
-5. **Notion sync:** update markdown in `docs/`, list in `notion-structure.json`, push. Details: `docs/infrastructure/NOTION-SYNC-GUIDE.md`.
-6. **Design system:** check `design-system/` before any UI work. Document new CSS classes in `design-system/README.md`.
-7. **Announce doc changes:** state file path and what changed.
-8. **Widget work:** check `design-system/widgets.html` stoplight audit before starting (Green=ok, Yellow=needs dev action, Orange=needs review, Red=blocked).
+5. **Design system:** check `design-system/` before any UI work. Document new CSS classes in `design-system/README.md`.
+6. **Announce doc changes:** state file path and what changed.
+7. **Widget work:** check `design-system/widgets.html` stoplight audit before starting (Green=ok, Yellow=needs dev action, Orange=needs review, Red=blocked).
 
 ---
 
@@ -101,5 +100,5 @@ Optional specialized subagent definitions live in `.claude/agents/` (documentati
 ## Reference
 - [Brand Positioning](./docs/strategy/brand-positioning.md) | [Personas](./docs/ux/personas.md)
 - [Project Plan](./docs/execution/project-plan/index.md) | [Backlog](./docs/execution/project-plan/backlog.md) | [Bugs](./docs/execution/BUGS.md)
-- [Deployment + Supabase Commands](./docs/infrastructure/deployment.md) | [Notion Sync Guide](./docs/infrastructure/NOTION-SYNC-GUIDE.md)
+- [Deployment + Supabase Commands](./docs/infrastructure/deployment.md)
 - [Design System](./design-system/README.md) | [AI Widget Architecture](./docs/infrastructure/technical-design/ai-widget-system.md)
