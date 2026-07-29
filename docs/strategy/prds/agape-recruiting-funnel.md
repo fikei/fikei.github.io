@@ -55,7 +55,7 @@ Out of scope for now (manual): post-screening accept/vote, house tour, onboardin
 ### v3.3.0 (2026-07-22): recruiter-confirmed move-in
 Structured `move_in_from`/`move_in_to` window on the applicant (migration 124, set via `recruit_set_move_in` RPC, attributed). Editable from the profile's Move-in fact — the applicant's typed answer stays on top, the confirmed window sits underneath. When set it is exact (no "flexible" escape hatch) and overrides the parsed text in sublines, filters, and placement qualification; saving re-runs the placement sweep.
 
-### v3.37.0 (2026-07-29): trial check-in + decision dates
+### v3.39.0 (2026-07-29): trial check-in + decision dates
 A trial candidate's two decision moments now live on the stay (migration 139,
 `recruit_stays.checkin_on` / `decision_on`), not in someone's head:
 
