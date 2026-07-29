@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.33.0';
+const VERSION = '3.33.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1609,12 +1609,17 @@ function initGlobalPlayer() {
   window.addEventListener('resize', gpSyncPlacement);
   // The review pane scrolls independently of the page.
   document.addEventListener('scroll', gpSyncPlacement, { capture: true, passive: true });
-  document.getElementById('gp-close').addEventListener('click', gpStop);
-  document.getElementById('gp-expand').addEventListener('click', () => {
+  // The docked player sits outside the review overlay, so its clicks would
+  // otherwise bubble to the outside-click handler that closes the review —
+  // reopening and immediately closing it.
+  document.getElementById('gp-close').addEventListener('click', (e) => { e.stopPropagation(); gpStop(); });
+  document.getElementById('gp-expand').addEventListener('click', (e) => {
+    e.stopPropagation();
     if (!gp.applicantId) return;
     openReview(gp.applicantId);
     reviewTab = 'call';
     renderReview();
+    gpSyncPlacement();
   });
 }
 
