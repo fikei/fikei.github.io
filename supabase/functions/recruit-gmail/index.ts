@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.18.1'
+const VERSION = '1.19.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -1124,7 +1124,9 @@ serve(async (req) => {
           const appLink = (id: string) => `https://ctrl.rodeo/applications/?a=${encodeURIComponent(id)}`
           if (toPing.length > 3) {
             const lines = toPing.map((a) => `• [${a.first_name} ${a.last_name || ''}](${appLink(a.id)})`).join('\n')
-            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`, 0x378add, `${toPing.length} new applications`)
+            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`,
+              0x378add, `${toPing.length} new applications`,
+              [{ label: 'Open the inbox', url: 'https://ctrl.rodeo/applications/?view=inbox' }])
           } else {
             for (const a of toPing) {
               const track = /short/i.test(a.residency || '') ? 'Sublet' : 'Full-time'
@@ -1132,7 +1134,9 @@ serve(async (req) => {
               await postChannelEmbed(pingChannel,
                 `📥 **${a.first_name} ${a.last_name || ''}** applied — ${track}${a.move_in ? ` · ${String(a.move_in).slice(0, 60)}` : ''}\n` +
                 (why ? `_${why}_\n` : '') +
-                `[Read + vote](${appLink(a.id)})`, 0x378add, `New application — ${a.first_name}`)
+                '', 0x378add, `New application — ${a.first_name}`,
+                [{ label: `Review ${a.first_name}`, url: appLink(a.id) },
+                 { label: 'Open the inbox', url: 'https://ctrl.rodeo/applications/?view=inbox' }])
             }
           }
           if (toPing.length) {

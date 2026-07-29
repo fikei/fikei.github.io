@@ -523,10 +523,16 @@ export async function postSigninMessage(channelId: string): Promise<any> {
 
 // One channel nudge for a post nobody claimed within 96h.
 // Plain embed post to any channel (new-application pings etc.).
-export async function postChannelEmbed(channelId: string, description: string, color = 0x378add, label = 'Automated post'): Promise<any> {
+export async function postChannelEmbed(
+  channelId: string, description: string, color = 0x378add, label = 'Automated post',
+  links: Array<{ label: string; url: string }> = [],
+): Promise<any> {
+  const components = links.length
+    ? [{ type: 1, components: links.slice(0, 5).map((l) => ({ type: 2, style: 5, label: l.label, url: l.url })) }]
+    : []
   const msg = await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ embeds: [{ description, color }] }),
+    body: JSON.stringify({ embeds: [{ description, color }], components }),
   })
   await auditMirror(label, description.split('\n')[0], { channelId })
   return msg
