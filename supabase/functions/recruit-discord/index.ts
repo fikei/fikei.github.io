@@ -348,7 +348,7 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
 }
 
 // Harvest finished Recall recordings: after a call ends, pull the transcript,
-// summarize with Haiku, post notes + recording link to #recruiting-interviews,
+// summarize with Haiku, post notes + recording link to #recruiting-automation,
 // and store the summary on the screening row (the app reads it from there).
 // Runs on the same 15-min cron tick as reminders; inert without RECALL_API_KEY.
 // Every scheduled screening with a Meet link gets a recording bot — including

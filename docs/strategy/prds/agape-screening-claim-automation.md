@@ -34,7 +34,7 @@ Applicant uses the /schedule picker ───────────┤
                                                ▼
                         recruit_availability updated (existing)
                                                ▼
-                 NEW: post to #recruiting-interviews (bot message)
+                 NEW: post to #recruiting-automation (bot message)
                  One message per applicant. Buttons = concrete
                  30-min slots derived from their windows (max ~8,
                  spread across days) + "Other time…"
@@ -56,7 +56,7 @@ Dedup rules: one open post per applicant (re-availability edits the existing pos
 
 ## Channel
 
-**`#recruiting-interviews`** (ID `1529576830514762029`) — bot-writable, visible to the Recruiting Society role. Keep it single-purpose: posts and claims only, discussion goes to the applicant thread in `#recruiting`.
+**`#recruiting-automation`** (ID `1529576830514762029`) — bot-writable, visible to the Recruiting Society role. Keep it single-purpose: posts and claims only, discussion goes to the applicant thread in `#recruiting`.
 
 ## Hosting
 

@@ -2642,7 +2642,7 @@ async function openClaimPreview(applicantId) {
     if (claimCtx?.applicantId !== applicantId) return; // closed meanwhile
     claimCtx.extraction = out.extraction;
     const emb = out.preview?.embeds?.[0] || {};
-    document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-interviews:';
+    document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-automation:';
     document.getElementById('claim-preview-body').innerHTML = `
       <div class="claim-preview ${out.slotLabels?.length ? '' : 'claim-preview--manual'}">
         <p class="claim-preview__title">${esc(emb.title || '')}</p>
@@ -2666,7 +2666,7 @@ async function postClaimFromModal() {
   btn.disabled = true; btn.textContent = 'Posting…';
   try {
     const out = await gmailCall({ action: 'claim-post', applicantId: claimCtx.applicantId, extraction: claimCtx.extraction });
-    toast(out.posted ? 'Posted to #recruiting-interviews — first claim wins' : 'Already claimed — not reposted');
+    toast(out.posted ? 'Posted to #recruiting-automation — first claim wins' : 'Already claimed — not reposted');
     closeClaimModal();
   } catch (e) {
     toast(`Post failed: ${e.message}`);
