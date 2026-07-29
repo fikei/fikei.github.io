@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.36.0';
+const VERSION = '3.36.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -556,7 +556,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, cpRes, dvRes, vwRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
