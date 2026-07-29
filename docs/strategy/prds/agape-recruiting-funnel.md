@@ -55,5 +55,29 @@ Out of scope for now (manual): post-screening accept/vote, house tour, onboardin
 ### v3.3.0 (2026-07-22): recruiter-confirmed move-in
 Structured `move_in_from`/`move_in_to` window on the applicant (migration 124, set via `recruit_set_move_in` RPC, attributed). Editable from the profile's Move-in fact — the applicant's typed answer stays on top, the confirmed window sits underneath. When set it is exact (no "flexible" escape hatch) and overrides the parsed text in sublines, filters, and placement qualification; saving re-runs the placement sweep.
 
+### v3.39.0 (2026-07-29): trial check-in + decision dates
+A trial candidate's two decision moments now live on the stay (migration 139,
+`recruit_stays.checkin_on` / `decision_on`), not in someone's head:
+
+- **Check-in** — defaults to `starts_on + 1 month`. Far enough in to have signal,
+  early enough that a fixable problem is still fixable.
+- **Decision** — defaults to `ends_on - 1 month`, usually the end of month two of a
+  three-month sublet. Both sides need a month to make other plans.
+
+Both are prefilled in the occupancy drawer whenever the stay's type is **Trial
+candidate**, and both are editable — the defaults are a starting point, not a rule.
+Milestones must fall inside the trial window and the decision must follow the
+check-in. Changing a stay's type to anything else clears them.
+
+**Reminders.** `recruit-discord` v1.15.0 posts one embed per milestone to
+`#recruiting-automation`, seven days ahead, on the existing 15-minute `/remind`
+tick — no new cron. `checkin_reminded_at` / `decision_reminded_at` make each post
+once-only; moving a date in the app clears the stamp so the new date gets its own
+reminder. Milestones backdated more than 14 days are stamped silently — a date
+corrected after the fact isn't news.
+
+Backfilled on the two live trials (Alejandra, Sophia); Andy's finished Jan–Feb
+trial was left alone.
+
 ### Design reference
 Row states, chip taxonomy, and subcopy grammar for Inbox/Candidates/Openings: [docs/ux/recruiting-row-states.md](../../ux/recruiting-row-states.md) (v3.5.0 — response dot, room pills, note bubble, ✕ removal, see-more bar).
