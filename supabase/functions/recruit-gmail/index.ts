@@ -701,6 +701,42 @@ serve(async (req) => {
       return json({ results: out })
     }
 
+    if (action === 'relink-recordings') {
+      // Repair old notes whose 🎥 link is an expired Recall URL.
+      const { relinkRecordingPosts } = await import('../_shared/discord.ts')
+      const out = await relinkRecordingPosts(async (applicantId, title) => {
+        if (applicantId) {
+          const { data } = await client.from('recruit_screenings')
+            .select('share_token').eq('applicant_id', applicantId)
+            .not('share_token', 'is', null).not('recording_path', 'is', null)
+            .order('starts_at', { ascending: false }).limit(1).maybeSingle()
+          if (data?.share_token) return data.share_token
+        }
+        // No profile link: "<First> × <Resident> — Intro Call notes" or
+        // "<Title> — meeting notes". Try the applicant's first name, then
+        // the recorded-event title.
+        const stem = title.replace(/ — (Intro Call|meeting) notes$/, '').trim()
+        const first = stem.split('×')[0].trim().replace(/'s Intro Call$/, '')
+        if (first) {
+          const { data: app } = await client.from('recruit_applicants')
+            .select('id').ilike('first_name', first).limit(2)
+          if (app?.length === 1) {
+            const { data } = await client.from('recruit_screenings')
+              .select('share_token').eq('applicant_id', app[0].id)
+              .not('share_token', 'is', null).not('recording_path', 'is', null)
+              .order('starts_at', { ascending: false }).limit(1).maybeSingle()
+            if (data?.share_token) return data.share_token
+          }
+        }
+        const { data: ev } = await client.from('recruit_recorded_events')
+          .select('share_token').eq('title', stem)
+          .not('share_token', 'is', null).not('recording_path', 'is', null)
+          .limit(1).maybeSingle()
+        return ev?.share_token || null
+      })
+      return json(out)
+    }
+
     if (action === 'recording-link') {
       // Our permanent storage copy first; Recall (short-lived presigned URL)
       // only as fallback for recordings not yet archived.
