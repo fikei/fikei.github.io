@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.30.0';
+const VERSION = '3.31.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1393,15 +1393,68 @@ function savedRate() {
   return PLAY_RATES.includes(r) ? r : 1;
 }
 
-/* Speed rides on the player itself (top-right), not as a row beneath it. */
+/* Controls ride on the player itself (top-right), not as a row beneath it:
+   playback speed and pop-out, matching the public watch page. */
 function speedOverlayHtml(videoId) {
   const cur = savedRate();
-  return `<div class="vspeed" data-speed-for="${videoId}">
-    <button type="button" class="vspeed__btn" aria-haspopup="true" aria-expanded="false">${cur}×</button>
-    <div class="vspeed__menu" role="menu">
-      ${PLAY_RATES.map(r => `<button type="button" role="menuitemradio" data-rate="${r}" aria-checked="${r === cur}">${r}×</button>`).join('')}
+  return `<div class="vchrome">
+    <div class="vspeed" data-speed-for="${videoId}">
+      <button type="button" class="vspeed__btn" aria-haspopup="true" aria-expanded="false">${cur}×</button>
+      <div class="vspeed__menu" role="menu">
+        ${PLAY_RATES.map(r => `<button type="button" role="menuitemradio" data-rate="${r}" aria-checked="${r === cur}">${r}×</button>`).join('')}
+      </div>
     </div>
+    <button type="button" class="vspeed__btn vpip" data-pip-for="${videoId}" title="Pop out into a floating window">⧉</button>
   </div>`;
+}
+
+/* Native picture-in-picture, so the call keeps playing when you switch tabs. */
+function wirePip(videoId) {
+  const btn = document.querySelector(`[data-pip-for="${videoId}"]`);
+  const video = document.getElementById(videoId);
+  if (!btn || !video) return;
+  if (!document.pictureInPictureEnabled || video.disablePictureInPicture) { btn.hidden = true; return; }
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch { /* browser declined — inline playback still works */ }
+  });
+}
+
+/* Dock the player bottom-right once it scrolls out of its container while
+   playing, so the call keeps running while you read notes and comment on it.
+   A placeholder holds the layout height so nothing jumps. */
+function wireMiniPlayer(videoId, scrollRoot) {
+  const video = document.getElementById(videoId);
+  const wrap = video?.closest('.video-wrap');
+  if (!video || !wrap || !window.IntersectionObserver) return;
+  let dismissed = false;
+  const setMini = on => {
+    if (wrap.classList.contains('is-mini') === on) return;
+    if (on) {
+      wrap.style.setProperty('--mini-h', `${wrap.offsetHeight}px`);
+      wrap.classList.add('is-mini');
+    } else {
+      wrap.classList.remove('is-mini');
+    }
+  };
+  // Threshold 0 fires on full exit/entry; a partial threshold alone never
+  // reports the fully-scrolled-past state.
+  const obs = new IntersectionObserver(([entry]) => {
+    const watching = !video.paused && !video.ended;
+    setMini(!entry.isIntersecting && watching && !dismissed);
+  }, { root: scrollRoot || null, threshold: 0 });
+  obs.observe(wrap);
+  video.addEventListener('pause', () => setMini(false));
+  video.addEventListener('play', () => { dismissed = false; });
+  wrap.querySelector('[data-mini-close]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dismissed = true;
+    video.pause();
+    setMini(false);
+  });
 }
 
 function wireSpeedBar(videoId) {
@@ -1504,7 +1557,9 @@ async function loadCallPanel(a) {
   host().innerHTML = `
     <p class="notes__empty">${esc(`${row.housemate_name ? `${row.housemate_name} × ` : ''}${fullName(a)}`)} · ${row.starts_at ? fmtSlot(row.starts_at) : ''}</p>
     ${sc.watch
-      ? `<div class="video-wrap">${speedOverlayHtml('call-video')}<video id="call-video" class="call-video" controls playsinline></video></div>
+      ? `<div class="video-wrap">
+           <div class="mini-bar"><span class="mini-bar__title">Intro call</span><button type="button" data-mini-close aria-label="Close mini player">✕</button></div>
+           ${speedOverlayHtml('call-video')}<video id="call-video" class="call-video" controls playsinline></video></div>
          <p class="email-modal__status" id="call-status">Fetching recording…</p>`
       : row.external_recording_url
         // These hosts block cross-origin embedding, so this opens out rather
@@ -1526,6 +1581,8 @@ async function loadCallPanel(a) {
     </section>`;
   loadComments(a.id).then(() => { if (queue[qIndex] === a.id && reviewTab === 'call') renderNotes(a.id); });
   wireSpeedBar('call-video');
+  wirePip('call-video');
+  wireMiniPlayer('call-video', document.querySelector('.review__scroll'));
   document.getElementById('notes-form-call')?.addEventListener('submit', (ev) => { ev.preventDefault(); postNote(a.id); });
   document.getElementById('call-stamp')?.addEventListener('click', () => {
     const v = document.getElementById('call-video');
@@ -1574,6 +1631,7 @@ async function openWatch(screeningId) {
     video.src = out.url;
     status.textContent = '';
     wireSpeedBar('watch-video');
+    wirePip('watch-video');
   } catch (e) {
     status.textContent = `Recording unavailable: ${e.message}`;
   }
