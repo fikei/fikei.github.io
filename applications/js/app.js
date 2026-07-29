@@ -4006,6 +4006,7 @@ function init() {
   });
   sb = window.CtrlAuth.getSupabaseClient();
   redeemSigninToken(); // no-op without ?signin=
+  initGlobalPlayer();
 
   document.getElementById('gate-btn').onclick = signInWithDiscord;
   document.getElementById('gate-alt').onclick = () => window.CtrlAuth.openLoginModal();
