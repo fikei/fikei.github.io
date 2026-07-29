@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.20.0'
+const VERSION = '1.21.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -498,6 +498,11 @@ serve(async (req) => {
     if (action === 'send') {
       const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
       if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
+      // Outreach can never reach someone who has been archived. 'send-update'
+      // is the only channel left for them, and it carries no invitation.
+      if (applicant.stage === 'rejected' || applicant.stage === 'archived') {
+        return json({ error: 'They are archived — only their update email can be sent' }, 409)
+      }
       const subject = String(body.subject || '').slice(0, 300)
       const text = String(body.body || '').slice(0, 10000)
       if (!subject || !text) return json({ error: 'Subject and body required' }, 400)
