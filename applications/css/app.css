@@ -363,6 +363,9 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   background: var(--bg-surface); border: 0;
 }
 .inbox-row__review:hover { background: var(--bg-overlay); }
+/* Ladder pairs btn--sm's small type with a 36px target; .btn--sm is declared
+   later in this file, so bind the height to the more specific selector. */
+.btn.inbox-row__review { height: 36px; }
 .inbox-empty { color: var(--fg-subtle); text-align: center; padding: var(--space-8) var(--space-4); }
 
 /* Avatars — initials on a neutral surface (28 list / 56 review). */

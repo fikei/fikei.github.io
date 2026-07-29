@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.36.1';
+const VERSION = '3.36.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1979,7 +1979,7 @@ function renderApplicants() {
               ${noteBubble(a.id)}
               ${view === 'openings'
                 ? `${openingsCta(a)}${rowMenuHtml(a, g.key)}`
-                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn inbox-row__review" data-review="${a.id}">Review</button>` : ''}`}
+                : `${rowBadge(a)}${view === 'inbox' && !myVote(a.id) ? `<button class="btn btn--sm inbox-row__review" data-review="${a.id}">Review <span aria-hidden="true">→</span></button>` : ''}`}
             </span>
           </li>`).join('')}
       </ul>`}
