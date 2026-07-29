@@ -190,3 +190,16 @@ Migration 135: `recruit_applicants.exit_reason` (`future` | `opted_out` | `not_a
 The Discord post that offers an applicant's open times is a **screener scheduler**; a housemate **signs up** for a slot and becomes the **screener**. Row copy reads *"no screener yet · 2d"*, the app action stays **Ask for coverage**, and the preview modal is *"Ask housemates for coverage"* → **Post the scheduler**.
 
 "Claim" survives only where changing it would break things: the `recruit_claim_posts` table and `claimed_*` columns (a rename buys nothing), and Discord `custom_id`s — **live posted buttons carry `claim|…`, so that wire format is frozen**. The edge function accepts both `scheduler-preview`/`scheduler-post` and the legacy `claim-*` action names so a cached browser keeps working.
+
+## Copy rule: no jargon facing housemates
+Anything a housemate can read — Discord posts, DMs, audit lines, in-app copy — uses plain language. Never the words that only make sense inside the system: *ingested, extracted, payload, webhook, upsert, token, API, bot permissions, rejected*.
+
+| Was | Now |
+|---|---|
+| 7 applications ingested from the sheet | 7 new applications |
+| Direct message | Message sent |
+| Sign-in helper posted | Phone sign-in message posted |
+| Posted here because <#x> rejected it — check the bot's permissions | Posting this in <#x> didn't work, so it's here instead |
+| no concrete times could be read | didn't name specific times |
+
+Technical detail still belongs in two places: function logs, and the ops DM that fires when posting fails everywhere (that one is for whoever fixes it).
