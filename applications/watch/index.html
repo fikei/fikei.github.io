@@ -159,17 +159,24 @@
           placeholder.style.height = '';
         }
       };
-      const observer = new IntersectionObserver(([entry]) => {
-        // Dock only while actually watching — a paused video scrolling away
-        // is just a page you've moved past.
+      // Rect-based rather than IntersectionObserver: the observer is suspended
+      // while a tab is backgrounded and its thresholds never report the
+      // fully-scrolled-past state, so geometry on scroll is both simpler and
+      // more predictable. Dock only while actually watching — a paused video
+      // scrolling away is just a page you've moved past.
+      const evaluate = () => {
+        const r = placeholder.getBoundingClientRect();
+        const gone = r.bottom < 56 || r.top > window.innerHeight - 56;
         const watching = !video.paused && !video.ended;
-        setMini(!entry.isIntersecting && watching && !dismissed);
-      }, { threshold: 0.35 });
-      observer.observe(placeholder);
+        setMini(gone && watching && !dismissed);
+      };
+      window.addEventListener('scroll', evaluate, { passive: true });
+      window.addEventListener('resize', evaluate);
+      video.addEventListener('timeupdate', evaluate);
 
       // Pausing in the mini player returns it inline; so does scrolling back.
       video.addEventListener('pause', () => setMini(false));
-      video.addEventListener('play', () => { dismissed = false; });
+      video.addEventListener('play', () => { dismissed = false; evaluate(); });
 
       document.getElementById('mini-expand').addEventListener('click', () => {
         setMini(false);
