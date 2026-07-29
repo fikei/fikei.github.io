@@ -492,6 +492,28 @@ serve(async (req) => {
       return json({ posted: !!row, alreadyClaimed: !row })
     }
 
+    if (action === 'archive-now') {
+      // Force the archive for unarchived recordings and surface real errors
+      // (the cron sweep only logs them).
+      const { data: rows } = await client.from('recruit_screenings')
+        .select('id, recall_bot_id').eq('recall_status', 'done').is('recording_path', null)
+        .not('recall_bot_id', 'is', null)
+      const { getBotResult, archiveVideoToStorage } = await import('../_shared/recall.ts')
+      const out = []
+      for (const r of (rows || [])) {
+        try {
+          const bot = await getBotResult(r.recall_bot_id)
+          if (!bot.videoUrl) { out.push({ id: r.id, skipped: bot.statusCode }); continue }
+          const path = await archiveVideoToStorage(client, bot.videoUrl, `screenings/${r.id}.mp4`)
+          await client.from('recruit_screenings').update({ recording_path: path }).eq('id', r.id)
+          out.push({ id: r.id, archived: path })
+        } catch (err) {
+          out.push({ id: r.id, error: (err as Error).message })
+        }
+      }
+      return json({ results: out })
+    }
+
     if (action === 'recording-link') {
       // Our permanent storage copy first; Recall (short-lived presigned URL)
       // only as fallback for recordings not yet archived.

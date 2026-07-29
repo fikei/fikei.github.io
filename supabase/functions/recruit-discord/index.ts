@@ -533,7 +533,7 @@ async function archiveMissingRecordings(client: ReturnType<typeof db>): Promise<
       try {
         const bot = await getBotResult(r.recall_bot_id)
         if (bot.videoUrl) {
-          const path = await archiveVideoToStorage(bot.videoUrl, `${pathPrefix}/${r[idCol]}.mp4`)
+          const path = await archiveVideoToStorage(client, bot.videoUrl, `${pathPrefix}/${r[idCol]}.mp4`)
           await client.from(table).update({ recording_path: path }).eq(idCol, r[idCol])
           archived++
           console.log(`[archive] backfilled ${table} ${r[idCol]}`)
@@ -631,7 +631,7 @@ async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<
       if (bot.videoUrl) {
         try {
           const { archiveVideoToStorage } = await import('../_shared/recall.ts')
-          recordingPath = await archiveVideoToStorage(bot.videoUrl, `events/${m.gcal_event_id}.mp4`)
+          recordingPath = await archiveVideoToStorage(client, bot.videoUrl, `events/${m.gcal_event_id}.mp4`)
         } catch (err) { console.warn(`[archive] event ${m.gcal_event_id}: ${(err as Error).message}`) }
       }
       await client.from('recruit_recorded_events').update({
@@ -685,7 +685,7 @@ async function processRecordings(client: ReturnType<typeof db>): Promise<number>
       if (bot.videoUrl) {
         try {
           const { archiveVideoToStorage } = await import('../_shared/recall.ts')
-          recordingPath = await archiveVideoToStorage(bot.videoUrl, `screenings/${s.id}.mp4`)
+          recordingPath = await archiveVideoToStorage(client, bot.videoUrl, `screenings/${s.id}.mp4`)
         } catch (err) { console.warn(`[archive] screening ${s.id}: ${(err as Error).message}`) }
       }
       await client.from('recruit_screenings').update({
