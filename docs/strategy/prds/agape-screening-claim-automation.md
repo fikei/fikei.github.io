@@ -135,3 +135,7 @@ Calls scheduled outside the app already get picked up and recorded when the shar
 
 - **Unmatched-call DM** — the cron sweep DMs housemate attendees when an upcoming swept call has a guest that matches no applicant ("link it" + deep link). House-internal meetings (all attendees known) are stamped and never nag. One DM per event (`unmatched_notified_at`, migration 133).
 - **Link modal** — `?link=<gcal_event_id>` opens an applicant picker; linking clones the recorded event into `recruit_screenings` (Watch chip, notes land on the profile) via `recruit-gmail link-recording`, and stamps `applicant_id` on the recorded event.
+
+## Permanent recording archive (v1.11.0 / recruit-gmail v1.14.0, 2026-07-29)
+
+Recall.ai purges bot media ~7 days after a call and its download links are short-lived presigned URLs — old Discord links died and older calls became unwatchable. Now every finished recording is streamed into the private `recruit-recordings` storage bucket (migration 134: `recording_path` on both recording tables). `recording-link` serves a 6-hour signed URL from the archive first, Recall as fallback; a backfill sweep on the cron tick rescues recordings processed before the archive existed and marks Recall-purged ones `media_expired`. Discord recording posts remain convenience links — the app is the durable viewer.

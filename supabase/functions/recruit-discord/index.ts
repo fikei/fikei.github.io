@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.10.1'
+const VERSION = '1.11.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + magic-link sign-in + unmatched-call link nudges`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -516,6 +516,41 @@ async function notifyUnmatchedCalls(client: ReturnType<typeof db>): Promise<numb
   return notified
 }
 
+// Backfill archive: recordings processed before the archive existed (or whose
+// upload failed) get copied to storage while Recall still has the media.
+// media_expired marks the permanently lost so we stop retrying.
+async function archiveMissingRecordings(client: ReturnType<typeof db>): Promise<number> {
+  const { recallEnabled, getBotResult, archiveVideoToStorage } = await import('../_shared/recall.ts')
+  if (!recallEnabled()) return 0
+  let archived = 0
+  const sweep = async (table: string, idCol: string, pathPrefix: string, limit: number) => {
+    const { data: rows } = await client.from(table)
+      .select(`${idCol}, recall_bot_id`)
+      .eq('recall_status', 'done').is('recording_path', null)
+      .not('recall_bot_id', 'is', null).limit(limit)
+    // deno-lint-ignore no-explicit-any
+    for (const r of ((rows || []) as any[])) {
+      try {
+        const bot = await getBotResult(r.recall_bot_id)
+        if (bot.videoUrl) {
+          const path = await archiveVideoToStorage(bot.videoUrl, `${pathPrefix}/${r[idCol]}.mp4`)
+          await client.from(table).update({ recording_path: path }).eq(idCol, r[idCol])
+          archived++
+          console.log(`[archive] backfilled ${table} ${r[idCol]}`)
+        } else if (bot.statusCode === 'media_expired' || bot.done) {
+          await client.from(table).update({ recall_status: 'media_expired' }).eq(idCol, r[idCol])
+          console.warn(`[archive] ${table} ${r[idCol]} media gone (${bot.statusCode})`)
+        }
+      } catch (err) {
+        console.warn(`[archive] backfill ${table} ${r[idCol]}: ${(err as Error).message}`)
+      }
+    }
+  }
+  await sweep('recruit_screenings', 'id', 'screenings', 2)
+  await sweep('recruit_recorded_events', 'gcal_event_id', 'events', 1)
+  return archived
+}
+
 // Calls whose end time passed flip scheduled -> completed so the app stops
 // showing them as upcoming (the Watch chip takes over once notes land).
 async function completePastCalls(client: ReturnType<typeof db>): Promise<number> {
@@ -592,8 +627,16 @@ async function processMeetingRecordings(client: ReturnType<typeof db>): Promise<
         summary = await summarizeMeeting(await fetchTranscriptText(bot.transcriptUrl), m.title || 'Agape call')
       }
       await postMeetingNote(m.title || 'Agape call', summary, bot.videoUrl)
+      let recordingPath: string | null = null
+      if (bot.videoUrl) {
+        try {
+          const { archiveVideoToStorage } = await import('../_shared/recall.ts')
+          recordingPath = await archiveVideoToStorage(bot.videoUrl, `events/${m.gcal_event_id}.mp4`)
+        } catch (err) { console.warn(`[archive] event ${m.gcal_event_id}: ${(err as Error).message}`) }
+      }
       await client.from('recruit_recorded_events').update({
         recall_status: 'done', recording_summary: summary, recording_posted_at: new Date().toISOString(),
+        recording_path: recordingPath,
       }).eq('gcal_event_id', m.gcal_event_id)
       posted++
     } catch (err) {
@@ -636,10 +679,20 @@ async function processRecordings(client: ReturnType<typeof db>): Promise<number>
         summary = await summarizeIntroCall(transcript, applicantName, s.housemate_name || 'a resident')
       }
       await postRecordingNote(applicant?.first_name || 'Applicant', s.applicant_id, s.housemate_name || 'resident', summary, bot.videoUrl)
+      // Permanent copy — Recall purges media in ~7 days. Failure is fine:
+      // recording_path stays null and the backfill sweep retries next tick.
+      let recordingPath: string | null = null
+      if (bot.videoUrl) {
+        try {
+          const { archiveVideoToStorage } = await import('../_shared/recall.ts')
+          recordingPath = await archiveVideoToStorage(bot.videoUrl, `screenings/${s.id}.mp4`)
+        } catch (err) { console.warn(`[archive] screening ${s.id}: ${(err as Error).message}`) }
+      }
       await client.from('recruit_screenings').update({
         recall_status: 'done',
         recording_summary: summary,
         recording_posted_at: new Date().toISOString(),
+        recording_path: recordingPath,
       }).eq('id', s.id)
       posted++
       console.log(`[recall] notes posted for screening ${s.id}`)
@@ -676,6 +729,8 @@ serve(async (req) => {
       await completePastCalls(client)
       const sent = await remindUpcoming(client)
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
+      const archived = await archiveMissingRecordings(client)
+      if (archived) console.log(`[archive] ${archived} recording(s) copied to storage`)
       console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s)`)
       return json({ bots, live, reminded: sent, recorded })
     }

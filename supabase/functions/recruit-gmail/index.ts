@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.13.0'
+const VERSION = '1.14.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -493,14 +493,20 @@ serve(async (req) => {
     }
 
     if (action === 'recording-link') {
-      // Fresh Recall download URL for a finished recording (links expire).
+      // Our permanent storage copy first; Recall (short-lived presigned URL)
+      // only as fallback for recordings not yet archived.
       const { data: s } = await client.from('recruit_screenings')
-        .select('id, recall_bot_id').eq('id', String(body.screeningId || '')).maybeSingle()
-      if (!s?.recall_bot_id) return json({ error: 'No recording for this call' }, 404)
+        .select('id, recall_bot_id, recording_path').eq('id', String(body.screeningId || '')).maybeSingle()
+      if (!s?.recall_bot_id && !s?.recording_path) return json({ error: 'No recording for this call' }, 404)
+      if (s.recording_path) {
+        const { data: signed, error: signErr } = await client.storage
+          .from('recruit-recordings').createSignedUrl(s.recording_path, 6 * 3600)
+        if (!signErr && signed?.signedUrl) return json({ url: signed.signedUrl, source: 'archive' })
+      }
       const { getBotResult } = await import('../_shared/recall.ts')
       const bot = await getBotResult(s.recall_bot_id)
       if (!bot.videoUrl) return json({ error: 'Recording not ready (or has been purged)' }, 404)
-      return json({ url: bot.videoUrl })
+      return json({ url: bot.videoUrl, source: 'recall' })
     }
 
     if (action === 'scan') {
