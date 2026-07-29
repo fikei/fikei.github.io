@@ -12,6 +12,22 @@ export const TZ = 'America/Los_Angeles'
 const CLIENT_ID = Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID')!
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CALENDAR_CLIENT_SECRET')!
 
+// The shared Agape house calendar. Screenings land here so residents see
+// them on the calendar they actually read, instead of only on the shared
+// account's private primary. Overridable per-environment; 'primary' turns
+// the whole behaviour off and restores the old placement.
+export const HOUSE_CALENDAR_ID = Deno.env.get('AGAPE_HOUSE_CALENDAR_ID') ||
+  'knl4pjtdvea5kk80jf1lfuvcpk@group.calendar.google.com'
+
+// Calendars the sweep reads when matching events to applicants. 'primary'
+// stays in the list: invites a housemate sent from the shared account still
+// live there, and so does everything booked before this change.
+export function sweepCalendars(): string[] {
+  const extra = (Deno.env.get('AGAPE_EXTRA_CALENDAR_IDS') || '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+  return [...new Set(['primary', HOUSE_CALENDAR_ID, ...extra])]
+}
+
 // Minimal structural type so we don't pin a supabase-js version here.
 type Db = any
 
@@ -70,11 +86,26 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
     conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
     reminders: { useDefault: true },
   }
-  const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all&conferenceDataVersion=1', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(event),
-  })
+  // Post to the house calendar so residents see the call on the calendar
+  // they actually read. If the shared account only has read access there,
+  // fall back to its own primary rather than failing the booking outright —
+  // a screening that exists on the wrong calendar beats one that never got
+  // scheduled. The fallback is logged loudly so the permission gap surfaces.
+  const post = (calendarId: string) =>
+    fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all&conferenceDataVersion=1`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+
+  let calendarUsed = HOUSE_CALENDAR_ID
+  let resp = await post(calendarUsed)
+  if (!resp.ok && calendarUsed !== 'primary' && (resp.status === 403 || resp.status === 404)) {
+    const why = await resp.text()
+    console.warn(`[calendar] house calendar ${calendarUsed} rejected the event (${resp.status}) — falling back to primary. Grant "Make changes to events" to ${SHARED_EMAIL}. ${why.slice(0, 200)}`)
+    calendarUsed = 'primary'
+    resp = await post(calendarUsed)
+  }
   const created = await resp.json()
   if (!resp.ok) throw new Error(`Calendar failed: ${JSON.stringify(created).slice(0, 200)} — if this mentions scopes, reconnect the shared Gmail to grant calendar access`)
   const meet = created.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || created.hangoutLink || null
@@ -84,6 +115,7 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
     housemate_name: opts.housemateName, housemate_email: opts.housemateEmail,
     starts_at: opts.startsAt.toISOString(), ends_at: endsAt.toISOString(),
     gcal_event_id: created.id, meet_link: meet, status: 'scheduled',
+    kind: 'intro_call', calendar_id: calendarUsed, title: event.summary,
   }).select().single()
   if (error) throw new Error(error.message)
 
