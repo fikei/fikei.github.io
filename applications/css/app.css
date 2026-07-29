@@ -1354,9 +1354,10 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .remove-sheet__option--danger .remove-sheet__option-hint { color: inherit; opacity: 0.75; }
 .remove-sheet__until { margin-top: var(--space-3); }
 .remove-sheet__note { margin-top: var(--space-3); width: 100%; }
-/* --bg tracks the theme, so the label stays legible against both the light
-   theme's dark red and the dark theme's salmon. */
-.btn--danger { background: var(--error); border-color: var(--error); color: var(--bg); }
+/* Matches design-system/components.css .btn--danger (and the app's own
+   .gd-no): outline until hover, never a filled red sitting in a sheet. */
+.btn--danger { background: transparent; border-color: var(--error); color: var(--error); }
+.btn--danger:hover { background: var(--error); color: var(--bg); }
 
 /* Exit state: transparency, never strike-through. 0.45 is the same value
    .inbox-row.is-dragging uses — "in motion, not settled".

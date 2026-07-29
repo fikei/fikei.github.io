@@ -818,7 +818,10 @@ function pickRemoveOption(id) {
   const submit = document.getElementById('remove-submit');
   submit.disabled = false;
   submit.textContent = opt.scope ? 'Remove' : opt.label;
+  // Danger is an outline style — it replaces the accent fill, never stacks
+  // on top of it (design-system/components.css .btn--danger).
   submit.classList.toggle('btn--danger', !!opt.danger);
+  submit.classList.toggle('btn--accent', !opt.danger);
 }
 
 function hideRemoveSheet() {
