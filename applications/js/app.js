@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.24.0';
+const VERSION = '3.26.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -49,6 +49,39 @@ function reasonLabel(id) {
 const HOLD_REASONS = DECISION_REASONS.hold; // legacy references
 // DB keeps 'pass'; the surface calls it Archive.
 const DECISION_LABELS = { outreach: 'Outreach', hold: 'Hold', pass: 'Archive' };
+
+/* Removing someone is one gesture with four outcomes. 'listing' is scope
+   (recruit_listing_candidates tombstone); the other three are exits from the
+   funnel (recruit_applicants.exit_reason, migration 135). Ordered least →
+   most final — only the last one is destructive. */
+const REMOVE_OPTIONS = [
+  {
+    id: 'listing', label: 'From this listing',
+    hint: 'still a candidate for other rooms',
+    chip: 'removed', scope: true,
+  },
+  {
+    id: 'future', label: 'Save for future',
+    hint: 'right person, wrong time — pick when to bring them back',
+    chip: 'saved for future', stage: 'candidate', needsDate: true,
+  },
+  {
+    id: 'opted_out', label: 'Opted out',
+    hint: 'they withdrew — no update email owed',
+    chip: 'opted out', stage: 'archived',
+  },
+  {
+    id: 'not_a_fit', label: 'Not a fit',
+    hint: 'our no — queues an update email',
+    chip: 'not a fit', stage: 'rejected', danger: true,
+  },
+];
+const removeOption = id => REMOVE_OPTIONS.find(o => o.id === id) || null;
+// Default return date for Save for future: three months out, month start.
+function defaultReturnDate() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 3, 1).toISOString().slice(0, 10);
+}
 
 const VIEWS = {
   inbox: { title: 'Inbox', kind: 'applicants' },
@@ -544,6 +577,8 @@ async function loadAll() {
     stage: r.stage || 'review',
     moveinFrom: r.move_in_from, moveinTo: r.move_in_to, moveinSetBy: r.move_in_set_by_name,
     updateSentAt: r.update_email_sent_at, updateSkippedAt: r.update_email_skipped_at,
+    exitReason: r.exit_reason || null, exitUntil: r.exit_until || null,
+    exitNote: r.exit_note || '', exitBy: r.exit_by_name || null,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -642,7 +677,9 @@ async function syncAutoPlacements() {
   if (!houseLoaded) return 0;
   const have = new Set(placements.map(p => `${p.applicant_id}:${p.listing_id}`));
   const fresh = [];
-  for (const a of applicants.filter(x => x.stage === 'candidate')) {
+  // A saved-for-future candidate keeps the stage but is off the board until
+  // their date lands, so they're excluded here as well as in matchesView.
+  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason)) {
     for (const l of listings.filter(l => l.status === 'open')) {
       if (!have.has(`${a.id}:${l.id}`) && qualifiesFor(a, l)) {
         fresh.push({ applicant_id: a.id, listing_id: l.id, source: 'auto' });
@@ -653,7 +690,7 @@ async function syncAutoPlacements() {
     if (p.source !== 'auto' || p.status !== 'active') return false;
     const a = applicants.find(x => x.id === p.applicant_id);
     const l = listings.find(x => x.id === p.listing_id);
-    return !a || !l || a.stage !== 'candidate' || !qualifiesFor(a, l);
+    return !a || !l || a.stage !== 'candidate' || a.exitReason || !qualifiesFor(a, l);
   });
   if (stale.length) {
     const { error } = await sb.from('recruit_listing_candidates').delete().in('id', stale.map(r => r.id));
@@ -693,6 +730,187 @@ async function removePlacement(applicantId, listingId, quiet = false) {
   renderRailCounts();
   if (!document.getElementById('review').hidden) renderReview();
   else if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+}
+
+/* ---------- funnel exits (migration 135) ----------
+   The three non-scope removals. Each writes exit_reason via the RPC and
+   moves the stage; 'not_a_fit' additionally records a pass decision so the
+   update-email tray picks them up. Passing reason=null is the Undo. */
+async function setExit(applicantId, reason, until = null, note = '') {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return false;
+  const { error } = await sb.rpc('recruit_set_exit', {
+    p_applicant: applicantId, p_reason: reason,
+    p_until: reason === 'future' ? until : null,
+    p_note: note || null, p_name: me?.name || null,
+  });
+  if (error) { toast(`Remove failed: ${error.message}`); return false; }
+  a.exitReason = reason;
+  a.exitUntil = reason === 'future' ? until : null;
+  a.exitNote = reason ? note : '';
+  a.exitBy = reason ? (me?.name || null) : null;
+  return true;
+}
+
+/* A future-fit exit hides them from Openings, so their auto placements have
+   to go too — otherwise the sweep and the view disagree about who's live. */
+async function clearActivePlacements(applicantId) {
+  const live = activePlacements(applicantId);
+  if (!live.length) return;
+  const { error } = await sb.from('recruit_listing_candidates')
+    .delete().in('id', live.map(p => p.id));
+  if (error) { console.warn('placement clear failed', error.message); return; }
+  const gone = new Set(live.map(p => p.id));
+  placements = placements.filter(p => !gone.has(p.id));
+}
+
+/* Saved-for-future people come back on their own — that's the whole reason
+   Save for future isn't just Archive. Anyone whose date has arrived has the
+   exit cleared on load; syncAutoPlacements then re-places them normally. */
+async function returnDueCandidates() {
+  const today = new Date().toISOString().slice(0, 10);
+  const due = applicants.filter(x => x.exitReason === 'future' && x.exitUntil && x.exitUntil <= today);
+  if (!due.length) return 0;
+  for (const a of due) {
+    if (await setExit(a.id, null)) a.returnedFromFuture = true;
+  }
+  return due.length;
+}
+
+/* ---------- the Remove sheet ----------
+   One ⋯ item, four outcomes. Opened from an Openings row (listingId set) or
+   from a profile (listingId null, so the scope option is hidden — there's no
+   "this listing" to scope to). */
+let removeTarget = null;   // { applicantId, listingId }
+let removePick = null;     // REMOVE_OPTIONS id
+
+function openRemoveSheet(applicantId, listingId = null) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  removeTarget = { applicantId, listingId: listingId || null };
+  removePick = null;
+  document.getElementById('remove-title').textContent = `Remove ${fullName(a)}`;
+  document.getElementById('remove-note').value = '';
+  document.getElementById('remove-until').value = defaultReturnDate();
+  document.getElementById('remove-until-wrap').hidden = true;
+  renderRemoveOptions();
+  document.getElementById('remove-submit').disabled = true;
+  document.getElementById('remove-submit').classList.remove('btn--danger');
+  document.getElementById('remove-modal').hidden = false;
+}
+
+function renderRemoveOptions() {
+  const listingId = removeTarget?.listingId;
+  document.getElementById('remove-options').innerHTML = REMOVE_OPTIONS
+    .filter(o => !o.scope || listingId)
+    .map(o => `<button type="button" class="remove-sheet__option${removePick === o.id ? ' is-selected' : ''}${o.danger ? ' remove-sheet__option--danger' : ''}" data-remove-pick="${o.id}">
+      <span class="remove-sheet__option-label">${esc(o.label)}</span>
+      <span class="remove-sheet__option-hint">${esc(o.hint)}</span>
+    </button>`).join('');
+}
+
+function pickRemoveOption(id) {
+  const opt = removeOption(id);
+  if (!opt) return;
+  removePick = id;
+  renderRemoveOptions();
+  document.getElementById('remove-until-wrap').hidden = !opt.needsDate;
+  const submit = document.getElementById('remove-submit');
+  submit.disabled = false;
+  submit.textContent = opt.scope ? 'Remove' : opt.label;
+  // Danger is an outline style — it replaces the accent fill, never stacks
+  // on top of it (design-system/components.css .btn--danger).
+  submit.classList.toggle('btn--danger', !!opt.danger);
+  submit.classList.toggle('btn--accent', !opt.danger);
+}
+
+function hideRemoveSheet() {
+  document.getElementById('remove-modal').hidden = true;
+  removeTarget = null;
+  removePick = null;
+}
+
+async function submitRemove() {
+  if (!removeTarget || !removePick) return;
+  const { applicantId, listingId } = removeTarget;
+  const opt = removeOption(removePick);
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a || !opt) return;
+  const note = document.getElementById('remove-note').value.trim();
+  const until = opt.needsDate ? document.getElementById('remove-until').value : null;
+  if (opt.needsDate && !until) { toast('Pick a date to bring them back'); return; }
+
+  hideRemoveSheet();
+  // Fade the row and hold it — nothing is written until the window closes,
+  // so Undo is a no-op rather than a compensating write.
+  beginRowExit(applicantId, listingId, opt, async () => {
+    if (opt.scope) { await removePlacement(applicantId, listingId); return; }
+    if (!await setExit(applicantId, opt.id, until, note)) return;
+    // Their listing slots go with them — all three exits leave the board.
+    await clearActivePlacements(applicantId);
+    if (opt.id === 'not_a_fit') await saveDecision(applicantId, 'pass', null, null, note);
+    if (a.stage !== opt.stage) await setStage(applicantId, opt.stage);
+    toast(opt.id === 'not_a_fit'
+      ? `${fullName(a)} → Archived — update email queued`
+      : opt.id === 'opted_out'
+        ? `${fullName(a)} → Archived — no update email owed`
+        : `${fullName(a)} saved for ${fmtDay(until)} — they'll come back on their own`);
+    renderRailCounts();
+    if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    if (!document.getElementById('review').hidden) renderReview();
+  });
+}
+
+/* ---------- transparency exit ----------
+   The row fades to the same 0.45 the drag state uses, swaps its actions for
+   the outcome chip + Undo, and holds for EXIT_HOLD_MS before the write runs.
+   It never moves while the window is open — no reflow under the cursor. */
+const EXIT_HOLD_MS = 6000;
+const pendingExits = new Map(); // rowKey -> { timer, commit }
+
+const exitRowKey = (applicantId, listingId) => `${applicantId}|${listingId || ''}`;
+
+function beginRowExit(applicantId, listingId, opt, commit) {
+  const key = exitRowKey(applicantId, listingId);
+  if (pendingExits.has(key)) clearTimeout(pendingExits.get(key).timer);
+  const row = document.querySelector(
+    listingId
+      ? `.inbox-row[data-row-id="${CSS.escape(applicantId)}"][data-row-group="${CSS.escape(listingId)}"]`
+      : `.inbox-row[data-row-id="${CSS.escape(applicantId)}"]`);
+  if (!row) { commit(); return; } // row isn't on screen — just do it
+
+  const actions = row.querySelector('.inbox-row__actions');
+  const restore = actions ? actions.innerHTML : null;
+  row.classList.add('is-exiting');
+  if (actions) {
+    actions.innerHTML = `<span class="exit-chip">${esc(opt.chip)}</span>
+      <button type="button" class="cta-link exit-undo" data-undo-exit="${esc(key)}">Undo</button>`;
+  }
+  const timer = setTimeout(() => {
+    pendingExits.delete(key);
+    commit();
+  }, EXIT_HOLD_MS);
+  pendingExits.set(key, { timer, commit, row, actions, restore });
+}
+
+function undoRowExit(key) {
+  const held = pendingExits.get(key);
+  if (!held) return;
+  clearTimeout(held.timer);
+  pendingExits.delete(key);
+  held.row.classList.remove('is-exiting');
+  if (held.actions && held.restore !== null) held.actions.innerHTML = held.restore;
+  toast('Kept them where they were');
+}
+
+/* Any re-render drops the held rows, so commit them first — otherwise the
+   fade silently disappears and the write never happens. */
+function flushPendingExits() {
+  for (const [key, held] of pendingExits) {
+    clearTimeout(held.timer);
+    pendingExits.delete(key);
+    held.commit();
+  }
 }
 
 /* ---------- outreach email drafts ---------- */
@@ -972,8 +1190,10 @@ async function render() {
 function matchesView(a) {
   const out = a.stage !== 'rejected' && a.stage !== 'archived';
   if (view === 'inbox') return a.stage === 'review';
+  // Saved for future stays a candidate — visible in Candidates with its chip,
+  // absent from Openings until the return date brings them back.
   if (view === 'candidates') return a.stage === 'candidate';
-  if (view === 'openings') return activePlacements(a.id).length > 0 && out;
+  if (view === 'openings') return activePlacements(a.id).length > 0 && out && !a.exitReason;
   if (view === 'screening') return !!screeningState[a.id] && out;
   if (view === 'archive') return !out;
   return false;
@@ -1241,13 +1461,21 @@ function placementChip(a) {
 
 function rowBadge(a) {
   if (view === 'inbox') return voteChip(a);
-  if (view === 'archive') return stageChip(a);
+  // Archive carries two facts: which kind of no, and whether they've been
+  // told. The email chip only earns its place when an email is actually
+  // owed or sent — "opted out · Archived" is noise.
+  if (view === 'archive') {
+    const owed = a.stage === 'rejected' || a.updateSentAt;
+    return exitChip(a) + (owed || !a.exitReason ? stageChip(a) : '');
+  }
   if (view === 'screening') return screeningChip(a);
-  if (view === 'candidates') return placementChip(a);
+  if (view === 'candidates') return exitChip(a) || placementChip(a);
   return decisionChip(a.id);
 }
 
 function renderApplicants() {
+  // Held rows die on re-render, so their writes have to land first.
+  flushPendingExits();
   const viewList = applicants.filter(matchesView);
   const list = viewList.filter(matchesFilters);
   const filtered = list.length !== viewList.length;
@@ -1383,7 +1611,7 @@ function renderApplicants() {
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${repliedDot(a)}
-            ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder">⠿</span>' : ''}
+            ${view === 'openings' ? '<span class="inbox-row__grip" title="Drag to reorder — or drop on another listing to move them">⠿</span>' : ''}
             <button class="inbox-row__main" data-review="${a.id}">
               ${avatarHtml(a)}
               <span class="inbox-row__text">
@@ -1433,8 +1661,9 @@ function othersAccordion(listingId) {
   </details>`;
 }
 
-/* Row-level ⋯: profile, availability link, remove, and Pass (archives +
-   queues the update email — passing always requires outreach). */
+/* Row-level ⋯: navigation up top, one Remove… below the rule. The four
+   removal outcomes live in the sheet rather than the menu — each needs a
+   consequence line ("queues an update email") that a menu can't carry. */
 function rowMenuHtml(a, listingId) {
   const mid = `row-${a.id}-${listingId}`;
   return `<span class="listing-menu-wrap">
@@ -1442,12 +1671,22 @@ function rowMenuHtml(a, listingId) {
     <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
-      <button type="button" class="listing-menu__item" data-remove-placement="${a.id}|${esc(listingId)}">Remove from this listing</button>
       ${screeningState[a.id]?.watch ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
-      <button type="button" class="listing-menu__item" data-dropped-row="${a.id}">${esc(a.first)} dropped out…</button>
-      <button type="button" class="listing-menu__item listing-menu__item--danger" data-pass-row="${a.id}">Pass on ${esc(a.first)}…</button>
+      <span class="listing-menu__rule" aria-hidden="true"></span>
+      <button type="button" class="listing-menu__item" data-open-remove="${a.id}|${esc(listingId)}">Remove…</button>
     </span>
   </span>`;
+}
+
+/* Exit state on a row outside Openings — Candidates shows saved-for-future
+   with its return date, Archive shows which kind of no it was. */
+function exitChip(a) {
+  if (!a.exitReason) return '';
+  const opt = removeOption(a.exitReason);
+  if (!opt) return '';
+  const when = a.exitReason === 'future' && a.exitUntil ? ` · ${fmtDay(a.exitUntil)}` : '';
+  const who = a.exitBy ? ` by ${a.exitBy}` : '';
+  return `<span class="decision-chip decision-chip--exit decision-chip--exit-${esc(a.exitReason)}" title="${esc(opt.hint)}${esc(who)}">${esc(opt.chip)}${esc(when)}</span>`;
 }
 
 /* Occupancy-gap sweep: stretches of 28+ days with nothing scheduled in the
@@ -1522,33 +1761,101 @@ function openGiveDecision(applicantId) {
   modal.hidden = false;
 }
 
-/* Drag-to-reorder applicants inside each listing group; shared house state. */
+/* Drag applicants inside a listing group to reorder, or across groups to
+   move them to another opening. Same-group drops write shared row order;
+   cross-group drops are a real placement move (drop the source, add the
+   target) so the auto-sweep won't undo either half. */
 let dragRow = null; // { id, group }
+
+function saveRowOrder(group, ids) {
+  const rowOrder = (settings.outreach_row_order && typeof settings.outreach_row_order === 'object') ? settings.outreach_row_order : {};
+  rowOrder[group] = ids;
+  settings.outreach_row_order = rowOrder;
+  sb.from('recruit_settings').upsert({
+    key: 'outreach_row_order', value: rowOrder,
+    updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+  }).then(({ error }) => { if (error) toast(`Order save failed: ${error.message}`); });
+}
+
+/* Move a placement between listings. The source row is deleted rather than
+   tombstoned: a 'removed' tombstone is a recruiter saying "never here
+   again", which isn't what a move means — they may well qualify later. */
+async function movePlacement(applicantId, fromListingId, toListingId) {
+  const a = applicants.find(x => x.id === applicantId);
+  const to = listings.find(l => l.id === toListingId);
+  if (!a || !to) return;
+  if (activePlacements(applicantId).some(p => p.listing_id === toListingId)) {
+    toast(`${a.first} is already on that listing`);
+    return;
+  }
+  const added = await addPlacement(applicantId, toListingId, 'manual');
+  if (!added) return;
+  const src = placements.find(p => p.applicant_id === applicantId && p.listing_id === fromListingId);
+  if (src) {
+    const { error } = await sb.from('recruit_listing_candidates').delete().eq('id', src.id);
+    if (error) { toast(`Move half-finished: ${error.message}`); }
+    else placements = placements.filter(p => p.id !== src.id);
+  }
+  const room = rooms.find(r => r.id === to.room_id);
+  toast(`${a.first} moved to ${room?.name || 'the other listing'}${qualifiesFor(a, to) ? '' : " — they don't auto-qualify there, so it'll stick"}`);
+  renderRailCounts();
+  renderApplicants();
+}
+
 function wireRowDrag(host) {
+  const clearTargets = () => host.querySelectorAll('.is-drop-target')
+    .forEach(el => el.classList.remove('is-drop-target'));
+
   host.querySelectorAll('.inbox-row[data-row-id]').forEach(row => {
     row.addEventListener('dragstart', e => {
       dragRow = { id: row.dataset.rowId, group: row.dataset.rowGroup };
       row.classList.add('is-dragging');
       e.dataTransfer.effectAllowed = 'move';
+      // Firefox won't start a drag without payload.
+      try { e.dataTransfer.setData('text/plain', row.dataset.rowId); } catch { /* */ }
     });
-    row.addEventListener('dragend', () => { row.classList.remove('is-dragging'); dragRow = null; });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('is-dragging');
+      clearTargets();
+      dragRow = null;
+    });
     row.addEventListener('dragover', e => {
-      if (dragRow && row.dataset.rowGroup === dragRow.group) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+      if (!dragRow) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
     });
     row.addEventListener('drop', e => {
+      if (!dragRow) return;
       e.preventDefault();
-      if (!dragRow || row.dataset.rowGroup !== dragRow.group || row.dataset.rowId === dragRow.id) return;
-      const group = dragRow.group;
+      e.stopPropagation(); // don't also fire the section handler underneath
+      const { id, group } = dragRow;
+      clearTargets();
+      if (row.dataset.rowGroup !== group) { movePlacement(id, group, row.dataset.rowGroup); return; }
+      if (row.dataset.rowId === id) return;
       const ids = [...host.querySelectorAll(`.inbox-row[data-row-group="${CSS.escape(group)}"]`)].map(x => x.dataset.rowId);
-      ids.splice(ids.indexOf(row.dataset.rowId), 0, ids.splice(ids.indexOf(dragRow.id), 1)[0]);
-      const rowOrder = (settings.outreach_row_order && typeof settings.outreach_row_order === 'object') ? settings.outreach_row_order : {};
-      rowOrder[group] = ids;
-      settings.outreach_row_order = rowOrder;
-      sb.from('recruit_settings').upsert({
-        key: 'outreach_row_order', value: rowOrder,
-        updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
-      }).then(({ error }) => { if (error) toast(`Order save failed: ${error.message}`); });
+      ids.splice(ids.indexOf(row.dataset.rowId), 0, ids.splice(ids.indexOf(id), 1)[0]);
+      saveRowOrder(group, ids);
       renderApplicants();
+    });
+  });
+
+  // Whole-section targets — the only way to reach a listing with no rows yet.
+  host.querySelectorAll('.inbox-group[data-group-key]').forEach(section => {
+    section.addEventListener('dragover', e => {
+      if (!dragRow || section.dataset.groupKey === dragRow.group) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      section.classList.add('is-drop-target');
+    });
+    section.addEventListener('dragleave', e => {
+      if (!section.contains(e.relatedTarget)) section.classList.remove('is-drop-target');
+    });
+    section.addEventListener('drop', e => {
+      if (!dragRow || section.dataset.groupKey === dragRow.group) return;
+      e.preventDefault();
+      const { id, group } = dragRow;
+      clearTargets();
+      movePlacement(id, group, section.dataset.groupKey);
     });
   });
 }
@@ -2452,13 +2759,24 @@ function renderReviewFoot(a) {
       const room = rooms.find(r => r.id === l.room_id);
       return `<button type="button" class="decision-chip decision-chip--outreach placement-pill" data-remove-placement="${a.id}|${p.listing_id}" title="Remove from ${esc(room?.name || 'this listing')} — the auto-sweep won't re-add them">${esc(room?.name || 'Room')} ✕</button>`;
     }).join('');
-    foot.innerHTML = `
-      ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
-      <span class="foot-cta">${openingsCta(a)}</span>
-      <span class="foot-links">
-        <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to a listing'}</button>
-        <button type="button" class="cta-link cta-link--danger" data-open-decision="pass">Not a fit…</button>
-      </span>`;
+    // Saved for future: they're off the board, so the outreach CTA would be
+    // a lie. Show the standing date and a way back instead.
+    if (a.exitReason === 'future') {
+      foot.innerHTML = `
+        <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
+        <span class="foot-links">
+          <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back now</button>
+          <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
+        </span>`;
+    } else {
+      foot.innerHTML = `
+        ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
+        <span class="foot-cta">${openingsCta(a)}</span>
+        <span class="foot-links">
+          <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Add to another listing' : 'Add to a listing'}</button>
+          <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
+        </span>`;
+    }
   } else {
     foot.innerHTML = `<button class="btn review__btn" data-reopen="${a.id}">Reopen — back to Inbox</button>`;
   }
@@ -3183,6 +3501,10 @@ async function _checkMembershipAndEnter() {
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
     loadHouse().then(async () => {
+      // Saved-for-future people whose date has landed come back first, so the
+      // placement sweep below re-places them in the same pass.
+      const back = await returnDueCandidates();
+      if (back) toast(`${back} saved candidate${back === 1 ? ' is' : 's are'} back — their date arrived`);
       const added = await syncAutoPlacements();
       if (added) toast(`${added} auto-placement${added === 1 ? '' : 's'} added across open listings`);
       const drafted = await syncDraftListings();
@@ -3364,32 +3686,28 @@ function init() {
       proseT.textContent = clamped ? 'More' : 'Less';
       return;
     }
-    const dr = e.target.closest('[data-dropped-row]');
-    if (dr) {
-      const a = applicants.find(x => x.id === dr.dataset.droppedRow);
-      if (a && confirm(`${fullName(a)} dropped out? They move to the Archive and come off every listing — no update email is owed, since they withdrew.`)) {
-        saveDecision(a.id, 'pass', 'dropped-out', null, 'Dropped out');
-        Promise.all(activePlacements(a.id).map(pl => removePlacement(a.id, pl.listing_id, true)))
-          .then(() => setStage(a.id, 'archived'))
-          .then(() => {
-            toast(`${fullName(a)} → Archived (dropped out)`);
-            renderRailCounts();
-            if (VIEWS[view]?.kind === 'applicants') renderApplicants();
-          });
-      }
+    const orm = e.target.closest('[data-open-remove]');
+    if (orm) {
+      const [aid, lid] = orm.dataset.openRemove.split('|');
+      openRemoveSheet(aid, lid || null);
       return;
     }
-    const pr = e.target.closest('[data-pass-row]');
-    if (pr) {
-      const a = applicants.find(x => x.id === pr.dataset.passRow);
-      if (a && confirm(`Pass on ${fullName(a)}? They move to the Archive and get queued for an update email.`)) {
-        saveDecision(a.id, 'pass', null, null, '');
-        setStage(a.id, 'rejected').then(() => {
-          toast(`${fullName(a)} → Archived — update email queued`);
-          renderRailCounts();
-          if (VIEWS[view]?.kind === 'applicants') renderApplicants();
-        });
-      }
+    const rpick = e.target.closest('[data-remove-pick]');
+    if (rpick) { pickRemoveOption(rpick.dataset.removePick); return; }
+    const undo = e.target.closest('[data-undo-exit]');
+    if (undo) { undoRowExit(undo.dataset.undoExit); return; }
+    const bb = e.target.closest('[data-bring-back]');
+    if (bb) {
+      const id = bb.dataset.bringBack;
+      setExit(id, null).then(async ok => {
+        if (!ok) return;
+        if (!houseLoaded) await loadHouse();
+        const added = await syncAutoPlacements();
+        toast(`Back on the board${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
+        renderRailCounts();
+        if (!document.getElementById('review').hidden) renderReview();
+        else if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+      });
       return;
     }
     const sp = e.target.closest('[data-slot-pick]');
@@ -3580,6 +3898,10 @@ function init() {
     if (error) { toast(`Preference save failed: ${error.message}`); e.target.checked = !value; settings.open_to_couples = !value; }
     else toast(value ? 'House preference: open to couples' : 'House preference: not open to couples');
   };
+
+  document.getElementById('remove-close').onclick = hideRemoveSheet;
+  document.getElementById('remove-cancel').onclick = hideRemoveSheet;
+  document.getElementById('remove-submit').onclick = submitRemove;
 
   document.getElementById('claim-close').onclick = closeClaimModal;
   document.getElementById('claim-cancel').onclick = closeClaimModal;

@@ -107,7 +107,7 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 ## v3.17 amendments
 - **Review availability** (blue) replaces Pick a time; context tier shows `N windows offered`. Opens a modal: bookable slot chips per window, a **How we read it** bullet list (their verbatim snippet + date, timezone conversion note, platform request, the day-part mapping rules), and the secondary path at the bottom: *"Doesn't work with your schedule? Ask the house on Discord"* (→ claim-post preview).
 - **Post-screening primary is Schedule a visit** (blue, opens the email draft); Watch demotes to a small inline green ▶ icon beside it — an icon secondary doesn't violate the one-primary rule.
-- **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach).
+- **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach). *Superseded in v3.26 — see below.*
 
 
 ## v3.23 (2026-07-27) — the outstanding list
@@ -120,8 +120,68 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 - **Flexible dial**: bare "Flexible" rides any window; "month + flexible" = that month ±1.
 - **Auto-post toggle**: `discord_auto_post` setting (rail footer checkbox) — the manual→auto claim cutover without a deploy.
 
-## v3.24 — dropped out
+## v3.24 — dropped out *(superseded by v3.26)*
 Row ⋮ in Openings gains **"[name] dropped out…"**. A withdrawal is not a rejection: it archives clean (`stage='archived'`, **no update email owed**), pulls them off every listing with tombstones so the auto-sweep can't re-add them, and records `reason='dropped-out'` for the CSV. Archive shows a neutral **Dropped out** chip instead of "Update queued".
+
+*This is now the **Opted out** option in the v3.26 Remove sheet.* The menu item and its confirm dialog are gone; historical `reason='dropped-out'` rows are backfilled to `exit_reason='opted_out'` by migration 135 and still render their **Dropped out** chip via `stageChip`.
 
 ## v3.25 — automation audit channel
 `#recruiting-interviews` was renamed **`#recruiting-automation`** (same channel id). It is now the audit hub: `auditMirror()` in `_shared/discord.ts` posts a one-line record of **every** automation — channel posts, pings, notes, recordings, live-call announcements, and DMs — alongside the real message at its intended target. Skipped when the target already is the automation channel; failures are logged, never propagated. New-application pings target **#recruiting-society** (the members channel) with a 14-day floor so enabling them never dumps the backlog.
+
+## v3.26 (2026-07-29) — removing someone
+
+`Pass` collapsed three different outcomes into one destructive action that always archived **and** queued a rejection email. They're now four, behind one gesture.
+
+### The ⋯ menu
+
+Navigation on top, a rule, then one item:
+
+```
+Open profile
+Copy availability link
+Give decision…            (only when a recording exists)
+──────────────────────
+Remove…
+```
+
+The four outcomes live in a **sheet**, not a submenu — each needs a consequence line that a menu can't carry, and hover submenus are unreliable on a touch surface where the row is already a drag handle.
+
+### The Remove sheet
+
+| Option | Hint | Stage | Placements | Email owed |
+|---|---|---|---|---|
+| **From this listing** | still a candidate for other rooms | unchanged | tombstones *this* one | none |
+| **Save for future** | right person, wrong time — pick when to bring them back | `candidate` | all cleared | none |
+| **Opted out** | they withdrew — no update email owed | `archived` | all cleared | **none** |
+| **Not a fit** | our no — queues an update email | `rejected` | all cleared | queued in the update tray |
+
+*From this listing* only appears when the sheet is opened from an Openings row — there's no "this listing" to scope to from a profile. *Save for future* expands a date field inline (defaults to three months out).
+
+Ordered least → most final; only *Not a fit* is red.
+
+### Where they show up afterward
+
+| Outcome | Openings | Candidates | Archive |
+|---|---|---|---|
+| From this listing | leaves that group; reachable under "See other qualified applicants" with `removed` + **Add** | unchanged | — |
+| Save for future | gone until the date | `saved for future · Mar 1, 2027` chip; foot offers **Bring back now** | — |
+| Opted out | gone | — | `opted out` chip |
+| Not a fit | gone | — | `not a fit` chip |
+
+**Save for future auto-returns.** `returnDueCandidates()` runs at load: anyone whose `exit_until` has passed has the exit cleared, and the placement sweep re-places them in the same pass. Without the return trip it would just be Archive with extra steps.
+
+### Transparency exit (never strike-through)
+
+Picking an option doesn't write immediately. The row fades to `opacity: .45` — the same value `.inbox-row.is-dragging` uses, i.e. "in motion, not settled" — swaps its actions for the outcome chip plus **Undo**, and holds 6s. It never moves while the window is open, so nothing reflows under the cursor. Undo is a no-op rather than a compensating write; any re-render flushes held rows so a pending write can't be silently lost.
+
+**Strike-through is not used anywhere in this design system.** Removed, deferred, and archived states are all expressed with transparency.
+
+### Cross-listing drag
+
+Dragging a row onto **another** listing moves the placement (add target, delete source). Dropping inside the same group still reorders. The whole `.inbox-group` is a drop target, so a listing with no rows yet is reachable; it outlines while hovered.
+
+The source placement is **deleted, not tombstoned** — a tombstone means "never here again", which isn't what a move means. If the person doesn't auto-qualify for the target, the toast says so (the manual placement will stick).
+
+### Schema
+
+Migration 135: `recruit_applicants.exit_reason` (`future` | `opted_out` | `not_a_fit`), `exit_until` (DATE, only valid with `future`), `exit_note`, `exit_by_name`, `exit_at`. Writes go through the `recruit_set_exit` RPC — the table stays client-read-only, same pattern as `recruit_set_stage`. Passing a NULL reason clears the exit (that's Bring back now). "From this listing" is *not* recorded here — `recruit_listing_candidates.status` already holds that tombstone.

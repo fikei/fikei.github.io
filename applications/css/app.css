@@ -1330,6 +1330,66 @@ body[data-auth-state="loading"] .gate { visibility: hidden; }
 .cta--green.btn { background: #1D9E75; border-color: #1D9E75; color: #fff; }
 .gd-no { color: var(--error); border-color: var(--error); background: transparent; }
 
+/* --- v3.24.0: the Remove sheet, transparency exits, cross-listing drag --- */
+
+/* Menu rule: navigation above, removal below. */
+.listing-menu__rule {
+  height: 1px; margin: 4px 6px;
+  background: var(--border);
+}
+
+/* Each option carries its consequence, so it's a two-line target. */
+.remove-sheet__options { display: flex; flex-direction: column; gap: var(--space-2); }
+.remove-sheet__option {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px; text-align: left; cursor: pointer;
+  background: var(--bg-surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.remove-sheet__option:hover { background: var(--bg-overlay); border-color: var(--border-strong); }
+.remove-sheet__option.is-selected { border-color: currentColor; background: var(--bg-overlay); }
+.remove-sheet__option--danger { color: var(--error); }
+.remove-sheet__option-label { font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.remove-sheet__option-hint { font-size: var(--font-size-caption); color: var(--fg-subtle); }
+.remove-sheet__option--danger .remove-sheet__option-hint { color: inherit; opacity: 0.75; }
+.remove-sheet__until { margin-top: var(--space-3); }
+.remove-sheet__note { margin-top: var(--space-3); width: 100%; }
+/* Matches design-system/components.css .btn--danger (and the app's own
+   .gd-no): outline until hover, never a filled red sitting in a sheet. */
+.btn--danger { background: transparent; border-color: var(--error); color: var(--error); }
+.btn--danger:hover { background: var(--error); color: var(--bg); }
+
+/* Exit state: transparency, never strike-through. 0.45 is the same value
+   .inbox-row.is-dragging uses — "in motion, not settled".
+   The fade applies to WHO is leaving, not to the chip saying so or the way
+   back — dimming the Undo would hide the one control that still matters. */
+.inbox-row.is-exiting .inbox-row__main,
+.inbox-row.is-exiting .inbox-row__grip,
+.inbox-row.is-exiting .replied-dot,
+.inbox-row.is-exiting .note-bubble { opacity: 0.45; }
+.inbox-row.is-exiting .inbox-row__main { pointer-events: none; }
+.exit-chip {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
+  border-radius: var(--radius-pill); background: var(--pass-tint);
+  color: var(--fg-subtle); font-size: var(--font-size-caption);
+  font-weight: var(--fw-semibold); white-space: nowrap;
+}
+.exit-undo { margin-left: var(--space-2); }
+/* Colored by how final the exit was: amber = coming back, gray = they left,
+   red = our no. */
+.decision-chip--exit-future { background: var(--hold-tint); color: var(--hold-fg); }
+.decision-chip--exit-opted_out { background: var(--pass-tint); color: var(--fg-subtle); }
+.decision-chip--exit-not_a_fit { background: var(--pass-tint); color: var(--error); }
+
+/* Cross-listing drop target — the whole section lights up, so a listing
+   with no rows yet is still reachable. */
+.inbox-group.is-drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+.inbox-group.is-drop-target .inbox-empty--group { color: var(--accent); }
+
 /* --- v3.22.1 (restored post-rebase): mobile CTA-column fix — must stay
    LAST so the cascade resolves in its favor. --- */
 @media (max-width: 480px) {

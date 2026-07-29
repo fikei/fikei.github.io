@@ -52,6 +52,7 @@ The CTRL Design System provides a unified visual language across all ctrl.rodeo 
 - **Minimal** — Borders over fills, function over decoration
 - **Dark-first** — Dark mode default with optional light mode
 - **Accessible** — Clear visual hierarchy, readable text
+- **Transparency, never strike-through** — Removed, deferred, archived, and disabled things are expressed by reducing opacity. `text-decoration: line-through` is not used anywhere in this system. See [Removed & deferred states](#removed--deferred-states).
 
 ## Quick Start
 
@@ -565,6 +566,99 @@ Button group for admin panel sections.
 - Flexbox with gap spacing
 - Wraps on narrow screens
 - Buttons match admin panel style
+
+### Removed & deferred states
+
+**Rule: transparency, never strike-through.** Nothing in this system uses `text-decoration: line-through`. A thing on its way out is dimmed, not defaced — strike-through reads as "wrong/invalid", while these states mean "no longer here", which is a different fact.
+
+Two opacity values, both already load-bearing:
+
+| Value | Meaning | Existing users |
+|---|---|---|
+| `0.45` | **In motion, not settled** — mid-drag, mid-exit, pending a write | `.inbox-row.is-dragging`, `.inbox-row.is-exiting` |
+| `0.5` | **Settled but inactive** — closed, filled, archived, disabled | `.listing-row.is-done`, disabled buttons (`0.35`) |
+
+Do not introduce a third value for "faded" without a reason the table can't cover.
+
+**Dim the subject, not the controls.** When a row is mid-exit it still carries an outcome chip and an Undo. Those must stay at full opacity — dimming the way back hides the one control that still matters.
+
+```html
+<li class="inbox-row is-exiting">
+  <span class="inbox-row__grip">⠿</span>              <!-- dimmed -->
+  <button class="inbox-row__main">…name, avatar…</button>  <!-- dimmed -->
+  <span class="inbox-row__actions">                    <!-- full opacity -->
+    <span class="exit-chip">not a fit</span>
+    <button class="cta-link exit-undo">Undo</button>
+  </span>
+</li>
+```
+
+```css
+.inbox-row.is-exiting .inbox-row__main,
+.inbox-row.is-exiting .inbox-row__grip { opacity: 0.45; }
+.inbox-row.is-exiting .inbox-row__main { pointer-events: none; }
+```
+
+**Hold before committing.** A destructive action fades the row and waits (~6s) before writing. The row does **not** move during the hold — nothing reflows under the cursor. Undo is therefore a no-op rather than a compensating write, and any re-render must flush held rows so a pending write can't be silently dropped.
+
+*Reference implementation: `applications/js/app.js` — `beginRowExit()` / `undoRowExit()` / `flushPendingExits()`.*
+
+### Reason Sheet
+
+A destructive or branching action with **more than two outcomes** opens a sheet, not a submenu. Each option carries a one-line consequence; menus can't show that, and hover submenus fail on touch.
+
+```html
+<div class="email-modal__card remove-sheet">
+  <div class="email-modal__head">
+    <h3 class="hold-sheet__title">Remove Marisa Chen</h3>
+    <button class="review__close email-modal__close">✕</button>
+  </div>
+  <div class="remove-sheet__options">
+    <button class="remove-sheet__option">
+      <span class="remove-sheet__option-label">From this listing</span>
+      <span class="remove-sheet__option-hint">still a candidate for other rooms</span>
+    </button>
+    <button class="remove-sheet__option is-selected">…</button>
+    <button class="remove-sheet__option remove-sheet__option--danger">
+      <span class="remove-sheet__option-label">Not a fit</span>
+      <span class="remove-sheet__option-hint">our no — queues an update email</span>
+    </button>
+  </div>
+  <!-- optional: a field an option reveals inline, never a second layer -->
+  <label class="listing-form__field remove-sheet__until" hidden>…</label>
+  <textarea class="notes__input remove-sheet__note" rows="2"></textarea>
+  <div class="decision-sheet__actions">
+    <button class="hold-sheet__cancel">Cancel</button>
+    <button class="btn btn--accent btn--sm btn--danger">Not a fit</button>
+  </div>
+</div>
+```
+
+**Reason sheet rules:**
+- Options ordered **least → most final**; at most one `--danger`
+- Every option gets a hint line stating its consequence (what's written, what's sent)
+- An option needing extra input expands **inline** — never a second sheet
+- The submit button's label mirrors the chosen option, not a generic "Confirm"
+- `btn--danger` **replaces** `btn--accent` rather than stacking on it — danger is an outline style that fills on hover, so the two together produce an accent fill with a red border
+- The parent menu keeps a single entry (`Remove…`), with a `.listing-menu__rule` separating navigation from destructive items
+
+### Drop Target
+
+Whole-container drop zone for drag-and-drop between groups. Highlighting the **container** rather than an insertion line is what makes an empty group reachable.
+
+```html
+<section class="inbox-group is-drop-target" data-group-key="listing-42">…</section>
+```
+
+```css
+.inbox-group.is-drop-target { outline: 2px dashed var(--accent); outline-offset: 4px; }
+```
+
+**Drop target behavior:**
+- `outline`, not `border` — no layout shift when it appears
+- Applied on `dragover`, cleared on `dragleave` and `dragend` (guard `dragleave` with `!el.contains(e.relatedTarget)` so child elements don't flicker it off)
+- Row-level `drop` handlers must `stopPropagation()` so the container handler doesn't also fire
+- Set `dataTransfer.setData('text/plain', …)` on `dragstart` — Firefox won't start a drag without a payload
 
 ### AI Widget System (`widgets.css`)
 
