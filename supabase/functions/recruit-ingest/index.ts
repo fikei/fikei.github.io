@@ -6,20 +6,60 @@
 // Deployed with --no-verify-jwt: the caller is a Google Apps Script, not a
 // signed-in user, so it authenticates with a shared secret header instead.
 //
-// POST /functions/v1/recruit-ingest
-//   headers: x-ingest-secret: <RECRUIT_INGEST_SECRET>
-//   body:    { rows: [ { "<sheet header>": "<value>", ... } ], dryRun?: true }
+// Two ways in:
+//   PULL (primary, hourly cron) — POST /functions/v1/recruit-ingest/pull
+//     auth: X-Cron-Nonce (cron) or x-ingest-secret (manual). Reads the sheet
+//     with the shared Google account's token, so no secret lives in the sheet.
+//   PUSH (optional, real-time) — POST /functions/v1/recruit-ingest
+//     auth: x-ingest-secret. body { rows: [ { "<header>": "<value>" } ] }
+//     For a Fillout/Apps Script webhook when seconds matter.
+//   dryRun: true on either reports the mapping and writes nothing.
 //
 // Idempotent: the row's id is derived from the applicant's name + submission
 // timestamp, and inserts ignore duplicates — so resending the whole sheet is
 // a safe backfill, not a mess of copies.
 
-const VERSION = '1.0.1'
+const VERSION = '1.1.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { postChannelEmbed, AUTOMATION_CHANNEL_ID } from '../_shared/discord.ts'
+import { sharedAccessToken } from '../_shared/recruit-schedule.ts'
+
+// The application spreadsheet + tab, overridable so a new form or season
+// doesn't need a deploy.
+const SHEET_ID = Deno.env.get('RECRUIT_SHEET_ID') || '1dyDpPv7LhFSjL2Nz2E_2GMBIR-qGZg4qW4TjEkt7Epg'
+const SHEET_RANGE = Deno.env.get('RECRUIT_SHEET_RANGE') || 'Form Responses 1'
+
+/* Read the sheet as rows of { header: value } with the shared account's OAuth
+   token. Needs the spreadsheets.readonly scope; until the account is
+   reconnected Google answers 403, and we say exactly that rather than
+   failing quietly. */
+// deno-lint-ignore no-explicit-any
+async function readSheet(client: any): Promise<Array<Record<string, unknown>>> {
+  const at = await sharedAccessToken(client)
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_RANGE)}`
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${at}` } })
+  const text = await resp.text()
+  if (!resp.ok) {
+    if (resp.status === 403 && /insufficient|scope|ACCESS_TOKEN_SCOPE/i.test(text)) {
+      throw new Error('the shared Google account has not granted the Sheets scope yet — reconnect it from the /applications rail footer')
+    }
+    if (resp.status === 403 || resp.status === 404) {
+      throw new Error(`the shared account cannot read the sheet — share it with live.at.agapesf@gmail.com as Viewer (HTTP ${resp.status})`)
+    }
+    throw new Error(`Sheets API ${resp.status}: ${text.slice(0, 200)}`)
+  }
+  const values: string[][] = JSON.parse(text).values || []
+  if (values.length < 2) return []
+  const headers = values[0]
+  return values.slice(1).map((row) => {
+    const obj: Record<string, unknown> = {}
+    headers.forEach((h, i) => { if (h) obj[String(h)] = row[i] ?? '' })
+    return obj
+  })
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,21 +127,41 @@ function deriveId(first: string, last: string, submittedAt: Date): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const secret = Deno.env.get('RECRUIT_INGEST_SECRET')
-    if (!secret) return json({ error: 'RECRUIT_INGEST_SECRET not configured' }, 500)
-    if (req.headers.get('x-ingest-secret') !== secret) return json({ error: 'bad or missing x-ingest-secret' }, 401)
-
+    const isPull = new URL(req.url).pathname.endsWith('/pull')
+    const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const body = await req.json().catch(() => ({}))
-    const rows: Array<Record<string, unknown>> = Array.isArray(body.rows) ? body.rows
-      : body.row && typeof body.row === 'object' ? [body.row] : []
-    if (!rows.length) return json({ error: 'send { rows: [ {header: value} ] }' }, 400)
     const dryRun = body.dryRun === true
 
-    const client = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+    // The hourly cron presents a one-time nonce (same handshake the reminder
+    // cron uses); humans and webhooks present the shared secret.
+    const secret = Deno.env.get('RECRUIT_INGEST_SECRET')
+    const nonce = req.headers.get('x-cron-nonce')
+    let authed = Boolean(secret) && req.headers.get('x-ingest-secret') === secret
+    if (!authed && nonce) {
+      const { data: burned } = await client.from('recruit_cron_nonce')
+        .delete().eq('nonce', nonce).gte('created_at', new Date(Date.now() - 10 * 60000).toISOString())
+        .select('nonce').maybeSingle()
+      authed = Boolean(burned)
+    }
+    if (!authed) return json({ error: 'bad or missing x-ingest-secret / x-cron-nonce' }, 401)
+
+    let rows: Array<Record<string, unknown>>
+    if (isPull) {
+      try {
+        rows = await readSheet(client)
+      } catch (err) {
+        console.error(`[recruit-ingest] pull failed: ${(err as Error).message}`)
+        return json({ error: (err as Error).message }, 502)
+      }
+    } else {
+      rows = Array.isArray(body.rows) ? body.rows
+        : body.row && typeof body.row === 'object' ? [body.row] : []
+      if (!rows.length) return json({ error: 'send { rows: [ {header: value} ] }' }, 400)
+    }
     const prepared: Array<Record<string, string>> = []
     const skipped: string[] = []
 
-    for (const raw of rows.slice(0, 200)) {
+    for (const raw of rows.slice(0, 500)) {
       const m = mapRow(raw)
       if (!m.email?.includes('@')) { skipped.push(`no email: ${JSON.stringify(raw).slice(0, 80)}`); continue }
       if (!m.first_name) { skipped.push(`no name: ${m.email}`); continue }
@@ -118,7 +178,7 @@ serve(async (req) => {
       })
     }
 
-    if (dryRun) return json({ dryRun: true, wouldInsert: prepared, skipped })
+    if (dryRun) return json({ dryRun: true, source: isPull ? 'sheet' : 'push', rowsRead: rows.length, wouldInsert: prepared, skipped })
     if (!prepared.length) return json({ inserted: 0, skipped })
 
     // ignoreDuplicates: resending the sheet is a backfill, not a mess.
@@ -142,7 +202,7 @@ serve(async (req) => {
       }
     }
     console.log(`[recruit-ingest] ${created.length} created, ${prepared.length - created.length} already present, ${skipped.length} skipped`)
-    return json({ inserted: created.length, ids: created.map((c) => c.id), duplicates: prepared.length - created.length, skipped })
+    return json({ inserted: created.length, source: isPull ? 'sheet' : 'push', rowsRead: rows.length, ids: created.map((c) => c.id), duplicates: prepared.length - created.length, skipped })
   } catch (err) {
     console.error(`[recruit-ingest] ${(err as Error).message}`)
     return json({ error: (err as Error).message }, 500)
