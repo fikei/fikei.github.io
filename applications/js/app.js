@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.23.0';
+const VERSION = '3.24.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -31,6 +31,7 @@ const DECISION_REASONS = {
     { id: 'other', label: 'Other' },
   ],
   pass: [
+    { id: 'dropped-out', label: 'Dropped out' },
     { id: 'fit', label: 'Not a community fit' },
     { id: 'budget', label: 'Budget too low' },
     { id: 'timing', label: 'Timing doesn’t work' },
@@ -680,13 +681,14 @@ async function addPlacement(applicantId, listingId, source = 'manual') {
   return data;
 }
 
-async function removePlacement(applicantId, listingId) {
+async function removePlacement(applicantId, listingId, quiet = false) {
   const { error } = await sb.from('recruit_listing_candidates')
     .update({ status: 'removed', updated_at: new Date().toISOString() })
     .eq('applicant_id', applicantId).eq('listing_id', listingId);
   if (error) { toast(`Remove failed: ${error.message}`); return; }
   const row = placements.find(p => p.applicant_id === applicantId && p.listing_id === listingId);
   if (row) row.status = 'removed';
+  if (quiet) return;
   toast('Removed from the listing — the auto-sweep won\'t re-add them');
   renderRailCounts();
   if (!document.getElementById('review').hidden) renderReview();
@@ -1068,6 +1070,7 @@ function stageChip(a) {
     const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}` : (decisions[a.id]?.note || 'Did not pass review');
     return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
   }
+  if (decisions[a.id]?.reason === 'dropped-out') return `<span class="decision-chip decision-chip--vote" title="They withdrew — no update email owed">Dropped out</span>`;
   if (a.updateSentAt) return `<span class="decision-chip decision-chip--outreach" title="Update email sent">Update sent ${fmtDate(a.updateSentAt)}</span>`;
   return `<span class="decision-chip decision-chip--pass">Archived</span>`;
 }
@@ -1441,6 +1444,7 @@ function rowMenuHtml(a, listingId) {
       ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
       <button type="button" class="listing-menu__item" data-remove-placement="${a.id}|${esc(listingId)}">Remove from this listing</button>
       ${screeningState[a.id]?.watch ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
+      <button type="button" class="listing-menu__item" data-dropped-row="${a.id}">${esc(a.first)} dropped out…</button>
       <button type="button" class="listing-menu__item listing-menu__item--danger" data-pass-row="${a.id}">Pass on ${esc(a.first)}…</button>
     </span>
   </span>`;
@@ -3358,6 +3362,21 @@ function init() {
       const prose = proseT.previousElementSibling;
       const clamped = prose.classList.toggle('is-clamped');
       proseT.textContent = clamped ? 'More' : 'Less';
+      return;
+    }
+    const dr = e.target.closest('[data-dropped-row]');
+    if (dr) {
+      const a = applicants.find(x => x.id === dr.dataset.droppedRow);
+      if (a && confirm(`${fullName(a)} dropped out? They move to the Archive and come off every listing — no update email is owed, since they withdrew.`)) {
+        saveDecision(a.id, 'pass', 'dropped-out', null, 'Dropped out');
+        Promise.all(activePlacements(a.id).map(pl => removePlacement(a.id, pl.listing_id, true)))
+          .then(() => setStage(a.id, 'archived'))
+          .then(() => {
+            toast(`${fullName(a)} → Archived (dropped out)`);
+            renderRailCounts();
+            if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+          });
+      }
       return;
     }
     const pr = e.target.closest('[data-pass-row]');

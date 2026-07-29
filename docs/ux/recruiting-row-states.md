@@ -119,3 +119,6 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 - **Schedule a visit** drafts a visit-specific invite (`emailType: 'visit'`).
 - **Flexible dial**: bare "Flexible" rides any window; "month + flexible" = that month ±1.
 - **Auto-post toggle**: `discord_auto_post` setting (rail footer checkbox) — the manual→auto claim cutover without a deploy.
+
+## v3.24 — dropped out
+Row ⋮ in Openings gains **"[name] dropped out…"**. A withdrawal is not a rejection: it archives clean (`stage='archived'`, **no update email owed**), pulls them off every listing with tombstones so the auto-sweep can't re-add them, and records `reason='dropped-out'` for the CSV. Archive shows a neutral **Dropped out** chip instead of "Update queued".
