@@ -57,7 +57,7 @@ serve(async (req) => {
       if (error) return json({ error: 'Could not save — try again' }, 500)
       console.log(`availability saved for ${applicant.id} (${windows.length} windows)`)
 
-      // Post/refresh the claimable message in #recruiting-interviews.
+      // Post/refresh the claimable message in #recruiting-automation.
       // Warn-only: Discord being down never blocks the applicant's save.
       try {
         const { data: full } = await client.from('recruit_applicants')

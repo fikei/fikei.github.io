@@ -122,3 +122,6 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 
 ## v3.24 — dropped out
 Row ⋮ in Openings gains **"[name] dropped out…"**. A withdrawal is not a rejection: it archives clean (`stage='archived'`, **no update email owed**), pulls them off every listing with tombstones so the auto-sweep can't re-add them, and records `reason='dropped-out'` for the CSV. Archive shows a neutral **Dropped out** chip instead of "Update queued".
+
+## v3.25 — automation audit channel
+`#recruiting-interviews` was renamed **`#recruiting-automation`** (same channel id). It is now the audit hub: `auditMirror()` in `_shared/discord.ts` posts a one-line record of **every** automation — channel posts, pings, notes, recordings, live-call announcements, and DMs — alongside the real message at its intended target. Skipped when the target already is the automation channel; failures are logged, never propagated. New-application pings target **#recruiting-society** (the members channel) with a 14-day floor so enabling them never dumps the backlog.
