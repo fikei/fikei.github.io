@@ -2,20 +2,25 @@
 
 **One line:** the application spreadsheet pushes each new row to the `recruit-ingest` edge function on submit, so applicants appear in `/applications` Inbox without a manual import.
 
-Status: **endpoint live** (`recruit-ingest` v1.0.1) · **one setup step left in the sheet** (below).
+Status: **live, API pull on an hourly cron** (`recruit-ingest` v1.1.0, migration 131) · one blocker: the shared Google account needs a reconnect to grant the Sheets scope.
 
 ---
 
-## Why push, not pull
+## Why the API pull is primary
 
-Google Sheets has no native webhook. The two real options:
+Google Sheets has no native webhook, so the two options are an Apps Script trigger inside the sheet (push) or a scheduled read through the Sheets API (pull). **Pull is the primary path** because it's more stable in the ways that matter here:
 
-| Approach | Latency | Cost to set up | Notes |
-|---|---|---|---|
-| **Apps Script trigger → our endpoint** ✅ chosen | seconds | paste one script into the sheet, once | No new OAuth scopes. The sheet already has permission to read itself. |
-| Scheduled pull via pg_cron + Sheets API | up to an hour | reconnect the shared Google account with an added `spreadsheets.readonly` scope, or share the sheet with a service account | More moving parts, and a scope change re-triggers the OAuth consent dance. |
+| | API pull ✅ primary | Apps Script push |
+|---|---|---|
+| Where the code lives | our repo, deployed + versioned | inside the spreadsheet, editable by anyone with edit access |
+| Secret exposure | none — the shared account's OAuth token | the ingest secret sits in plaintext in the script |
+| Failure visibility | edge-function logs + the audit channel | Apps Script disables triggers after repeated errors, silently |
+| Works for hand-added rows | yes (it reads the whole tab) | no (only fires on form submit) |
+| Latency | up to an hour | seconds |
 
-Push wins because it needs no new Google permissions and lands applicants while the applicant is still warm — the Discord ping and the vote can happen the same hour.
+An hour of latency costs nothing: the applicant has just filled in a form and isn't waiting on us. The push endpoint stays available for a Fillout-style webhook if real-time ever matters.
+
+Because the pull is **idempotent**, re-reading the entire sheet every hour is free: ids derive from name + submission timestamp and inserts ignore duplicates.
 
 ## The endpoint
 
@@ -32,7 +37,13 @@ body:    { "rows": [ { "<sheet header>": "<value>", ... } ] }
 - New rows land at `stage='review'`, so the funnel picks them up: the `recruit-gmail` scan pings #recruiting-society (14-day floor, digest at 4+) and the house votes.
 - Each ingest posts one audit line to #recruiting-automation.
 
-## Setup: the Apps Script (one time, in the sheet)
+## What runs
+
+- **Cron** (migration 131): `recruit_application_ingest_tick`, hourly at :07, one-time-nonce auth (same handshake as the reminder cron).
+- **Endpoint**: `POST /functions/v1/recruit-ingest/pull` — reads `RECRUIT_SHEET_ID` / `RECRUIT_SHEET_RANGE` (defaults to the Jan 2026+ responses sheet, tab `Form Responses 1`) with the shared account's token.
+- **Prereqs**: the sheet is shared with `live.at.agapesf@gmail.com` (already true), and that account has granted `spreadsheets.readonly` — added to recruit-gmail's consent screen, so **reconnecting the shared Gmail from the /applications rail footer grants it**. Until then the pull returns a plain-English 502 saying exactly that.
+
+## Optional: real-time push via Apps Script
 
 1. Open the application spreadsheet → **Extensions → Apps Script**.
 2. Paste this, replacing `PASTE_SECRET_HERE` with the `RECRUIT_INGEST_SECRET` value (ask Ian / read it from Supabase → Edge Functions → Secrets):
