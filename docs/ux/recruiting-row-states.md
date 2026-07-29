@@ -107,7 +107,7 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 ## v3.17 amendments
 - **Review availability** (blue) replaces Pick a time; context tier shows `N windows offered`. Opens a modal: bookable slot chips per window, a **How we read it** bullet list (their verbatim snippet + date, timezone conversion note, platform request, the day-part mapping rules), and the secondary path at the bottom: *"Doesn't work with your schedule? Ask the house on Discord"* (→ claim-post preview).
 - **Post-screening primary is Schedule a visit** (blue, opens the email draft); Watch demotes to a small inline green ▶ icon beside it — an icon secondary doesn't violate the one-primary rule.
-- **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach). *Superseded in v3.24 — see below.*
+- **Row ⋯ menu** (grip back on the left edge): Open profile · Copy availability link · Remove from this listing · **Pass on [name]…** (confirm → stage `rejected`, update email queued — passing always requires outreach). *Superseded in v3.26 — see below.*
 
 
 ## v3.23 (2026-07-27) — the outstanding list
@@ -120,7 +120,15 @@ Watch opens a **Call** tab on the applicant profile (not a modal): recording pla
 - **Flexible dial**: bare "Flexible" rides any window; "month + flexible" = that month ±1.
 - **Auto-post toggle**: `discord_auto_post` setting (rail footer checkbox) — the manual→auto claim cutover without a deploy.
 
-## v3.24 (2026-07-29) — removing someone
+## v3.24 — dropped out *(superseded by v3.26)*
+Row ⋮ in Openings gains **"[name] dropped out…"**. A withdrawal is not a rejection: it archives clean (`stage='archived'`, **no update email owed**), pulls them off every listing with tombstones so the auto-sweep can't re-add them, and records `reason='dropped-out'` for the CSV. Archive shows a neutral **Dropped out** chip instead of "Update queued".
+
+*This is now the **Opted out** option in the v3.26 Remove sheet.* The menu item and its confirm dialog are gone; historical `reason='dropped-out'` rows are backfilled to `exit_reason='opted_out'` by migration 135 and still render their **Dropped out** chip via `stageChip`.
+
+## v3.25 — automation audit channel
+`#recruiting-interviews` was renamed **`#recruiting-automation`** (same channel id). It is now the audit hub: `auditMirror()` in `_shared/discord.ts` posts a one-line record of **every** automation — channel posts, pings, notes, recordings, live-call announcements, and DMs — alongside the real message at its intended target. Skipped when the target already is the automation channel; failures are logged, never propagated. New-application pings target **#recruiting-society** (the members channel) with a 14-day floor so enabling them never dumps the backlog.
+
+## v3.26 (2026-07-29) — removing someone
 
 `Pass` collapsed three different outcomes into one destructive action that always archived **and** queued a rejection email. They're now four, behind one gesture.
 

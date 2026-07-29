@@ -1,17 +1,39 @@
 // _shared/discord.ts
-// Discord REST helpers for the screening-claim flow: post/edit the claimable
-// message in #recruiting-interviews, DM the claimer, nudge stuck posts.
-// Used by recruit-gmail, recruit-availability, and recruit-discord.
+// Discord REST helpers for the recruiting automations: claim posts, notes,
+// pings, DMs. Used by recruit-gmail, recruit-availability, recruit-discord.
+//
+// Channel roles:
+//   #recruiting-automation — every automated message the app sends lands
+//     here as well as at its intended target, so the house has one audit
+//     trail and subgroups can be granted access to just this channel.
+//     (Formerly #recruiting-automation — same channel id, renamed 2026-07.)
+//   #recruiting-society — the members channel: new-application pings,
+//     Intro Call notes/recordings, live-call announcements.
 
 // deno-lint-ignore-file no-explicit-any
 
 import { TZ } from './recruit-schedule.ts'
 
 const DISCORD_API = 'https://discord.com/api/v10'
-// #recruiting-interviews in the Agape guild (952961396121931838)
-export const CLAIMS_CHANNEL_ID = Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || '1529576830514762029'
-// #recruiting-society — where finished Intro Call notes/recordings post
+// #recruiting-automation in the Agape guild (952961396121931838) — claim
+// posts live here AND it is the audit mirror for every other automation.
+export const AUTOMATION_CHANNEL_ID = Deno.env.get('RECRUITING_AUTOMATION_CHANNEL_ID')
+  || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || '1529576830514762029'
+// Kept for callers that still speak in claim terms — same channel.
+export const CLAIMS_CHANNEL_ID = AUTOMATION_CHANNEL_ID
+// #recruiting-society — the members channel (pings, notes, recordings)
 export const NOTES_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
+
+// Compact one-liner for the audit trail: the embed's title/description or
+// the plain content, whichever the payload carries.
+function summarize(payload: Record<string, unknown>): string {
+  const embeds = payload.embeds as Array<Record<string, string>> | undefined
+  if (embeds?.length) {
+    const e = embeds[0]
+    return [e.title, (e.description || '').split('\n')[0]].filter(Boolean).join(' — ')
+  }
+  return String(payload.content || '(no text)').split('\n')[0]
+}
 
 function botHeaders(): Record<string, string> {
   const token = Deno.env.get('DISCORD_BOT_TOKEN')
@@ -110,6 +132,12 @@ function appLink(applicantId: string): string {
   return `https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`
 }
 
+// Capability link to our archived copy — Recall's presigned URLs died within
+// hours, so recording posts point here instead. The token is the credential.
+function watchLink(shareToken: string): string {
+  return `https://ctrl.rodeo/applications/watch/?t=${encodeURIComponent(shareToken)}`
+}
+
 // "her/his/their application" from the applicant's own pronouns field;
 // neutral "their" whenever unstated or ambiguous.
 function possessive(pronouns: string | null | undefined): string {
@@ -188,7 +216,7 @@ async function postOrPatch(channelId: string, messageId: string | null, payload:
 }
 
 // Post (or edit, per the one-open-post-per-applicant rule) the claim message —
-// in BOTH #recruiting-interviews and #recruiting-society. Either copy is
+// in BOTH #recruiting-automation and #recruiting-society. Either copy is
 // claimable; both carry the same custom_ids so the claim handler is agnostic.
 // Returns the recruit_claim_posts row, or null when posting was skipped.
 export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promise<any | null> {
@@ -216,7 +244,7 @@ export async function upsertClaimMessage(db: any, input: ClaimPostInput): Promis
   const { data: row, error } = await db.from('recruit_claim_posts').upsert({
     applicant_id: input.applicantId,
     discord_message_id: message.id,
-    discord_channel_id: message.channel_id || CLAIMS_CHANNEL_ID,
+    discord_channel_id: message.channel_id || AUTOMATION_CHANNEL_ID,
     mirror_message_id: mirror?.id || null,
     mirror_channel_id: mirror ? (mirror.channel_id || NOTES_CHANNEL_ID) : null,
     slots, platform: input.platform, timezone_note: input.timezoneNote,
@@ -283,6 +311,8 @@ export async function editClaimMessageFailed(
   })
 }
 
+/* DMs are audited as well: a claimer's confirmation is an automation the
+   house should be able to see happened, without exposing the DM thread. */
 export async function dmUser(discordUserId: string, content: string): Promise<void> {
   const channel = await discordFetch('/users/@me/channels', {
     method: 'POST', body: JSON.stringify({ recipient_id: discordUserId }),
@@ -290,6 +320,34 @@ export async function dmUser(discordUserId: string, content: string): Promise<vo
   await discordFetch(`/channels/${channel.id}/messages`, {
     method: 'POST', body: JSON.stringify({ content }),
   })
+  await auditMirror('Direct message', content.split('\n')[0], { dmTo: discordUserId })
+}
+
+/* Audit mirror: a one-line record of every automated message, posted to
+   #recruiting-automation alongside the real thing. Best-effort by design —
+   an audit failure must never break (or double-report) the automation it
+   describes, and messages that already went to the automation channel are
+   skipped so the trail stays readable. */
+export async function auditMirror(
+  label: string, summary: string, target: { channelId?: string; dmTo?: string } = {},
+): Promise<void> {
+  try {
+    if (target.channelId && target.channelId === AUTOMATION_CHANNEL_ID) return
+    const where = target.dmTo ? `DM → <@${target.dmTo}>`
+      : target.channelId ? `→ <#${target.channelId}>`
+      : '→ (no channel)'
+    await discordFetch(`/channels/${AUTOMATION_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        embeds: [{
+          description: `🤖 **${label}** ${where}\n${summary.slice(0, 900)}`,
+          color: 0x6a6c6a,
+        }],
+      }),
+    })
+  } catch (err) {
+    console.warn(`[discord] audit mirror for "${label}" failed: ${(err as Error).message}`)
+  }
 }
 
 // Ops contact for last-resort alerts when Discord posting fails everywhere.
@@ -301,9 +359,10 @@ const ALERT_DISCORD_USER_ID = Deno.env.get('ALERT_DISCORD_USER_ID') || '85378260
 // the other recruiting channel with a ⚠️ prefix → DM the ops contact.
 // Throws if every rung fails, so callers don't stamp state as posted.
 export async function postResilient(channelId: string, payload: Record<string, unknown>, label: string): Promise<void> {
-  const fallback = channelId === NOTES_CHANNEL_ID ? CLAIMS_CHANNEL_ID : NOTES_CHANNEL_ID
+  const fallback = channelId === NOTES_CHANNEL_ID ? AUTOMATION_CHANNEL_ID : NOTES_CHANNEL_ID
   try {
     await discordFetch(`/channels/${channelId}/messages`, { method: 'POST', body: JSON.stringify(payload) })
+    await auditMirror(label, summarize(payload), { channelId })
     return
   } catch (err) {
     console.warn(`[discord] ${label}: post to ${channelId} failed: ${(err as Error).message}`)
@@ -331,12 +390,12 @@ export async function postResilient(channelId: string, payload: Record<string, u
 // Post the recording + summary back to the claims channel after a call ends.
 export async function postRecordingNote(
   firstName: string, applicantId: string, residentName: string,
-  summary: string | null, videoUrl: string | null,
+  summary: string | null, shareToken: string | null,
 ): Promise<void> {
   const lines = [
     summary || '_No transcript captured (captions may have been off)._',
     '',
-    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+    shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
     `📋 [Full profile](${appLink(applicantId)})`,
   ]
   await postResilient(NOTES_CHANNEL_ID, {
@@ -350,12 +409,12 @@ export async function postRecordingNote(
 
 // Notes for a non-applicant meeting hosted by the shared account.
 export async function postMeetingNote(
-  title: string, summary: string | null, videoUrl: string | null,
+  title: string, summary: string | null, shareToken: string | null,
 ): Promise<void> {
   const lines = [
     summary || '_No transcript captured (captions may have been off)._',
     '',
-    videoUrl ? `🎥 [Recording](${videoUrl}) _(link expires — grab it soon)_` : '🎥 Recording unavailable.',
+    shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
   ]
   await postResilient(NOTES_CHANNEL_ID, {
     embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
@@ -375,6 +434,7 @@ export async function postLiveCall(title: string, when: string, meetLink: string
 // Persistent "Get sign-in link" helper message for phone sign-in — tapping
 // the button gets an ephemeral one-time link (handled in recruit-discord).
 export async function postSigninMessage(channelId: string): Promise<any> {
+  await auditMirror('Sign-in helper posted', 'Persistent phone sign-in message', { channelId })
   return await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: JSON.stringify({
@@ -394,11 +454,13 @@ export async function postSigninMessage(channelId: string): Promise<any> {
 
 // One channel nudge for a post nobody claimed within 96h.
 // Plain embed post to any channel (new-application pings etc.).
-export async function postChannelEmbed(channelId: string, description: string, color = 0x378add): Promise<any> {
-  return await discordFetch(`/channels/${channelId}/messages`, {
+export async function postChannelEmbed(channelId: string, description: string, color = 0x378add, label = 'Automated post'): Promise<any> {
+  const msg = await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: JSON.stringify({ embeds: [{ description, color }] }),
   })
+  await auditMirror(label, description.split('\n')[0], { channelId })
+  return msg
 }
 
 export async function notifyStuck(channelId: string, messageId: string, firstName: string): Promise<void> {

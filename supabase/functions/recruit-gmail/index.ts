@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.14.0'
+const VERSION = '1.15.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed } from '../_shared/discord.ts'
+import { upsertClaimMessage, editClaimMessageClaimed, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,7 +114,7 @@ async function autoPostEnabled(client: ReturnType<typeof db>): Promise<boolean> 
 }
 
 // After availability lands, post/refresh the claimable message in
-// #recruiting-interviews. Warn-only: Discord being down never breaks a scan.
+// #recruiting-automation. Warn-only: Discord being down never breaks a scan.
 async function postClaim(client: ReturnType<typeof db>, applicantId: string, extraction: Extraction): Promise<void> {
   if (!extraction.windows.length && !extraction.needs_human) return
   try {
@@ -492,6 +492,28 @@ serve(async (req) => {
       return json({ posted: !!row, alreadyClaimed: !row })
     }
 
+    if (action === 'archive-now') {
+      // Force the archive for unarchived recordings and surface real errors
+      // (the cron sweep only logs them).
+      const { data: rows } = await client.from('recruit_screenings')
+        .select('id, recall_bot_id').eq('recall_status', 'done').is('recording_path', null)
+        .not('recall_bot_id', 'is', null)
+      const { getBotResult, archiveVideoToStorage } = await import('../_shared/recall.ts')
+      const out = []
+      for (const r of (rows || [])) {
+        try {
+          const bot = await getBotResult(r.recall_bot_id)
+          if (!bot.videoUrl) { out.push({ id: r.id, skipped: bot.statusCode }); continue }
+          const path = await archiveVideoToStorage(client, bot.videoUrl, `screenings/${r.id}.mp4`)
+          await client.from('recruit_screenings').update({ recording_path: path }).eq('id', r.id)
+          out.push({ id: r.id, archived: path })
+        } catch (err) {
+          out.push({ id: r.id, error: (err as Error).message })
+        }
+      }
+      return json({ results: out })
+    }
+
     if (action === 'recording-link') {
       // Our permanent storage copy first; Recall (short-lived presigned URL)
       // only as fallback for recordings not yet archived.
@@ -663,11 +685,16 @@ serve(async (req) => {
       // a batch of 4+ collapses into a single digest.
       let pinged = 0
       try {
-        const pingChannel = Deno.env.get('RECRUITING_PING_CHANNEL_ID') || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || ''
+        // New applications go to the members channel; the audit copy lands in
+        // #recruiting-automation automatically.
+        const pingChannel = Deno.env.get('RECRUITING_PING_CHANNEL_ID') || NOTES_CHANNEL_ID
         if (pingChannel) {
+          // Only genuinely new applications — a 14-day floor keeps switching
+          // this on from dumping the historical backlog into the channel.
+          const pingFloor = new Date(Date.now() - 14 * 86400000).toISOString()
           const { data: fresh } = await client.from('recruit_applicants')
             .select('id, first_name, last_name, residency, move_in, why_agape')
-            .eq('stage', 'review').is('discord_ping_at', null)
+            .eq('stage', 'review').is('discord_ping_at', null).gte('submitted_at', pingFloor)
             .order('submitted_at', { ascending: false }).limit(12)
           const { data: votedRows } = await client.from('recruit_votes').select('applicant_id')
           const voted = new Set((votedRows || []).map((v) => v.applicant_id))
@@ -675,7 +702,7 @@ serve(async (req) => {
           const appLink = (id: string) => `https://ctrl.rodeo/applications/?a=${encodeURIComponent(id)}`
           if (toPing.length > 3) {
             const lines = toPing.map((a) => `• [${a.first_name} ${a.last_name || ''}](${appLink(a.id)})`).join('\n')
-            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`)
+            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`, 0x378add, `${toPing.length} new applications`)
           } else {
             for (const a of toPing) {
               const track = /short/i.test(a.residency || '') ? 'Sublet' : 'Full-time'
@@ -683,7 +710,7 @@ serve(async (req) => {
               await postChannelEmbed(pingChannel,
                 `📥 **${a.first_name} ${a.last_name || ''}** applied — ${track}${a.move_in ? ` · ${String(a.move_in).slice(0, 60)}` : ''}\n` +
                 (why ? `_${why}_\n` : '') +
-                `[Read + vote](${appLink(a.id)})`)
+                `[Read + vote](${appLink(a.id)})`, 0x378add, `New application — ${a.first_name}`)
             }
           }
           if (toPing.length) {

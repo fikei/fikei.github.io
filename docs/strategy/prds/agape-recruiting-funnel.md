@@ -21,7 +21,7 @@ Status: **Phase A shipped (v3.0.0, migration 120); auto-placement shipped early 
    - Score ≥ threshold (avg ≥ 3.5 across ≥ 3 votes) → Candidates.
    - Everyone who doesn't pass **receives an update email** (Phase B queue).
 3. **Room openings** — listings generated from the occupancy calendar; candidates bucketed into the listing that fits best (move-in date weighted heaviest). Same-date openings share one general pool; the room is assigned later. A Recruiting member sends the screening request from the listing shortlist.
-4. **Screening request** — availability asked in natural language; replies trigger the claim flow in `#recruiting-interviews` (see [agape-screening-claim-automation.md](./agape-screening-claim-automation.md), built in a parallel effort — `recruit-discord` is shared infrastructure).
+4. **Screening request** — availability asked in natural language; replies trigger the claim flow in `#recruiting-automation` (see [agape-screening-claim-automation.md](./agape-screening-claim-automation.md), built in a parallel effort — `recruit-discord` is shared infrastructure).
 
 Out of scope for now (manual): post-screening accept/vote, house tour, onboarding (Notion, Google permissions, buddy matching).
 

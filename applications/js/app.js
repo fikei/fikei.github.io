@@ -9,7 +9,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.24.0';
+const VERSION = '3.26.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -31,6 +31,7 @@ const DECISION_REASONS = {
     { id: 'other', label: 'Other' },
   ],
   pass: [
+    { id: 'dropped-out', label: 'Dropped out' },
     { id: 'fit', label: 'Not a community fit' },
     { id: 'budget', label: 'Budget too low' },
     { id: 'timing', label: 'Timing doesn’t work' },
@@ -717,13 +718,14 @@ async function addPlacement(applicantId, listingId, source = 'manual') {
   return data;
 }
 
-async function removePlacement(applicantId, listingId) {
+async function removePlacement(applicantId, listingId, quiet = false) {
   const { error } = await sb.from('recruit_listing_candidates')
     .update({ status: 'removed', updated_at: new Date().toISOString() })
     .eq('applicant_id', applicantId).eq('listing_id', listingId);
   if (error) { toast(`Remove failed: ${error.message}`); return; }
   const row = placements.find(p => p.applicant_id === applicantId && p.listing_id === listingId);
   if (row) row.status = 'removed';
+  if (quiet) return;
   toast('Removed from the listing — the auto-sweep won\'t re-add them');
   renderRailCounts();
   if (!document.getElementById('review').hidden) renderReview();
@@ -1285,6 +1287,7 @@ function stageChip(a) {
     const why = st.veto ? `Vetoed by ${st.veto.voter_name || 'a housemate'}` : (decisions[a.id]?.note || 'Did not pass review');
     return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
   }
+  if (decisions[a.id]?.reason === 'dropped-out') return `<span class="decision-chip decision-chip--vote" title="They withdrew — no update email owed">Dropped out</span>`;
   if (a.updateSentAt) return `<span class="decision-chip decision-chip--outreach" title="Update email sent">Update sent ${fmtDate(a.updateSentAt)}</span>`;
   return `<span class="decision-chip decision-chip--pass">Archived</span>`;
 }
@@ -2954,7 +2957,7 @@ async function openClaimPreview(applicantId) {
     if (claimCtx?.applicantId !== applicantId) return; // closed meanwhile
     claimCtx.extraction = out.extraction;
     const emb = out.preview?.embeds?.[0] || {};
-    document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-interviews:';
+    document.getElementById('claim-status').textContent = 'This exact message goes to #recruiting-automation:';
     document.getElementById('claim-preview-body').innerHTML = `
       <div class="claim-preview ${out.slotLabels?.length ? '' : 'claim-preview--manual'}">
         <p class="claim-preview__title">${esc(emb.title || '')}</p>
@@ -2978,7 +2981,7 @@ async function postClaimFromModal() {
   btn.disabled = true; btn.textContent = 'Posting…';
   try {
     const out = await gmailCall({ action: 'claim-post', applicantId: claimCtx.applicantId, extraction: claimCtx.extraction });
-    toast(out.posted ? 'Posted to #recruiting-interviews — first claim wins' : 'Already claimed — not reposted');
+    toast(out.posted ? 'Posted to #recruiting-automation — first claim wins' : 'Already claimed — not reposted');
     closeClaimModal();
   } catch (e) {
     toast(`Post failed: ${e.message}`);

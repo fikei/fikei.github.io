@@ -85,11 +85,14 @@ BEGIN
 END;
 $$;
 
--- Backfill: everyone already archived by a recruiter 'pass' decision was,
--- under the old single-verb model, always our no. Historical rows keep
--- their attribution; the update-email state is untouched either way.
+-- Backfill from the two verbs that came before this sheet:
+--   'pass' + reason 'dropped-out'  → they withdrew        → opted_out
+--   'pass' + anything else         → our no               → not_a_fit
+-- The dropped-out carve-out matters: those people chose to leave, and
+-- relabelling them 'not a fit' would misattribute the decision to the house.
+-- Historical rows keep their attribution; update-email state is untouched.
 UPDATE recruit_applicants a
-  SET exit_reason = 'not_a_fit',
+  SET exit_reason = CASE WHEN d.reason = 'dropped-out' THEN 'opted_out' ELSE 'not_a_fit' END,
       exit_by_name = d.decided_by_name,
       exit_at = d.decided_at
   FROM recruit_decisions d

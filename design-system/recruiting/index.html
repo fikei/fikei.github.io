@@ -166,7 +166,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>design system · v3.23</span><a href="/design-system/">← all design systems</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>design system · v3.25</span><a href="/design-system/">← all design systems</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -205,6 +205,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
       <a href="#listing-header" data-story="listing-header">Listing header</a>
       <a href="#profile" data-story="profile">Profile</a>
       <a href="#stage-machine" data-story="stage-machine">Stage machine</a>
+      <a href="#automation-audit" data-story="automation-audit">Automation audit</a>
     </div>
   </div>
 </aside>
@@ -562,6 +563,27 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
         <li>Long answers clamp to six lines with More/Less; heard-from is a quiet "Via" fact, not a bubble.</li>
         <li>The Call tab holds the recording, AI summary, and comments with "comment at current time" stamps.</li>
         <li>Confirmed move-in replaces the parsed date outright — green, ✓, attributed — with the raw answer on hover.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-automation-audit">
+    <h1>Automation audit</h1>
+    <p class="lede">Every automated message the app sends is visible in one channel, so the house can audit the robot and subgroups can be given access to just that channel.</p>
+    <div class="canvas">
+      <div style="background:var(--elevated);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 16px;max-width:520px;">
+        <p style="margin:0 0 4px;font-size:13px;">🤖 <b>New application — Marisa</b> → #recruiting-society</p>
+        <p style="margin:0;font-size:12px;color:var(--ink-3);">📥 Marisa Maccaro applied — Full-time · Sep 2026</p>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Notes</h3>
+      <ul>
+        <li><b>#recruiting-automation</b> is the audit hub (formerly #recruiting-interviews — same channel, renamed). Claim posts live here; everything else is mirrored here.</li>
+        <li><b>#recruiting-society</b> is the members channel: new-application pings, Intro Call notes and recordings, live-call announcements.</li>
+        <li>Mirrors are one compact line — label, target channel, first line of the real message. Best-effort: an audit failure never breaks the automation it describes, and messages that already went to the automation channel aren't echoed.</li>
+        <li><b>DMs are audited too</b> — the house sees that a claimer confirmation went out without seeing the thread.</li>
+        <li>New-application pings only cover the last 14 days, so turning them on never dumps the backlog.</li>
       </ul>
     </div>
   </section>
