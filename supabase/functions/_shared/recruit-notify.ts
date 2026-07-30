@@ -683,9 +683,18 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
     const who = active.get(sc.applicant_id)
     if (!who || !sc.starts_at) continue
     const when = new Date(sc.starts_at)
-    const dayPart = ptToday(when) === ptToday()
-      ? 'today'
-      : when.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: TZ })
+    /* A booking is only news before it happens. Backfilled and swept calls are
+       already in the past, and announcing one as "booked" reads as though it
+       had just been arranged. A day of grace, so a call booked this morning for
+       this afternoon still gets its line. */
+    if (when.getTime() < Date.now() - 86400000) continue
+
+    /* Never "today" in a stored sentence. The ledger keeps this line forever, so
+       a relative word is true on the day it is written and a lie every day
+       after — which is how "booked for today at 10:15 AM" ended up in the
+       channel describing yesterday's call. */
+    const dayPart = when.toLocaleDateString('en-US',
+      { weekday: 'long', month: 'short', day: 'numeric', timeZone: TZ })
     const at = when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(':00', '')
     /* Who is taking it — when we actually know. Calls swept off the calendar
        carry the organiser's display name, which for a shared calendar is
@@ -772,7 +781,9 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
         dedupe_key: `screening_today:${sc.id}:${startsPT}`,
         payload: {
           title: fullName(who),
-          sentence: `{} has an intro call today at ${at}${sc.housemate_name ? ` with ${sc.housemate_name}` : ''}.`,
+          // Safe here: this kind only exists on the day of the call, and its
+          // dedupe key carries that date, so it is never re-read on another day.
+          sentence: `{} has an intro call today at ${at}${sc.housemate_name && !/calendar|the house|@/i.test(String(sc.housemate_name)) ? ` with ${sc.housemate_name}` : ''}.`,
           section: 'Screening',
           links: [{ label: 'Open their profile', url: applicantLink(sc.applicant_id) }],
         },
@@ -838,6 +849,12 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
     const date = a.move_in_from || placedStart.get(a.id) ||
       ptToday(new Date(new Date(screenedAt).getTime() + 30 * 86400000))
     const left = daysUntil(date)
+
+    /* Only the move-in clock. "Interviewed and nobody voted" is the same
+       condition screening_followup already reports, and firing both produced two
+       lines a word apart about one person — the duplication this whole pass is
+       trying to kill. That fact now lives in one place: the follow-up sentence
+       below names the missing votes itself. */
     if (left > 14) continue
     const step = left < 0 ? 'passed' : left <= 3 ? 'urgent' : left <= 7 ? 'soon' : 'open'
     const n = tally.get(a.id) || 0
@@ -936,6 +953,7 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
     if (step === null) continue
 
     const heard = lastOut.get(a.id) && lastOut.get(a.id)! > call
+    const unvoted = !voted.has(a.id)
     out.push({
       kind: 'screening_followup',
       subject_type: 'applicant',
@@ -946,10 +964,15 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
       dedupe_key: `screening_followup:${a.id}:${step}`,
       payload: {
         title: fullName(a),
-        sentence: heard
+        /* One sentence, both facts. The candidate is waiting AND the house
+           hasn't decided — reporting those separately meant two notifications a
+           word apart about the same person on the same day. */
+        sentence: unvoted
+          ? `{} was interviewed ${plural(days, 'day')} ago and the house still hasn't voted.`
+          : heard
           ? `{} was interviewed and has heard nothing for ${plural(days, 'day')}.`
-          : `{} was interviewed ${plural(days, 'day')} ago and has heard nothing back.`,
-        body: voted.has(a.id) ? 'the house has started voting' : 'nobody has voted yet',
+          : `{} was interviewed ${plural(days, 'day')} ago and is waiting on the house to decide.`,
+        body: unvoted ? undefined : 'voting has started, nobody has told them',
         section: 'Owed an answer',
         links: [{ label: 'Write to them', url: applicantLink(a.id) }],
       },

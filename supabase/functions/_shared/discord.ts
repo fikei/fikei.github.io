@@ -27,8 +27,20 @@ export const AUTOMATION_CHANNEL_ID = Deno.env.get('RECRUITING_AUTOMATION_CHANNEL
   || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || '1529576830514762029'
 // Kept for callers that still speak in claim terms — same channel.
 export const CLAIMS_CHANNEL_ID = AUTOMATION_CHANNEL_ID
-// #recruiting-society — the members channel (pings, notes, recordings)
-export const NOTES_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
+/* #recruiting-society — the members channel (pings, notes, recordings).
+
+   HELD. Every recruiting automation is pointed at #recruiting-automation while
+   the notification system earns its keep, and this is the one place that can be
+   true for all of them: notes, recordings, live-call announcements, the claim
+   mirror, and postResilient's fallback all resolve their destination through
+   this constant. Redirecting it here means no caller can post to the house
+   channel by forgetting to check a flag — which is exactly how a new-application
+   ping kept landing there while the ledger's own switch said not to.
+
+   Set RECRUITING_SOCIETY_POSTS=true to hand the channel back its traffic. */
+const SOCIETY_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
+const SOCIETY_POSTS_ON = Deno.env.get('RECRUITING_SOCIETY_POSTS') === 'true'
+export const NOTES_CHANNEL_ID = SOCIETY_POSTS_ON ? SOCIETY_CHANNEL_ID : AUTOMATION_CHANNEL_ID
 
 // Compact one-liner for the audit trail: the embed's title/description or
 // the plain content, whichever the payload carries.
@@ -391,7 +403,11 @@ export async function fetchChannelMessages(
 }
 
 export async function postResilient(channelId: string, payload: Record<string, unknown>, label: string): Promise<void> {
+  // While society posts are held both constants are the same channel, and
+  // retrying there would fail twice and bury the real error. Skip straight to
+  // the alert DM in that case.
   const fallback = channelId === NOTES_CHANNEL_ID ? AUTOMATION_CHANNEL_ID : NOTES_CHANNEL_ID
+  const canFallBack = fallback !== channelId
   try {
     await discordFetch(`/channels/${channelId}/messages`, { method: 'POST', body: JSON.stringify(payload) })
     await auditMirror(label, summarize(payload), { channelId })
@@ -400,6 +416,7 @@ export async function postResilient(channelId: string, payload: Record<string, u
     console.warn(`[discord] ${label}: post to ${channelId} failed: ${(err as Error).message}`)
   }
   try {
+    if (!canFallBack) throw new Error('no distinct fallback channel')
     await discordFetch(`/channels/${fallback}/messages`, {
       method: 'POST',
       body: JSON.stringify({
