@@ -4,6 +4,14 @@
 
 ---
 
+## [1.4.0] - 2026-07-30
+
+### Changed
+- **Exit rows are inset tiles; footers have no hairlines** (direction A). Each exit is a filled surface with radius and a 6px gap; the commit row dropped its `border-top`. A rule between two things that belong together separates what should be grouped.
+- **No Save button unless it creates, confirms, or destroys.** Editing an existing record autosaves on `change`; `drawer-cta__flag` replaces the commit row with "Changes save as you go" / "Saved". Applied to the stay drawer and the listing editor.
+
+---
+
 ## [1.3.0] - 2026-07-30
 
 ### Added

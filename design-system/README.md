@@ -646,21 +646,31 @@ A destructive or branching action with **more than two outcomes** opens a sheet,
 
 A sidebar or drawer footer is **three tiers deep, ordered by consequence** — not one right-aligned flex row. A ~380px drawer cannot keep four targets honest side by side; the stay editor proved it, with two red underlined links each wrapping onto two lines.
 
+**No hairlines.** Exits are inset tiles with radius and a gap; the commit row has no `border-top`. A rule between two things that belong together is separating what should be grouped — surface, radius, and space do that job instead.
+
+**No Save on an existing record.** Fields commit on `change`, and a quiet status line (`drawer-cta__flag`) says "Changes save as you go", flashing "Saved" when a write lands. An explicit commit survives in exactly three cases: **creating** a record (`Add stay`, `Create listing`), **confirming** a state change (`Welcome them in`), and anything **destructive**.
+
 ```html
 <div class="drawer-cta">
-  <!-- tier 1 + 2: commit and dismiss, together -->
+  <!-- tier 1 + 2: only on a NEW record. An existing one autosaves. -->
   <div class="drawer-cta__row">
     <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
-    <button type="submit" class="btn btn--accent drawer-cta__commit">Save</button>
+    <button type="submit" class="btn btn--accent drawer-cta__commit">Add stay</button>
   </div>
+  <!-- …or, editing an existing record: -->
+  <p class="drawer-cta__flag" data-save-flag>Changes save as you go</p>
 
-  <!-- tier 3: the ways out — full-width rows, one per line -->
+  <!-- tier 3: the ways out — inset tiles, one per line, no rules -->
   <div class="drawer-cta__exits">
     <button type="button" class="drawer-cta__exit">
-      Mark leaving <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+      <span class="drawer-cta__exit-label">Mark leaving</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&rarr;</span>
+      <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
     </button>
     <button type="button" class="drawer-cta__exit drawer-cta__exit--danger">
-      Remove stay <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+      <span class="drawer-cta__exit-label">Remove stay</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
+      <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
     </button>
   </div>
 
@@ -674,17 +684,19 @@ A sidebar or drawer footer is **three tiers deep, ordered by consequence** — n
 
 | Class | Tier | Rule |
 |---|---|---|
-| `drawer-cta__commit` | 1 | The one filled primary, bottom-right. **Exactly one per sidebar** — it is the only thing that saves what's on screen. |
+| `drawer-cta__commit` | 1 | The one filled primary, bottom-right. **Only on a new record, a confirmation, or a destructive act** — never a plain Save. |
 | `drawer-cta__quiet` | 2 | Dismiss. No fill, no border, beside the primary. Cancel is not a decision, so it doesn't look like one. |
-| `drawer-cta__exit` | 3 | The ways out. Full-width row below a rule, label left, hint right. `--danger` for destructive (red label, tinted hover); muted for state changes. |
-| `drawer-cta__alt` | — | Optional second forward path. Outlined, never filled, label stacked over hint. |
+| `drawer-cta__flag` | 2 | Replaces the commit row when editing an existing record: "Changes save as you go", flashing "Saved". |
+| `drawer-cta__exit` | 3 | The ways out. Full-width **inset tile** — filled surface, radius, 6px gap, no rules. Label + hint stacked left, glyph right. `--danger` for destructive. |
+| `drawer-cta__alt` | — | Optional second forward path. **Outlined, never filled** — that's what distinguishes a forward path from a way out now that exits are filled. |
 
 **Sidebar CTA rules:**
 - Anything that **removes, ends, or re-routes** a record leaves the commit row entirely
 - Exits never underline — weight and color carry them (see [Removed & deferred states](#removed--deferred-states))
 - Every exit and alt carries a hint; a red label is never the only explanation of what a button does
-- Full-width rows mean labels never truncate, so copy stays plain (`Mark leaving`, not `Mark leaving — list room`). The label is `white-space: nowrap`; the **hint** wraps or ellipsizes first
-- Under 480px the hint drops to its own line rather than squeezing the label
+- Tiles mean labels never truncate, so copy stays plain (`Mark leaving`, not `Mark leaving — list room`). The label and hint stack; the tile grows
+- Place the icon explicitly (`grid-column: 2; grid-row: 1 / 3`) — an element spanning both rows is auto-placed *before* the label and would otherwise take column 1
+- Autosave writes on `change`, never on `input`: text commits when it loses focus, dates and selects the instant they settle. Repaint only what changed (one lane, the drawer subtitle) — a whole-view render rebuilds the form and throws away the caret
 
 *Reference implementation: `applications/css/app.css` — `.drawer-cta`. Story: [Sidebar CTAs](https://ctrl.rodeo/design-system/recruiting/#sidebar-ctas).*
 

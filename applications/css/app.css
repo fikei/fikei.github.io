@@ -821,11 +821,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .listing-form__field .listing-status { width: 100%; height: 36px; }
 .listing-form__notes { min-height: 48px; }
 .listing-form__error { margin: 0; color: var(--error); font-size: var(--font-size-small); min-height: 1.2em; }
-.listing-form__delete {
-  margin-right: auto;
-  background: none; border: 0; padding: 0;
-  color: var(--error); font-size: var(--font-size-small); text-decoration: underline; cursor: pointer;
-}
 
 /* --- Outreach ↔ listing attachments --- */
 .inbox-row__attach { color: var(--outreach-fg); }
@@ -1585,26 +1580,31 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .log-row.is-done .inbox-row__sub { opacity: 0.5; }
 .log-row.is-done .log-row__meta { opacity: 0.7; }
 
-/* --- v3.45.0: sidebar CTA tiers (Sassy `drawer-cta`) ---
+/* --- v3.48.0: sidebar CTA tiers (Sassy `drawer-cta`) ---
    Drawer footers had four actions fighting inside one right-aligned flex
    row: two red underlined links (which wrapped onto two lines in a 380px
    sidebar), a text Cancel, and the primary. A sidebar is too narrow to keep
-   four targets honest side by side, so the footer is now three explicit
-   tiers, ordered by consequence:
+   four targets honest side by side, so the footer is three explicit tiers,
+   ordered by consequence:
 
      tier 1  .drawer-cta__commit   the one filled primary — right-aligned
      tier 2  .drawer-cta__quiet    dismiss — no fill, beside the primary
-     tier 3  .drawer-cta__exit     destructive / state changes — full-width
-                                   rows below a rule, one per line
+     tier 3  .drawer-cta__exit     destructive / state changes — inset tiles,
+                                   one per line, separated by space not rules
 
    Rules: exactly one commit per sidebar; anything that removes, ends, or
    re-routes a record leaves the commit row entirely; exits never underline
    (see the design system's transparency-not-decoration rule) and carry a
-   hint so a red label is never the only explanation of what it does. */
-.drawer-cta { margin-top: var(--space-4); display: flex; flex-direction: column; }
+   hint so a red label is never the only explanation of what it does.
+
+   Direction A (Sassy v3.31): no hairlines anywhere in this footer. Each exit
+   is its own inset surface with radius and a gap, so separation comes from
+   the tile edge rather than a rule drawn between two things that belong
+   together. The commit row loses its border-top too — space above it does
+   the same job without a line. */
+.drawer-cta { margin-top: var(--space-5); display: flex; flex-direction: column; }
 .drawer-cta__row {
   display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
-  padding-top: var(--space-3); border-top: 1px solid var(--border);
 }
 .drawer-cta__commit { flex: 0 0 auto; min-width: 104px; }
 .drawer-cta__quiet {
@@ -1615,9 +1615,9 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .drawer-cta__quiet:hover { color: var(--fg); background: var(--bg-overlay); }
 /* The optional fourth slot: a second, non-destructive path the sidebar also
-   offers ("create a listing instead", "welcome them in"). Full-width and
-   outlined, never filled — the filled commit stays unique so the eye can
-   still find the one action that saves what's on screen. */
+   offers ("create a listing instead", "welcome them in"). Outlined rather
+   than filled — that's what separates a forward path from a way out, now
+   that the exits are filled tiles. */
 .drawer-cta__alt {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   width: 100%; padding: var(--space-3);
@@ -1626,30 +1626,32 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   font-size: var(--font-size-small); font-weight: var(--fw-semibold);
 }
 .drawer-cta__alt:hover { background: var(--bg-overlay); }
-/* The alt's hint is a full sentence, so it stacks under the label instead of
-   competing with it for the same line. */
 .drawer-cta__alt .drawer-cta__exit-hint { text-align: left; }
-.drawer-cta__exits { display: flex; flex-direction: column; margin-top: var(--space-3); }
+/* No Save button on an existing record — the fields are the save. This line
+   says so, and briefly says "Saved" when a write lands, so the absence of a
+   button never reads as "nothing happened". */
+.drawer-cta__flag {
+  margin: 0; text-align: right;
+  color: var(--fg-subtle); font-size: var(--font-size-caption);
+  transition: color 120ms ease;
+}
+.drawer-cta__flag.is-on { color: var(--success); font-weight: var(--fw-semibold); }
+.drawer-cta__exits { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-3); }
 .drawer-cta__exit {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
-  width: 100%; padding: var(--space-3) 0;
-  background: transparent; border: 0; border-top: 1px solid var(--border);
-  color: var(--fg-muted); text-align: left; text-decoration: none;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-3);
+  width: 100%; padding: var(--space-3);
+  background: var(--bg-surface); border: 0; border-radius: var(--radius-sm);
+  color: var(--fg); text-align: left; text-decoration: none;
   font-size: var(--font-size-small); font-weight: var(--fw-semibold);
-  white-space: nowrap;
 }
-.drawer-cta__exit:hover { color: var(--fg); }
+/* Explicit placement — an icon spanning both rows would otherwise be placed
+   before the auto-flowed label and take column 1. */
+.drawer-cta__exit-label { grid-column: 1; grid-row: 1; }
+.drawer-cta__exit-hint  { grid-column: 1; grid-row: 2;
+  color: var(--fg-subtle); font-size: var(--font-size-caption); font-weight: 400; }
+.drawer-cta__exit-icon  { grid-column: 2; grid-row: 1 / 3; align-self: center;
+  color: var(--fg-subtle); font-size: var(--font-size-small); }
+.drawer-cta__exit:hover { background: var(--bg-overlay); }
 .drawer-cta__exit--danger { color: var(--error); }
-.drawer-cta__exit--danger:hover { color: var(--error); background: var(--pass-tint); }
-/* The hint yields first: it wraps or ellipsizes so the label — the thing that
-   says what the button does — always reads on one line. */
-.drawer-cta__exit-hint {
-  flex: 0 1 auto; min-width: 0; white-space: normal;
-  color: var(--fg-subtle); font-size: var(--font-size-caption); font-weight: 400; text-align: right;
-}
-/* On a full-width phone drawer the hint gets its own line rather than
-   squeezing the label into an ellipsis. */
-@media (max-width: 480px) {
-  .drawer-cta__exit { flex-direction: column; align-items: flex-start; gap: 2px; }
-  .drawer-cta__exit-hint { text-align: left; }
-}
+.drawer-cta__exit--danger .drawer-cta__exit-icon { color: var(--error); }
+.drawer-cta__exit--danger:hover { background: color-mix(in srgb, var(--error) 14%, transparent); }
