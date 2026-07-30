@@ -769,7 +769,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .cal__event {
   position: absolute; top: 10px; bottom: 10px;
   display: inline-flex; align-items: center;
-  padding: 0 var(--space-2); margin: 0 2px;
+  padding: 0 var(--space-2); margin: 0 4px;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-caption); font-weight: var(--fw-medium);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
