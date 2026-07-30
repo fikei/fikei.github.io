@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.52.0';
+const VERSION = '3.53.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5348,6 +5348,18 @@ async function openLinkRecording(gcalEventId) {
 
 /* ---------- auth + boot ---------- */
 
+/* Sign-in must return you to the page you were trying to reach. A link posted
+   in Discord usually carries a destination (?a=<applicant>, ?view=…), and
+   redirecting to just origin+pathname threw it away — you signed in and landed
+   on the inbox home wondering what you had clicked. Transient auth params are
+   stripped so a retry can't loop. */
+function returnUrl() {
+  const url = new URL(location.href);
+  ['signin', 'code', 'state', 'scope', 'error', 'error_description', 'cb'].forEach(k => url.searchParams.delete(k));
+  return url.origin + url.pathname + (url.searchParams.toString() ? `?${url.searchParams}` : '');
+}
+
+
 /* Webview sandboxes (Discord/Instagram/FB in-app browsers, Android wv) break
    OAuth round-trips: isolated short-lived storage, and the PKCE verifier is
    lost if the flow hops out and back. Nudge toward the real browser or the
@@ -5392,7 +5404,7 @@ async function signInWithDiscord() {
   try {
     const { error } = await sb.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo: window.location.origin + window.location.pathname, scopes: 'identify email' },
+      options: { redirectTo: returnUrl(), scopes: 'identify email' },
     });
     if (error) throw error;
   } catch (e) {
@@ -5594,17 +5606,19 @@ function init() {
     document.getElementById('app').hidden = true;
     document.getElementById('gate').hidden = false;
     if (new URLSearchParams(location.search).get('signin')) return; // redeem in flight
+    // Lead with /signin: it is the only path that survives in-app browsers,
+    // and it works from any link anyone posts in Discord.
     setGate('Sign in with Discord to open the applicant inbox.', 'Continue with Discord',
       inAppBrowser()
-        ? 'Heads up: you\'re in an in-app browser, where Discord sign-in often loops. Use ⋯ → "Open in browser", or tap "Get sign-in link" in the recruiting channel for a one-tap link.'
-        : null);
+        ? 'You\'re in an in-app browser, where Discord sign-in usually fails. Type /signin in the Agape server for a one-tap link that works here — or use ⋯ → "Open in browser".'
+        : 'On a phone? Type /signin in the Agape server for a one-tap link instead.');
     document.getElementById('gate-btn').onclick = signInWithDiscord;
   });
 
   window.CtrlAuth.init({
     supabaseUrl: SUPABASE_URL,
     supabaseAnonKey: SUPABASE_ANON_KEY,
-    redirectTo: window.location.origin + window.location.pathname,
+    redirectTo: returnUrl(),
     mountTo: '#ctrl-auth-root',
   });
   sb = window.CtrlAuth.getSupabaseClient();
