@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.40.3">
+  <link rel="stylesheet" href="css/app.css?v=3.42.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -88,6 +88,9 @@
       <div id="review-progress"></div>
       <button class="review__close" id="review-close" aria-label="Close">✕</button>
     </div>
+    <!-- Carries the last decision onto the next applicant, so auto-advance
+         never leaves you wondering what just happened. -->
+    <div class="review__banner" id="review-banner" hidden></div>
     <div class="review__scroll"><div class="review__inner" id="review-body"></div></div>
     <!-- Contextual: vote bar while in review, recruiter actions for candidates. -->
     <div class="review__foot" id="review-foot"></div>
@@ -303,7 +306,7 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=3.40.3"></script>
+  <script src="js/app.js?v=3.42.0"></script>
 
 </body>
 </html>
