@@ -79,5 +79,39 @@ corrected after the fact isn't news.
 Backfilled on the two live trials (Alejandra, Sophia); Andy's finished Jan–Feb
 trial was left alone.
 
+### v3.43.0 (2026-07-29): candidate → resident
+The end of the funnel finally exists. Migration 141:
+
+- **`recruit_stays.applicant_id`** — the missing link. Until now the person in
+  the room was a free-text name with no way back to the application they came
+  from, so nothing could join the two halves of the app together. Nullable:
+  most residents predate the funnel.
+- **`stage = 'resident'`** — a terminal state that isn't a rejection. Drops
+  them out of the auto-placement sweep and every applicant rail for free.
+- **`recruit_onboarding`** — a checklist seeded on promotion, ticked by hand,
+  each row carrying who ticked it. Deliberately **not** a provisioning
+  integration: it's the house's shared memory of what a new resident is still
+  owed (Google Group, Notion, Discord role, buddy, chore rotation, keys).
+- **`recruit_promote_stay` / `recruit_promote_candidate`** — one transaction:
+  close the trial the day before, open an open-ended residency, move the
+  stage, retire their listing placements. Two entry points because two kinds
+  of people get promoted — a candidate the funnel knows, and whoever is in a
+  trial stay. Two of the three trials on the board right now (Sophia, Andy)
+  have no application row at all, so a promotion keyed only on
+  `recruit_applicants` would have been useless for them.
+
+**UX.** The residency-decision reminder links into Occupancy. A trial stay's
+drawer leads with **Welcome them in**, which expands to room + start date
+(defaulting to the trial room and the day after the trial ends) and confirms.
+The candidate profile shows the same action and hands off to the drawer rather
+than duplicating the form. Saying no uses the existing Remove… sheet, which
+gains a **Trial ended — not staying** reason (shown only for someone actually
+on a trial) so the archive can tell "we lived with them and it didn't work"
+apart from "we never got that far".
+
+Not built: a Discord announcement on promotion. It needs an authenticated
+route on `recruit-discord`, and the checklist already gives the house the
+signal. Worth revisiting if promotions start getting missed.
+
 ### Design reference
 Row states, chip taxonomy, and subcopy grammar for Inbox/Candidates/Openings: [docs/ux/recruiting-row-states.md](../../ux/recruiting-row-states.md) (v3.5.0 — response dot, room pills, note bubble, ✕ removal, see-more bar).
