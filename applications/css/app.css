@@ -1052,6 +1052,11 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .occ-drawer__fact dt { color: var(--fg-subtle); }
 .occ-drawer__fact dd { margin: 0; font-weight: var(--fw-medium); }
 .occ-drawer__note { margin: 0; color: var(--fg-muted); font-size: var(--font-size-small); }
+/* The name a ballot's form copy should carry, under the field that holds it.
+   `code` wraps rather than scrolls: the name is meant to be read and retyped
+   into Drive, not treated as a snippet. */
+.occ-drawer__hint { display: block; margin-top: 4px; color: var(--fg-subtle); font-size: var(--font-size-caption); font-weight: var(--fw-regular); }
+.occ-drawer__hint code { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
 @media (max-width: 720px) { .occ-drawer { width: 100vw; border-left: 0; } }
 
 /* --- v2.16.1: phone-sized timeline (3 months at a time) --- */

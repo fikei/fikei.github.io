@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.56.0';
+const VERSION = '3.57.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -3287,28 +3287,42 @@ function trialFieldsHtml(s) {
         <input type="date" name="decision_on" class="listing-status" value="${s.decision_on || ''}">
       </label>
     </div>
-    <label class="listing-form__field">Check-in ballot
-      <input type="url" name="checkin_form_url" class="listing-status" placeholder="Google Form link"
-             value="${esc(s.checkin_form_url || '')}">
-    </label>
-    <label class="listing-form__field">Decision ballot
-      <input type="url" name="decision_form_url" class="listing-status" placeholder="Google Form link"
-             value="${esc(s.decision_form_url || '')}">
-    </label>
-    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. Each one needs its own copy of the housemate feedback form, named
-      <code>Agape vote · ${esc(s.occupant || 'Name')} · Month 1 · ${voteCloseOn(s.checkin_on) || 'YYYY-MM-DD'}</code> —
-      the date is the Monday meeting the ballot closes at, not the milestone. The house gets nudged a week out, three days before, and on the morning of that meeting.</p>
+    ${ballotFieldHtml('checkin', 'Month 1', s.occupant, s.checkin_on, s.checkin_form_url)}
+    ${ballotFieldHtml('decision', 'Final decision', s.occupant, s.decision_on, s.decision_form_url)}
+    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. Each needs its own copy of the housemate feedback form, named as shown — the date is the meeting the ballot closes at, not the milestone. The house is nudged a week out, three days out, and on the day of that meeting. Move a milestone into a different month and the ballot closes at a different meeting, so rename the form and the nudges start again.</p>
   </div>`;
 }
 
-/* When a ballot closes: the last Monday house meeting strictly before the
-   milestone, because that meeting is where the house actually decides. Kept
-   in step with lastMondayBefore() in _shared/recruit-notify.ts. */
+/* One ballot field, with the name its form copy should carry underneath it.
+   The name is derived rather than described because the close date is computed
+   — asking someone to work out which Monday it is, for two milestones, per
+   person, is how the folder ends up with four naming schemes in it. */
+function ballotFieldHtml(which, milestone, occupant, on, url) {
+  const close = voteCloseOn(on);
+  return `<label class="listing-form__field">${esc(milestone)} ballot
+      <input type="url" name="${which}_form_url" class="listing-status" placeholder="Google Form link"
+             value="${esc(url || '')}">
+      <span class="occ-drawer__hint">${on
+        ? `Name the copy <code>Agape vote · ${esc(occupant || 'Name')} · ${esc(milestone)} · ${close}</code> — closes at the ${fmtShort(close)} meeting.`
+        : 'Set the date above and this names itself.'}</span>
+    </label>`;
+}
+
+/* When a ballot closes: the house's month-end meeting — the last Monday of a
+   month — that still falls on or before the milestone. Milestones sit on month
+   boundaries and the house settles a month at its last meeting in the month
+   before it, so a Oct 1 decision is taken at the Sep 28 meeting. Kept in step
+   with ballotCloses() in _shared/recruit-notify.ts. */
+function lastMondayOfMonth(year, month) {
+  const d = new Date(Date.UTC(year, month + 1, 0));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
 function voteCloseOn(iso) {
   if (!iso) return '';
-  const d = new Date(iso + 'T12:00');
-  d.setDate(d.getDate() - (((d.getDay() + 6) % 7) || 7));
-  return d.toISOString().slice(0, 10);
+  const d = new Date(iso + 'T00:00:00Z');
+  const own = lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth());
+  return own <= iso ? own : lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth() - 1);
 }
 
 /* --- candidate → resident ---

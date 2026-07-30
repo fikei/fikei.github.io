@@ -1450,27 +1450,35 @@ async function detectOccupancyConflicts(db: DB): Promise<Notification[]> {
    the house talks — which is the Monday meeting. So the ballot closes at the
    last Monday meeting *before* the milestone, and every sentence names it.
 
-   Four rungs, escalating rather than repeating:
-     open      a week before the closing meeting — the ballot exists, go fill it
-     due       three days before the milestone itself
-     last call the day of the closing meeting
-     overdue   the milestone passed undecided — on-call, not the house
-
-   The T-3 rung is skipped when it would land after the closing meeting (a
-   milestone early in the week), because by then last call is the truer
-   sentence and two lines for one fact is the thing the catalogue forbids. */
+   Four rungs, escalating rather than repeating, all anchored on that meeting:
+     open      a week before it — the ballot exists, go fill it
+     due       three days before it — the weekend to do it in
+     last call the day of it
+     overdue   the milestone passed undecided — on-call, not the house */
 const VOTE_OPEN_LEAD = 7      // days before the closing meeting
-const VOTE_DUE_LEAD = 3       // days before the milestone — the house's ask
+const VOTE_DUE_LEAD = 3       // days before the closing meeting
 const VOTE_STALE_DAYS = 14    // past this, a milestone is history, not news
 
-/* The house meets on Monday nights, so a ballot closes at the last Monday
-   strictly before the milestone. A milestone that falls on a Monday closes at
-   the meeting a week earlier — the answers are wanted going *into* the day,
-   not on it. */
-export function lastMondayBefore(isoDate: string): string {
-  const d = new Date(`${isoDate}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() - (((d.getUTCDay() + 6) % 7) || 7))
+/* When a ballot closes: the house's *month-end* meeting — the last Monday of a
+   month — that still falls on or before the milestone.
+
+   Trial milestones sit on month boundaries (month 1 is the 1st, a decision is a
+   month before a sublet ends), and the house settles a month at its last
+   meeting in the month before it. So a Oct 1 decision is taken at the Sep 28
+   meeting, not the one on Sep 21: "before the corresponding month" is the rule
+   the house already runs on, and the nearest Monday would have picked the wrong
+   meeting for every mid-month milestone. */
+function lastMondayOfMonth(year: number, month: number): string {
+  const d = new Date(Date.UTC(year, month + 1, 0))       // last day of that month
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
   return d.toISOString().slice(0, 10)
+}
+export function ballotCloses(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  const own = lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth())
+  // A milestone before its own month's meeting belongs to the month before —
+  // which is every first-of-the-month milestone, i.e. most of them.
+  return own <= isoDate ? own : lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth() - 1)
 }
 
 const MILESTONES = [
@@ -1512,7 +1520,7 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
       const on: string | null = which === 'checkin' ? s.checkin_on : s.decision_on
       if (!on) continue
       const form: string | null = which === 'checkin' ? s.checkin_form_url : s.decision_form_url
-      const close = lastMondayBefore(on)
+      const close = ballotCloses(on)
       const toMilestone = daysUntil(on)
       const toClose = daysUntil(close)
 
@@ -1522,7 +1530,7 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
       let step: 'open' | 'due' | 'last_call' | 'overdue' | null = null
       if (toMilestone < 0) step = 'overdue'
       else if (toClose <= 0) step = 'last_call'
-      else if (toMilestone <= VOTE_DUE_LEAD) step = 'due'
+      else if (toClose <= VOTE_DUE_LEAD) step = 'due'
       else if (toClose <= VOTE_OPEN_LEAD) step = 'open'
       if (!step) continue
 
@@ -1542,7 +1550,12 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
         subject_label: who,
         audience: step === 'overdue' ? 'oncall' : 'house',
         lane: step === 'open' ? 'daily' : 'now',
-        dedupe_key: `trial_vote:${s.id}:${which}:${step}`,
+        /* Keyed on the closing meeting, not just the step: a trial that gets
+           extended moves its decision date, and a key without the meeting in it
+           would leave the house holding the deadline from before the extension.
+           A milestone that moves *within* the same meeting's month is the same
+           deadline, so that correctly stays quiet. */
+        dedupe_key: `trial_vote:${s.id}:${which}:${close}:${step}`,
         payload: {
           title: who,
           copy,
