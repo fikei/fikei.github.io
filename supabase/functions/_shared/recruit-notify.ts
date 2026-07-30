@@ -670,59 +670,97 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
   const out: Notification[] = []
   const active = await activeApplicants(db)
 
-  // Claimed — who took it, and when the call is.
-  const { data: claims } = await db.from('recruit_claim_posts')
-    .select('applicant_id, status, claimed_slot, claimed_at, posted_at')
-    .gte('posted_at', new Date(Date.now() - 21 * 86400000).toISOString())
-  for (const c of claims || []) {
-    const who = active.get(c.applicant_id)
+  /* A call got taken. Keyed on the screening rather than the claim post,
+     because a call reaches the calendar three different ways — the Claim button
+     in Discord, a time agreed in the email thread that scheduleFromEmail books,
+     and someone arranging it by hand in the app — and only the first leaves a
+     claim post. Reading recruit_screenings catches all three, which is what
+     "when someone takes a call" actually means. */
+  const { data: booked } = await db.from('recruit_screenings')
+    .select('id, applicant_id, housemate_name, starts_at, status, kind, created_at')
+    .gte('created_at', new Date(Date.now() - 21 * 86400000).toISOString())
+  for (const sc of booked || []) {
+    const who = active.get(sc.applicant_id)
+    if (!who || !sc.starts_at) continue
+    const when = new Date(sc.starts_at)
+    const dayPart = ptToday(when) === ptToday()
+      ? 'today'
+      : when.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: TZ })
+    const at = when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(':00', '')
+    /* Who is taking it — when we actually know. Calls swept off the calendar
+       carry the organiser's display name, which for a shared calendar is
+       "Agape Internal Calendar" or "the house": not a person, and reading
+       "Agape Internal Calendar is taking Keerti's call" makes the whole line
+       look machine-generated. When the name isn't a person, the call is the
+       subject of the sentence instead of the screener. */
+    const named = sc.housemate_name && !/calendar|the house|@|^scheduled/i.test(String(sc.housemate_name))
+      ? String(sc.housemate_name) : null
+    out.push({
+      kind: 'screening_booked',
+      subject_type: 'applicant',
+      subject_id: sc.applicant_id,
+      subject_label: who.first_name,
+      lane: 'now',
+      // Re-fires if the call moves, since a rescheduled call is news again.
+      dedupe_key: `screening_booked:${sc.id}:${sc.starts_at}`,
+      payload: {
+        title: fullName(who),
+        sentence: named
+          ? `${named} is taking {}'s intro call ${dayPart} at ${at}.`
+          : `{}'s intro call is booked for ${dayPart} at ${at}.`,
+        body: 'calendar invite sent, on the house calendar',
+        section: 'Screening',
+        links: [{ label: 'Open their profile', url: applicantLink(sc.applicant_id) }],
+      },
+    })
+  }
+
+  /* Times offered, nobody booked. Read from recruit_availability rather than
+     from claim posts: a claim post only exists when discord_auto_post is on
+     (it is off), so keying on it meant this could never fire — while the
+     failure it describes, a candidate who did their part and heard nothing,
+     is the most damaging one in the funnel. */
+  const { data: offers } = await db.from('recruit_availability')
+    .select('applicant_id, windows, updated_at')
+    .lte('updated_at', new Date(Date.now() - 72 * 3600000).toISOString())
+  const bookedFor = new Set((booked || []).map((s2: { applicant_id: string }) => s2.applicant_id))
+  for (const o of offers || []) {
+    const who = active.get(o.applicant_id)
     if (!who) continue
-    if (c.status === 'claimed' && c.claimed_at) {
-      out.push({
-        kind: 'screening_claimed',
-        subject_type: 'applicant',
-        subject_id: c.applicant_id,
-        subject_label: who.first_name,
-        lane: 'now',
-        dedupe_key: `screening_claimed:${c.applicant_id}:${c.claimed_at}`,
-        payload: {
-          title: fullName(who),
-          sentence: `Someone took {}'s intro call.`,
-          section: 'Screening',
-          links: [{ label: 'Open screening', url: applicantLink(c.applicant_id) }],
-        },
-      })
-    }
-    // Still nobody, three days on. This is the one that costs a candidate:
-    // they did their part and the house went quiet.
-    if (c.status === 'open' && new Date(c.posted_at).getTime() < Date.now() - 72 * 3600000) {
-      out.push({
-        kind: 'screening_unclaimed',
-        subject_type: 'applicant',
-        subject_id: c.applicant_id,
-        subject_label: who.first_name,
-        audience: 'oncall',
-        lane: 'now',
-        dedupe_key: `screening_unclaimed:${c.applicant_id}:${Math.floor((Date.now() - new Date(c.posted_at).getTime()) / (72 * 3600000))}`,
-        payload: {
-          title: fullName(who),
-          sentence: `{} sent times ${plural(Math.floor((Date.now() - new Date(c.posted_at).getTime()) / 86400000), 'day')} ago and nobody has taken the call.`,
-          section: 'Screening',
-          links: [{ label: 'Take the call', url: applicantLink(c.applicant_id) }],
-        },
-      })
-    }
+    if (!Array.isArray(o.windows) || !o.windows.length) continue   // nothing was actually offered
+    if (bookedFor.has(o.applicant_id)) continue                    // somebody took it
+    const days = Math.floor((Date.now() - new Date(o.updated_at).getTime()) / 86400000)
+    out.push({
+      kind: 'screening_unclaimed',
+      subject_type: 'applicant',
+      subject_id: o.applicant_id,
+      subject_label: who.first_name,
+      audience: 'oncall',
+      lane: 'now',
+      // One nudge per 3-day block, so it escalates by repetition without
+      // becoming daily noise.
+      dedupe_key: `screening_unclaimed:${o.applicant_id}:${Math.floor(days / 3)}`,
+      payload: {
+        title: fullName(who),
+        sentence: `{} offered times ${plural(days, 'day')} ago and nobody has taken the call.`,
+        section: 'Screening',
+        links: [{ label: 'Take the call', url: applicantLink(o.applicant_id) }],
+      },
+    })
   }
 
   // Today's calls, and calls whose notes have landed.
   const { data: screenings } = await db.from('recruit_screenings')
-    .select('id, applicant_id, housemate_name, starts_at, status, kind, recording_posted_at, share_token')
+    .select('id, applicant_id, housemate_name, starts_at, status, kind, created_at, recording_posted_at, share_token')
     .gte('starts_at', new Date(Date.now() - 14 * 86400000).toISOString())
   for (const sc of screenings || []) {
     const who = active.get(sc.applicant_id)
     if (!who) continue
     const startsPT = ptToday(new Date(sc.starts_at))
-    if (sc.status === 'scheduled' && startsPT === ptToday()) {
+    // Only worth its own line if the booking notification didn't already say
+    // "today" — a call booked this morning for this afternoon says it once.
+    const bookedToday = ptToday(new Date(sc.created_at)) === ptToday()
+    if (sc.status === 'scheduled' && startsPT === ptToday() && !bookedToday) {
       const at = new Date(sc.starts_at).toLocaleTimeString('en-US',
         { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(':00', '')
       out.push({
@@ -1367,7 +1405,7 @@ const KINDS: Record<string, { icon: string; label: string }> = {
 
   // The call.
   screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
-  screening_claimed:      { icon: '🤝', label: 'Call claimed' },
+  screening_booked:       { icon: '🤝', label: 'Call booked' },
   screening_today:        { icon: '📞', label: 'Call today' },
   screening_notes:        { icon: '📝', label: 'Recording ready' },
   screening_followup:     { icon: '⌛', label: 'Owed an answer' },

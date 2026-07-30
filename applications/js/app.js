@@ -1768,7 +1768,7 @@ const ACTIVITY_KINDS = {
   reply_nudge:            { icon: '🔔', label: 'Following up' },
   reply_unclear:          { icon: '🤔', label: 'Reply needs a read' },
   screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
-  screening_claimed:      { icon: '🤝', label: 'Call claimed' },
+  screening_booked:       { icon: '🤝', label: 'Call booked' },
   screening_today:        { icon: '📞', label: 'Call today' },
   screening_notes:        { icon: '📝', label: 'Recording ready' },
   screening_followup:     { icon: '⌛', label: 'Owed an answer' },
