@@ -1355,13 +1355,13 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .listing-menu__item--danger { color: var(--error); }
 
 /* --- v3.18.0: aligned CTA column, quiet ⋮, confirm-to-book modal --- */
-/* The CTA column is fixed so every row's buttons line up. 258px is what a
-   labelled secondary needs beside the primary — at 172px the pair wrapped onto
-   two lines, which breaks the one-action-per-line read. */
-.inbox-row__actions .cta-stack { width: 258px; align-items: stretch; }
-.inbox-row__actions .cta-stack .cta-std { width: 100%; justify-content: center; }
+/* The CTA column is fixed at 258px — what a labelled secondary needs beside
+   the primary — and so is every button in it. A primary is 172px whether it
+   says "Get started" or "Schedule a visit", so the buttons read as one column
+   of equal controls instead of a ragged edge that tracks label length. */
+.inbox-row__actions .cta-stack { width: 258px; align-items: flex-start; }
+.inbox-row__actions .cta-stack .cta-std { flex: 0 0 172px; width: 172px; justify-content: center; }
 .inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; }
-.inbox-row__actions .cta-pair .cta-std { flex: 1; }
 .inbox-row__actions .cta-context { align-self: flex-end; }
 .listing-menu-btn { border-color: transparent; background: transparent; letter-spacing: 0; font-size: 16px; }
 .listing-menu-btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
@@ -1372,8 +1372,10 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 
 /* --- v3.19.0: contextual profile footer + quieter profile --- */
 .foot-cta { display: inline-flex; }
-.foot-cta .cta-stack { width: 200px; align-items: stretch; }
-.foot-cta .cta-std { width: 100%; justify-content: center; }
+/* Same rule in the profile footer: one fixed primary width, not a button that
+   grows with its label. */
+.foot-cta .cta-stack { width: 200px; align-items: flex-start; }
+.foot-cta .cta-std { flex: 0 0 172px; width: 172px; justify-content: center; }
 .foot-links { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center; }
 .cta-link--danger { color: var(--error); }
 .review__prose.is-clamped {
@@ -1385,7 +1387,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .review__fact-value--quiet { color: var(--fg-subtle); }
 /* --- v3.19.1: footer CTA pair sizing --- */
 .foot-cta .cta-pair { display: flex; width: 100%; gap: 6px; }
-.foot-cta .cta-pair .cta-std { width: auto; flex: 1; }
+.foot-cta .cta-pair .cta-std { flex: 0 0 172px; width: 172px; }
 .foot-cta .cta-pair .cta-icon { width: auto; flex: 0 0 auto; }
 
 /* --- v3.23.0: update tray, draft cards, decisions --- */
