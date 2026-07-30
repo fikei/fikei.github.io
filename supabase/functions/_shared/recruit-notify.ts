@@ -683,11 +683,20 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
     const who = active.get(sc.applicant_id)
     if (!who || !sc.starts_at) continue
     const when = new Date(sc.starts_at)
-    /* A booking is only news before it happens. Backfilled and swept calls are
-       already in the past, and announcing one as "booked" reads as though it
-       had just been arranged. A day of grace, so a call booked this morning for
-       this afternoon still gets its line. */
-    if (when.getTime() < Date.now() - 86400000) continue
+    /* A booking is only news while the call is still ahead.
+
+       The first version allowed a day of grace, reasoning that a call booked
+       this morning for this afternoon should still get its line. But that grace
+       is about the BOOKING being recent, and the test that matters is whether
+       the CALL has happened — so a call twenty hours past sat inside the window
+       and got announced as "booked", which reads as though it had just been
+       arranged. A call that already happened is covered by its own kinds:
+       screening_notes when the recording lands, screening_followup when nobody
+       follows up. */
+    if (when.getTime() <= Date.now()) continue
+    // And only a live booking. A completed or cancelled screening is not news
+    // about something upcoming, whatever its start time says.
+    if (sc.status !== 'scheduled') continue
 
     /* Never "today" in a stored sentence. The ledger keeps this line forever, so
        a relative word is true on the day it is written and a lie every day
