@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.22.0'
+const VERSION = '1.25.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -108,8 +108,14 @@ Extract:
    below 0.6 we route it to a human instead of acting on it. A polite,
    ambiguous message ("thanks, I'll think about it") is low confidence, not
    "withdrawing".
-8. "summary": one short line, in their words, of what they are asking or saying.
-   Max 120 characters, no preamble.
+8. "summary": a SHORT THIRD-PERSON NOUN PHRASE that completes the sentence
+   "they asked ___" or "they told us ___". Not a description of the email, not a
+   quote, no leading capital, no trailing period.
+   Good: "whether the room is furnished", "if full-time residency is possible",
+         "that they can't move until July"
+   Bad:  "Asking about the room." / "Interested in moving to SF; asking if
+         full-time residency at Agape is possible." / "The applicant wants…"
+   Max 90 characters. Empty string if there is no clear ask.
 
 EMAIL START
 ${text.slice(0, 3000)}
@@ -433,15 +439,34 @@ function header(headers: Array<{ name: string; value: string }>, name: string): 
    the call, while the digest line tells *the house* she replied. Two surfaces,
    two audiences, and suppressing the second because the first fired is how a
    house ends up unable to answer "did anyone ever get back to her?". */
+/* For most intents the label carries everything: "wants to move their call" is
+   the whole story and the thread has the rest. But for a question, a changed
+   plan, or a reply nobody can parse, the CONTENT is the notification — "asked a
+   question" tells a housemate nothing they can act on. Those quote the
+   applicant's own summary line inside the sentence, which keeps it prose (no
+   trailing annotation) while carrying the thing that matters. */
+/* The summary is a clause meant to slot straight into the sentence ("whether
+   the room is furnished"), so it goes in unquoted and lowercased. Anything that
+   still arrives looking like a sentence — a capital first letter and a verb — is
+   dropped rather than mangled into the middle of ours. */
+function clause(s: string | null): string {
+  const t = (s || '').replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '')
+  if (!t || t.length > 90) return ''
+  // A description, not a clause: "The applicant wants…", "Asking about…".
+  if (/^(the applicant|asking|confirming|brief|interested|they |he |she )/i.test(t)) return ''
+  return t.charAt(0).toLowerCase() + t.slice(1)
+}
 const INTENT_SENTENCE: Record<string, (s: string | null) => string> = {
   availability:    () => `{} sent times for a call.`,
   reschedule:      () => `{} wants to move their call.`,
-  plans_changed:   () => `{}'s plans changed.`,
   withdrawing:     () => `{} is no longer looking.`,
   post_acceptance: () => `{} is asking about moving in.`,
-  question:        () => `{} asked a question.`,
   info_provided:   () => `{} sent something over.`,
   nudge:           () => `{} is following up.`,
+  plans_changed:   (s) => clause(s) ? `{} told us ${clause(s)}.` : `{}'s plans changed.`,
+  question:        (s) => clause(s) ? `{} asked ${clause(s)}.` : `{} asked a question.`,
+  // 'unclear' means the model couldn't summarise it either, so the sentence
+  // stays plain and whatever it managed goes in the body for the Activity view.
   unclear:         () => `{} replied and it needs a read.`,
 }
 // Which lane each intent earns. The urgent three interrupt; the rest wait for
@@ -482,8 +507,12 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
         sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(r.intent_summary),
-        body: [r.intent_summary, also.length ? `also ${also.join(', ')}` : null]
-          .filter(Boolean).join(' · ') || undefined,
+        body: [
+          // Only repeat the summary where the sentence didn't already use it.
+          ['plans_changed', 'question'].includes(intent) && clause(r.intent_summary)
+            ? null : r.intent_summary,
+          also.length ? `also ${also.join(', ')}` : null,
+        ].filter(Boolean).join(' · ') || undefined,
         section: 'Replies',
         links: [{ label: 'Read the thread', url: `https://ctrl.rodeo/applications/?a=${encodeURIComponent(r.applicant_id)}` }],
       },
@@ -506,7 +535,7 @@ serve(async (req) => {
     // one-time nonce minted by the pg_cron tick, delete-on-use (migration
     // 123), with X-Cron-Secret honoured if CRON_SECRET is ever configured.
     const reqUrl = new URL(req.url)
-    const isCron = reqUrl.pathname.endsWith('/scan')
+    const isCron = reqUrl.pathname.endsWith('/scan') || reqUrl.pathname.endsWith('/classify-backfill')
     // /scan?dry=1 — report what email-autoschedule WOULD book and change
     // nothing else. Read-only, same nonce gate; exists so the detector can be
     // audited before anyone turns it on.
@@ -523,6 +552,47 @@ serve(async (req) => {
         authorized = Boolean(burned)
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
+    }
+
+    /* POST /classify-backfill?limit=40[&record=1]
+       Run the intent classifier over inbound email we already have.
+
+       This is how shadow mode earns its keep: instead of guessing at a
+       confidence floor, label a few dozen real replies and look at what the
+       model actually did. Notifications are NOT created by default — an old
+       reply is history, and turning a year of archived mail into a channel full
+       of stale asks would be worse than useless. Pass record=1 only to also
+       write ledger rows for people still in the funnel. */
+    if (reqUrl.pathname.endsWith('/classify-backfill')) {
+      const limit = Math.min(Number(reqUrl.searchParams.get('limit')) || 40, 120)
+      const record_ = reqUrl.searchParams.get('record') === '1'
+      const { data: rows } = await client.from('recruit_emails')
+        .select('id, gmail_id, applicant_id, subject, body_text, snippet, sent_at, intent')
+        .eq('direction', 'in').is('intent', null)
+        .order('sent_at', { ascending: false }).limit(limit)
+      if (!rows?.length) return json({ classified: 0, note: 'nothing left to classify' })
+
+      let classified = 0
+      const results: Array<Record<string, unknown>> = []
+      for (const r of rows) {
+        const body = (r.body_text || r.snippet || '').trim()
+        if (!body) continue
+        const ex = await extractAvailability(body)
+        await client.from('recruit_emails').update({
+          intent: ex.intent, intents: ex.intents,
+          intent_confidence: ex.intent_confidence, intent_summary: ex.intent_summary,
+          intent_at: new Date().toISOString(),
+        }).eq('id', r.id)
+        classified++
+        results.push({
+          applicant: r.applicant_id, sent_at: r.sent_at, subject: (r.subject || '').slice(0, 60),
+          intent: ex.intent, intents: ex.intents,
+          confidence: ex.intent_confidence, summary: ex.intent_summary,
+        })
+      }
+      const recorded = record_ ? await recordReplyIntents(client) : 0
+      console.log(`classify-backfill: ${classified} labelled, ${recorded} notification(s)`)
+      return json({ classified, recorded, results })
     }
 
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
