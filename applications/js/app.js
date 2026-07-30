@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.40.3';
+const VERSION = '3.41.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -107,6 +107,7 @@ let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
+let sendUpdateWith = true;    // "Send them an update" rides with a Not-a-fit decision
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
@@ -1305,13 +1306,37 @@ async function castVote(applicantId) {
   const before = a.stage;
   if (fresh) a.stage = fresh.stage;
   const verdict = pendingVerdict;
+  const wantsUpdate = document.getElementById('vote-send-update')?.checked ?? sendUpdateWith;
   pendingVerdict = null;
-  if (verdict === 'not_fit') toast(`${fullName(a)} archived — update email queued`);
-  else if (a.stage === 'candidate' && before !== 'candidate') {
+  if (verdict === 'not_fit') {
+    // The email decision was made on the decision step, so honour it here
+    // rather than asking again.
+    if (!wantsUpdate) {
+      const { error: skipErr } = await sb.rpc('recruit_skip_update', { p_applicant: applicantId });
+      if (skipErr) toast(`Archived, but the email couldn't be marked skipped: ${skipErr.message}`);
+      else { a.updateSkippedAt = new Date().toISOString(); a.stage = 'archived'; }
+    }
+    renderRailCounts();
+    // Auto-advance: their profile has nothing left to do on it. The banner
+    // carries the outcome onto the next applicant.
+    const summary = `${fullName(a)} archived — ${wantsUpdate ? 'update email queued' : 'no email sent'}`;
+    // Last in the queue means step() closes the overlay, taking the banner with
+    // it, so say it in a toast instead.
+    if (qIndex >= queue.length - 1) toast(summary);
+    else {
+      showReviewBanner(`<span><b>${esc(fullName(a))}</b> archived — ${wantsUpdate ? 'update email queued' : 'no email sent'}</span>
+        <button type="button" class="cta-link" data-reopen="${a.id}">Undo</button>`);
+      keepBannerOnce = true;
+    }
+    step(1);
+    if (wantsUpdate) openUpdateEmail(applicantId);
+    return;
+  }
+  if (a.stage === 'candidate' && before !== 'candidate') {
     if (!houseLoaded) await loadHouse();
     const added = await syncAutoPlacements();
     toast(`${fullName(a)} moved forward → Candidates${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
-  } else toast(`Saved — flagged for another housemate to read`);
+  } else toast('Saved — flagged for another housemate to read');
   renderRailCounts();
   renderReview();
 }
@@ -3043,10 +3068,30 @@ function openReview(id) {
 function closeReview() {
   document.getElementById('review').hidden = true;
   document.body.style.overflow = '';
+  hideReviewBanner();
   gpSyncPlacement(); // a playing call follows you out to the list
   const url = new URL(location); url.searchParams.delete('a');
   history.replaceState(null, '', url);
   render();
+}
+
+/* One line of "what just happened" that survives auto-advance. Carries the way
+   back, since undoing a decision you made a second ago shouldn't mean hunting
+   through Archive for the person. */
+let bannerTimer = null;
+let keepBannerOnce = false;   // set when the banner explains the step we're taking
+function showReviewBanner(html) {
+  const el = document.getElementById('review-banner');
+  if (!el) return;
+  el.innerHTML = html;
+  el.hidden = false;
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { el.hidden = true; }, 12000);
+}
+function hideReviewBanner() {
+  clearTimeout(bannerTimer);
+  const el = document.getElementById('review-banner');
+  if (el) { el.hidden = true; el.innerHTML = ''; }
 }
 
 function step(delta) {
@@ -3054,7 +3099,10 @@ function step(delta) {
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
   pendingVerdict = null;
+  sendUpdateWith = true;
   moveinEditing = false;
+  if (!keepBannerOnce) hideReviewBanner();
+  keepBannerOnce = false;
   hideHoldSheet();
   renderReview();
   resetScroll();
@@ -3251,6 +3299,8 @@ function renderReviewFoot(a) {
   const foot = document.getElementById('review-foot');
   if (!foot) return;
   const keepNote = document.getElementById('vote-note')?.value ?? null;
+  const liveBox = document.getElementById('vote-send-update');
+  if (liveBox) sendUpdateWith = liveBox.checked;
   if (a.stage === 'review') {
     const mine = myVote(a.id);
     const sel = pendingVerdict || mine?.verdict || null;
@@ -3270,6 +3320,9 @@ function renderReviewFoot(a) {
         <input type="text" class="listing-status vote-bar__note" id="vote-note" maxlength="500"
           placeholder="Your comment (required)"
           value="${esc(keepNote ?? mine?.note ?? '')}">
+        ${sel === 'not_fit' ? `<label class="vote-bar__email" title="Unchecked, they're archived with nothing sent">
+          <input type="checkbox" id="vote-send-update" ${sendUpdateWith ? 'checked' : ''}> Send them an update
+        </label>` : ''}
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
       </div>`;
   } else if (a.stage === 'candidate') {
@@ -3326,6 +3379,7 @@ async function reopenApplicant(id) {
       v.verdict === 'not_fit' || v.verdict === 'forward' ? { ...v, verdict: 'needs_input' } : v);
   }
   if (await setStage(id, 'review')) {
+    hideReviewBanner();
     toast(st0.decisive
       ? `Reopened — ${reviewerName(st0.decisive)}'s comment is kept as needing input`
       : 'Reopened — back in the Inbox');

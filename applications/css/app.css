@@ -402,6 +402,17 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   flex-shrink: 0;
 }
 .review__bar-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+/* Auto-advance banner: what just happened, and the way back. */
+.review__banner {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  margin: 0 auto var(--space-3); max-width: 720px; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm); background: var(--bg-surface);
+  border: 1px solid var(--border); color: var(--fg-muted);
+  font-size: var(--font-size-small);
+}
+.review__banner[hidden] { display: none; }
+.review__banner b { color: var(--fg); font-weight: var(--fw-semibold); }
+.review__banner button { margin-left: auto; }
 .review__dots { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 .review__dot {
   width: 8px; height: 8px; border-radius: 999px;
@@ -1054,6 +1065,13 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .vote-bar__verdict.is-not-fit.is-on { background: rgba(168, 32, 13, 0.16); box-shadow: inset 0 0 0 1.5px var(--error); }
 .vote-bar__verdict.is-needs-input.is-on { background: var(--bg-overlay); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
 .vote-bar__verdict.is-forward.is-on { background: #9FE870; border-color: #9FE870; color: #163300; }
+/* "Send them an update" rides with the archive decision, so the choice to
+   email is made once, in the same gesture. Only shown for Not a fit. */
+.vote-bar__email {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-small); color: var(--fg-muted); cursor: pointer;
+}
+.vote-bar__email input { accent-color: var(--accent); cursor: pointer; }
 .vote-bar__note { flex: 1 1 180px; min-width: 0; height: 44px; }
 .vote-bar__cast { height: 44px; border-radius: var(--radius-pill); }
 .vote-bar__cast[disabled] { opacity: 0.5; cursor: not-allowed; }
