@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.48.0';
+const VERSION = '3.49.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -882,6 +882,10 @@ async function addPlacement(applicantId, listingId, source = 'manual') {
     logEvent('event_placement', applicantId, who ? fullName(who) : '',
       `${me?.name || 'A housemate'} put {} on ${listingLabel(listingId)}.`);
   }
+  // They now have a room, so "no room fits" is answered — and the listing has a
+  // shortlist, so its "nobody qualifies" is too.
+  ackFor('applicant', applicantId, ['candidate_parked']);
+  ackFor('listing', listingId, ['listing_no_qualifiers']);
   return data;
 }
 
@@ -1335,6 +1339,12 @@ async function setStage(id, stage) {
   if (a && before !== stage) {
     logEvent('event_stage', id, fullName(a),
       `${me.name || 'A housemate'} moved {} from ${before || 'nowhere'} to ${stage}.`);
+    // Anything that chases a live candidate stops mattering the moment they
+    // stop being one.
+    if (stage !== 'candidate' && stage !== 'review') {
+      ackFor('applicant', id, ['candidate_parked', 'candidate_placed', 'screening_followup',
+        'decision_open', 'gone_cold', 'review_stalled', 'needs_input']);
+    }
   }
   return true;
 }
@@ -1357,6 +1367,8 @@ async function castVote(applicantId) {
   votes[applicantId] = [...(votes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
   logEvent('event_verdict', applicantId, fullName(a),
     `${me.name || 'A housemate'} reviewed {} as ${VERDICTS[pendingVerdict]?.toLowerCase() || pendingVerdict}.`, note);
+  // The review IS the answer to both of those asks.
+  ackFor('applicant', applicantId, ['review_stalled', 'needs_input', 'application_new']);
   // "Not a fit" is a recruiter decision too, so Archive and the update tray
   // can show the reason in the reviewer's own words.
   if (pendingVerdict === 'not_fit') await saveDecision(applicantId, 'pass', 'fit', me.name, note);
@@ -1496,26 +1508,55 @@ async function render() {
 /* Kind → how it introduces itself. Must stay in step with KINDS in
    _shared/recruit-notify.ts: the log and Discord should use the same words for
    the same thing, and neither should ever show the raw kind slug. */
+/* Mirrors KINDS in _shared/recruit-notify.ts — the log and Discord must use the
+   same word and the same icon for the same thing, and neither may ever show a
+   raw kind slug. Single-codepoint emoji only: anything needing a U+FE0F
+   variation selector renders as a box in Discord. */
 const ACTIVITY_KINDS = {
-  application_new:   { icon: '📥', label: 'New application' },
-  review_stalled:    { icon: '⏳', label: 'Waiting on a review' },
-  review_backlog:    { icon: '🗄️', label: 'Inbox backlog' },
-  opening_at_risk:   { icon: '🏠', label: 'Opening at risk' },
-  opening_overdue:   { icon: '🔴', label: 'Opening overdue' },
-  room_emptying:     { icon: '📦', label: 'Room emptying' },
+  application_new:        { icon: '📥', label: 'New application' },
+  review_stalled:         { icon: '⏳', label: 'Waiting on a review' },
+  review_backlog:         { icon: '📚', label: 'Inbox backlog' },
+  needs_input:            { icon: '🙋', label: 'Second read wanted' },
+  opening_at_risk:        { icon: '🏠', label: 'Opening at risk' },
+  opening_overdue:        { icon: '🔴', label: 'Opening overdue' },
+  room_emptying:          { icon: '📦', label: 'Room emptying' },
+  reply_availability:     { icon: '📅', label: 'Sent times' },
+  reply_reschedule:       { icon: '⏰', label: 'Wants to move the call' },
+  reply_plans_changed:    { icon: '🔄', label: 'Plans changed' },
+  reply_withdrawing:      { icon: '👋', label: 'Withdrew' },
+  reply_post_acceptance:  { icon: '🔑', label: 'Asking about moving in' },
+  reply_question:         { icon: '❓', label: 'Asked a question' },
+  reply_info_provided:    { icon: '📎', label: 'Sent something over' },
+  reply_nudge:            { icon: '🔔', label: 'Following up' },
+  reply_unclear:          { icon: '🤔', label: 'Reply needs a read' },
+  screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
+  screening_claimed:      { icon: '🤝', label: 'Call claimed' },
+  screening_today:        { icon: '📞', label: 'Call today' },
+  screening_notes:        { icon: '📝', label: 'Recording ready' },
+  screening_followup:     { icon: '⌛', label: 'Owed an answer' },
+  candidate_placed:       { icon: '✅', label: 'Passed review' },
+  candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
+  decision_open:          { icon: '📊', label: 'Decision open' },
+  candidate_promoted:     { icon: '🎉', label: 'Welcomed in' },
+  gone_cold:              { icon: '💤', label: 'Gone quiet' },
+  listing_draft:          { icon: '📄', label: 'Draft opening' },
+  listing_draft_stale:    { icon: '🐌', label: 'Draft going stale' },
+  listing_has_candidates: { icon: '🎯', label: 'Ready to screen' },
+  listing_no_qualifiers:  { icon: '🚫', label: 'Nobody qualifies' },
+  listing_filled_no_stay: { icon: '📋', label: 'Filled but unbooked' },
+  onboarding_owed:        { icon: '🎁', label: 'Onboarding owed' },
+  occupancy_conflict:     { icon: '❗', label: 'Calendar clash' },
+  // Profile events — things housemates do, appended by recruit_log_event. They
+  // share the ledger because a profile's history is one story; what separates
+  // them is audience 'none', meaning recorded and never sent.
+  event_verdict:          { icon: '🔖', label: 'Review written' },
+  event_stage:            { icon: '🔀', label: 'Stage changed' },
+  event_email:            { icon: '📤', label: 'Email sent' },
+  event_placement:        { icon: '📌', label: 'Shortlist changed' },
+  event_move_in:          { icon: '🧳', label: 'Move-in confirmed' },
+  event_comment:          { icon: '💬', label: 'Note added' },
+  event_screening:        { icon: '👥', label: 'Call arranged' },
 };
-/* Profile events — things housemates do, appended by recruit_log_event. They
-   share the ledger with notifications because a profile's history is one story;
-   what separates them is audience 'none', meaning recorded and never sent. */
-Object.assign(ACTIVITY_KINDS, {
-  event_verdict:     { icon: '⚖️', label: 'Review written' },
-  event_stage:       { icon: '➡️', label: 'Stage changed' },
-  event_email:       { icon: '📤', label: 'Email sent' },
-  event_placement:   { icon: '📌', label: 'Shortlist changed' },
-  event_move_in:     { icon: '📆', label: 'Move-in confirmed' },
-  event_comment:     { icon: '💬', label: 'Note added' },
-  event_screening:   { icon: '📞', label: 'Call arranged' },
-});
 const kindIcon = k => ACTIVITY_KINDS[k]?.icon || '•';
 const kindLabel = k => ACTIVITY_KINDS[k]?.label
   || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
@@ -1667,6 +1708,28 @@ async function loadProfileActivity(a) {
       </span>
     </li>`).join('')}
   </ul>`;
+}
+
+/* Mark every open notification of these kinds, for this subject, resolved.
+   Called when the underlying condition is actually dealt with — reviewing an
+   applicant answers "waiting on a review", opening a listing answers its draft
+   nudge. Without this the digest keeps asking for things already done, which is
+   the fastest way for a notification channel to lose its credibility.
+
+   Fire-and-forget, like logEvent: a housemate's action must never fail because
+   the bookkeeping did. */
+async function ackFor(subjectType, subjectId, kinds) {
+  if (!subjectId) return;
+  try {
+    const { error } = await sb.rpc('recruit_ack_subject', {
+      p_subject_type: subjectType, p_subject_id: String(subjectId), p_kinds: kinds || null,
+    });
+    if (error) { console.warn('[activity] could not resolve', kinds, error.message); return; }
+    // Keep the rail badge honest without a refetch.
+    if (activityOpenCount) { loadActivityCount(); }
+  } catch (err) {
+    console.warn('[activity] could not resolve', kinds, err);
+  }
 }
 
 /* Append a profile event. Fire-and-forget on purpose: the log is valuable but
@@ -3641,7 +3704,16 @@ async function updateListingStatus(id, status) {
   const prev = l.status;
   l.status = status;
   const { error } = await sb.from('recruit_listings').update({ status }).eq('id', id);
-  if (error) { l.status = prev; toast(`Update failed: ${error.message}`); }
+  if (error) { l.status = prev; toast(`Update failed: ${error.message}`); rerenderAfterListingChange(); return; }
+  // Opening a draft is the answer to both draft nudges; taking it off the market
+  // answers everything that was chasing the room.
+  if (prev === 'draft' && status === 'open') {
+    ackFor('listing', id, ['listing_draft', 'listing_draft_stale']);
+  }
+  if (status === 'filled' || status === 'closed') {
+    ackFor('listing', id, ['listing_draft', 'listing_draft_stale', 'listing_no_qualifiers',
+      'opening_at_risk', 'opening_overdue', 'listing_has_candidates']);
+  }
   rerenderAfterListingChange();
 }
 
@@ -4584,6 +4656,9 @@ async function gmailCall(payload) {
     const who = applicants.find(x => x.id === payload.applicantId);
     logEvent('event_email', payload.applicantId, who ? fullName(who) : '',
       `${me?.name || 'A housemate'} emailed {}.`, payload.subject || null);
+    // Writing to them is precisely what the silence notifications were asking
+    // for, so they are answered whatever the email actually said.
+    ackFor('applicant', payload.applicantId, ['screening_followup', 'gone_cold']);
   }
   return out;
 }
