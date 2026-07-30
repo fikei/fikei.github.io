@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.40.2';
+const VERSION = '3.40.3';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -560,7 +560,7 @@ async function loadAll() {
   const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
-    sb.from('recruit_comments').select('applicant_id, author_name, body, created_at').order('created_at'),
+    sb.from('recruit_comments').select('applicant_id, author_name, body, created_at, source').order('created_at'),
     // Full rows, not just the state columns: this is also what hydrates
     // emailsCache so a profile can render its thread before any Gmail
     // round-trip. body_text is the one heavy column and stays out — the
@@ -1736,7 +1736,7 @@ function renderWatchNotes() {
       <div class="note__body-wrap">
         <div class="note__meta">
           <span class="note__author">${esc(c.author_name || 'Housemate')}</span>
-          <span class="note__time">${relTime(c.created_at)}</span>
+          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : ''}</span>
         </div>
         <p class="note__body">${esc(c.body)}</p>
       </div>
@@ -3348,7 +3348,7 @@ function renderNotes(applicantId) {
       <div class="note__body-wrap">
         <div class="note__meta">
           <span class="note__author">${esc(c.author_name || 'Housemate')}</span>
-          <span class="note__time">${relTime(c.created_at)}</span>
+          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : ''}</span>
         </div>
         <p class="note__body">${esc(c.body)}</p>
       </div>

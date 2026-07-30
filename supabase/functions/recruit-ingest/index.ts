@@ -19,7 +19,7 @@
 // timestamp, and inserts ignore duplicates — so resending the whole sheet is
 // a safe backfill, not a mess of copies.
 
-const VERSION = '1.3.0'
+const VERSION = '1.4.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -208,6 +208,16 @@ serve(async (req) => {
         const k = Object.keys(r).find((h) => /e-?mail/i.test(h))
         return k ? String(r[k] || '').trim().toLowerCase() : ''
       }
+      // A comment's anchor is an opaque range id, but Drive hands back the
+      // quoted cell — which for these threads is the row's Timestamp. That
+      // string identifies the submission exactly, so it's the match key.
+      const stampOf = (r: Record<string, unknown>) => {
+        const k = Object.keys(r).find((h) => /timestamp|submitted/i.test(h))
+        return k ? String(r[k] || '').trim() : ''
+      }
+      const normStamp = (v: string) => v.replace(/\s+/g, ' ').trim()
+      const byStamp = new Map<string, Record<string, unknown>>()
+      for (const r of sheetRows) { const st = normStamp(stampOf(r)); if (st) byStamp.set(st, r) }
       const { data: appRows } = await client.from('recruit_applicants').select('id, email, first_name, last_name')
       const byEmail = new Map((appRows || []).map((a: any) => [String(a.email || '').toLowerCase(), a]))
 
@@ -238,20 +248,20 @@ serve(async (req) => {
         // Resolve the applicant: the anchor's row number first, then the
         // quoted cell text (an email, or a name).
         let applicant: any = null
-        const rowNum = Number((String(t.anchor || '').match(/[A-Z]+(\d+)/) || [])[1] || 0)
-        if (rowNum > 1 && sheetRows[rowNum - 2]) applicant = byEmail.get(emailOf(sheetRows[rowNum - 2])) || null
-        if (!applicant) {
-          const quoted = String(t.quotedFileContent?.value || '').trim()
+        const quoted = normStamp(String(t.quotedFileContent?.value || ''))
+        const stampRow = quoted ? byStamp.get(quoted) : null
+        if (stampRow) applicant = byEmail.get(emailOf(stampRow)) || null
+        if (!applicant && quoted) {
           const em = quoted.match(/[\w.+-]+@[\w-]+\.[\w.]+/)
           if (em) applicant = byEmail.get(em[0].toLowerCase()) || null
-          if (!applicant && quoted) {
+          if (!applicant) {
             const q = quoted.toLowerCase()
             applicant = (appRows || []).find((a: any) =>
               q === `${a.first_name} ${a.last_name}`.toLowerCase().trim() ||
               q === String(a.email || '').toLowerCase()) || null
           }
         }
-        if (!applicant) { unmatched.push({ author: authorName, body: body.slice(0, 120), anchor: t.anchor || null }); continue }
+        if (!applicant) { unmatched.push({ author: authorName, body: body.slice(0, 120), anchor: t.anchor || null, quoted: t.quotedFileContent?.value || null }); continue }
 
         // Does the comment point at a decision? Only unmistakable language
         // counts; anything softer stays a comment for a human to read.
