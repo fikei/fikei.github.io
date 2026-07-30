@@ -1860,9 +1860,16 @@ export async function previewTick(db: DB): Promise<Array<Record<string, unknown>
        them nothing about who. Deliberate divergence from record(): don't
        "fix" this into matching, and don't trust it to prove a line is linked.
        It won't show the difference. */
-    line: `${icon(n.kind)} ${n.payload.copy
-      ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
-      : (n.payload.sentence || '')}`.replace('{subject}', String(n.payload.vars?.subject ?? n.payload.title)),
+    /* Exactly what would be posted, prompt included. A preview that shows only
+       the sentence is not a preview of the message — the prompt is the half that
+       asks the house for something, and leaving it out is how you end up
+       checking the wrong thing. */
+    line: [
+      `${icon(n.kind)} ${n.payload.copy
+        ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
+        : (n.payload.sentence || '')}`,
+      renderPrompt(n.kind, n.payload.links?.[0]?.url),
+    ].filter(Boolean).join('\n').replace('{subject}', String(n.payload.vars?.subject ?? n.payload.title)),
     dedupe_key: n.dedupe_key,
   }))
 }
