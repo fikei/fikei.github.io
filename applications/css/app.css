@@ -1653,3 +1653,8 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   .drawer-cta__exit { flex-direction: column; align-items: flex-start; gap: 2px; }
   .drawer-cta__exit-hint { text-align: left; }
 }
+
+/* Per-profile activity feed (v3.48.0). Reads as prose, so the line wraps
+   instead of ellipsizing the way the scannable rail rows do. */
+.activity-feed .log-row { align-items: flex-start; }
+.activity-feed__line { white-space: normal; font-weight: 400; }
