@@ -84,11 +84,11 @@ export const TEMPLATES: Record<string, string> = {
   // --- applicants
   'application_new':              '{subject} applied for {track}.',
   'application_new.timed':        '{subject} applied for {track}, {timing}.',
-  'review_stalled':               '{subject} has been waiting {days} for a review.',
-  'review_backlog':               '{subject} have never been reviewed, all of them older than {window} days.',
-  'needs_input':                  '{asker} wants another read on {subject}.',
+  'review_stalled':               '{subject} has been waiting {days} for review.',
+  'review_backlog':               '{subject} are waiting for reviews, {window} days.',
+  'needs_input':                  '{asker} wants second opinon on {subject}.',
   'candidate_placed':             '{subject} passed review and fits {rooms}.',
-  'candidate_parked':             '{subject} passed review but no open room fits them.',
+  'candidate_parked':             '{subject} passed review but no openings fit their move-in dates.',
   'gone_cold':                    '{subject} never answered the last email, sent {days} ago.',
   'candidate_promoted':           '{subject} moved into {room} on {date} as a resident.',
 
@@ -97,7 +97,7 @@ export const TEMPLATES: Record<string, string> = {
   'decision_open.overdue':        'The house still has not decided on {subject}, who wanted to move in {date}.',
 
   // --- the call
-  'screening_followup.undecided': "{subject} was interviewed {days} ago and the house still hasn't decided.",
+  'screening_followup.undecided': "{subject} was interviewed {days} ago and waiting on house decision.",
   // Naming who ran the call turns "somebody should" into "you said you would".
   'screening_followup.undecided_by': "{screener} interviewed {subject} {days} ago and the house still hasn't decided.",
   'screening_followup.silent':    '{subject} was interviewed and has heard nothing for {days}.',
@@ -149,6 +149,27 @@ export const TEMPLATES: Record<string, string> = {
   'reply_plans_changed.plain':    "{subject}'s plans changed.",
   'reply_question':               '{subject} asked {ask}.',
   'reply_question.plain':         '{subject} asked a question.',
+}
+
+/* ---- prompts ------------------------------------------------------------
+   A closing line inviting the house to say what it knows.
+
+   A new application is exactly the moment somebody knows something — "I met her
+   at the climbing gym", "he's a friend of Sam's" — and that knowledge otherwise
+   dies in the channel, because contributing it means opening the app and
+   retyping it. Replies to the notification are read back and filed as house
+   notes on the applicant, so answering in Discord is enough.
+
+   Only on kinds where a stranger's opinion actually helps. A room emptying does
+   not need the house's thoughts; a person joining it does. {url} is their
+   profile. */
+export const PROMPTS: Record<string, string> = {
+  application_new:
+    'Know them? Reply here with what you know, or [read their application]({url}).',
+  needs_input:
+    'Reply here with your read, or [open the application]({url}).',
+  candidate_placed:
+    'Reply here if you know them, or [see their profile]({url}).',
 }
 
 /* ---- actions ------------------------------------------------------------
@@ -232,6 +253,15 @@ export async function loadCopyOverrides(db: any): Promise<Map<string, string>> {
     console.warn(`[copy] could not load overrides: ${(err as Error).message}`)
     return new Map()
   }
+}
+
+/* The prompt, with the applicant's link in it, or nothing. Kept separate from
+   renderCopy so the sentence stays the sentence — the prompt is an invitation
+   appended below it, not part of what happened. */
+export function renderPrompt(kind: string, url?: string | null): string {
+  const prompt = PROMPTS[kind]
+  if (!prompt || !url) return ''
+  return prompt.replace('{url}', url)
 }
 
 export const icon = (kind: string) => KINDS[kind]?.icon || '•'

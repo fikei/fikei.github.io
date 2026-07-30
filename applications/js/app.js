@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.58.0';
+const VERSION = '3.59.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1985,7 +1985,9 @@ async function loadProfileActivity(a) {
   // House comments.
   for (const c of commentsRes.data || []) {
     add(c.created_at, 'event_comment',
-      `${who(c.author_name)} left a note.`, c.body);
+      c.source === 'discord'
+        ? `${who(c.author_name)} replied in Discord.`
+        : `${who(c.author_name)} left a note.`, c.body);
   }
 
   // Listings they were added to or taken off.
@@ -2466,7 +2468,7 @@ function renderWatchNotes() {
       <div class="note__body-wrap">
         <div class="note__meta">
           <span class="note__author">${esc(c.author_name || 'Housemate')}</span>
-          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : ''}</span>
+          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : c.source === 'discord' ? ' · replied in Discord' : ''}</span>
         </div>
         <p class="note__body">${esc(c.body)}</p>
       </div>
@@ -4760,7 +4762,7 @@ function renderNotes(applicantId) {
       <div class="note__body-wrap">
         <div class="note__meta">
           <span class="note__author">${esc(c.author_name || 'Housemate')}</span>
-          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : ''}</span>
+          <span class="note__time">${relTime(c.created_at)}${c.source === 'sheet' ? ' · from the application sheet' : c.source === 'discord' ? ' · replied in Discord' : ''}</span>
         </div>
         <p class="note__body">${esc(c.body)}</p>
       </div>

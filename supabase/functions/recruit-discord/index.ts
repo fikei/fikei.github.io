@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.22.2'
+const VERSION = '1.22.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -897,11 +897,11 @@ serve(async (req) => {
       // then broadcast whatever the house is owed. Isolated from everything
       // above — a failing detector must not cost the screening reminders their
       // tick.
-      let notify = { detected: 0, logged: 0, now: 0, digest: 0 }
+      let notify = { detected: 0, logged: 0, now: 0, digest: 0, replies: 0 }
       try { notify = await notifyTick(client) } catch (err) {
         console.warn(`[notify] tick failed: ${(err as Error).message}`)
       }
-      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), ${ballots} ballot(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
+      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), ${ballots} ballot(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested / ${notify.replies} reply note(s)`)
       return json({ bots, live, reminded: sent, recorded, ballots, notify })
     }
 

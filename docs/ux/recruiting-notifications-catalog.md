@@ -336,6 +336,29 @@ those tables can't explain.
 
 ---
 
+## Replying to a notification
+
+Some notifications end with an invitation:
+
+> 📥 **Monique Nguyen** applied for a full-time room, from Sept 2026.
+> Know them? Reply here with what you know, or [read their application](…).
+
+**Replying in Discord files a house note on that applicant.** The tick reads
+replies to its own messages, matches them to the notification via
+`discord_message_id`, and writes them to `recruit_comments` — the same table the
+in-app House notes box uses — so they appear on the profile, in its Activity tab,
+and in the review overlay, tagged *replied in Discord*.
+
+Two rules keep it safe: only replies to a message the bot posted, by a known
+recruiting member, are filed — anything else is a conversation the house is
+having, and filing it onto someone's application would be wrong. And Discord's
+message id is the primary key of `recruit_notification_replies`, so re-reading
+the same 24-hour window every 15 minutes cannot file a reply twice.
+
+Prompts live in `PROMPTS` in the copy module and exist only on kinds where a
+stranger's opinion helps: `application_new`, `needs_input`, `candidate_placed`.
+A room emptying does not need the house's thoughts; a person joining it does.
+
 ## Batching
 
 Batching applies to Discord only; the log is never batched.
