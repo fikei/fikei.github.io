@@ -252,11 +252,15 @@ export async function upsertScreenerScheduler(db: any, input: ScreenerSchedulerI
 
   const message = await postOrPatch(CLAIMS_CHANNEL_ID, live?.discord_message_id || null, payload)
   // Mirror copy is best-effort: missing channel perms must not kill the post.
+  // While society posts are held, NOTES resolves to the same channel as the
+  // primary — mirroring then would just duplicate the scheduler post.
   let mirror: any = null
-  try {
-    mirror = await postOrPatch(NOTES_CHANNEL_ID, live?.mirror_message_id || null, payload)
-  } catch (err) {
-    console.warn(`[discord] mirror post failed for ${input.applicantId}: ${(err as Error).message}`)
+  if (NOTES_CHANNEL_ID !== CLAIMS_CHANNEL_ID) {
+    try {
+      mirror = await postOrPatch(NOTES_CHANNEL_ID, live?.mirror_message_id || null, payload)
+    } catch (err) {
+      console.warn(`[discord] mirror post failed for ${input.applicantId}: ${(err as Error).message}`)
+    }
   }
 
   const { data: row, error } = await db.from('recruit_claim_posts').upsert({
