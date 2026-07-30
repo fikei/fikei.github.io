@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.49.0';
+const VERSION = '3.50.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -146,7 +146,8 @@ let activityFilter = { kind: 'all', open: false };
 let activityOpenCount = 0;    // unresolved notifications, for the rail badge
 let view = 'inbox';           // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
-let rooms = [];               // recruit_rooms
+let rooms = [];               // recruit_rooms, in-pool only — what the funnel places into
+let allRooms = [];            // every room including shared spaces, for costs/details
 let stays = [];               // recruit_stays rows (date-based tenures)
 let listings = [];            // recruit_listings rows
 let onboarding = [];          // recruit_onboarding rows (checklist per resident stay)
@@ -1489,12 +1490,17 @@ async function loadComments(applicantId) {
 /* ---------- house data ---------- */
 async function loadHouse() {
   const [rRes, sRes, lRes, oRes] = await Promise.all([
+    // Rooms out of the pool (shared spaces like the basement Studio) are real
+    // rooms the funnel never places anyone into — see migration 146.
     sb.from('recruit_rooms').select('*').order('sort'),
     sb.from('recruit_stays').select('*').order('starts_on'),
     sb.from('recruit_listings').select('*').order('starts_on'),
     sb.from('recruit_onboarding').select('*').order('sort'),
   ]);
-  rooms = rRes.data || [];
+  // `!== false` on purpose: a room row that predates migration 146 has no
+  // in_pool value, and it should stay visible rather than vanish.
+  allRooms = rRes.data || [];
+  rooms = allRooms.filter(r => r.in_pool !== false);
   stays = sRes.data || [];
   listings = lRes.data || [];
   onboarding = oRes.data || [];
@@ -1526,7 +1532,8 @@ async function render() {
   const headAction = document.getElementById('page-head-action');
   if (headAction) headAction.innerHTML = view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>` : '';
   document.querySelectorAll('[data-view-link]').forEach(el =>
-    el.classList.toggle('is-current', el.dataset.viewLink === view && el.classList.contains('rail-nav__row')));
+    el.classList.toggle('is-current', el.dataset.viewLink === view
+      && (el.classList.contains('rail-nav__row') || el.classList.contains('rail-foot__settings'))));
   renderRailCounts();
 
   const root = document.getElementById('view-root');
@@ -2979,6 +2986,14 @@ function roomGaps(roomId) {
   return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= setting('gap_min_days'));
 }
 
+/* Is this open stretch already published? Overlap, not equality: a listing is
+   usually created from a gap and then edited, so the dates drift apart while
+   still describing the same opening. */
+function openListingFor(roomId, gapStart, gapEnd) {
+  return listings.find(l => l.room_id === roomId && l.status === 'open'
+    && l.starts_on <= gapEnd && (l.ends_on || '9999-12-31') >= gapStart) || null;
+}
+
 /* One room's bars: stays, then the uncovered stretches between them. Module
    scope (not a closure inside renderOccupancy) so refreshLane() can repaint a
    single lane after an autosave without rebuilding the drawer. */
@@ -3000,12 +3015,18 @@ function laneBarsHtml(r) {
     const left = occPos(a) * 100;
     const width = occPos(isoAddDays(b, 1)) * 100 - left;
     const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
-    // No label: a red stretch already reads as empty, and the dates it
-    // spans are the point. Tapping it opens the drawer, which names them.
-    bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
-      style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
-      aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
-      data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
+    // An open stretch that is already listed is a different situation from one
+    // nobody has done anything about, and the calendar was silent about which
+    // was which. Listed reads as work in progress, not as a hole.
+    const listed = openListingFor(r.id, a, b);
+    const label = listed
+      ? `Listed — ${listed.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtShort(listed.starts_on)}`
+      : `Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list`;
+    bars.push(`<button type="button" class="cal__event cal__event--vacant ${listed ? 'is-listed' : ''} ${active ? 'is-editing' : ''}"
+      style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="${esc(label)}"
+      aria-label="${esc(listed ? label : `Open ${fmtShort(a)} – ${fmtShort(b)}`)}"
+      data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}">${
+        listed ? '<span class="cal__event-tag">listed</span>' : ''}</button>`);
   }
   return bars.join('');
 }
@@ -3062,6 +3083,7 @@ function renderOccupancy() {
           </div>`).join('')}
       </div>
     </div>
+    ${occListingsHtml()}
     ${occupantsHtml()}
     <div id="occ-drawer-host"></div>`;
   renderOccDrawer();
@@ -3598,6 +3620,44 @@ function nextMilestoneLabel(s, todayIso) {
 }
 
 /* --- current + past occupants --- */
+/* Open listings, on the page that shows who is in the house. The calendar says
+   a stretch is listed; this says what the listing actually offers and how many
+   candidates are sitting in it — the two questions the badge can't answer. */
+function occListingsHtml() {
+  const open = listings.filter(l => l.status === 'open')
+    .slice().sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+  if (!open.length) return '';
+  const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));
+  const money = n => n != null && n !== '' ? '$' + Number(n).toLocaleString('en-US') : null;
+  return `
+    <section class="inbox-group occ-listings">
+      <div class="inbox-group__head">
+        <h2 class="inbox-group__label">Open listings</h2>
+        <span class="inbox-group__count">${open.length} live</span>
+      </div>
+      <ul class="inbox-card">
+        ${open.map(l => {
+          const room = roomById[l.room_id];
+          const placed = placements.filter(p => p.listing_id === l.id && p.status === 'active').length;
+          const rent = money(l.rent_monthly ?? room?.rent_monthly);
+          return `<li class="inbox-row">
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(room?.name || 'Room')}</span>
+              <span class="inbox-row__sub">${esc(listingWindow(l))}${rent ? ` · ${rent}/mo` : ''}${
+                l.source === 'gap' ? ' · from the calendar' : ''}</span>
+            </span>
+            <span class="inbox-row__actions">
+              <span class="link-chip">${placed} candidate${placed === 1 ? '' : 's'}</span>
+              <span class="listing-kind listing-kind--${l.kind === 'resident' ? 'trial' : 'sublet'}">${
+                l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+              <button class="btn btn--sm" data-edit-listing="${l.id}">Edit</button>
+            </span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </section>`;
+}
+
 function occupantsHtml() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const roomById = Object.fromEntries(rooms.map(r => [r.id, r]));

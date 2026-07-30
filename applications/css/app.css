@@ -241,6 +241,10 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   color: var(--fg-muted); font-size: var(--font-size-small); cursor: pointer;
 }
 .rail-foot__link:hover { color: var(--fg); text-decoration: underline; }
+/* Settings lives with the account rather than in the funnel, so it reads as a
+   footer link — but it is a view, and the rail marks the current one. */
+.rail-foot__settings { display: block; }
+.rail-foot__settings.is-current { color: var(--fg); font-weight: var(--fw-semibold); }
 
 /* Mobile top bar + drawer */
 .mobile-bar { display: none; }
@@ -1794,3 +1798,22 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   display: flex; flex-direction: column; gap: var(--space-3);
   background: transparent; border: 0; padding: 0;
 }
+
+/* --- v3.50.0: listings on the occupancy page ---
+   A listed stretch and a stretch nobody has touched were drawn identically.
+   Listed reads as work in progress: solid edge instead of dashed, and a small
+   tag when the bar is wide enough to hold one. */
+.cal__event--vacant.is-listed {
+  background: var(--outreach-tint);
+  border: 1px solid var(--outreach-fg);
+  justify-content: center;
+}
+.cal__event--vacant.is-listed:hover { background: var(--outreach-tint); filter: brightness(1.15); }
+.cal__event-tag {
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--outreach-fg);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.occ-listings { margin-top: var(--space-6); }
+.occ-listings .inbox-row__actions { align-items: center; gap: var(--space-2); }
+.occ-listings .link-chip { border: 0; }
