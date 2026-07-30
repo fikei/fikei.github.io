@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.21.0'
+const VERSION = '1.22.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -21,6 +21,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendIntroEmail, sharedAccessToken, sweepCalendars, HOUSE_CALENDAR_ID, SHARED_EMAIL } from '../_shared/recruit-schedule.ts'
 import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
 import { notifyTick, previewTick } from '../_shared/recruit-notify.ts'
+import { ensureBallots } from '../_shared/recruit-ballots.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -561,6 +562,15 @@ async function notifyUnmatchedCalls(client: ReturnType<typeof db>): Promise<numb
   return notified
 }
 
+// House-local hour, 0–23. The tick runs every 15 minutes; work that should
+// happen once a day picks its hour with this rather than earning a cron of its
+// own. PT, not UTC — "8am" is a time the house recognises.
+function ptHour(now = new Date()): number {
+  return Number(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit',
+  }).format(now)) % 24
+}
+
 // Trial-candidate milestones used to post their own one-shot embeds from here.
 // They are now four escalating rungs in the notification ledger
 // (detectTrialVotes in _shared/recruit-notify.ts), so they get copy overrides,
@@ -868,6 +878,18 @@ serve(async (req) => {
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
       const archived = await archiveMissingRecordings(client)
       if (archived) console.log(`[archive] ${archived} recording(s) copied to storage`)
+      /* Trial ballots, once a day at PT 8am — the copy of the feedback form
+         each milestone is voted with. Ahead of the ledger on purpose: a ballot
+         made this morning is linked by the time the day's nudges go out, so
+         the house never gets told to fill in a form that doesn't exist yet.
+         Idempotent, so the four ticks inside the 8am hour cost one pass. */
+      let ballots = 0
+      if (ptHour() === 8) {
+        try { ballots = await ensureBallots(client) } catch (err) {
+          console.warn(`[ballots] pass failed: ${(err as Error).message}`)
+        }
+        if (ballots) console.log(`[ballots] ${ballots} created`)
+      }
       // The notification ledger: detect what's true now, write it to the log,
       // then broadcast whatever the house is owed. Isolated from everything
       // above — a failing detector must not cost the screening reminders their
@@ -876,8 +898,8 @@ serve(async (req) => {
       try { notify = await notifyTick(client) } catch (err) {
         console.warn(`[notify] tick failed: ${(err as Error).message}`)
       }
-      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
-      return json({ bots, live, reminded: sent, recorded, notify })
+      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), ${ballots} ballot(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
+      return json({ bots, live, reminded: sent, recorded, ballots, notify })
     }
 
     const pathname = new URL(req.url).pathname
