@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.49.0';
+const VERSION = '3.51.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2986,12 +2986,37 @@ function roomGaps(roomId) {
   return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= setting('gap_min_days'));
 }
 
-/* Is this open stretch already published? Overlap, not equality: a listing is
-   usually created from a gap and then edited, so the dates drift apart while
-   still describing the same opening. */
-function openListingFor(roomId, gapStart, gapEnd) {
-  return listings.find(l => l.room_id === roomId && l.status === 'open'
-    && l.starts_on <= gapEnd && (l.ends_on || '9999-12-31') >= gapStart) || null;
+/* What a listing actually covers, as dates. A sublet states its own end; a
+   resident trial runs a fixed length; a listing with no end date is assumed to
+   run that same length rather than forever — an offer with no horizon isn't an
+   offer. */
+function listingSpan(l) {
+  const months = setting('trial_length_months');
+  return [l.starts_on, l.ends_on || addMonthsIso2(l.starts_on, months)];
+}
+
+/* Cut one open stretch into what's listed and what isn't. The whole gap used to
+   turn "listed" the moment any listing touched it, so a three-month opening
+   inside an eight-month gap looked like an eight-month opening. */
+function gapSegments(roomId, gapStart, gapEnd) {
+  const open = listings
+    .filter(l => l.room_id === roomId && l.status === 'open')
+    .map(l => ({ l, span: listingSpan(l) }))
+    .filter(({ span }) => span[0] <= gapEnd && span[1] >= gapStart)
+    .sort((x, y) => x.span[0].localeCompare(y.span[0]));
+  const segs = [];
+  let cursor = gapStart;
+  for (const { l, span } of open) {
+    const from = span[0] < gapStart ? gapStart : span[0];
+    const to = span[1] > gapEnd ? gapEnd : span[1];
+    if (to < cursor) continue;                        // already covered
+    if (from > cursor) segs.push([cursor, isoAddDays(from, -1), null]);
+    segs.push([from < cursor ? cursor : from, to, l]);
+    cursor = isoAddDays(to, 1);
+    if (cursor > gapEnd) break;
+  }
+  if (cursor <= gapEnd) segs.push([cursor, gapEnd, null]);
+  return segs;
 }
 
 /* One room's bars: stays, then the uncovered stretches between them. Module
@@ -3011,22 +3036,29 @@ function laneBarsHtml(r) {
       style="left: ${left}%; width: calc(${Math.max(width, 0.8)}% - var(--bar-break))" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
       data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
   }
-  for (const [a, b] of roomGaps(r.id)) {
-    const left = occPos(a) * 100;
-    const width = occPos(isoAddDays(b, 1)) * 100 - left;
-    const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
-    // An open stretch that is already listed is a different situation from one
-    // nobody has done anything about, and the calendar was silent about which
-    // was which. Listed reads as work in progress, not as a hole.
-    const listed = openListingFor(r.id, a, b);
-    const label = listed
-      ? `Listed — ${listed.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtShort(listed.starts_on)}`
-      : `Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list`;
-    bars.push(`<button type="button" class="cal__event cal__event--vacant ${listed ? 'is-listed' : ''} ${active ? 'is-editing' : ''}"
-      style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="${esc(label)}"
-      aria-label="${esc(listed ? label : `Open ${fmtShort(a)} – ${fmtShort(b)}`)}"
-      data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}">${
-        listed ? '<span class="cal__event-tag">listed</span>' : ''}</button>`);
+  for (const [gapA, gapB] of roomGaps(r.id)) {
+    // A listed stretch and one nobody has touched were drawn identically, and
+    // the listed bar is the listing's own window — usually three months — not
+    // the whole gap it sits inside.
+    for (const [a, b, listed] of gapSegments(r.id, gapA, gapB)) {
+      const left = occPos(a) * 100;
+      const width = occPos(isoAddDays(b, 1)) * 100 - left;
+      if (width <= 0) continue;
+      if (listed) {
+        const act = occDrawer?.type === 'listing' && occDrawer.id === listed.id;
+        const label = `Listed ${fmtShort(a)} – ${fmtShort(b)} · ${
+          listed.kind === 'resident' ? 'resident trial' : 'sublet'}`;
+        bars.push(`<button type="button" class="cal__event cal__event--vacant is-listed ${act ? 'is-editing' : ''}"
+          style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="${esc(label)}"
+          aria-label="${esc(label)}" data-listing-bar="${listed.id}"><span class="cal__event-tag">listed</span></button>`);
+        continue;
+      }
+      const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
+      bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
+        style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
+        aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
+        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
+    }
   }
   return bars.join('');
 }
@@ -3098,10 +3130,11 @@ function renderOccupancy() {
 /* --- right-hand drawer: stay editor, gap actions, or room details --- */
 function openOccDrawer(next) {
   if (next?.type !== 'stay' || next.id !== promoting) promoting = null;
-  occDrawer = next;
+  occDrawer = next;   // a new drawer starts at its first step, never mid-flow
   document.querySelectorAll('.cal__event.is-editing, .cal__room-btn.is-editing').forEach(el => el.classList.remove('is-editing'));
   if (next?.type === 'stay') document.querySelector(`[data-stay="${next.id}"]`)?.classList.add('is-editing');
   if (next?.type === 'gap') document.querySelector(`[data-gap-room="${next.roomId}"][data-gap-start="${next.start}"]`)?.classList.add('is-editing');
+  if (next?.type === 'listing') document.querySelector(`[data-listing-bar="${next.id}"]`)?.classList.add('is-editing');
   if (next?.type === 'room') document.querySelector(`[data-room-info="${next.roomId}"]`)?.classList.add('is-editing');
   renderOccDrawer();
 }
@@ -3332,6 +3365,78 @@ function gapDrawerBody() {
   })}</div>`;
 }
 
+/* --- tapping a listing ---
+   A listed stretch used to open the gap chooser, whose two options were
+   "create a listing" (already done) and "add an occupant" (not the point). A
+   live listing has its own question: who's in it, and is it still true?
+   So the drawer shows the offer and the candidates sitting in it, and its
+   actions are the ones a listing actually has — edit the offer, mark it filled,
+   or close it. Recording an occupant is still reachable, because a room that
+   got taken offline is a real thing, but it's the alternative, not the default. */
+function listingDrawerBody(l) {
+  const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+  const money = n => n != null && n !== '' ? '$' + Number(n).toLocaleString('en-US') : null;
+  const rent = money(l.rent_monthly ?? room?.rent_monthly);
+  const dues = money(l.dues_monthly ?? settings.dues_monthly);
+  const food = money(l.groceries_monthly ?? settings.food_monthly);
+  const allIn = [l.rent_monthly ?? room?.rent_monthly, l.dues_monthly ?? settings.dues_monthly,
+    l.groceries_monthly ?? settings.food_monthly].every(v => v != null && v !== '')
+    ? money(Number(l.rent_monthly ?? room?.rent_monthly) + Number(l.dues_monthly ?? settings.dues_monthly)
+        + Number(l.groceries_monthly ?? settings.food_monthly)) : null;
+
+  if (occDrawer.choice === 'edit') {
+    return `<button type="button" class="step-back" data-listing-choice="">&larr; Edit the offer</button>
+      <div class="step-listing">${listingForm(l)}</div>`;
+  }
+  if (occDrawer.choice === 'occupant') {
+    const [from, to] = listingSpan(l);
+    return `<button type="button" class="step-back" data-listing-choice="">&larr; Record who's moving in</button>
+      ${stayFormHtml({ kind: l.kind === 'resident' ? 'candidate' : 'sublet', starts_on: from, ends_on: to }, l.room_id)}`;
+  }
+
+  const placed = placements.filter(p => p.listing_id === l.id && p.status === 'active');
+  const named = placed.map(p => applicants.find(a => a.id === p.applicant_id)).filter(Boolean);
+  const facts = [
+    ['Window', listingWindow(l)],
+    ['Rent', rent], ['Communal dues', dues], ['Food', food],
+    ['All-in, one person', allIn ? `${allIn}/mo` : null],
+    ['Listed', l.source === 'gap' ? 'from the occupancy calendar' : 'by hand'],
+  ].filter(([, v]) => v);
+
+  return `
+    <dl class="occ-drawer__facts">
+      ${facts.map(([k, v]) => `<div class="occ-drawer__fact"><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join('')}
+    </dl>
+    <div class="occ-drawer__section">Candidates ${placed.length ? `· ${placed.length}` : ''}</div>
+    ${named.length ? `<div class="listing-row__people">
+      ${named.map(a => `<button class="link-chip" data-review="${a.id}">${esc(a.first_name || 'Applicant')}</button>`).join('')}
+    </div>` : `<p class="occ-drawer__note">Nobody qualifies for it yet. Candidates are placed by rule as their dates line up.</p>`}
+    ${l.notes ? `<p class="occ-drawer__note">${esc(l.notes)}</p>` : ''}
+    <div class="drawer-cta">
+      <button type="button" class="drawer-cta__alt" data-listing-choice="edit">
+        <span>Edit the offer</span>
+        <span class="drawer-cta__exit-hint">dates, rent, notes</span>
+      </button>
+      <div class="drawer-cta__exits">
+        <button type="button" class="drawer-cta__exit" data-listing-choice="occupant">
+          <span class="drawer-cta__exit-label">Record who's moving in</span>
+          <span class="drawer-cta__exit-icon" aria-hidden="true">&rarr;</span>
+          <span class="drawer-cta__exit-hint">someone took it — closes the gap</span>
+        </button>
+        <button type="button" class="drawer-cta__exit" data-listing-status="filled" data-listing-id="${l.id}">
+          <span class="drawer-cta__exit-label">Mark filled</span>
+          <span class="drawer-cta__exit-icon" aria-hidden="true">&check;</span>
+          <span class="drawer-cta__exit-hint">keeps it on the record, stops placing candidates</span>
+        </button>
+        <button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-listing-status="closed" data-listing-id="${l.id}">
+          <span class="drawer-cta__exit-label">Close listing</span>
+          <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
+          <span class="drawer-cta__exit-hint">we're not offering this room after all</span>
+        </button>
+      </div>
+    </div>`;
+}
+
 function roomDetailsHtml(r) {
   const facts = [
     ['Floor', r.floor],
@@ -3387,6 +3492,14 @@ function renderOccDrawer() {
     title = `${room?.name || 'Room'} — open`;
     sub = `${fmtShort(occDrawer.start)} – ${fmtShort(occDrawer.end)}`;
     body = gapDrawerBody();
+  } else if (occDrawer.type === 'listing') {
+    const l = listings.find(x => x.id === occDrawer.id);
+    if (!l) { occDrawer = null; hostWrap.innerHTML = ''; return; }
+    const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+    title = `${room?.name || 'Room'} — listed`;
+    sub = `${l.kind === 'resident' ? 'Resident trial' : 'Sublet'} · ${
+      l.status === 'open' ? 'open to candidates' : esc(l.status)}`;
+    body = listingDrawerBody(l);
   } else if (occDrawer.type === 'room') {
     const r = rooms.find(x => x.id === occDrawer.roomId);
     if (!r) { occDrawer = null; hostWrap.innerHTML = ''; return; }
@@ -3409,6 +3522,21 @@ function renderOccDrawer() {
     occDrawer.choice = btn.dataset.gapChoice || null;
     renderOccDrawer();
   }));
+  hostWrap.querySelectorAll('[data-listing-choice]').forEach(btn => btn.addEventListener('click', () => {
+    occDrawer.choice = btn.dataset.listingChoice || null;
+    renderOccDrawer();
+  }));
+  hostWrap.querySelectorAll('[data-listing-status]').forEach(btn => btn.addEventListener('click', () => {
+    setListingStatusFromDrawer(btn.dataset.listingId, btn.dataset.listingStatus);
+  }));
+  const drawerListing = hostWrap.querySelector('.step-listing [data-listing-form]');
+  if (drawerListing && occDrawer?.type === 'listing') {
+    drawerListing.addEventListener('change', () => autoSaveListing(drawerListing, 'status'));
+    drawerListing.querySelector('[data-cancel-listing]')?.addEventListener('click', () => {
+      occDrawer.choice = null;
+      renderOccDrawer();
+    });
+  }
   const gapListing = hostWrap.querySelector('.step-listing [data-listing-form]');
   if (gapListing) {
     gapListing.addEventListener('submit', onListingCreate);
@@ -3817,8 +3945,8 @@ function listingLabel(listingId) {
 function listingWindow(l) {
   const len = windowLength(l.starts_on, l.ends_on);
   if (l.kind === 'resident') {
-    const trialEnd = new Date(l.starts_on + 'T12:00'); trialEnd.setMonth(trialEnd.getMonth() + 3);
-    return `Trial ${fmtDay(l.starts_on)} – ${fmtDay(trialEnd.toISOString().slice(0, 10))} · 3-month trial, then house vote`;
+    const months = setting('trial_length_months');
+    return `Trial ${fmtDay(l.starts_on)} – ${fmtDay(addMonthsIso2(l.starts_on, months))} · ${months}-month trial, then a review`;
   }
   return (l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)} · end date TBD`) + (len ? ` · ${len}` : '');
 }
@@ -3997,6 +4125,22 @@ async function deleteListing(id) {
   listings = listings.filter(x => x.id !== id);
   toast('Listing deleted');
   rerenderAfterListingChange();
+}
+
+/* Marking filled or closing is a real state change with an audience — the
+   auto-placement sweep stops feeding it — so it confirms, then closes the
+   drawer rather than leaving a dead listing open on screen. */
+async function setListingStatusFromDrawer(id, status) {
+  const l = listings.find(x => x.id === id);
+  if (!l) return;
+  const room = rooms.find(r => r.id === l.room_id);
+  const placed = placements.filter(p => p.listing_id === id && p.status === 'active').length;
+  const what = status === 'filled' ? 'Mark filled' : 'Close';
+  const tail = placed ? ` ${placed} candidate${placed === 1 ? '' : 's'} stop being placed in it.` : '';
+  if (!confirm(`${what} the ${l.kind === 'resident' ? 'resident trial' : 'sublet'} listing for ${room?.name || 'this room'}?${tail}`)) return;
+  occDrawer = null;
+  await updateListingStatus(id, status);
+  toast(status === 'filled' ? 'Listing marked filled' : 'Listing closed');
 }
 
 async function updateListingStatus(id, status) {
@@ -5574,6 +5718,13 @@ function init() {
     if (drawerClose) { openOccDrawer(null); return; }
     const leaving = e.target.closest('[data-leaving-room]');
     if (leaving) { markLeaving(+leaving.dataset.leavingRoom); return; }
+    const listingBar = e.target.closest('[data-listing-bar]');
+    if (listingBar) {
+      const id = listingBar.dataset.listingBar;
+      const already = occDrawer?.type === 'listing' && occDrawer.id === id;
+      openOccDrawer(already ? null : { type: 'listing', id });
+      return;
+    }
     const editL = e.target.closest('[data-edit-listing]');
     if (editL) { openListingModal(editL.dataset.editListing); return; }
     const newL = e.target.closest('[data-new-listing]');
