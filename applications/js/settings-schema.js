@@ -105,6 +105,11 @@ const SETTING_DEFS = {
     label: 'Slots offered per ask', unit: 'slots', min: 3, max: 20, step: 1,
     hint: 'More slots is more choice and a longer Discord post.',
   },
+  trial_length_months: {
+    scope: 'house', type: 'number', section: null, default: 3,
+    label: 'A resident trial runs', unit: 'months', min: 1, max: 12, step: 1,
+    hint: 'Also how long a listing is assumed to run when it states no end date.',
+  },
   save_for_future_months: {
     scope: 'house', type: 'number', section: null, default: 3,
     label: 'Save for future brings them back in', unit: 'months', min: 1, max: 12, step: 1,
