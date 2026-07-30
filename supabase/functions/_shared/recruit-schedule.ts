@@ -76,12 +76,11 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
     description: `A get-to-know-you Agape Intro Call with ${applicant.first_name}, scheduled from their offered availability.`,
     start: { dateTime: opts.startsAt.toISOString(), timeZone: TZ },
     end: { dateTime: endsAt.toISOString(), timeZone: TZ },
+    /* People only. The recording bot is added afterwards, on purpose — see
+       below. */
     attendees: [
       { email: applicant.email },
       ...(opts.housemateEmail.includes('@') ? [{ email: opts.housemateEmail }] : []),
-      // Recording bot's own Google account: invited attendees join Meets
-      // directly, so the bot never has to knock (RECALL_BOT_EMAIL, optional).
-      ...(Deno.env.get('RECALL_BOT_EMAIL')?.includes('@') ? [{ email: Deno.env.get('RECALL_BOT_EMAIL') }] : []),
     ],
     conferenceData: { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: 'hangoutsMeet' } } },
     reminders: { useDefault: true },
@@ -108,6 +107,41 @@ export async function scheduleScreening(db: Db, opts: ScheduleOpts): Promise<{
   }
   const created = await resp.json()
   if (!resp.ok) throw new Error(`Calendar failed: ${JSON.stringify(created).slice(0, 200)} — if this mentions scopes, reconnect the shared Gmail to grant calendar access`)
+
+  /* Now add the recording bot, quietly.
+
+     The bot needs to be an ATTENDEE so Meet admits it without knocking, but it
+     does not need email and cannot receive it: meet@notes.ctrl.rodeo is a
+     Workspace identity on a domain with no MX record. Including it in the
+     original POST meant sendUpdates=all mailed it too, and every single intro
+     call bounced a delivery-failure notice back into the shared inbox.
+
+     So the humans are invited first with sendUpdates=all, and the bot is patched
+     in with sendUpdates=none: on the guest list, never mailed. The patch
+     replaces the attendee array wholesale, so the existing guests are carried
+     over rather than rewritten.
+
+     A failure here is logged and swallowed — a bot that has to knock is a small
+     problem, and a screening that didn't get booked is a large one. */
+  const botEmail = Deno.env.get('RECALL_BOT_EMAIL')
+  if (botEmail?.includes('@') && created.id) {
+    try {
+      const withBot = [...(created.attendees || []), { email: botEmail }]
+      const patch = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarUsed)}/events/${created.id}?sendUpdates=none`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attendees: withBot }),
+        },
+      )
+      if (!patch.ok) {
+        console.warn(`[calendar] could not add the notetaker to ${created.id}: ${(await patch.text()).slice(0, 200)}`)
+      }
+    } catch (err) {
+      console.warn(`[calendar] could not add the notetaker: ${(err as Error).message}`)
+    }
+  }
   const meet = created.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri || created.hangoutLink || null
 
   const { data: row, error } = await db.from('recruit_screenings').insert({

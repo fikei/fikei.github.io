@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.24.0'
+const VERSION = '1.25.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -91,34 +91,39 @@ const ephemeral = (content: string) => ({ type: 4, data: { content, flags: 64 } 
 /* The interview guide, as the screener should receive it.
 
    Lives in recruit_settings so it can be rewritten without a deploy — it is the
-   kind of text that gets edited after every second call for a while. Returns an
-   empty list when deliberately emptied, so the house turns this off by clearing
-   the setting rather than by us shipping a flag for it.
+   kind of text that gets edited after every second call for a while.
 
-   Returned as MESSAGES, not a message. Discord caps one at 2000 characters and
-   the real guide is longer than that, so a single send would cut it off
-   mid-question — which is worse than no guide, because the screener would not
-   know anything was missing. Splitting on blank lines keeps each section whole. */
-async function interviewGuide(client: ReturnType<typeof db>): Promise<string[]> {
+   Written to fit ONE Discord message. A guide that arrives in two parts gets
+   read as one and a half: the second message looks like a footnote, and the
+   close — what you actually promise the applicant — was in it. Length is the
+   discipline that keeps it a reference rather than a script.
+
+   {profile} and {notes} are substituted per call, so the screener can open the
+   application they are about to discuss without going to find it. The splitter
+   below stays as a safety net: if somebody pastes an essay into the setting it
+   arrives whole rather than truncated mid-question. */
+async function interviewGuide(
+  client: ReturnType<typeof db>,
+  applicantId: string,
+): Promise<string[]> {
   const { data } = await client.from('recruit_settings').select('key, value')
     .in('key', ['interview_guide', 'interview_guide_url'])
   const map = new Map((data || []).map((r) => [r.key, r.value]))
-  const guide = String(map.get('interview_guide') || '').trim()
   const url = String(map.get('interview_guide_url') || '').trim()
-  if (!guide && !url) return []
+  const guide = String(map.get('interview_guide') || '').trim()
+    .replaceAll('{profile}', `https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`)
+    .replaceAll('{notes}', url || 'https://ctrl.rodeo/applications/')
+  if (!guide) return []
 
-  const head = '**How we run an intro call**'
-  const tail = url ? `[The full version lives here](${url})` : ''
   const LIMIT = 1900          // headroom under Discord's 2000
+  if (guide.length <= LIMIT) return [guide]
 
-  // Pack whole paragraphs into as few messages as fit.
+  console.warn(`[recruit-discord] interview guide is ${guide.length} chars — splitting; it is meant to fit one message`)
   const out: string[] = []
-  let buf = head
-  for (const para of [...guide.split(/\n\s*\n/), tail].filter(Boolean)) {
+  let buf = ''
+  for (const para of guide.split(/\n\s*\n/)) {
     if (buf && `${buf}\n\n${para}`.length > LIMIT) { out.push(buf); buf = '' }
     buf = buf ? `${buf}\n\n${para}` : para
-    // A single paragraph longer than the limit is the one case we must cut, and
-    // it is better to cut it than to drop it silently.
     while (buf.length > LIMIT) { out.push(buf.slice(0, LIMIT)); buf = buf.slice(LIMIT) }
   }
   if (buf) out.push(buf)
@@ -166,7 +171,7 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
        confirmation because the confirmation is the urgent half. A failure here
        must not mark the claim as failed — the call is booked either way. */
     try {
-      for (const part of await interviewGuide(client)) {
+      for (const part of await interviewGuide(client, applicantId)) {
         await dmUser(opts.discordUserId, part)
       }
     } catch (err) {
