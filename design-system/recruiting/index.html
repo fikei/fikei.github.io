@@ -170,6 +170,37 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 }
 .dcta__exits + .dcta__alt { margin-top: 14px; }
 .dcta__alt .dcta__hint { text-align: left; }
+/* Settings (concept) */
+.tag-concept { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tint-amber-ink); background: var(--tint-amber); padding: 1px 5px; border-radius: 999px; }
+.setpage { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 22px; }
+.setnav { display: flex; flex-direction: column; gap: 1px; }
+.setnav a { font-size: 12.5px; color: var(--ink-2); padding: 6px 9px; border-radius: var(--r-xs); }
+.setnav a.on { background: var(--tint-blue); color: var(--ink); font-weight: 600; }
+.setsec { background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-bottom: 12px; }
+.setsec > h4 { margin: 0; font-size: 13.5px; }
+.setsec > .shint { margin: 2px 0 14px; font-size: 11.5px; color: var(--ink-3); }
+.fld { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.fld .l { grid-column: 1; grid-row: 1; font-size: 12.5px; font-weight: 600; }
+.fld .h { grid-column: 1; grid-row: 2; font-size: 11px; color: var(--ink-3); }
+.fld .c { grid-column: 2; grid-row: 1 / 3; align-self: center; justify-self: end; }
+.num { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--ink-3); }
+.num input { width: 54px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-xs); color: var(--ink); font: 600 12.5px/1 inherit; padding: 7px 8px; text-align: right; }
+.sw2 { width: 34px; height: 20px; border-radius: 999px; background: var(--tint-gray); border: 1px solid var(--line-2); position: relative; display: inline-block; }
+.sw2 i { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-3); transition: left 120ms ease; }
+.sw2.on { background: var(--accent); border-color: var(--accent); }
+.sw2.on i { left: 16px; background: var(--accent-ink); }
+.saved { font-size: 10.5px; color: var(--ok); }
+.autorow { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.autorow .l { grid-column: 1; grid-row: 1; font-size: 12.5px; font-weight: 600; }
+.autorow .h { grid-column: 1; grid-row: 2; font-size: 11px; color: var(--ink-3); }
+.autorow .when { grid-column: 2; grid-row: 1; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+.autorow .cad { grid-column: 2; grid-row: 2; font-size: 10.5px; color: var(--ink-3); text-align: right; }
+.autorow .c { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.conn { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 11px 0; border-top: 1px solid var(--line); }
+.conn .who { flex: 1; min-width: 0; font-weight: 600; }
+.conn .st { font-size: 11px; }
+.conn .st.ok { color: var(--ok); }
+.conn .st.warn { color: var(--tint-amber-ink); }
 .tiers { display: grid; grid-template-columns: 68px 1fr; gap: 10px 14px; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
 .tiers b { color: var(--ink); }
 .tiers code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--ink-3); }
@@ -193,7 +224,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.28</span><a href="/design-system/">← all of Sassy</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.29</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -233,6 +264,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
       <a href="#listing-header" data-story="listing-header">Listing header</a>
       <a href="#profile" data-story="profile">Profile</a>
       <a href="#stage-machine" data-story="stage-machine">Stage machine</a>
+      <a href="#settings" data-story="settings">Settings <span class="tag-concept">concept</span></a>
       <a href="#automation-audit" data-story="automation-audit">Automation audit</a>
     </div>
   </div>
@@ -279,6 +311,8 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
+      <div class="dec"><span class="d">Jul 30</span><br><b>Settings gets the rail's vocabulary, and a schema instead of a page.</b><p>The rail footer was the only place a setting could go, so most settings never became settings — the house's recruiting behavior lives in literals (3 quiet days, ±1 flexible month, +1/−1 trial milestones) that need a deploy to change. The concept: six sections named <code>You · House · Funnel · Automations · Connections · Data</code>, rendered from a field schema where <code>scope</code> picks the store and the schema default <em>is</em> the code default. Concept only — see <a href="#settings">Settings</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Inbox is Applicants, and Screening left the rail.</b><p>"Inbox" described a queue; "Applicants" names what's in it. Screening was a rail entry nobody navigated to — the work happens on a person's row and in Discord — so the view stays routable for deep links and left the rail.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>The design system got a name: Sassy.</b><p>"The design system" was a description, not a name, so nothing in a review could refer to it without a paragraph of context. Sassy is the whole thing — the global CTRL layer and every product system under it, this one included.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Sidebar CTAs became three tiers instead of one flex row.</b><p>The stay drawer's footer had four actions crammed right-aligned: two red underlined links (both wrapping onto two lines), a text Cancel, and the primary. Commit, dismiss, and the ways out are now separate tiers, and anything destructive leaves the commit row entirely. See <a href="#sidebar-ctas">Sidebar CTAs</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Occupancy bars are exact, and empty stretches are unlabelled.</b><p>The break between back-to-back stays comes off each bar's right edge only, so a left edge still lands on its start date to the pixel. Month gridlines moved to one overlay on the header's own grid — the per-lane repeating gradient drifted a pixel or two per month. Red stretches dropped their "Open" label: the color already says it, and tapping says the dates.</p></div>
@@ -636,6 +670,103 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
         <li>The Call tab holds the recording, AI summary, and comments with "comment at current time" stamps.</li>
         <li>Confirmed move-in replaces the parsed date outright — green, ✓, attributed — with the raw answer on hover.</li>
       </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-settings">
+    <h1>Settings <span class="tag-concept">concept</span></h1>
+    <p class="lede">Six sections that borrow the rail's own vocabulary, rendered from a schema so a new setting is one object literal.</p>
+    <div class="canvas">
+      <div class="setpage">
+        <nav class="setnav">
+          <a>You</a>
+          <a class="on">Funnel</a>
+          <a>House</a>
+          <a>Automations</a>
+          <a>Connections</a>
+          <a>Data</a>
+        </nav>
+        <div>
+          <div class="setsec">
+            <h4>Funnel</h4>
+            <p class="shint">How applicants move. Changes here apply to everyone.</p>
+            <div class="fld">
+              <span class="l">Follow-up goes amber after</span>
+              <span class="c"><span class="num"><input value="3"> days</span></span>
+              <span class="h">A thread this quiet is worth another email.</span>
+            </div>
+            <div class="fld">
+              <span class="l">Flexible move-in stretches by</span>
+              <span class="c"><span class="num"><input value="1"> months</span></span>
+              <span class="h">How far a “flexible” date reaches on each side when matching listings.</span>
+            </div>
+            <div class="fld">
+              <span class="l">Offer an update email by default <span class="saved">✓ saved</span></span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">When someone is marked not a fit — you can still change it per person.</span>
+            </div>
+            <div class="dcta">
+              <div class="dcta__row">
+                <button class="dcta__quiet">Cancel</button>
+                <button class="btn dcta__commit">Save</button>
+              </div>
+              <div class="dcta__exits">
+                <button class="dcta__exit">Reset this section <span class="dcta__hint">back to Sassy defaults</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="setsec">
+            <h4>Automations</h4>
+            <p class="shint">Things that run without you.</p>
+            <div class="autorow">
+              <span class="l">Scan the shared inbox</span>
+              <span class="when">ran 4 min ago</span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">Pulls new applications, replies, and availability.</span>
+              <span class="cad">every 20 min</span>
+            </div>
+            <div class="autorow">
+              <span class="l">Remind screeners before a call</span>
+              <span class="when">ran 11 min ago</span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">DMs whoever claimed the call, an hour ahead.</span>
+              <span class="cad">every 15 min</span>
+            </div>
+            <div class="autorow">
+              <span class="l">Auto-post coverage asks</span>
+              <span class="when">off</span>
+              <span class="c"><span class="sw2"><i></i></span></span>
+              <span class="h">Off means a human sees the message before the house does.</span>
+              <span class="cad">on availability</span>
+            </div>
+          </div>
+
+          <div class="setsec">
+            <h4>Connections</h4>
+            <p class="shint">Where recruiting reaches outside the app.</p>
+            <div class="conn"><span class="who">live.at.agapesf@gmail.com</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">House calendar</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">Discord · #recruiting-automation, #recruiting-interviews</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">Agape Notes (call recording)</span><span class="st warn">not set up</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Structure</h3>
+      <ul>
+        <li><b>The sections are the rail's words.</b> <code>You · House · Funnel · Automations · Connections · Data</code>. The app already teaches House and Funnel; settings shouldn't teach a second taxonomy. If a new setting has no obvious home, the setting is confused — not the taxonomy.</li>
+        <li><b>Rendered from a schema, not hand-written.</b> Each field declares <code>{ key, label, hint, type, scope, default, min, max, unit }</code>; four types (<code>bool · number · text · enum</code>) cover every knob in the app. Adding a setting is appending an object.</li>
+        <li><b><code>scope</code> picks the store</b> — <code>house</code> → <code>recruit_settings</code>, <code>profile</code> → <code>recruit_profiles</code>, <code>local</code> → localStorage. Callers use <code>setting(key)</code> and never learn where a value lives.</li>
+        <li><b>The schema default is the code default.</b> <code>setting('followup_stale_days')</code> returns 3 until someone changes it, so exposing a knob needs no migration and no seed — and today's magic numbers (3 days, ±1 month, +3 months) become one named thing each.</li>
+        <li><b>Automations and connections are their own row types</b>, not fields: what it does, how often, when it last ran, whether it's on. Those are the four things you want when something didn't happen.</li>
+        <li><b>Save behavior follows the type.</b> Toggles and enums autosave with an inline tick; numbers and text take an explicit commit. The schema knows the type, so the renderer enforces it — no per-field config.</li>
+        <li>Section footers are <a href="#sidebar-ctas">Sidebar CTAs</a> — one commit, and “reset this section” as an exit row with a hint.</li>
+      </ul>
+      <h3>Notes</h3>
+      <p>A full view at <code>?view=settings</code>, not a modal — every section is deep-linkable, so a toast or a Discord audit post can point at the exact knob. The rail footer drops to <b>identity · Settings · Sign out</b>; theme moves to You, Gmail to Connections, CSV export to Data, and food/dues move out of the room drawer (a house-wide cost has no business inside one room) into House.</p>
+      <p>Full write-up, open decisions, and build order: <code>docs/ux/recruiting-settings-concept.md</code>.</p>
     </div>
   </section>
 
