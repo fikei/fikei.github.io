@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agape recruiting — design system</title>
+<title>Agape recruiting — a Sassy design system</title>
 <style>
 :root {
   --bg: #0d1117; --surface: #161b22; --elevated: #1f2630;
@@ -146,6 +146,33 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 .co { font-size: 12px; color: var(--ink-2); display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
 .co b { color: var(--ink); font-size: 12px; }
 .co .m { width: 18px; height: 18px; border-radius: 50%; background: var(--tint-blue); color: var(--tint-blue-ink); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+/* Sidebar CTAs — the drawer footer's three tiers. Mirrors .drawer-cta in
+   applications/css/app.css; keep the two in step. */
+.sidebar { width: 340px; max-width: 100%; background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; }
+.sidebar .fieldstub { height: 34px; border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface); margin-bottom: 10px; }
+.dcta { display: flex; flex-direction: column; margin-top: 16px; }
+.dcta__row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dcta__commit { min-width: 92px; border-radius: 999px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.dcta__quiet { background: transparent; border: 0; color: var(--ink-2); font: 500 12.5px/1 inherit; padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer; }
+.dcta__exits { display: flex; flex-direction: column; margin-top: 12px; }
+.dcta__exit {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line);
+  background: transparent; color: var(--ink-2); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer; white-space: nowrap;
+}
+.dcta__exit.danger { color: var(--red); }
+.dcta__hint { color: var(--ink-3); font: 400 11px/1.35 inherit; text-align: right; white-space: normal; min-width: 0; }
+.dcta__alt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; padding: 12px; margin-top: 4px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: transparent; color: var(--ink); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.dcta__exits + .dcta__alt { margin-top: 14px; }
+.dcta__alt .dcta__hint { text-align: left; }
+.tiers { display: grid; grid-template-columns: 68px 1fr; gap: 10px 14px; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
+.tiers b { color: var(--ink); }
+.tiers code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--ink-3); }
 .rule { display: grid; grid-template-columns: 16px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .rule:last-child { border-bottom: 0; }
 .rule .n { color: var(--ink-3); padding-top: 2px; }
@@ -166,7 +193,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>design system · v3.27</span><a href="/design-system/">← all design systems</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.28</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -200,6 +227,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <button type="button">Patterns <span class="tw">▼</span></button>
     <div class="items">
       <a href="#two-tier" data-story="two-tier">Two-tier rail</a>
+      <a href="#sidebar-ctas" data-story="sidebar-ctas">Sidebar CTAs</a>
       <a href="#row-states" data-story="row-states">Row states</a>
       <a href="#schedule-modal" data-story="schedule-modal">Schedule modal</a>
       <a href="#listing-header" data-story="listing-header">Listing header</a>
@@ -251,6 +279,9 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
+      <div class="dec"><span class="d">Jul 30</span><br><b>The design system got a name: Sassy.</b><p>"The design system" was a description, not a name, so nothing in a review could refer to it without a paragraph of context. Sassy is the whole thing — the global CTRL layer and every product system under it, this one included.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Sidebar CTAs became three tiers instead of one flex row.</b><p>The stay drawer's footer had four actions crammed right-aligned: two red underlined links (both wrapping onto two lines), a text Cancel, and the primary. Commit, dismiss, and the ways out are now separate tiers, and anything destructive leaves the commit row entirely. See <a href="#sidebar-ctas">Sidebar CTAs</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Occupancy bars are exact, and empty stretches are unlabelled.</b><p>The break between back-to-back stays comes off each bar's right edge only, so a left edge still lands on its start date to the pixel. Month gridlines moved to one overlay on the header's own grid — the per-lane repeating gradient drifted a pixel or two per month. Red stretches dropped their "Open" label: the color already says it, and tapping says the dates.</p></div>
       <div class="dec"><span class="d">Jul 29</span><br><b>The single decider came back — with three options and a required comment.</b><p>Quorum stalled: 58 applications sat waiting for a third vote that never came. One read now decides (not a fit / needs input / move forward), and the comment is the accountability that the tally used to pretend to be. "Needs input" is the honest version of a hung vote.</p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>Collective votes replaced the single decider.</b><p>Culture fit is the house's call; the app's job is quorum, blindness until you've voted, and a hard veto. <em>Superseded Jul 29.</em></p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>AI suggestions replaced by deterministic placement.</b><p>A candidate is in every listing they qualify for, by rule. Confidence percentages were deleted — dates either line up or they don't.</p></div>
@@ -486,6 +517,45 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <div class="notes"><h3>Notes</h3><p>An icon secondary may split the column with the primary — alignment holds because the pair shares the same 172px. A chip in the top slot means the state is passive: someone else's move. The profile footer reuses this exact component at 200px.</p></div>
   </section>
 
+  <section class="story" id="s-sidebar-ctas">
+    <h1>Sidebar CTAs</h1>
+    <p class="lede">A drawer footer is three tiers deep, ordered by consequence: what saves, what dismisses, and the ways out.</p>
+    <div class="canvas">
+      <div class="sidebar">
+        <div class="fieldstub"></div>
+        <div class="fieldstub"></div>
+        <div class="dcta">
+          <div class="dcta__row">
+            <button class="dcta__quiet">Cancel</button>
+            <button class="btn dcta__commit">Save</button>
+          </div>
+          <div class="dcta__exits">
+            <button class="dcta__exit">Mark leaving <span class="dcta__hint">sets a move-out date and lists the room</span></button>
+            <button class="dcta__exit danger">Remove stay <span class="dcta__hint">deletes it from the timeline</span></button>
+          </div>
+          <button class="dcta__alt"><span>Welcome them in</span><span class="dcta__hint">Ends the trial and starts an open-ended residency on Sep 1, 2026.</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>The tiers</h3>
+      <div class="tiers">
+        <span><code>__commit</code></span><span><b>One filled primary.</b> Bottom-right, pill, accent. Exactly one per sidebar — it is the only thing that saves what's on screen.</span>
+        <span><code>__quiet</code></span><span><b>Dismiss.</b> No fill, no border, beside the primary. Cancel is not a decision, so it does not look like one.</span>
+        <span><code>__exit</code></span><span><b>The ways out.</b> Full-width rows below a rule, one per line, label left and a hint right. Destructive ones take <code>--danger</code> (red label, tinted hover); state changes stay muted.</span>
+        <span><code>__alt</code></span><span><b>Optional second path.</b> Outlined, never filled, label over hint. Used when the sidebar genuinely offers two forward moves ("create a listing instead", "welcome them in").</span>
+      </div>
+      <h3>Notes</h3>
+      <ul>
+        <li>Anything that removes, ends, or re-routes a record <b>leaves the commit row</b>. A 340px sidebar cannot keep four targets honest side by side — this is exactly how the stay drawer ended up with two red underlined links wrapping onto two lines each.</li>
+        <li>Exits never underline. Weight and color carry them; see <a href="#voice">Voice</a> and the transparency-not-decoration rule.</li>
+        <li>Every exit and alt carries a hint. A red label is never the only explanation of what a button does.</li>
+        <li>Full-width rows mean labels never truncate, so the copy can stay plain ("Mark leaving") instead of compressed ("Mark leaving — list room").</li>
+        <li>Under 480px the hint drops to its own line rather than squeezing the label into an ellipsis.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="story" id="s-row-states">
     <h1>Row states</h1>
     <p class="lede">Active means your move; passive means the chip tells you whose it is. Every passive state carries its escalation rule.</p>
@@ -608,7 +678,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 <script>
 (function () {
   var stories = document.querySelectorAll('.story');
-  var links = document.querySelectorAll('[data-story]');
+  var links = document.querySelectorAll('.side [data-story]');
   var crumb = document.getElementById('crumb');
   function groupOf(link) {
     var g = link.closest('.grp');

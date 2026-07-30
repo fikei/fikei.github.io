@@ -1,4 +1,4 @@
-# Design System - Features
+# Sassy — Features
 
 > Complete component and token inventory for ctrl.rodeo
 
