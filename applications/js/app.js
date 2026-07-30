@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.59.0';
+const VERSION = '3.60.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -4517,6 +4517,7 @@ function renderReview() {
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
+    ${stagesHtml(a)}
     ${houseEventsHtml(a)}
     <section class="review__section notes" id="notes">
       <div class="notes__head">
@@ -4917,6 +4918,85 @@ function windowSlots(w) {
 /* Visits and house events swept off the house calendar. Read-only context:
    "they came to dinner on the 4th" is exactly the thing that used to live
    only in someone's head. Newest first, past ones included. */
+
+/* The two things that have to happen to a candidate, always on screen.
+
+   Before this, an intro call and a house visit only appeared once one existed —
+   a screening card if booked, a calendar row if visited, nothing at all
+   otherwise. So "has nobody booked her call, or did I just miss it?" could only
+   be answered by reading the whole profile and inferring from absence, and
+   absence looks identical to a rendering bug.
+
+   Now both stages are permanent rows with an explicit state. Not scheduled is a
+   state, and the row says so and offers the way to fix it. */
+const STAGE_STATE = {
+  none:      { label: 'Not scheduled', cls: 'is-none' },
+  scheduled: { label: 'Scheduled',     cls: 'is-scheduled' },
+  done:      { label: 'Completed',     cls: 'is-done' },
+};
+
+function stageRow(kind, opts) {
+  const st = STAGE_STATE[opts.state];
+  return `<div class="stage-row stage-row--${st.cls}">
+    <span class="stage-row__what">${esc(kind)}</span>
+    <span class="stage-chip stage-chip--${st.cls}">${st.label}</span>
+    <span class="stage-row__detail">${opts.detail || ''}</span>
+    <span class="stage-row__action">${opts.action || ''}</span>
+  </div>`;
+}
+
+function stagesHtml(a) {
+  const sc = screeningState[a.id] || {};
+
+  /* The intro call. "Completed" wins over "scheduled" when both exist, because
+     a second call booked after the first is the exception and the first one
+     having happened is the fact that matters most. */
+  let callState = 'none', callDetail = '', callAction = '';
+  if (sc.done) {
+    callState = 'done';
+    callDetail = `${esc(fmtSlot(sc.doneAt))}${sc.with && !/calendar|the house/i.test(sc.with) ? ` · ${esc(sc.with)}` : ''}`;
+    callAction = sc.watch
+      ? `<button type="button" class="cta-link" data-play-mini="${a.id}">Watch</button>`
+      : sc.awaiting ? '<span class="stage-row__muted">recording on the way</span>' : '';
+  } else if (sc.at) {
+    callState = 'scheduled';
+    callDetail = `${esc(fmtSlot(sc.at))}${sc.with && !/calendar|the house/i.test(sc.with) ? ` · ${esc(sc.with)}` : ''}`;
+    callAction = sc.link ? `<a class="cta-link" href="${esc(sc.link)}" target="_blank" rel="noopener">Join</a>` : '';
+  } else {
+    // Availability already in hand is the difference between "ask them" and
+    // "somebody take this" — the two have completely different next actions.
+    const hasTimes = (availCache[a.id]?.windows || []).length > 0;
+    callDetail = hasTimes ? 'they sent times, nobody has taken it' : 'no times offered yet';
+    callAction = `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="${hasTimes ? 'schedule' : 'availability'}">${hasTimes ? 'Book it' : 'Ask for times'}</button>`;
+  }
+
+  // The house visit. Read from the calendar rather than screenings — a visit is
+  // an event the house holds, not a call somebody claims.
+  const visits = (houseEvents[a.id] || []).filter(e => e.kind === 'visit');
+  const past = visits.filter(e => new Date(e.ends_at || e.starts_at) < new Date());
+  const upcoming = visits.filter(e => new Date(e.ends_at || e.starts_at) >= new Date());
+  let visitState = 'none', visitDetail = '', visitAction = '';
+  if (past.length) {
+    visitState = 'done';
+    visitDetail = esc(fmtSlot(past[past.length - 1].starts_at));
+  } else if (upcoming.length) {
+    visitState = 'scheduled';
+    visitDetail = esc(fmtSlot(upcoming[0].starts_at));
+  } else {
+    // Only worth offering once they have actually been interviewed.
+    visitDetail = sc.done ? 'ready to invite' : 'after the intro call';
+    visitAction = sc.done
+      ? `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="visit">Invite them</button>`
+      : '';
+  }
+
+  return `<section class="review__section stages">
+    <h3 class="review__section-title">Where they are</h3>
+    ${stageRow('Intro call', { state: callState, detail: callDetail, action: callAction })}
+    ${stageRow('House visit', { state: visitState, detail: visitDetail, action: visitAction })}
+  </section>`;
+}
+
 function houseEventsHtml(a) {
   const evs = (houseEvents[a.id] || []).slice()
     .sort((x, y) => (y.starts_at || '').localeCompare(x.starts_at || ''));
