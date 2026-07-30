@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.42.1';
+const VERSION = '3.42.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -109,6 +109,7 @@ let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
 let sendUpdateWith = true;    // "Send them an update" rides with a Not-a-fit decision
 let noteDraft = { id: null, text: '' };  // review comment in progress, scoped to its applicant
+let footFor = null;           // which applicant the review bar in the DOM belongs to
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
@@ -3320,9 +3321,11 @@ function renderReviewFoot(a) {
   if (!foot) return;
   // In-progress typing survives a re-render of the bar, but only for the
   // applicant it was typed about — carrying it to the next person would put
-  // your words on the wrong profile.
+  // your words on the wrong profile. The capture is keyed on who the bar in
+  // the DOM was rendered for, not on who we're about to render: on an advance
+  // those differ, and that gap is exactly where the text used to leak.
   const liveNote = document.getElementById('vote-note');
-  if (liveNote) noteDraft = { id: noteDraft.id ?? a.id, text: liveNote.value };
+  if (liveNote && footFor === a.id) noteDraft = { id: a.id, text: liveNote.value };
   const keepNote = noteDraft.id === a.id ? noteDraft.text : null;
   const liveBox = document.getElementById('vote-send-update');
   if (liveBox) sendUpdateWith = liveBox.checked;
@@ -3350,6 +3353,7 @@ function renderReviewFoot(a) {
         </label>` : ''}
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
       </div>`;
+    footFor = a.id;
   } else if (a.stage === 'candidate') {
     const pills = activePlacements(a.id).map(p => {
       const l = listings.find(x => x.id === p.listing_id);
