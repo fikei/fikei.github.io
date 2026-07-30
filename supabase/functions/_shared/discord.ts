@@ -581,7 +581,57 @@ export async function postSigninMessage(channelId: string): Promise<any> {
 const VIEW_CHANNEL = 1n << 10n
 const ADMINISTRATOR = 1n << 3n
 
+/* Fetch the channel + role table ONCE. Doing this per member turned a roster
+   sweep into two Discord calls per person, which is fine for one lookup and
+   ruinous for a whole guild. */
+export async function recruitingGate(): Promise<{ channel: any; roleById: Map<string, bigint>; guildId: string } | null> {
+  const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
+  const [channels, roles] = await Promise.all([
+    discordFetch(`/guilds/${guildId}/channels`, { method: 'GET' }),
+    discordFetch(`/guilds/${guildId}/roles`, { method: 'GET' }),
+  ])
+  const wantedId = Deno.env.get('RECRUITING_CHANNEL_ID')
+  const named = (rx: RegExp) => channels.find((c: any) => rx.test(String(c.name || '')) && c.type !== 4)
+  const channel = wantedId
+    ? channels.find((c: any) => String(c.id) === wantedId)
+    : (named(/recruit.*society|society.*recruit/i) || named(/recruit/i))
+  if (!channel) return null
+  return { channel, roleById: new Map(roles.map((r: any) => [r.id, BigInt(r.permissions)])), guildId }
+}
+
+/* Pure permission maths against an already-fetched gate. */
+export function canSeeWithGate(
+  gate: { channel: any; roleById: Map<string, bigint>; guildId: string },
+  discordUserId: string,
+  memberRoles: string[],
+): boolean {
+  const { channel, roleById, guildId } = gate
+  let base = (roleById.get(guildId) as bigint) ?? 0n
+  for (const rid of memberRoles) base |= (roleById.get(rid) as bigint) ?? 0n
+  if (base & ADMINISTRATOR) return true
+  const overwrites = (channel.permission_overwrites || []) as Array<any>
+  let perms = base
+  const everyone = overwrites.find((o) => o.id === guildId)
+  if (everyone) { perms &= ~BigInt(everyone.deny); perms |= BigInt(everyone.allow) }
+  let allow = 0n, deny = 0n
+  for (const ow of overwrites) {
+    if (ow.type === 0 && ow.id !== guildId && memberRoles.includes(ow.id)) {
+      allow |= BigInt(ow.allow); deny |= BigInt(ow.deny)
+    }
+  }
+  perms &= ~deny; perms |= allow
+  const mine = overwrites.find((o) => o.type === 1 && o.id === discordUserId)
+  if (mine) { perms &= ~BigInt(mine.deny); perms |= BigInt(mine.allow) }
+  return (perms & VIEW_CHANNEL) === VIEW_CHANNEL
+}
+
 export async function canSeeRecruiting(discordUserId: string, memberRoles: string[]): Promise<boolean> {
+  const gate = await recruitingGate()
+  if (!gate) return false
+  return canSeeWithGate(gate, discordUserId, memberRoles)
+}
+
+export async function _unusedCanSeeRecruiting(discordUserId: string, memberRoles: string[]): Promise<boolean> {
   const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
   const [channels, roles] = await Promise.all([
     discordFetch(`/guilds/${guildId}/channels`, { method: 'GET' }),

@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.6.1'
+const VERSION = '1.7.0'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel gate + #recruiting-automation admin (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -368,13 +368,46 @@ serve(async (req) => {
         db.from('recruit_admins').select('user_id'),
       ])
       const byDiscord = new Map((cached || []).map((r: Record<string, unknown>) => [String(r.discord_user_id), r]))
+      // Resolve the channel + role table once. checkRecruitingChannel fetches
+      // both on every call, which is two Discord round trips per member — fine
+      // for one lookup, ruinous across a whole guild (it hung the request).
+      const [chResp, roleResp] = await Promise.all([
+        discordGet(`/guilds/${AGAPE_GUILD_ID}/channels`),
+        discordGet(`/guilds/${AGAPE_GUILD_ID}/roles`),
+      ])
+      const channels = await chResp.json() as Array<Record<string, any>>
+      const allRoles = await roleResp.json() as Array<{ id: string; permissions: string }>
+      const wanted = Deno.env.get('RECRUITING_CHANNEL_ID')
+      const pick = (rx: RegExp) => channels.find(c => rx.test(String(c.name || '')) && c.type !== 4)
+      const chan = wanted ? channels.find(c => String(c.id) === wanted)
+        : (pick(/recruit.*society|society.*recruit/i) || pick(/recruit/i))
+      if (!chan) return new Response(JSON.stringify({ error: 'Recruiting channel not found' }), { status: 502, headers: jsonHeaders })
+      const roleById = new Map(allRoles.map(r => [r.id, BigInt(r.permissions)]))
+      const overwrites = (chan.permission_overwrites || []) as Array<Record<string, any>>
+      const seeChannel = (did: string, memberRoles: string[]): boolean => {
+        let base = roleById.get(AGAPE_GUILD_ID) ?? 0n
+        for (const rid of memberRoles) base |= roleById.get(rid) ?? 0n
+        if (base & ADMINISTRATOR) return true
+        let perms = base
+        const ev = overwrites.find(o => o.id === AGAPE_GUILD_ID)
+        if (ev) { perms &= ~BigInt(ev.deny); perms |= BigInt(ev.allow) }
+        let allow = 0n, deny = 0n
+        for (const ow of overwrites) {
+          if (ow.type === 0 && ow.id !== AGAPE_GUILD_ID && memberRoles.includes(ow.id)) {
+            allow |= BigInt(ow.allow); deny |= BigInt(ow.deny)
+          }
+        }
+        perms &= ~deny; perms |= allow
+        const mine = overwrites.find(o => o.type === 1 && o.id === did)
+        if (mine) { perms &= ~BigInt(mine.deny); perms |= BigInt(mine.allow) }
+        return (perms & VIEW_CHANNEL) === VIEW_CHANNEL
+      }
+
       const rows: Array<Record<string, unknown>> = []
       for (const m of members) {
         const did = String(m.user?.id || '')
         if (!did || m.user?.bot) continue
-        let canSee = false
-        try { canSee = await checkRecruitingChannel(did, m.roles || []) } catch { canSee = false }
-        if (!canSee) continue
+        if (!seeChannel(did, m.roles || [])) continue
         const row = byDiscord.get(did)
         rows.push({
           discordUserId: did,
