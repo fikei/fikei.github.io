@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.22.0'
+const VERSION = '1.22.1'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -883,8 +883,11 @@ serve(async (req) => {
          made this morning is linked by the time the day's nudges go out, so
          the house never gets told to fill in a form that doesn't exist yet.
          Idempotent, so the four ticks inside the 8am hour cost one pass. */
+      // ?ballots=1 forces the pass off-schedule — for the morning someone
+      // reconnects the shared account and doesn't want to wait until 8am to
+      // find out whether it worked. Same cron auth as the rest of /remind.
       let ballots = 0
-      if (ptHour() === 8) {
+      if (ptHour() === 8 || new URL(req.url).searchParams.get('ballots') === '1') {
         try { ballots = await ensureBallots(client) } catch (err) {
           console.warn(`[ballots] pass failed: ${(err as Error).message}`)
         }
