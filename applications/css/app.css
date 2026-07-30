@@ -1817,3 +1817,67 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .occ-listings { margin-top: var(--space-6); }
 .occ-listings .inbox-row__actions { align-items: center; gap: var(--space-2); }
 .occ-listings .link-chip { border: 0; }
+
+/* ---------- closed application: one bar (v3.50.0) ----------
+   Replaces the old pairing of a top banner explaining why an application closed
+   and a bottom action bar offering to reopen it. One subject, one bar: what
+   happened, the reason in the decider's own words, and the single action that
+   undoes it.
+
+   The left edge is the colour code. It carries the KIND of closure — the house
+   passed, they withdrew, wrong timing, a trial that ended, a house rule — so
+   the reader knows which before reading a word. Colour is on a 3px rule rather
+   than a fill: a closed application should read as settled, not alarming. */
+.closed-bar {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.closed-bar__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.closed-bar__head {
+  font-size: var(--font-size-body); font-weight: var(--fw-semibold); color: var(--fg);
+}
+/* The reason is the point of the bar, so it wraps rather than truncating. */
+.closed-bar__sub {
+  font-size: var(--font-size-small); color: var(--fg-muted);
+  white-space: normal; overflow-wrap: anywhere;
+}
+.closed-bar__actions { flex-shrink: 0; display: flex; align-items: center; gap: var(--space-2); }
+.closed-bar__reopen {
+  height: 36px; padding: 0 var(--space-3);
+  background: var(--bg-overlay); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--fg); font: inherit; font-size: var(--font-size-small);
+  font-weight: var(--fw-medium); cursor: pointer;
+}
+.closed-bar__reopen:hover { background: var(--bg-surface); border-color: var(--fg-subtle); }
+.closed-bar__quiet {
+  height: 36px; padding: 0 var(--space-2);
+  background: transparent; border: 0;
+  color: var(--fg-muted); font: inherit; font-size: var(--font-size-small); cursor: pointer;
+}
+.closed-bar__quiet:hover { color: var(--fg); }
+
+/* The house decided no. */
+.closed-bar--ours   { border-left-color: var(--error); }
+/* They decided, not us — no judgement to read into it. */
+.closed-bar--theirs { border-left-color: var(--fg-subtle); }
+/* Right person, wrong time. */
+.closed-bar--later  { border-left-color: var(--warning); }
+/* We lived with them and it didn't work — its own category on purpose. */
+.closed-bar--trial  { border-left-color: var(--hold-fg, var(--warning)); }
+/* A rule closed it, nobody's judgement. */
+.closed-bar--rule   { border-left-color: var(--border-strong); }
+@media (max-width: 560px) {
+  .closed-bar { flex-direction: column; align-items: stretch; }
+  .closed-bar__actions { justify-content: flex-end; }
+}
+
+/* A profile's activity feed carries a detail line under the sentence — a review
+   comment, an email subject, the note someone left. It wraps; the sentence
+   above it is the scannable part. */
+.activity-feed__detail { white-space: normal; overflow-wrap: anywhere; }
