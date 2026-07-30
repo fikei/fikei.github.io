@@ -244,10 +244,32 @@ milestone days away with no ballot is worse news than one with an unfilled
 ballot, not better. `trial_vote_overdue` is exempt: it escalates the missed
 decision itself, which no form would have fixed.
 
+### Where ballots come from
+
+**The cron makes them.** `ensureBallots` in `_shared/recruit-ballots.ts` runs
+once a day at **PT 8am** off the same 15-minute tick, ahead of the nudge ladder
+so a ballot made this morning is linked before the day's notifications go out.
+For every trial milestone whose meeting is within 14 days and which has no form
+yet, it copies the template into the folder under the name below and writes the
+responder URL onto the stay. It looks for the name before copying, so a save
+that fails can't leave the folder with three ballots for one person.
+
+Three settings, none of which need a deploy to change:
+`ballot_template_file_id`, `ballot_folder_id`, `ballot_lead_days`.
+
+**It needs Drive write, which the shared account does not yet have.** The
+account is consented to `drive.readonly`; every copy 403s, is caught, and the
+house gets the "no ballot attached yet" line — which is exactly what is true.
+Reconnecting the shared Gmail grants `.../auth/drive` and turns provisioning on
+with no code change. `drive.file` would not do: it gives per-file access to what
+the app created, and these copies land in a folder the app didn't make, inside a
+Shared Drive.
+
 ### Naming the form copies
 
 One copy per person per milestone — never a shared form, because answers about
-two people in one response sheet can't be read separately. Copy
+two people in one response sheet can't be read separately. The cron builds this
+name; make it by hand the same way. Copy
 [the housemate feedback form](https://docs.google.com/forms/d/1UpVuMOeSItoSvXpDn2LukBOl6_y0VWfSrrqXs3RWNrk/edit)
 into the **Housemate Feedback** folder it already lives in
 (`14VM4VP1_YpcIenjg-rWn5E_i_laY9_rw`, inside the Agape Shared Drive — the house

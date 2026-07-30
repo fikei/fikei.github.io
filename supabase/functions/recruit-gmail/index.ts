@@ -44,6 +44,16 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events', // screening-call invites
   'https://www.googleapis.com/auth/spreadsheets.readonly', // application-sheet ingest
   'https://www.googleapis.com/auth/drive.readonly', // review comment threads on the application sheet
+  /* Trial ballots copy the housemate feedback form into the Housemate Feedback
+     folder on the cron (_shared/recruit-ballots.ts). drive.file is not enough:
+     it gives per-file access to what the app itself created, and the copy has
+     to land in a folder the app didn't make, inside a Shared Drive.
+
+     Adding this line changes nothing on its own — the shared account keeps
+     whatever it was consented to until somebody reconnects it. Until then
+     ballot provisioning 403s, is caught, and the house sees "no ballot
+     attached yet", which is true. */
+  'https://www.googleapis.com/auth/drive',
 ]
 
 function db() {
