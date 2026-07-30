@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.25.0'
+const VERSION = '1.26.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -102,6 +102,21 @@ const ephemeral = (content: string) => ({ type: 4, data: { content, flags: 64 } 
    application they are about to discuss without going to find it. The splitter
    below stays as a safety net: if somebody pastes an essay into the setting it
    arrives whole rather than truncated mid-question. */
+/* The cron gate, shared by every header-authenticated route: a shared secret
+   when one is configured, otherwise the one-time nonce the pg_cron tick mints
+   and this burns on use. */
+async function cronAuthorized(req: Request, client: ReturnType<typeof db>): Promise<boolean> {
+  const secret = Deno.env.get('CRON_SECRET')
+  if (secret && req.headers.get('x-cron-secret') === secret) return true
+  const nonce = req.headers.get('x-cron-nonce')
+  if (!nonce || !/^[0-9a-f-]{36}$/i.test(nonce)) return false
+  const { data: burned } = await client.from('recruit_cron_nonce')
+    .delete().eq('nonce', nonce)
+    .gte('created_at', new Date(Date.now() - 10 * 60000).toISOString())
+    .select().maybeSingle()
+  return Boolean(burned)
+}
+
 async function interviewGuide(
   client: ReturnType<typeof db>,
   applicantId: string,
@@ -901,17 +916,7 @@ serve(async (req) => {
     // nonce minted by the pg_cron tick (migration 123) — delete-on-use.
     if (new URL(req.url).pathname.endsWith('/remind')) {
       const client = db()
-      const secret = Deno.env.get('CRON_SECRET')
-      let authorized = Boolean(secret) && req.headers.get('x-cron-secret') === secret
-      const nonce = req.headers.get('x-cron-nonce')
-      if (!authorized && nonce && /^[0-9a-f-]{36}$/i.test(nonce)) {
-        const { data: burned } = await client.from('recruit_cron_nonce')
-          .delete().eq('nonce', nonce)
-          .gte('created_at', new Date(Date.now() - 10 * 60000).toISOString())
-          .select().maybeSingle()
-        authorized = Boolean(burned)
-      }
-      if (!authorized) return json({ error: 'unauthorized' }, 401)
+      if (!(await cronAuthorized(req, client))) return json({ error: 'unauthorized' }, 401)
       /* /remind?dry=1 — show what the detectors would say, write nothing, send
          nothing. The safe way to check a copy edit: forcing a real tick to see
          new wording re-posts every row it recreates. */
@@ -958,6 +963,32 @@ serve(async (req) => {
       }
       console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), ${ballots} ballot(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested / ${notify.replies} reply note(s)`)
       return json({ bots, live, reminded: sent, recorded, ballots, notify })
+    }
+
+    /* POST /guide-preview?to=<discord user id>[&a=<applicant id>]
+       DM the interview guide to one person, exactly as a screener receives it.
+
+       Copy that is only ever seen at the moment somebody claims a real call is
+       copy nobody proofreads — you would have to book a screening to find out
+       that a line reads badly. This sends it on demand, to one recipient, with
+       the same substitution and the same message splitting as the real path, so
+       what you read is what a screener gets.
+
+       Same nonce gate as /remind: it can DM, so it is not open. */
+    if (new URL(req.url).pathname.endsWith('/guide-preview')) {
+      const client = db()
+      if (!(await cronAuthorized(req, client))) return json({ error: 'unauthorized' }, 401)
+      const params = new URL(req.url).searchParams
+      const to = params.get('to') || ''
+      if (!/^\d{5,25}$/.test(to)) return json({ error: 'pass ?to=<discord user id>' }, 400)
+
+      // A real applicant if one is named, so the {profile} link is clickable;
+      // otherwise a placeholder that still shows where the link would go.
+      const applicantId = params.get('a') || 'preview'
+      const parts = await interviewGuide(client, applicantId)
+      if (!parts.length) return json({ sent: 0, note: 'interview_guide is empty' })
+      for (const part of parts) await dmUser(to, part)
+      return json({ sent: parts.length, chars: parts.map((p) => p.length) })
     }
 
     const pathname = new URL(req.url).pathname
