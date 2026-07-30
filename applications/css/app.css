@@ -572,7 +572,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   /* Openings rows: the fixed CTA column (its buttons are hidden here
      anyway) starved the name column into one-letter-per-line wraps. */
   .inbox-row__actions .cta-stack { width: auto; }
-  .inbox-row__actions .cta-context { display: none; }
   .inbox-row__grip { display: none; } /* drag-reorder is a desktop affordance */
   .inbox-row__title { overflow-wrap: break-word; }
 }
@@ -1327,7 +1326,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 
 /* --- v3.14.0: CTA stack (context line under the action) + Call tab --- */
 .cta-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.cta-context { font-size: var(--font-size-caption); color: var(--fg-subtle); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .call-video { width: 100%; max-height: 420px; border-radius: var(--radius-md); background: #000; margin-bottom: var(--space-3); }
 
 /* --- v3.16.0: state-colored rounded-rect primaries + comments column --- */
@@ -1355,14 +1353,14 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .listing-menu__item--danger { color: var(--error); }
 
 /* --- v3.18.0: aligned CTA column, quiet ⋮, confirm-to-book modal --- */
-/* The CTA column is fixed at 258px — what a labelled secondary needs beside
-   the primary — and so is every button in it. A primary is 172px whether it
-   says "Get started" or "Schedule a visit", so the buttons read as one column
-   of equal controls instead of a ragged edge that tracks label length. */
-.inbox-row__actions .cta-stack { width: 258px; align-items: flex-start; }
-.inbox-row__actions .cta-stack .cta-std { flex: 0 0 172px; width: 172px; justify-content: center; }
-.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; }
-.inbox-row__actions .cta-context { align-self: flex-end; }
+/* Row buttons are sized by their label — "Get started" is as wide as the
+   words, never stretched to fill the column. The column keeps a fixed width so
+   the ⋮ stays in one place down the list, and the buttons align to its right
+   edge so every row's last pixel matches. */
+.inbox-row__actions .cta-stack { width: 258px; align-items: flex-end; }
+.inbox-row__actions .cta-stack .cta-std { flex: 0 0 auto; width: auto; }
+.inbox-row__actions .cta-pair { display: flex; width: auto; gap: 6px; justify-content: flex-end; }
+.inbox-row__actions .cta-pair .cta-std { flex: 0 0 auto; width: auto; }
 .listing-menu-btn { border-color: transparent; background: transparent; letter-spacing: 0; font-size: 16px; }
 .listing-menu-btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
 .avail-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
@@ -1374,8 +1372,8 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .foot-cta { display: inline-flex; }
 /* Same rule in the profile footer: one fixed primary width, not a button that
    grows with its label. */
-.foot-cta .cta-stack { width: 200px; align-items: flex-start; }
-.foot-cta .cta-std { flex: 0 0 172px; width: 172px; justify-content: center; }
+.foot-cta .cta-stack { width: 200px; align-items: stretch; }
+.foot-cta .cta-std { width: 100%; justify-content: center; }
 .foot-links { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center; }
 .cta-link--danger { color: var(--error); }
 .review__prose.is-clamped {
@@ -1387,7 +1385,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .review__fact-value--quiet { color: var(--fg-subtle); }
 /* --- v3.19.1: footer CTA pair sizing --- */
 .foot-cta .cta-pair { display: flex; width: 100%; gap: 6px; }
-.foot-cta .cta-pair .cta-std { flex: 0 0 172px; width: 172px; }
+.foot-cta .cta-pair .cta-std { width: auto; flex: 1; }
 .foot-cta .cta-pair .cta-icon { width: auto; flex: 0 0 auto; }
 
 /* --- v3.23.0: update tray, draft cards, decisions --- */

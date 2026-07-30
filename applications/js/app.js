@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.43.3';
+const VERSION = '3.44.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -477,7 +477,11 @@ function joinBtn(sc) {
 function openingsCta(a) {
   const sc = screeningState[a.id];
   const phase = callPhase(sc);
-  const stack = (top, ctx) => `<span class="cta-stack">${top}${ctx ? `<span class="cta-context">${ctx}</span>` : ''}</span>`;
+  /* One tier only. The caption under the primary ("no decisions yet", "replied
+     2d ago") repeated what the row, the dot, and the profile already say, and
+     it made every row two lines tall. Callers still pass context; it's dropped
+     here so the call sites keep reading as intent rather than markup. */
+  const stack = (top) => `<span class="cta-stack">${top}</span>`;
   const when = sc?.at ? `${fmtSlot(sc.at)}${sc.with ? ` · ${esc(sc.with)}` : ''}` : '';
   if (phase === 'watch') {
     const dv = decisionVotes[a.id] || [];
