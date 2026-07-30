@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.25.0'
+const VERSION = '1.26.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -501,8 +501,17 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
       subject_id: r.applicant_id,
       subject_label: a.first_name,
       lane: INTENT_LANE[intent] || 'daily',
-      // Per message, not per person: two questions deserve two answers.
-      dedupe_key: `reply:${r.id}`,
+      /* Per message, not per person — two questions deserve two answers.
+
+         Except availability, which collapses to one entry per person per day.
+         Arranging a call is a back-and-forth ("Tuesday?" / "or Wednesday" / "any
+         time after 5") and every leg of it parses as availability: one real
+         thread produced eight identical "sent times for a call" lines. The house
+         needs to know she replied, once — the thread has the rest, and the claim
+         post is already tracking the actual scheduling. */
+      dedupe_key: intent === 'availability'
+        ? `reply_availability:${r.applicant_id}:${String(r.sent_at).slice(0, 10)}`
+        : `reply:${r.id}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
         sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(r.intent_summary),
