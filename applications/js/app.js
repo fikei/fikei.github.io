@@ -2699,6 +2699,37 @@ function roomGaps(roomId) {
   return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= 7);
 }
 
+/* One room's bars: stays, then the uncovered stretches between them. Module
+   scope (not a closure inside renderOccupancy) so refreshLane() can repaint a
+   single lane after an autosave without rebuilding the drawer. */
+function laneBarsHtml(r) {
+  const winEndExcl = addMonthsIso(occStart, OCC_WINDOW);
+  const bars = [];
+  for (const s of roomStays(r.id)) {
+    const endExcl = s.ends_on ? isoAddDays(s.ends_on, 1) : winEndExcl;
+    if (s.starts_on >= winEndExcl || endExcl <= occStart) continue;
+    const left = occPos(s.starts_on) * 100;
+    const width = (s.ends_on ? occPos(endExcl) : 1) * 100 - left;
+    const range = `${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
+    const active = occDrawer?.type === 'stay' && occDrawer.id === s.id;
+    bars.push(`<button type="button" class="cal__event cal__event--${s.kind} ${!s.ends_on ? 'is-open-ended' : ''} ${active ? 'is-editing' : ''}"
+      style="left: ${left}%; width: calc(${Math.max(width, 0.8)}% - var(--bar-break))" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
+      data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
+  }
+  for (const [a, b] of roomGaps(r.id)) {
+    const left = occPos(a) * 100;
+    const width = occPos(isoAddDays(b, 1)) * 100 - left;
+    const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
+    // No label: a red stretch already reads as empty, and the dates it
+    // spans are the point. Tapping it opens the drawer, which names them.
+    bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
+      style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
+      aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
+      data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
+  }
+  return bars.join('');
+}
+
 function renderOccupancy() {
   OCC_WINDOW = occMq.matches ? 3 : 12;
   if (!occStart) occStart = defaultOccStart();
@@ -2711,33 +2742,6 @@ function renderOccupancy() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const todayPct = todayIso >= occStart && occPos(todayIso) < 1 ? occPos(todayIso) * 100 : null;
 
-  const barsFor = r => {
-    const winEndExcl = addMonthsIso(occStart, OCC_WINDOW);
-    const bars = [];
-    for (const s of roomStays(r.id)) {
-      const endExcl = s.ends_on ? isoAddDays(s.ends_on, 1) : winEndExcl;
-      if (s.starts_on >= winEndExcl || endExcl <= occStart) continue;
-      const left = occPos(s.starts_on) * 100;
-      const width = (s.ends_on ? occPos(endExcl) : 1) * 100 - left;
-      const range = `${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
-      const active = occDrawer?.type === 'stay' && occDrawer.id === s.id;
-      bars.push(`<button type="button" class="cal__event cal__event--${s.kind} ${!s.ends_on ? 'is-open-ended' : ''} ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: calc(${Math.max(width, 0.8)}% - var(--bar-break))" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
-        data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
-    }
-    for (const [a, b] of roomGaps(r.id)) {
-      const left = occPos(a) * 100;
-      const width = occPos(isoAddDays(b, 1)) * 100 - left;
-      const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
-      // No label: a red stretch already reads as empty, and the dates it
-      // spans are the point. Tapping it opens the drawer, which names them.
-      bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
-        aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
-        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
-    }
-    return bars.join('');
-  };
 
   host.innerHTML = `
     <div class="occ-legend">
@@ -2774,7 +2778,7 @@ function renderOccupancy() {
               <span class="occ__room-name">${esc(r.name)}</span>
               <span class="occ__room-sub">${esc(r.floor)}${r.total_sqft ? ` · ${r.total_sqft} sq ft` : ''}</span>
             </button>
-            <div class="cal__lane">${barsFor(r)}</div>
+            <div class="cal__lane" data-lane-room="${r.id}">${laneBarsHtml(r)}</div>
           </div>`).join('')}
       </div>
     </div>
@@ -2946,12 +2950,16 @@ function stayFormHtml(s, roomId) {
   const exits = [];
   if (!isNew && s.kind === 'resident') {
     exits.push(`<button type="button" class="drawer-cta__exit" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">
-      Mark leaving <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+      <span class="drawer-cta__exit-label">Mark leaving</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&rarr;</span>
+      <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
     </button>`);
   }
   if (!isNew) {
     exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-stay-delete="${s.id}">
-      Remove stay <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+      <span class="drawer-cta__exit-label">Remove stay</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
+      <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
     </button>`);
   }
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
@@ -2976,10 +2984,10 @@ function stayFormHtml(s, roomId) {
     ${trialFieldsHtml(s)}
     <p class="listing-form__error" data-form-error></p>
     <div class="drawer-cta">
-      <div class="drawer-cta__row">
+      ${isNew ? `<div class="drawer-cta__row">
         <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
-        <button type="submit" class="btn btn--accent drawer-cta__commit">${isNew ? 'Add stay' : 'Save'}</button>
-      </div>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">Add stay</button>
+      </div>` : `<p class="drawer-cta__flag" data-save-flag>Changes save as you go</p>`}
       ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
     </div>
   </form>`;
@@ -3064,7 +3072,7 @@ function renderOccDrawer() {
       </div>
       <div class="occ-drawer__body">${body}</div>
     </aside>`;
-  hostWrap.querySelector('[data-stay-form]')?.addEventListener('submit', onStaySave);
+  hostWrap.querySelector('[data-stay-form]')?.addEventListener('submit', onStayFormSubmit);
   hostWrap.querySelector('[data-promote-open]')?.addEventListener('click', e => {
     promoting = e.currentTarget.dataset.promoteOpen;
     renderOccDrawer();
@@ -3096,6 +3104,12 @@ function renderOccDrawer() {
       form.querySelector(sel)?.addEventListener('change', () => syncTrialFields(form));
     }
     syncTrialFields(form);
+    // Autosave. `change` is the right moment: text commits on blur, dates and
+    // selects the instant they settle. Delegated, so the trial milestone fields
+    // that appear later are covered without re-binding.
+    if (form.dataset.stayForm !== 'new') {
+      form.addEventListener('change', () => autoSaveStay(form));
+    }
   }
 }
 
@@ -3122,9 +3136,11 @@ function syncTrialFields(form) {
   }
 }
 
-async function onStaySave(e) {
-  e.preventDefault();
-  const form = e.target;
+/* Validate + write, and nothing else — no toast, no navigation, no re-render.
+   Both the autosave path and the create button go through this so an edit and
+   an insert can never drift apart on validation. Returns true on success;
+   on failure the inline error is already set. */
+async function writeStayForm(form) {
   const fd = new FormData(form);
   const id = form.dataset.stayForm;
   const err = form.querySelector('[data-form-error]');
@@ -3169,6 +3185,71 @@ async function onStaySave(e) {
     if (error) { err.textContent = error.message; return; }
     Object.assign(stays.find(s => s.id === id) || {}, rec);
   }
+  err.textContent = '';
+  return true;
+}
+
+/* --- autosave ---
+   A field commits on `change`, which for text fires when it loses focus and
+   for dates/selects the moment the value settles. Nothing is repainted except
+   the one lane and the drawer's own subtitle, so focus and caret survive.
+   Creation is the exception: a record that doesn't exist yet can't autosave,
+   so a new stay keeps an explicit "Add stay". */
+let staySavedTimer = null;
+
+async function autoSaveStay(form) {
+  if (form.dataset.stayForm === 'new') return;
+  const ok = await writeStayForm(form);
+  if (!ok) return;
+  const roomId = +form.dataset.stayRoom;
+  refreshLane(roomId);
+  refreshOccupants();
+  refreshDrawerSub();
+  const flag = form.querySelector('[data-save-flag]');
+  if (flag) {
+    flag.textContent = 'Saved';
+    flag.classList.add('is-on');
+    clearTimeout(staySavedTimer);
+    staySavedTimer = setTimeout(() => {
+      flag.classList.remove('is-on');
+      flag.textContent = 'Changes save as you go';
+    }, 2200);
+  }
+}
+
+/* Repaint one room's bars in place. The whole-view render would rebuild the
+   drawer and throw away whatever the cursor was in. */
+function refreshLane(roomId) {
+  const lane = document.querySelector(`[data-lane-room="${roomId}"]`);
+  const r = rooms.find(x => x.id === roomId);
+  if (lane && r) lane.innerHTML = laneBarsHtml(r);
+}
+
+function refreshOccupants() {
+  const host = document.querySelector('.occupants');
+  if (!host) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = occupantsHtml();
+  const next = wrap.firstElementChild;
+  if (next) host.replaceWith(next);
+}
+
+/* The subtitle carries the stay's dates, so it goes stale the moment one changes. */
+function refreshDrawerSub() {
+  if (occDrawer?.type !== 'stay') return;
+  const s = stays.find(x => x.id === occDrawer.id);
+  const el = document.querySelector('.occ-drawer__sub');
+  if (!s || !el) return;
+  const room = rooms.find(r => r.id === s.room_id);
+  el.textContent = `${room?.name || 'Room'} · ${KIND_LABELS[s.kind]} · ${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
+}
+
+/* Submit means "I'm done here": the Add-stay button on a new record, or Enter
+   in a field on an existing one. Either way, write and close. */
+async function onStayFormSubmit(e) {
+  e.preventDefault();
+  const ok = await writeStayForm(e.target);
+  if (!ok) return;
   occDrawer = null;
   toast('Occupancy updated');
   renderOccupancy();
@@ -3416,10 +3497,18 @@ function listingForm(l) {
       <textarea name="notes" class="notes__input listing-form__notes" rows="2" maxlength="1000">${esc(l.notes || '')}</textarea>
     </label>
     <p class="listing-form__error" data-form-error></p>
-    <div class="decision-sheet__actions">
-      ${isNew ? '' : `<button type="button" class="listing-form__delete" data-delete-listing="${l.id}">Delete listing</button>`}
-      <button type="button" class="hold-sheet__cancel" data-cancel-listing>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">${isNew ? 'Create listing' : 'Save changes'}</button>
+    <div class="drawer-cta">
+      ${isNew ? `<div class="drawer-cta__row">
+        <button type="button" class="drawer-cta__quiet" data-cancel-listing>Cancel</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">Create listing</button>
+      </div>` : `<p class="drawer-cta__flag" data-save-flag>Changes save as you go</p>
+      <div class="drawer-cta__exits">
+        <button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-delete-listing="${l.id}">
+          <span class="drawer-cta__exit-label">Delete listing</span>
+          <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
+          <span class="drawer-cta__exit-hint">removes it and unplaces its candidates</span>
+        </button>
+      </div>`}
     </div>
   </form>`;
 }
@@ -3438,7 +3527,11 @@ function openListingModal(idOrNew) {
     <p class="notes__empty">A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial.</p>
     ${listingForm(l)}`;
   document.getElementById('listing-modal').hidden = false;
-  body.querySelector('[data-listing-form]').addEventListener('submit', onListingSubmit);
+  const lform = body.querySelector('[data-listing-form]');
+  lform.addEventListener('submit', onListingCreate);
+  if (lform.dataset.listingForm !== 'new') {
+    lform.addEventListener('change', e => autoSaveListing(lform, e.target.name));
+  }
 }
 
 function closeListingModal() {
@@ -3457,9 +3550,9 @@ function rerenderAfterListingChange() {
   });
 }
 
-async function onListingSubmit(e) {
-  e.preventDefault();
-  const form = e.target;
+/* Validate + write only. Shared by the autosave path and the create button so
+   the two can't drift apart on validation. */
+async function writeListingForm(form) {
   const id = form.dataset.listingForm;
   const fd = new FormData(form);
   const num = k => { const v = fd.get(k); return v === '' || v === null ? null : Math.round(+v); };
@@ -3488,14 +3581,47 @@ async function onListingSubmit(e) {
     }).select().single();
     if (error) { err.textContent = error.message; return; }
     listings.push(data);
-    toast('Listing created');
   } else {
     const { error } = await sb.from('recruit_listings').update(rec).eq('id', id);
     if (error) { err.textContent = error.message; return; }
     Object.assign(listings.find(l => l.id === id) || {}, rec);
-    toast('Listing updated');
   }
+  err.textContent = '';
+  return true;
+}
+
+async function onListingCreate(e) {
+  e.preventDefault();
+  if (!await writeListingForm(e.target)) return;
   rerenderAfterListingChange();
+}
+
+/* Autosave an existing listing: write, then refresh the views behind the modal
+   without closing it. A status change can pick up or drop auto-placements, so
+   that sync still has to run. */
+let listingSavedTimer = null;
+/* Fields that can change who qualifies for this listing. Editing the notes
+   shouldn't cost an auto-placement round trip. */
+const PLACEMENT_FIELDS = new Set(['room_id', 'kind', 'starts_on', 'ends_on', 'status']);
+async function autoSaveListing(form, changed) {
+  if (form.dataset.listingForm === 'new') return;
+  if (!await writeListingForm(form)) return;
+  const flag = form.querySelector('[data-save-flag]');
+  if (flag) {
+    flag.textContent = 'Saved';
+    flag.classList.add('is-on');
+    clearTimeout(listingSavedTimer);
+    listingSavedTimer = setTimeout(() => {
+      flag.classList.remove('is-on');
+      flag.textContent = 'Changes save as you go';
+    }, 2200);
+  }
+  if (!PLACEMENT_FIELDS.has(changed)) return;
+  const added = await syncAutoPlacements();
+  renderRailCounts();
+  if (view === 'openings') renderApplicants();
+  else if (view === 'occupancy') renderOccupancy();
+  if (added) toast(`${added} candidate${added === 1 ? '' : 's'} auto-placed`);
 }
 
 async function deleteListing(id) {

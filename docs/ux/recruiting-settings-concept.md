@@ -147,13 +147,9 @@ Section footers use [`drawer-cta`](https://ctrl.rodeo/design-system/recruiting/#
 
 ## Open decisions
 
-### 1. Autosave per control, or an explicit Save per section?
+### ~~1. Autosave per control, or an explicit Save per section?~~ — decided Jul 30
 
-- **Autosave** matches the current footer checkboxes (they upsert on change) and suits toggles, but a number field autosaving mid-typing is hostile, and "did that save?" has no answer.
-- **Save per section** gives every change a moment of intent, which is right for things like the staleness window that silently change what everyone else sees — but it's ceremony for flipping a checkbox.
-- **Nuance:** the two behave differently because the *settings* are different. A toggle is a decision; a number is a draft until you stop typing.
-
-**Recommendation:** autosave `bool` and `enum` on change with an inline "saved" tick; require an explicit commit for `number` and `text`. The schema already knows the type, so the renderer can enforce this — no per-field configuration.
+**Autosave, everywhere.** Settled app-wide rather than for Settings alone: nothing in the app gets a Save button unless it **creates**, **confirms**, or **destroys**. Fields write on `change` — text on blur, dates/selects/toggles the instant they settle — and a quiet status line says "Changes save as you go", flashing "Saved" when a write lands. Section footers therefore carry no commit at all; the only button in a Settings section is "Reset this section", which is destructive. See the [Sidebar CTAs](https://ctrl.rodeo/design-system/recruiting/#sidebar-ctas) story.
 
 ### 2. Who can change house-wide settings?
 
@@ -176,7 +172,7 @@ Section footers use [`drawer-cta`](https://ctrl.rodeo/design-system/recruiting/#
 ## Suggested build order
 
 1. `settings-schema.js` + `setting()` / `setSetting()`, and route the four v1 knobs and all existing settings through them. No UI yet — behavior identical, literals gone.
-2. `?view=settings` with the six sections rendering from the schema; rail entry added, footer stripped to identity + Settings + Sign out. Move food/dues out of the room drawer into **House**.
+2. `?view=settings` with the six sections rendering from the schema, every field autosaving on `change`; rail entry added, footer stripped to identity + Settings + Sign out. Move food/dues out of the room drawer into **House**.
 3. Automations + Connections row types, reading `cron.job_run_details` and the Gmail token state for status.
 4. `updated_by` / `updated_at` on `recruit_settings`, surfaced per setting.
 

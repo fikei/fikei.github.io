@@ -750,7 +750,7 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
         dedupe_key: `screening_notes:${sc.id}`,
         payload: {
           title: fullName(who),
-          sentence: `{}'s call notes and recording are ready to read.`,
+          sentence: `{}'s recording & summary are ready.`,
           section: 'Screening',
           links: [{ label: 'Read the notes', url: applicantLink(sc.applicant_id) }],
         },
