@@ -31,6 +31,8 @@
 // twice in a row changes nothing.
 
 import { AUTOMATION_CHANNEL_ID } from './discord.ts'
+import { ACTIONS, KINDS, icon, label, loadCopyOverrides, renderCopy } from './recruit-copy.ts'
+import type { CopyVars } from './recruit-copy.ts'
 
 const TZ = 'America/Los_Angeles'
 const APP = 'https://ctrl.rodeo/applications/'
@@ -146,7 +148,13 @@ export interface Notification {
        "{} has been waiting 24 days for a review." Sentences, not labelled
        fields — a housemate reads a line of prose faster than they parse
        "Waiting on a review · Chloe Revery". */
-    sentence: string
+    /* Which sentence to say, and what to say it with. record() resolves these
+       against recruit_copy and writes the finished line into `sentence`, so a
+       delivered notification keeps the exact words it was sent with even if the
+       template is edited afterwards. */
+    copy?: string
+    vars?: CopyVars
+    sentence?: string
     title: string     // the subject on its own, for the Activity view and digest rows
     body?: string     // any detail that doesn't belong in the sentence
     section?: string
@@ -277,6 +285,12 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export async function record(db: DB, rows: Notification[]): Promise<number> {
   if (!rows.length) return 0
   const { muted } = await loadSettings(db)
+  /* Resolve wording here, once, at the moment the row is written — not at send
+     time. A delivered notification then keeps the exact words it went out with
+     even if someone edits the template afterwards, which is what makes the log
+     an honest record of what the house was told rather than of what it would be
+     told today. */
+  const overrides = await loadCopyOverrides(db)
   const payload = rows.map((n) => ({
     kind: n.kind,
     subject_type: n.subject_type,
@@ -286,7 +300,12 @@ export async function record(db: DB, rows: Notification[]): Promise<number> {
     recipient_id: n.recipient_id || null,
     lane: n.lane || 'daily',
     dedupe_key: n.dedupe_key,
-    payload: n.payload,
+    payload: {
+      ...n.payload,
+      sentence: n.payload.copy
+        ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
+        : n.payload.sentence,
+    },
     due_at: n.due_at || new Date().toISOString(),
     muted: muted.has(n.kind),
     ...(n.already_broadcast ? { members_at: new Date().toISOString() } : {}),
@@ -333,10 +352,14 @@ async function detectNewApplications(db: DB): Promise<Notification[]> {
       // The kind's label already says "New application" — the title is just
       // who, and the body is the two facts that decide whether to read on.
       title: `${a.first_name} ${a.last_name || ''}`.trim(),
-      sentence: `{} applied for ${/short/i.test(a.residency || '') ? 'a sublet' : 'a full-time room'}` +
-        `${moveInClause(a.move_in) ? `, ${moveInClause(a.move_in)}` : ''}.`,
+      copy: moveInClause(a.move_in) ? 'application_new.timed' : 'application_new',
+      vars: {
+        subject: fullName(a),
+        track: /short/i.test(a.residency || '') ? 'a sublet' : 'a full-time room',
+        timing: moveInClause(a.move_in),
+      },
       section: 'New applications',
-      links: [{ label: `Review ${a.first_name}`, url: applicantLink(a.id) }],
+      links: [{ label: ACTIONS.review, url: applicantLink(a.id) }],
     },
     // recruit-gmail's scan already posted this one; the row is the log entry.
     already_broadcast: true,
@@ -390,9 +413,10 @@ async function detectReviewStalled(db: DB): Promise<Notification[]> {
       dedupe_key: `review_stalled:${a.id}:${step}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
-        sentence: `{} has been waiting ${plural(days, 'day')} for a review.`,
+        copy: 'review_stalled',
+        vars: { subject: fullName(a), days: plural(days, 'day') },
         section: 'Needs a review',
-        links: [{ label: `Review ${a.first_name}`, url: applicantLink(a.id) }],
+        links: [{ label: ACTIONS.review, url: applicantLink(a.id) }],
       },
     })
   }
@@ -431,9 +455,10 @@ async function detectReviewBacklog(db: DB): Promise<Notification[]> {
     dedupe_key: `review_backlog:${thursday.getUTCFullYear()}-W${week}`,
     payload: {
       title: `${plural(n, 'application')}`,
-      sentence: `{} have never been reviewed, all of them older than ${REVIEW_RECENT_DAYS} days.`,
+      copy: 'review_backlog',
+      vars: { subject: plural(n, 'application'), window: REVIEW_RECENT_DAYS },
       section: 'Backlog',
-      links: [{ label: 'Open the inbox', url: viewLink('inbox') }],
+      links: [{ label: ACTIONS.inbox, url: viewLink('inbox') }],
     },
   }]
 }
@@ -473,12 +498,11 @@ async function detectOpeningsAtRisk(db: DB): Promise<Notification[]> {
       dedupe_key: `opening_risk:${l.id}:${step}`,
       payload: {
         title: String(room),
-        sentence: left < 0
-          ? `{} should have opened ${fmtDay(starts)}, ${plural(Math.abs(left), 'day')} ago, and is still empty.`
-          : `{} opens ${fmtDay(starts)}, ${plural(left, 'day')} away, and is still unfilled.`,
+        copy: left < 0 ? 'opening_overdue' : 'opening_at_risk',
+        vars: { subject: String(room), date: fmtDay(starts), days: plural(Math.abs(left), 'day') },
         section: 'Openings at risk',
-        links: [{ label: 'Open the shortlist', url: viewLink('openings') },
-                { label: 'See the room', url: `${APP}?view=occupancy&room=${l.room_id}` }],
+        links: [{ label: ACTIONS.shortlist, url: viewLink('openings') },
+                { label: ACTIONS.room, url: `${APP}?view=occupancy&room=${l.room_id}` }],
       },
     } as Notification
   })
@@ -532,9 +556,10 @@ async function detectRoomsEmptying(db: DB): Promise<Notification[]> {
       dedupe_key: `room_emptying:${s.id}:${step}`,
       payload: {
         title: String(room),
-        sentence: `{} empties ${fmtDay(ends)} when ${s.occupant || 'the occupant'} leaves, and has no listing yet.`,
+        copy: 'room_emptying',
+        vars: { subject: String(room), date: fmtDay(ends), occupant: String(s.occupant || 'the occupant') },
         section: 'Rooms emptying',
-        links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${s.room_id}` }],
+        links: [{ label: ACTIONS.calendar, url: `${APP}?view=occupancy&room=${s.room_id}` }],
       },
     })
   }
@@ -588,10 +613,11 @@ async function detectNeedsInput(db: DB): Promise<Notification[]> {
       dedupe_key: `needs_input:${v.id}`,
       payload: {
         title: fullName(active.get(v.applicant_id)!),
-        sentence: `${v.voter_name || 'A housemate'} wants another read on {}.`,
+        copy: 'needs_input',
+        vars: { subject: fullName(active.get(v.applicant_id)!), asker: v.voter_name || 'A housemate' },
         body: shortPhrase(v.note, 140),
         section: 'Needs a second read',
-        links: [{ label: 'Read the application', url: applicantLink(v.applicant_id) }],
+        links: [{ label: ACTIONS.review, url: applicantLink(v.applicant_id) }],
       },
     }))
 }
@@ -638,10 +664,11 @@ async function detectCandidateLanding(db: DB): Promise<Notification[]> {
         dedupe_key: `candidate_placed:${a.id}:${[...rooms].sort().join('+')}`,
         payload: {
           title: fullName(a),
-          sentence: `{} passed review and fits ${rooms.length === 1 ? rooms[0] : `${rooms.length} rooms`}.`,
+          copy: 'candidate_placed',
+          vars: { subject: fullName(a), rooms: rooms.length === 1 ? rooms[0] : `${rooms.length} rooms` },
           body: rooms.join(', '),
           section: 'Passed review',
-          links: [{ label: 'Open the shortlist', url: viewLink('openings') }],
+          links: [{ label: ACTIONS.shortlist, url: viewLink('openings') }],
         },
       })
     } else if (!booked.has(a.id)) {
@@ -654,9 +681,10 @@ async function detectCandidateLanding(db: DB): Promise<Notification[]> {
         dedupe_key: `candidate_parked:${a.id}:${ptToday().slice(0, 7)}`,
         payload: {
           title: fullName(a),
-          sentence: `{} passed review but no open room fits them.`,
+          copy: 'candidate_parked',
+          vars: { subject: fullName(a) },
           section: 'Waiting for a room',
-          links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+          links: [{ label: ACTIONS.profile, url: applicantLink(a.id) }],
         },
       })
     }
@@ -723,12 +751,11 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
       dedupe_key: `screening_booked:${sc.id}:${sc.starts_at}`,
       payload: {
         title: fullName(who),
-        sentence: named
-          ? `${named} is taking {}'s intro call ${dayPart} at ${at}.`
-          : `{}'s intro call is booked for ${dayPart} at ${at}.`,
+        copy: named ? 'screening_booked.named' : 'screening_booked',
+        vars: { subject: fullName(who), screener: named || '', when: `${dayPart} at ${at}` },
         body: 'calendar invite sent, on the house calendar',
         section: 'Screening',
-        links: [{ label: 'Open their profile', url: applicantLink(sc.applicant_id) }],
+        links: [{ label: ACTIONS.profile, url: applicantLink(sc.applicant_id) }],
       },
     })
   }
@@ -760,9 +787,10 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
       dedupe_key: `screening_unclaimed:${o.applicant_id}:${Math.floor(days / 3)}`,
       payload: {
         title: fullName(who),
-        sentence: `{} offered times ${plural(days, 'day')} ago and nobody has taken the call.`,
+        copy: 'screening_unclaimed',
+        vars: { subject: fullName(who), days: plural(days, 'day') },
         section: 'Screening',
-        links: [{ label: 'Take the call', url: applicantLink(o.applicant_id) }],
+        links: [{ label: ACTIONS.takeCall, url: applicantLink(o.applicant_id) }],
       },
     })
   }
@@ -792,9 +820,11 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
           title: fullName(who),
           // Safe here: this kind only exists on the day of the call, and its
           // dedupe key carries that date, so it is never re-read on another day.
-          sentence: `{} has an intro call today at ${at}${sc.housemate_name && !/calendar|the house|@/i.test(String(sc.housemate_name)) ? ` with ${sc.housemate_name}` : ''}.`,
+          copy: /calendar|the house|@/i.test(String(sc.housemate_name || '')) || !sc.housemate_name
+            ? 'screening_today' : 'screening_today.with',
+          vars: { subject: fullName(who), at, screener: String(sc.housemate_name || '') },
           section: 'Screening',
-          links: [{ label: 'Open their profile', url: applicantLink(sc.applicant_id) }],
+          links: [{ label: ACTIONS.profile, url: applicantLink(sc.applicant_id) }],
         },
       })
     }
@@ -808,9 +838,10 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
         dedupe_key: `screening_notes:${sc.id}`,
         payload: {
           title: fullName(who),
-          sentence: `{}'s recording & summary are ready.`,
+          copy: 'screening_notes',
+          vars: { subject: fullName(who) },
           section: 'Screening',
-          links: [{ label: 'Read the notes', url: applicantLink(sc.applicant_id) }],
+          links: [{ label: ACTIONS.notes, url: applicantLink(sc.applicant_id) }],
         },
       })
     }
@@ -877,12 +908,11 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
       dedupe_key: `decision_open:${a.id}:${step}`,
       payload: {
         title: fullName(a),
-        sentence: left < 0
-          ? `The house still has not decided on {}, who wanted to move in ${fmtDay(date)}.`
-          : `The house needs to decide on {} before ${fmtDay(date)}, ${plural(left, 'day')} away.`,
+        copy: left < 0 ? 'decision_open.overdue' : 'decision_open',
+        vars: { subject: fullName(a), date: fmtDay(date), days: plural(Math.abs(left), 'day') },
         body: n ? `${plural(n, 'housemate')} weighed in so far` : 'nobody has weighed in yet',
         section: 'Decisions',
-        links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+        links: [{ label: ACTIONS.profile, url: applicantLink(a.id) }],
       },
     })
   }
@@ -978,14 +1008,12 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
         /* One sentence, both facts. The candidate is waiting AND the house
            hasn't decided — reporting those separately meant two notifications a
            word apart about the same person on the same day. */
-        sentence: undecided
-          ? `{} was interviewed ${plural(days, 'day')} ago and the house still hasn't decided.`
-          : heard
-          ? `{} was interviewed and has heard nothing for ${plural(days, 'day')}.`
-          : `{} was interviewed ${plural(days, 'day')} ago and is waiting on the house to decide.`,
+        copy: undecided ? 'screening_followup.undecided'
+          : heard ? 'screening_followup.silent' : 'screening_followup.waiting',
+        vars: { subject: fullName(a), days: plural(days, 'day') },
         body: undecided ? undefined : 'the decision is in progress, nobody has told them',
         section: 'Owed an answer',
-        links: [{ label: 'Write to them', url: applicantLink(a.id) }],
+        links: [{ label: ACTIONS.write, url: applicantLink(a.id) }],
       },
     })
   }
@@ -1019,12 +1047,17 @@ async function detectPromotions(db: DB): Promise<Notification[]> {
     dedupe_key: `candidate_promoted:${s.id}`,
     payload: {
       title: String(s.occupant || 'A new housemate'),
-      sentence: `{} moved into ${roomName.get(s.room_id as number) || 'the house'} on ${fmtDay(String(s.starts_on))} as a resident.`,
+      copy: 'candidate_promoted',
+      vars: {
+        subject: String(s.occupant || 'A new housemate'),
+        room: roomName.get(s.room_id as number) || 'the house',
+        date: fmtDay(String(s.starts_on)),
+      },
       body: openItems.get(String(s.id))
         ? `${plural(openItems.get(String(s.id))!, 'onboarding item')} still to tick`
         : undefined,
       section: 'New housemates',
-      links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${s.room_id}` }],
+      links: [{ label: ACTIONS.calendar, url: `${APP}?view=occupancy&room=${s.room_id}` }],
     },
   }))
 }
@@ -1067,11 +1100,10 @@ async function detectDraftListings(db: DB): Promise<Notification[]> {
         : `listing_draft:${l.id}`,
       payload: {
         title: String(room),
-        sentence: stale
-          ? `{} has sat as a draft for ${plural(age, 'day')} and is not collecting candidates yet.`
-          : `{} came up as a draft opening from ${fmtDay(String(l.starts_on))}.`,
+        copy: stale ? 'listing_draft_stale' : 'listing_draft',
+        vars: { subject: String(room), days: plural(age, 'day'), date: fmtDay(String(l.starts_on)) },
         section: 'Draft openings',
-        links: [{ label: 'Open the listing', url: viewLink('openings') }],
+        links: [{ label: ACTIONS.listing, url: viewLink('openings') }],
       },
     }
   })
@@ -1111,9 +1143,10 @@ async function detectFirstCandidate(db: DB): Promise<Notification[]> {
       dedupe_key: `listing_has_candidates:${l.id}`,
       payload: {
         title: String(room),
-        sentence: `{} has ${plural(n, 'candidate')} on its shortlist and is ready for screening requests.`,
+        copy: 'listing_has_candidates',
+      vars: { subject: String(room), count: plural(n, 'candidate') },
         section: 'Ready to screen',
-        links: [{ label: 'Open the shortlist', url: viewLink('openings') }],
+        links: [{ label: ACTIONS.shortlist, url: viewLink('openings') }],
       },
     }
   })
@@ -1172,9 +1205,10 @@ async function detectNoQualifiers(db: DB): Promise<Notification[]> {
       dedupe_key: `listing_no_qualifiers:${l.id}:${ptToday().slice(0, 7)}`,
       payload: {
         title: String(room),
-        sentence: `Nobody qualifies for {} because ${because}.`,
+        copy: 'listing_no_qualifiers',
+        vars: { subject: String(room), reason: because },
         section: 'Nobody qualifies',
-        links: [{ label: 'Open the listing', url: viewLink('openings') }],
+        links: [{ label: ACTIONS.listing, url: viewLink('openings') }],
       },
     })
   }
@@ -1217,9 +1251,10 @@ async function detectFilledWithoutStay(db: DB): Promise<Notification[]> {
       dedupe_key: `listing_filled_no_stay:${l.id}:${ptToday().slice(0, 7)}`,
       payload: {
         title: String(room),
-        sentence: `{} is marked filled from ${fmtDay(String(l.starts_on))} but nobody is booked into it on the calendar.`,
+        copy: 'listing_filled_no_stay',
+        vars: { subject: String(room), date: fmtDay(String(l.starts_on)) },
         section: 'Reconcile',
-        links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${l.room_id}` }],
+        links: [{ label: ACTIONS.calendar, url: `${APP}?view=occupancy&room=${l.room_id}` }],
       },
     })
   }
@@ -1270,9 +1305,10 @@ async function detectGoneCold(db: DB): Promise<Notification[]> {
       dedupe_key: `gone_cold:${a.id}:${Math.floor(days / 7)}`,
       payload: {
         title: fullName(a),
-        sentence: `{} never answered the last email, sent ${plural(days, 'day')} ago.`,
+        copy: 'gone_cold',
+        vars: { subject: fullName(a), days: plural(days, 'day') },
         section: 'Gone quiet',
-        links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+        links: [{ label: ACTIONS.profile, url: applicantLink(a.id) }],
       },
     })
   }
@@ -1307,10 +1343,11 @@ async function detectOnboardingOwed(db: DB): Promise<Notification[]> {
       dedupe_key: `onboarding_owed:${st.id}:${Math.floor(age / 7)}`,
       payload: {
         title: String(st.occupant || 'A new housemate'),
-        sentence: `{} moved in ${plural(age, 'day')} ago and is still owed ${plural(items.length, 'thing')}.`,
+        copy: 'onboarding_owed',
+      vars: { subject: String(st.occupant || 'A new housemate'), days: plural(age, 'day'), count: plural(items.length, 'thing') },
         body: items.slice(0, 6).join(', '),
         section: 'Onboarding',
-        links: [{ label: 'Open the calendar', url: viewLink('occupancy') }],
+        links: [{ label: ACTIONS.calendar, url: viewLink('occupancy') }],
       },
     })
   }
@@ -1358,18 +1395,19 @@ async function detectOccupancyConflicts(db: DB): Promise<Notification[]> {
     dedupe_key: `occupancy_conflict:${ptToday().slice(0, 7)}:${clashes.length}`,
     payload: {
       title: `${plural(clashes.length, 'room')}`,
-      sentence: `{} have two people booked over the same dates.`,
+      copy: 'occupancy_conflict',
+      vars: { subject: plural(clashes.length, 'room') },
       body: clashes.slice(0, 6).join(' · '),
       section: 'Reconcile',
-      links: [{ label: 'Open the calendar', url: viewLink('occupancy') }],
+      links: [{ label: ACTIONS.calendar, url: viewLink('occupancy') }],
     },
   }]
 }
 
 /* Detect everything. Each kind is independent: one failing query must not cost
    the others their tick, so each is caught on its own. */
-export async function detect(db: DB): Promise<number> {
-  const kinds: Array<[string, () => Promise<Notification[]>]> = [
+function detectors(db: DB): Array<[string, () => Promise<Notification[]>]> {
+  return [
     ['application_new', () => detectNewApplications(db)],
     ['review_stalled', () => detectReviewStalled(db)],
     ['review_backlog', () => detectReviewBacklog(db)],
@@ -1392,8 +1430,11 @@ export async function detect(db: DB): Promise<number> {
     ['onboarding_owed', () => detectOnboardingOwed(db)],
     ['occupancy_conflict', () => detectOccupancyConflicts(db)],
   ]
+}
+
+export async function detect(db: DB): Promise<number> {
   let found = 0
-  for (const [name, fn] of kinds) {
+  for (const [name, fn] of detectors(db)) {
     try {
       found += await record(db, await fn())
     } catch (err) {
@@ -1409,73 +1450,18 @@ export async function detect(db: DB): Promise<number> {
    value and must never reach a Discord message — "review_stalled" is not a
    sentence. Every notification reads as: <icon> <label> · <who or what> — <why
    it matters>. */
-const KINDS: Record<string, { icon: string; label: string }> = {
-  // Every icon here is a SINGLE codepoint. Emoji that need a U+FE0F variation
-  // selector to render as a picture (🗄️, ⚠️, ➡️ …) are a coin-flip in Discord's
-  // font — they fall back to a text glyph or an empty box — so none are used.
-  // And every kind a detector can emit must appear in this map: an unlisted
-  // kind falls back to '•', which is how a channel ends up full of bullets.
-
-  // The backlog (Phase 1).
-  application_new:        { icon: '📥', label: 'New application' },
-  review_stalled:         { icon: '⏳', label: 'Waiting on a review' },
-  review_backlog:         { icon: '📚', label: 'Inbox backlog' },
-  needs_input:            { icon: '🙋', label: 'Second read wanted' },
-  opening_at_risk:        { icon: '🏠', label: 'Opening at risk' },
-  opening_overdue:        { icon: '🔴', label: 'Opening overdue' },
-  room_emptying:          { icon: '📦', label: 'Room emptying' },
-
-  // What arrives in the inbox (Phase 2b). One kind per intent, so each has its
-  // own lane and its own entry in notify_muted.
-  reply_availability:     { icon: '📅', label: 'Sent times' },
-  reply_reschedule:       { icon: '⏰', label: 'Wants to move the call' },
-  reply_plans_changed:    { icon: '🔄', label: 'Plans changed' },
-  reply_withdrawing:      { icon: '👋', label: 'Withdrew' },
-  reply_post_acceptance:  { icon: '🔑', label: 'Asking about moving in' },
-  reply_question:         { icon: '❓', label: 'Asked a question' },
-  reply_info_provided:    { icon: '📎', label: 'Sent something over' },
-  reply_nudge:            { icon: '🔔', label: 'Following up' },
-  reply_unclear:          { icon: '🤔', label: 'Reply needs a read' },
-
-  // The call.
-  screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
-  screening_booked:       { icon: '🤝', label: 'Call booked' },
-  screening_today:        { icon: '📞', label: 'Call today' },
-  screening_notes:        { icon: '📝', label: 'Recording ready' },
-  screening_followup:     { icon: '⌛', label: 'Owed an answer' },
-
-  // Where they stand.
-  candidate_placed:       { icon: '✅', label: 'Passed review' },
-  candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
-  decision_open:          { icon: '📊', label: 'Decision open' },
-  candidate_promoted:     { icon: '🎉', label: 'Welcomed in' },
-  gone_cold:              { icon: '💤', label: 'Gone quiet' },
-
-  // Openings, in detail.
-  listing_draft:          { icon: '📄', label: 'Draft opening' },
-  listing_draft_stale:    { icon: '🐌', label: 'Draft going stale' },
-  listing_has_candidates: { icon: '🎯', label: 'Ready to screen' },
-  listing_no_qualifiers:  { icon: '🚫', label: 'Nobody qualifies' },
-  listing_filled_no_stay: { icon: '📋', label: 'Filled but unbooked' },
-
-  // The house.
-  onboarding_owed:        { icon: '🎁', label: 'Onboarding owed' },
-  occupancy_conflict:     { icon: '❗', label: 'Calendar clash' },
-}
-/* An unmapped kind is a bug, not a style choice: it shows up in Discord as a
-   bullet with a de-slugged label, which is exactly how a merge once quietly
-   dropped two thirds of this map. Degrade readably, but say so in the logs. */
+/* Labels, icons, and every sentence live in _shared/recruit-copy.ts, so copy can
+   be read and edited as one document. Detectors below decide WHAT is true and
+   name a copy key; they no longer contain prose. Overrides in recruit_copy win
+   over the module's defaults, which is what makes wording changes a SQL edit
+   rather than a deploy. */
 const warned = new Set<string>()
 function checkKind(kind: string): void {
   if (KINDS[kind] || warned.has(kind)) return
   warned.add(kind)
   console.warn(`[notify] kind '${kind}' is missing from KINDS — it will render as a bullet`)
 }
-const icon = (kind: string) => { checkKind(kind); return KINDS[kind]?.icon || '•' }
-const label = (kind: string) => {
-  checkKind(kind)
-  return KINDS[kind]?.label || (kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, ' '))
-}
+
 
 /* One notification, one line. Deliberately three parts and no more: what kind
    of thing this is, who it concerns, and the single reason it was worth saying.
@@ -1645,6 +1631,44 @@ async function digestSentThisPeriod(db: DB, lane: 'daily' | 'weekly'): Promise<b
     .select('id').eq('lane', lane).not('digest_id', 'is', null)
     .gte('members_at', since).limit(1)
   return Boolean(data?.length)
+}
+
+/* What the detectors WOULD say right now, without writing or sending anything.
+
+   Checking a copy edit by deleting rows and forcing a tick re-posts them to the
+   channel — a re-send, not a preview, and it put four duplicate lines in front
+   of the house before I stopped doing it. This is the honest way to see the
+   effect of a template change: it runs the same detectors and the same renderer
+   against the same overrides, and stops before the ledger.
+
+   Rows whose dedupe_key already exists are marked `existing: true` — those would
+   be no-ops on a real tick, so a preview showing twenty lines does not mean
+   twenty messages are about to go out. */
+export async function previewTick(db: DB): Promise<Array<Record<string, unknown>>> {
+  const overrides = await loadCopyOverrides(db)
+  const found: Notification[] = []
+  for (const [name, fn] of detectors(db)) {
+    try {
+      found.push(...await fn())
+    } catch (err) {
+      console.warn(`[notify] preview ${name} failed: ${(err as Error).message}`)
+    }
+  }
+  const { data: seen } = await db.from('recruit_notifications')
+    .select('dedupe_key').in('dedupe_key', found.map((n) => n.dedupe_key))
+  const known = new Set((seen || []).map((r: { dedupe_key: string }) => r.dedupe_key))
+
+  return found.map((n) => ({
+    kind: n.kind,
+    existing: known.has(n.dedupe_key),
+    lane: n.lane || 'daily',
+    audience: n.audience || 'house',
+    copy: n.payload.copy || null,
+    line: `${icon(n.kind)} ${n.payload.copy
+      ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
+      : (n.payload.sentence || '')}`.replace('{subject}', String(n.payload.vars?.subject ?? n.payload.title)),
+    dedupe_key: n.dedupe_key,
+  }))
 }
 
 export interface TickResult {

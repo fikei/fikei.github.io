@@ -13,14 +13,14 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.17.1'
+const VERSION = '1.18.1'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestones + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendIntroEmail, sharedAccessToken, sweepCalendars, HOUSE_CALENDAR_ID, SHARED_EMAIL } from '../_shared/recruit-schedule.ts'
 import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
-import { notifyTick } from '../_shared/recruit-notify.ts'
+import { notifyTick, previewTick } from '../_shared/recruit-notify.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -917,6 +917,14 @@ serve(async (req) => {
         authorized = Boolean(burned)
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
+      /* /remind?dry=1 — show what the detectors would say, write nothing, send
+         nothing. The safe way to check a copy edit: forcing a real tick to see
+         new wording re-posts every row it recreates. */
+      if (new URL(req.url).searchParams.get('dry') === '1') {
+        const preview = await previewTick(client)
+        return json({ dryRun: true, wouldSend: preview.filter((p) => !p.existing).length, preview })
+      }
+
       const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
       const invitedIn = await inviteUnsignedMembers(client).catch((e) => {
         console.warn(`[signin-sweep] ${(e as Error).message}`); return 0

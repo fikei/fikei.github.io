@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.29.1'
+const VERSION = '1.30.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -24,6 +24,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
 import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
 import { record } from '../_shared/recruit-notify.ts'
+import { ACTIONS } from '../_shared/recruit-copy.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -439,67 +440,25 @@ function header(headers: Array<{ name: string; value: string }>, name: string): 
    the call, while the digest line tells *the house* she replied. Two surfaces,
    two audiences, and suppressing the second because the first fired is how a
    house ends up unable to answer "did anyone ever get back to her?". */
-/* For most intents the label carries everything: "wants to move their call" is
-   the whole story and the thread has the rest. But for a question or a changed
-   plan the CONTENT is the notification — "asked a question" tells a housemate
-   nothing they can act on — so those splice the ask into the sentence itself.
+/* Reply wording lives in _shared/recruit-copy.ts with everything else, keyed
+   `reply_<intent>`. Two of the nine have a variant: a question and a changed
+   plan are only useful if the notification carries what was actually asked, so
+   they splice the applicant's own clause in — and fall back to the plain form
+   when the model couldn't produce one clean enough to splice.
 
-   The summary is a clause meant to slot straight into the sentence ("whether
-   the room is furnished"), so it goes in unquoted and lowercased. Anything that
-   still arrives looking like a sentence — a capital first letter and a verb — is
-   dropped rather than mangled into the middle of ours. */
+   The summary arrives as a third-person noun phrase completing "they asked ___".
+   Anything still shaped like a sentence is dropped rather than pushed into the
+   middle of ours, because a mangled sentence makes the whole channel look
+   automated. */
 function clause(s: string | null): string {
   const t = (s || '').replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '')
   if (!t || t.length > 90) return ''
-  // A description, not a clause: "The applicant wants…", "Asking about…".
   if (/^(the applicant|asking|confirming|brief|interested|they |he |she )/i.test(t)) return ''
   return t.charAt(0).toLowerCase() + t.slice(1)
 }
-/* The offered times, as a housemate would say them: "Thu Jul 24, 9–11am · Fri
-   2–5pm". A notification that says only "sent times for a call" makes the reader
-   open the thread to learn the one fact they wanted, so the times go in the
-   line.
 
-   The date is dropped from a window that shares a day with the one before it,
-   and the am/pm from a start that shares it with its own end — the same
-   shortenings anyone makes when reading times aloud. */
-function fmtWindows(windows: Array<{ date: string; start: string; end: string }>): string {
-  if (!windows?.length) return ''
-  const hhmm = (t: string, withMeridiem: boolean) => {
-    const [h, m] = t.split(':').map(Number)
-    const h12 = h % 12 === 0 ? 12 : h % 12
-    return `${h12}${m ? `:${String(m).padStart(2, '0')}` : ''}${withMeridiem ? (h < 12 ? 'am' : 'pm') : ''}`
-  }
-  const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`)
-    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
-
-  const parts: string[] = []
-  let lastDay = ''
-  for (const w of windows.slice(0, 3)) {
-    const sameMeridiem = (Number(w.start.split(':')[0]) < 12) === (Number(w.end.split(':')[0]) < 12)
-    const range = `${hhmm(w.start, !sameMeridiem)}\u2013${hhmm(w.end, true)}`
-    parts.push(w.date === lastDay ? range : `${dayLabel(w.date)} ${range}`)
-    lastDay = w.date
-  }
-  const more = windows.length > 3 ? ` and ${windows.length - 3} more` : ''
-  return parts.join(' \u00b7 ') + more
-}
-
-const INTENT_SENTENCE: Record<string, (s: string | null) => string> = {
-  availability:    (s) => s ? `{} is free ${s}.` : `{} sent times for a call.`,
-  reschedule:      () => `{} wants to move their call.`,
-  withdrawing:     () => `{} is no longer looking.`,
-  post_acceptance: () => `{} is asking about moving in.`,
-  info_provided:   () => `{} sent something over.`,
-  nudge:           () => `{} is following up.`,
-  plans_changed:   (s) => clause(s) ? `{} told us ${clause(s)}.` : `{}'s plans changed.`,
-  question:        (s) => clause(s) ? `{} asked ${clause(s)}.` : `{} asked a question.`,
-  // 'unclear' means the model couldn't summarise it either, so the sentence
-  // stays plain and whatever it managed goes in the body for the Activity view.
-  unclear:         () => `{} replied and it needs a read.`,
-}
-// Which lane each intent earns. The urgent three interrupt; the rest wait for
-// the digest. A reschedule an hour before a call is not a tomorrow problem.
+// Which lane each intent earns. The urgent four interrupt; the rest wait for the
+// digest. A reschedule an hour before a call is not a tomorrow problem.
 const INTENT_LANE: Record<string, 'now' | 'daily'> = {
   reschedule: 'now', withdrawing: 'now', plans_changed: 'now', post_acceptance: 'now',
   availability: 'daily', question: 'daily', info_provided: 'daily', nudge: 'daily', unclear: 'daily',
@@ -558,6 +517,8 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
     const a = byId.get(r.applicant_id)!
     const intent = String(r.intent)
     const also = (r.intents || []).filter((x: string) => x !== intent)
+    const times = intent === 'availability' ? fmtWindows(windowsBy.get(r.applicant_id)) : ''
+    const ask = clause(r.intent_summary)
     return {
       kind: `reply_${intent}`,
       subject_type: 'applicant' as const,
@@ -577,17 +538,24 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
         : `reply:${r.id}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
-        sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(
-          // Availability speaks in times; every other intent speaks in words.
-          intent === 'availability' ? fmtWindows(windowsBy.get(r.applicant_id)) : r.intent_summary),
+        // Availability speaks in times; a question or a changed plan speaks in
+        // the applicant's own clause; the rest say it all in the label.
+        copy: intent === 'availability'
+          ? (times ? 'reply_availability' : 'reply_availability.plain')
+          : (intent === 'question' || intent === 'plans_changed')
+          ? (ask ? `reply_${intent}` : `reply_${intent}.plain`)
+          : `reply_${intent}`,
+        vars: {
+          subject: `${a.first_name} ${a.last_name || ''}`.trim(),
+          times, ask,
+        },
         body: [
           // Only repeat the summary where the sentence didn't already use it.
-          ['plans_changed', 'question'].includes(intent) && clause(r.intent_summary)
-            ? null : r.intent_summary,
+          ['plans_changed', 'question'].includes(intent) && ask ? null : r.intent_summary,
           also.length ? `also ${also.join(', ')}` : null,
         ].filter(Boolean).join(' · ') || undefined,
         section: 'Replies',
-        links: [{ label: 'Read the thread', url: `https://ctrl.rodeo/applications/?a=${encodeURIComponent(r.applicant_id)}` }],
+        links: [{ label: ACTIONS.emails, url: `https://ctrl.rodeo/applications/?a=${encodeURIComponent(r.applicant_id)}` }],
       },
     }
   })
