@@ -249,8 +249,9 @@ decision itself, which no form would have fixed.
 One copy per person per milestone — never a shared form, because answers about
 two people in one response sheet can't be read separately. Copy
 [the housemate feedback form](https://docs.google.com/forms/d/1UpVuMOeSItoSvXpDn2LukBOl6_y0VWfSrrqXs3RWNrk/edit)
-into an Agape-owned `Housemate votes/{year}` folder (the template's own folder
-isn't writable by the house) and name it:
+into the **Housemate Feedback** folder it already lives in
+(`14VM4VP1_YpcIenjg-rWn5E_i_laY9_rw`, inside the Agape Shared Drive — the house
+has write access there, so copies sit next to the template) and name it:
 
 ```
 Agape vote · {member} · {Month 1 | Final decision} · {YYYY-MM-DD}
@@ -274,7 +275,13 @@ folder ends up with four naming schemes in it.
   The drawer shows the computed date under the milestone fields — copy it.
 
 The responses sheet inherits the name with `(Responses)` appended, so a ballot
-and its answers stay findable as a pair.
+and its answers stay findable as a pair. A copy does **not** inherit the
+template's responses — each ballot collects its own, which is the whole point of
+one copy per person per milestone.
+
+The link stored on the stay is the responder URL
+(`.../forms/d/{id}/viewform`), not the `/edit` one Drive hands back on copy: the
+nudges send housemates to fill the form in, not to edit it.
 
 ---
 
