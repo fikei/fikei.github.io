@@ -92,6 +92,8 @@ export const TEMPLATES: Record<string, string> = {
 
   // --- the call
   'screening_followup.undecided': "{subject} was interviewed {days} ago and the house still hasn't decided.",
+  // Naming who ran the call turns "somebody should" into "you said you would".
+  'screening_followup.undecided_by': "{screener} interviewed {subject} {days} ago and the house still hasn't decided.",
   'screening_followup.silent':    '{subject} was interviewed and has heard nothing for {days}.',
   'screening_followup.waiting':   '{subject} was interviewed {days} ago and is waiting on the house to decide.',
   'screening_unclaimed':          '{subject} offered times {days} ago and nobody has taken the call.',
@@ -100,6 +102,7 @@ export const TEMPLATES: Record<string, string> = {
   'screening_today':              '{subject} has an intro call today at {at}.',
   'screening_today.with':         '{subject} has an intro call today at {at} with {screener}.',
   'screening_notes':              "{subject}'s recording & summary are ready.",
+  'screening_notes.by':           "{screener}'s call with {subject} has its recording & summary ready.",
 
   // --- openings
   'listing_draft':                '{subject} came up as a draft opening from {date}.',
