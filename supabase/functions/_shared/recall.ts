@@ -29,12 +29,17 @@ async function recallFetch(path: string, options: RequestInit = {}): Promise<any
 
 // Create a bot that joins the meeting at start time. Returns the bot id.
 export async function createRecordingBot(meetingUrl: string, joinAtISO: string): Promise<string> {
+  // When a Google login group is configured, the bot signs into its own
+  // Workspace account (meet@notes.ctrl.rodeo) and — being invited to every
+  // event — joins Meets directly with no knock.
+  const loginGroup = Deno.env.get('RECALL_LOGIN_GROUP_ID')
   const bot = await recallFetch('/api/v1/bot/', {
     method: 'POST',
     body: JSON.stringify({
       meeting_url: meetingUrl,
       bot_name: 'Agape Notes',
       join_at: joinAtISO,
+      ...(loginGroup ? { google_meet: { google_login_group_id: loginGroup } } : {}),
       recording_config: {
         transcript: { provider: { meeting_captions: {} } },
       },
