@@ -1563,6 +1563,23 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .gplayer.is-mini .vchrome { display: none; }
 @media (max-width: 520px) { .gplayer.is-mini { width: min(250px, 70vw); right: 10px; bottom: 10px; } }
 
+/* ---------- activity log (v3.47.0) ----------
+   The running record of every notification. Rows are deliberately quieter than
+   the funnel rails: a log is scanned, not worked, so the icon carries the kind
+   and the third line carries what happened to it. */
+.log-row__icon {
+  flex-shrink: 0; width: 24px; text-align: center;
+  font-size: 14px; line-height: 1;
+}
+.log-row__meta {
+  font-size: var(--font-size-caption); color: var(--fg-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Resolved entries stay in the log and stop competing for attention. */
+.log-row.is-done .inbox-row__title,
+.log-row.is-done .inbox-row__sub { opacity: 0.5; }
+.log-row.is-done .log-row__meta { opacity: 0.7; }
+
 /* --- v3.48.0: sidebar CTA tiers (Sassy `drawer-cta`) ---
    Drawer footers had four actions fighting inside one right-aligned flex
    row: two red underlined links (which wrapped onto two lines in a 380px
