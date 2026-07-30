@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.41.0';
+const VERSION = '3.42.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1344,11 +1344,19 @@ async function castVote(applicantId) {
 /* House rule: a stated budget ceiling under $1,500/mo is an auto-flag —
    straight to Archive (rejected: an update email is owed). Recorded as a
    decision too, for attribution and undo. */
+/* Attribution for decisions the app made on its own. Anything carrying this
+   name is tagged as automatic wherever it's shown, so nobody reads a house
+   rule as a housemate's call. */
+const AUTO_DECIDER = 'House rule';
+const isAutoDecision = rec => rec?.byName === AUTO_DECIDER || /^Auto[\s—-]/.test(rec?.byName || '');
+const fmtMoney = n => n == null ? '' : `$${Number(n).toLocaleString()}`;
+
 async function applyAutoFlags() {
   const auto = applicants.filter(a => a.stage === 'review' && !decisions[a.id]
     && budgetMax(a.budget) !== null && budgetMax(a.budget) < 1500);
   for (const a of auto) {
-    await saveDecision(a.id, 'pass', 'budget', 'Auto — budget under $1,500');
+    await saveDecision(a.id, 'pass', 'budget', AUTO_DECIDER,
+      `Budget tops out at ${fmtMoney(budgetMax(a.budget))}/mo — under the $1,500 house floor.`);
     await setStage(a.id, 'rejected');
   }
   return auto.length;
@@ -1510,6 +1518,12 @@ function voteChip(a) {
 }
 
 function stageChip(a) {
+  const rec = decisions[a.id];
+  if (isAutoDecision(rec)) {
+    const why = rec.note || (rec.reason ? reasonLabel(rec.reason) : 'A house rule archived them');
+    return `<span class="decision-chip decision-chip--auto" title="${esc(why)}">Auto-archived</span>` +
+      (a.stage === 'rejected' ? `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>` : '');
+  }
   if (a.stage === 'rejected') {
     const st = voteStats(a.id);
     const why = st.notFit ? `Not a fit — ${reviewerName(st.notFit)}: “${st.notFit.note}”` : (decisions[a.id]?.note || 'Did not pass review');
@@ -2000,7 +2014,7 @@ function renderApplicants() {
         </div>
         ${pending.map(x => `<div class="update-tray__row">
           <span class="update-tray__who">${esc(fullName(x))}</span>
-          <span class="update-tray__why">${voteStats(x.id).notFit ? `not a fit — ${esc(reviewerName(voteStats(x.id).notFit))}` : (decisions[x.id]?.note || 'did not pass review')}</span>
+          <span class="update-tray__why">${isAutoDecision(decisions[x.id]) ? `auto-archived — ${esc(decisions[x.id].note || reasonLabel(decisions[x.id].reason))}` : voteStats(x.id).notFit ? `not a fit — ${esc(reviewerName(voteStats(x.id).notFit))}` : (decisions[x.id]?.note || 'did not pass review')}</span>
           <button type="button" class="cta-link" data-update-edit="${x.id}">Edit email</button>
           <button type="button" class="cta-link" data-update-skip="${x.id}">Skip</button>
         </div>`).join('')}
@@ -3140,11 +3154,13 @@ function renderReview() {
   const archived = a.stage === 'rejected' || a.stage === 'archived';
   const archiveBanner = () => {
     const st = voteStats(a.id);
-    const why = st.notFit ? `Not a fit — ${reviewerName(st.notFit)}${st.notFit.note ? `: “${st.notFit.note}”` : ''}`
+    const auto = isAutoDecision(rec);
+    const why = auto ? (rec.note || reasonLabel(rec.reason) || 'A house rule archived them')
+      : st.notFit ? `Not a fit — ${reviewerName(st.notFit)}${st.notFit.note ? `: “${st.notFit.note}”` : ''}`
       : rec?.note || (rec?.reason ? reasonLabel(rec.reason) : 'Did not pass review');
     return `<div class="decision-banner decision-banner--pass">
       <div class="decision-banner__text">
-        <span class="decision-banner__label">${a.stage === 'rejected' ? 'Archived — update email queued' : 'Archived'}</span>
+        <span class="decision-banner__label">${auto ? 'Archived by a house rule' : a.stage === 'rejected' ? 'Archived — update email queued' : 'Archived'}${auto ? `<span class="decision-chip decision-chip--auto">Automatic</span>` : ''}</span>
         <span class="decision-banner__meta">${esc(why)}</span>
       </div>
       <span class="decision-banner__actions">
@@ -4199,7 +4215,7 @@ async function _checkMembershipAndEnter() {
     if (!VIEWS[view]) view = 'openings';
     pendingOccRoom = view === 'occupancy' ? +new URLSearchParams(location.search).get('room') || null : null;
     render();
-    if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived (budget under $1,500) — update emails queued`);
+    if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
     if (deep && applicants.some(x => x.id === deep)) openReview(deep);
     const linkEv = new URLSearchParams(location.search).get('link');

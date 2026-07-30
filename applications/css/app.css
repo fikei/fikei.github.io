@@ -1084,6 +1084,13 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .verdict-tag.is-not-fit { background: rgba(168, 32, 13, 0.16); color: var(--error); }
 .verdict-tag.is-forward { background: rgba(159, 232, 112, 0.18); color: #7FC24E; }
+
+/* Automatic decisions read as the system's, never a housemate's. */
+.decision-chip--auto {
+  background: var(--bg-overlay); color: var(--fg-muted);
+  border: 1px dashed var(--border-strong);
+}
+.decision-banner__label .decision-chip--auto { margin-left: var(--space-2); }
 @media (max-width: 720px) {
   .vote-bar__q { flex-basis: 100%; }
   .vote-bar__verdicts { flex-basis: 100%; }
