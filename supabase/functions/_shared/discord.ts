@@ -345,6 +345,14 @@ export async function dmUser(
   discordUserId: string,
   content: string,
   buttons: Array<{ label: string; customId: string }> = [],
+  /* Render the text as an embed rather than plain content.
+
+     Discord only resolves [label](url) inside an embed — in plain content it
+     shows the raw URL, which is why a message meant to say "View application"
+     would otherwise print sixty characters of query string. Plain stays the
+     default because most DMs here are one line and an embed would make them
+     look like announcements. */
+  asEmbed = false,
 ): Promise<void> {
   const channel = await discordFetch('/users/@me/channels', {
     method: 'POST', body: JSON.stringify({ recipient_id: discordUserId }),
@@ -359,7 +367,12 @@ export async function dmUser(
     : []
   await discordFetch(`/channels/${channel.id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content, ...(components.length ? { components } : {}) }),
+    body: JSON.stringify({
+      ...(asEmbed
+        ? { embeds: [{ description: content.slice(0, 3900), color: 0x378add }] }
+        : { content }),
+      ...(components.length ? { components } : {}),
+    }),
   })
   await auditMirror('Message sent', content.split('\n')[0], { dmTo: discordUserId })
 }

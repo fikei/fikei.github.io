@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.29.0'
+const VERSION = '1.30.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -458,9 +458,10 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
            have run twenty of these are not made to scroll past it. */
         await dmUser(dm.discord_user_id,
           `⏰ Coming up: you're interviewing **${name}** at ${slotWhen(new Date(s.starts_at))} PT.\n` +
-          `Meet: ${s.meet_link || '(see calendar invite)'}\n` +
-          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(s.applicant_id)}`,
-          [{ label: 'How we run an intro call', customId: `guide|${s.applicant_id}` }])
+          `${s.meet_link ? `[Join the Meet](${s.meet_link})` : 'See the calendar invite for the link'} · ` +
+          `[View application](https://ctrl.rodeo/applications/?a=${encodeURIComponent(s.applicant_id)})`,
+          [{ label: 'How we run an intro call', customId: `guide|${s.applicant_id}` }],
+          true)
         sent++
       }
       // Stamp even without a Discord id so we don't retry forever.
@@ -1021,9 +1022,10 @@ serve(async (req) => {
         const name = who ? `${who.first_name} ${who.last_name || ''}`.trim() : 'an applicant'
         await dmUser(to,
           `⏰ Coming up: you're interviewing **${name}** at 3:00 PM PT.\n` +
-          `Meet: (see calendar invite)\n` +
-          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`,
-          [{ label: 'How we run an intro call', customId: `guide|${applicantId}` }])
+          `[Join the Meet](https://meet.google.com/) · ` +
+          `[View application](https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)})`,
+          [{ label: 'How we run an intro call', customId: `guide|${applicantId}` }],
+          true)
         return json({ sent: 1, shape: 'reminder' })
       }
 
