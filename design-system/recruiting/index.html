@@ -151,16 +151,22 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 .sidebar { width: 340px; max-width: 100%; background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; }
 .sidebar .fieldstub { height: 34px; border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface); margin-bottom: 10px; }
 .dcta { display: flex; flex-direction: column; margin-top: 16px; }
-.dcta__row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dcta__row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .dcta__commit { min-width: 92px; border-radius: 999px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .dcta__quiet { background: transparent; border: 0; color: var(--ink-2); font: 500 12.5px/1 inherit; padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer; }
-.dcta__exits { display: flex; flex-direction: column; margin-top: 12px; }
+.dcta__flag { margin: 0; text-align: right; font-size: 11px; color: var(--ink-3); }
+.dcta__exits { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .dcta__exit {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line);
-  background: transparent; color: var(--ink-2); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer; white-space: nowrap;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px;
+  width: 100%; padding: 11px 12px; border: 0; border-radius: var(--r-sm);
+  background: var(--tint-gray); color: var(--ink); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer;
 }
+.dcta__exit .l { grid-column: 1; grid-row: 1; }
+.dcta__exit .h { grid-column: 1; grid-row: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.dcta__exit .ic { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--ink-3); }
+.dcta__exit:hover { background: var(--line); }
 .dcta__exit.danger { color: var(--red); }
+.dcta__exit.danger .ic { color: var(--red); }
 .dcta__hint { color: var(--ink-3); font: 400 11px/1.35 inherit; text-align: right; white-space: normal; min-width: 0; }
 .dcta__alt {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -312,7 +318,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.30</span><a href="/design-system/">← all of Sassy</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.31</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -400,7 +406,9 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
-      <div class="dec"><span class="d">Jul 30</span><br><b>The exit rows' hairlines are up for replacement.</b><p>Full-bleed rules between exits read as a 2015 settings list — the rule was separating things that should have been grouped. Five directions drawn side by side (inset tiles · inset-grouped · space only · danger zone · overflow), with a recommendation: group them in one container with no internal rules, and promote only the genuinely irreversible to a tinted danger block. Undecided — see <a href="#exit-directions">Exit rows — directions</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Nothing has a Save button unless it creates, confirms, or destroys.</b><p>Editing an existing record writes on <code>change</code> — text on blur, dates and selects the instant they settle — and a quiet line says so, flashing "Saved" when a write lands. Save survived only where it means something: <em>Add stay</em> and <em>Create listing</em> (a record that doesn't exist can't autosave), <em>Welcome them in</em> (a confirmation), and the destructive tiles. This also settles the first open question in the Settings concept.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Direction A won: exits are inset tiles, and the footer has no hairlines.</b><p>Each exit is its own filled surface with radius and a 6px gap; the commit row dropped its <code>border-top</code> too. The rules were separating rows that belonged together. The <code>__alt</code> stays outlined — that's now what distinguishes a forward path from a way out.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>The exit rows' hairlines were up for replacement.</b><p>Full-bleed rules between exits read as a 2015 settings list — the rule was separating things that should have been grouped. Five directions drawn side by side (inset tiles · inset-grouped · space only · danger zone · overflow), with a recommendation: group them in one container with no internal rules, and promote only the genuinely irreversible to a tinted danger block. Undecided — see <a href="#exit-directions">Exit rows — directions</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Settings gets the rail's vocabulary, and a schema instead of a page.</b><p>The rail footer was the only place a setting could go, so most settings never became settings — the house's recruiting behavior lives in literals (3 quiet days, ±1 flexible month, +1/−1 trial milestones) that need a deploy to change. The concept: six sections named <code>You · House · Funnel · Automations · Connections · Data</code>, rendered from a field schema where <code>scope</code> picks the store and the schema default <em>is</em> the code default. Concept only — see <a href="#settings">Settings</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Inbox is Applicants, and Screening left the rail.</b><p>"Inbox" described a queue; "Applicants" names what's in it. Screening was a rail entry nobody navigated to — the work happens on a person's row and in Discord — so the view stays routable for deep links and left the rail.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>The design system got a name: Sassy.</b><p>"The design system" was a description, not a name, so nothing in a review could refer to it without a paragraph of context. Sassy is the whole thing — the global CTRL layer and every product system under it, this one included.</p></div>
@@ -643,34 +651,42 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
   <section class="story" id="s-sidebar-ctas">
     <h1>Sidebar CTAs</h1>
-    <p class="lede">A drawer footer is three tiers deep, ordered by consequence: what saves, what dismisses, and the ways out.</p>
+    <p class="lede">A drawer footer is three tiers deep, ordered by consequence — with no hairlines and, on an existing record, no Save at all.</p>
     <div class="canvas">
       <div class="sidebar">
         <div class="fieldstub"></div>
         <div class="fieldstub"></div>
         <div class="dcta">
-          <div class="dcta__row">
-            <button class="dcta__quiet">Cancel</button>
-            <button class="btn dcta__commit">Save</button>
-          </div>
+          <p class="dcta__flag">Changes save as you go</p>
           <div class="dcta__exits">
-            <button class="dcta__exit">Mark leaving <span class="dcta__hint">sets a move-out date and lists the room</span></button>
-            <button class="dcta__exit danger">Remove stay <span class="dcta__hint">deletes it from the timeline</span></button>
+            <button class="dcta__exit"><span class="l">Mark leaving</span><span class="ic">&rarr;</span><span class="h">sets a move-out date and lists the room</span></button>
+            <button class="dcta__exit danger"><span class="l">Remove stay</span><span class="ic">&times;</span><span class="h">deletes it from the timeline</span></button>
           </div>
           <button class="dcta__alt"><span>Welcome them in</span><span class="dcta__hint">Ends the trial and starts an open-ended residency on Sep 1, 2026.</span></button>
+        </div>
+        <p class="shint" style="margin-top:14px">…and on a <b>new</b> record, where autosave has nothing to write to:</p>
+        <div class="dcta">
+          <div class="dcta__row">
+            <button class="dcta__quiet">Cancel</button>
+            <button class="btn dcta__commit">Add stay</button>
+          </div>
         </div>
       </div>
     </div>
     <div class="notes">
       <h3>The tiers</h3>
       <div class="tiers">
-        <span><code>__commit</code></span><span><b>One filled primary.</b> Bottom-right, pill, accent. Exactly one per sidebar — it is the only thing that saves what's on screen.</span>
+        <span><code>__commit</code></span><span><b>One filled primary — and only when it's earned.</b> A new record, a confirmation, or something destructive. Never a plain Save.</span>
         <span><code>__quiet</code></span><span><b>Dismiss.</b> No fill, no border, beside the primary. Cancel is not a decision, so it does not look like one.</span>
-        <span><code>__exit</code></span><span><b>The ways out.</b> Full-width rows below a rule, one per line, label left and a hint right. Destructive ones take <code>--danger</code> (red label, tinted hover); state changes stay muted.</span>
-        <span><code>__alt</code></span><span><b>Optional second path.</b> Outlined, never filled, label over hint. Used when the sidebar genuinely offers two forward moves ("create a listing instead", "welcome them in").</span>
+        <span><code>__flag</code></span><span><b>What replaces Save.</b> On an existing record: "Changes save as you go", flashing "Saved" when a write lands. The absence of a button should never read as "nothing happened".</span>
+        <span><code>__exit</code></span><span><b>The ways out.</b> Inset tiles — filled surface, radius, 6px gap, <em>no rules</em>. Label over hint, glyph right. Destructive ones take <code>--danger</code>.</span>
+        <span><code>__alt</code></span><span><b>Optional second path.</b> Outlined, never filled — that's what separates a forward move from a way out now that exits are filled.</span>
       </div>
       <h3>Notes</h3>
       <ul>
+        <li><b>No hairlines.</b> A rule between two things that belong together separates what should be grouped. Exits are tiles; the commit row lost its <code>border-top</code> too. (Direction A — see <a href="#exit-directions">the five directions</a>.)</li>
+        <li><b>No Save on an existing record.</b> Fields write on <code>change</code>: text on blur, dates and selects the instant they settle. An explicit commit survives only for <b>create</b>, <b>confirm</b>, and <b>destroy</b>.</li>
+        <li>Autosave repaints only what changed — one timeline lane and the drawer subtitle. A whole-view render rebuilds the form and throws away the caret.</li>
         <li>Anything that removes, ends, or re-routes a record <b>leaves the commit row</b>. A 340px sidebar cannot keep four targets honest side by side — this is exactly how the stay drawer ended up with two red underlined links wrapping onto two lines each.</li>
         <li>Exits never underline. Weight and color carry them; see <a href="#voice">Voice</a> and the transparency-not-decoration rule.</li>
         <li>Every exit and alt carries a hint. A red label is never the only explanation of what a button does.</li>
