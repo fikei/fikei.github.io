@@ -20,8 +20,8 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.3.0'
-console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel verification (OAuth or bot magic-link)`)
+const VERSION = '1.4.0'
+console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel gate + #recruiting-automation admin (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -89,13 +89,26 @@ async function fetchGuildMember(discordUserId: string): Promise<{ roles: string[
   return await resp.json()
 }
 
+// Same default as _shared/discord.ts; this function is standalone (no _shared
+// import), so the constant is duplicated rather than drifting behind an import.
+const AUTOMATION_CHANNEL_FALLBACK = '1529576830514762029'
+
 const VIEW_CHANNEL = 1n << 10n
 const ADMINISTRATOR = 1n << 3n
 
-// Effective-permission check for the Recruiting Society channel: base perms
-// from @everyone + the member's roles, then channel overwrites in Discord's
-// documented order (@everyone → roles → member).
-async function checkRecruitingChannel(discordUserId: string, memberRoles: string[]): Promise<boolean> {
+// Effective-permission check for one channel: base perms from @everyone + the
+// member's roles, then channel overwrites in Discord's documented order
+// (@everyone → roles → member).
+//
+// `pick` chooses which channel to test, so the same math serves two gates: the
+// Recruiting Society channel (can you use the app at all) and
+// #recruiting-automation (can you change how recruiting behaves).
+async function canViewChannel(
+  discordUserId: string,
+  memberRoles: string[],
+  pick: (channels: Array<Record<string, unknown>>) => Record<string, unknown> | undefined,
+  label: string,
+): Promise<boolean> {
   const [channelsResp, rolesResp] = await Promise.all([
     discordGet(`/guilds/${AGAPE_GUILD_ID}/channels`),
     discordGet(`/guilds/${AGAPE_GUILD_ID}/roles`),
@@ -104,15 +117,9 @@ async function checkRecruitingChannel(discordUserId: string, memberRoles: string
   const channels = await channelsResp.json() as Array<Record<string, unknown>>
   const roles = await rolesResp.json() as Array<{ id: string; permissions: string }>
 
-  // The guild has several recruiting-* channels (per-cohort); the gate is the
-  // "Recruiting Society" one, so prefer a society match over the first hit.
-  const wantedId = Deno.env.get('RECRUITING_CHANNEL_ID')
-  const named = (rx: RegExp) => channels.find(c => rx.test(String(c.name || '')) && c.type !== 4 /* not a category */)
-  const channel = wantedId
-    ? channels.find(c => String(c.id) === wantedId)
-    : (named(/recruit.*society|society.*recruit/i) || named(/recruit/i))
+  const channel = pick(channels)
   if (!channel) {
-    console.warn('Recruiting channel not found (set RECRUITING_CHANNEL_ID)')
+    console.warn(`${label} channel not found`)
     return false
   }
 
@@ -139,16 +146,51 @@ async function checkRecruitingChannel(discordUserId: string, memberRoles: string
   return (perms & VIEW_CHANNEL) === VIEW_CHANNEL
 }
 
+const namedChannel = (channels: Array<Record<string, unknown>>, rx: RegExp) =>
+  channels.find(c => rx.test(String(c.name || '')) && c.type !== 4 /* not a category */)
+
+// The guild has several recruiting-* channels (per-cohort); the gate is the
+// "Recruiting Society" one, so prefer a society match over the first hit.
+function checkRecruitingChannel(discordUserId: string, memberRoles: string[]) {
+  const wantedId = Deno.env.get('RECRUITING_CHANNEL_ID')
+  return canViewChannel(discordUserId, memberRoles, channels => wantedId
+    ? channels.find(c => String(c.id) === wantedId)
+    : (namedChannel(channels, /recruit.*society|society.*recruit/i) || namedChannel(channels, /recruit/i)),
+    'Recruiting Society')
+}
+
+// Admin = can see #recruiting-automation. Same channel the app already posts
+// its audit trail to, so the people who watch the automation are the people
+// who get to change it.
+function checkAutomationChannel(discordUserId: string, memberRoles: string[]) {
+  const wantedId = Deno.env.get('RECRUITING_AUTOMATION_CHANNEL_ID')
+    || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID')
+    || AUTOMATION_CHANNEL_FALLBACK
+  return canViewChannel(discordUserId, memberRoles, channels => wantedId
+    ? channels.find(c => String(c.id) === wantedId)
+    : namedChannel(channels, /recruit.*automation|automation.*recruit/i),
+    '#recruiting-automation')
+}
+
 async function verifyAndCache(userId: string, identity: DiscordIdentity) {
   const member = await fetchGuildMember(identity.discordUserId)
   const isMember = member !== null
   let isRecruiting = false
+  let isAdmin = false
   if (member) {
     try {
       isRecruiting = await checkRecruitingChannel(identity.discordUserId, member.roles || [])
     } catch (err) {
       // Channel check failing must not break the guild gate the events page uses.
       console.error('Recruiting channel check failed:', (err as Error).message)
+    }
+    if (isRecruiting) {
+      try {
+        isAdmin = await checkAutomationChannel(identity.discordUserId, member.roles || [])
+      } catch (err) {
+        // Losing this check costs write access to settings, never read access.
+        console.error('Automation channel check failed:', (err as Error).message)
+      }
     }
   }
   const row = {
@@ -163,6 +205,23 @@ async function verifyAndCache(userId: string, identity: DiscordIdentity) {
     .from('user_discord_membership')
     .upsert(row, { onConflict: 'user_id' })
   if (error) throw new Error(`Cache write failed: ${error.message}`)
+
+  // recruit_admins is the only thing RLS trusts for settings writes, and the
+  // client cannot write it — so it is reconciled here on every verify, in both
+  // directions. Losing access to #recruiting-automation loses admin.
+  try {
+    const db = getSupabase()
+    if (isAdmin) {
+      await db.from('recruit_admins').upsert(
+        { user_id: userId, discord_user_id: identity.discordUserId },
+        { onConflict: 'user_id' },
+      )
+    } else {
+      await db.from('recruit_admins').delete().eq('user_id', userId)
+    }
+  } catch (err) {
+    console.error('recruit_admins reconcile failed:', (err as Error).message)
+  }
 
   // First-sign-in nicety: when the login email is on the AgapeSF group
   // roster, seed recruit_profiles with their real name + group email so
@@ -192,8 +251,8 @@ async function verifyAndCache(userId: string, identity: DiscordIdentity) {
     }
   }
 
-  console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember} recruiting=${isRecruiting}`)
-  return row
+  console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember} recruiting=${isRecruiting} admin=${isAdmin}`)
+  return { ...row, is_recruiting_admin: isAdmin }
 }
 
 serve(async (req) => {
@@ -215,10 +274,17 @@ serve(async (req) => {
     if (!identity) {
       // Discord unlinked: drop any stale membership so RLS stops granting access
       await db.from('user_discord_membership').delete().eq('user_id', user.id)
-      return new Response(JSON.stringify({ linked: false, isMember: false, isRecruitingMember: false, discordUsername: null, verifiedAt: null }), { headers: jsonHeaders })
+      await db.from('recruit_admins').delete().eq('user_id', user.id)
+      return new Response(JSON.stringify({ linked: false, isMember: false, isRecruitingMember: false, isRecruitingAdmin: false, discordUsername: null, verifiedAt: null }), { headers: jsonHeaders })
     }
 
-    let row: { discord_username: string | null; is_agape_member: boolean; is_recruiting_member?: boolean; verified_at: string } | null = null
+    let row: {
+      discord_username: string | null
+      is_agape_member: boolean
+      is_recruiting_member?: boolean
+      is_recruiting_admin?: boolean
+      verified_at: string
+    } | null = null
     if (action !== 'verify') {
       const { data } = await db
         .from('user_discord_membership')
@@ -228,7 +294,13 @@ serve(async (req) => {
       const fresh = data &&
         data.discord_user_id === identity.discordUserId &&
         (Date.now() - new Date(data.verified_at).getTime()) < REVERIFY_DAYS * 86400_000
-      if (fresh) row = data
+      if (fresh) {
+        // Admin isn't cached on the membership row — read it from the table RLS
+        // actually consults, so the UI and the database can never disagree.
+        const { data: adm } = await db.from('recruit_admins')
+          .select('user_id').eq('user_id', user.id).maybeSingle()
+        row = { ...data, is_recruiting_admin: !!adm }
+      }
     }
     if (!row) row = await verifyAndCache(user.id, identity)
 
@@ -236,6 +308,7 @@ serve(async (req) => {
       linked: true,
       isMember: row.is_agape_member,
       isRecruitingMember: !!row.is_recruiting_member,
+      isRecruitingAdmin: !!row.is_recruiting_admin,
       discordUsername: row.discord_username,
       verifiedAt: row.verified_at,
     }), { headers: jsonHeaders })

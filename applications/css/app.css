@@ -1627,15 +1627,15 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .drawer-cta__alt:hover { background: var(--bg-overlay); }
 .drawer-cta__alt .drawer-cta__exit-hint { text-align: left; }
-/* No Save button on an existing record — the fields are the save. This line
-   says so, and briefly says "Saved" when a write lands, so the absence of a
-   button never reads as "nothing happened". */
+/* No Save button on an existing record — the fields are the save, and the app
+   doesn't explain that in words. The flag is empty until a write lands, then
+   says "Saved" for a moment. It keeps its line either way so nothing shifts. */
 .drawer-cta__flag {
-  margin: 0; text-align: right;
+  margin: 0; text-align: right; min-height: 1.2em;
   color: var(--fg-subtle); font-size: var(--font-size-caption);
-  transition: color 120ms ease;
+  opacity: 0; transition: opacity 140ms ease;
 }
-.drawer-cta__flag.is-on { color: var(--success); font-weight: var(--fw-semibold); }
+.drawer-cta__flag.is-on { opacity: 1; color: var(--success); font-weight: var(--fw-semibold); }
 .drawer-cta__exits { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-3); }
 .drawer-cta__exit {
   display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-3);
@@ -1671,3 +1671,126 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
    instead of ellipsizing the way the scannable rail rows do. */
 .activity-feed .log-row { align-items: flex-start; }
 .activity-feed__line { white-space: normal; font-weight: 400; }
+
+/* --- v3.49.0: Settings (Sassy: Settings) ---
+   Rendered from SETTING_DEFS, so this stylesheet describes field *types*, not
+   individual settings — a new knob needs no CSS. Same rules as the drawer
+   footers: no hairlines between rows that belong together, and no Save. */
+.settings { max-width: 720px; }
+.set-lede { margin: 0 0 var(--space-5); color: var(--fg-muted); font-size: var(--font-size-small); }
+.set-sec {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.set-sec__title { margin: 0; font-size: var(--font-size-title-4); font-weight: var(--fw-semibold); }
+.set-sec__hint { margin: 2px 0 var(--space-3); color: var(--fg-subtle); font-size: var(--font-size-caption); }
+
+/* A field is a tile, like an exit row — label, control, hint, no rules. */
+.set-field {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-4);
+  align-items: center;
+  padding: var(--space-3); margin-bottom: 6px;
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+  transition: box-shadow 140ms ease;
+}
+.set-field__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.set-field__hint { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); }
+.set-field__control { grid-column: 2; grid-row: 1 / 3; align-self: center; justify-self: end; }
+.set-field__by { display: block; color: var(--fg-subtle); opacity: 0.8; }
+/* Saved: a ring rather than a word. The field itself is the receipt. */
+.set-field.is-saved { box-shadow: inset 0 0 0 1px var(--success); }
+.set-field.is-locked .set-field__label { color: var(--fg-muted); }
+
+.set-num { display: inline-flex; align-items: baseline; gap: var(--space-2); }
+.set-num input { width: 76px; height: 34px; text-align: right; }
+.set-num__unit { color: var(--fg-subtle); font-size: var(--font-size-caption); white-space: nowrap; }
+.set-enum, .set-text { height: 34px; }
+.set-text { width: 200px; }
+
+/* Switch — the one control the app didn't already have. */
+.set-switch { display: inline-flex; cursor: pointer; }
+.set-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.set-switch__track {
+  position: relative; width: 38px; height: 22px; border-radius: var(--radius-pill);
+  background: var(--bg-overlay); border: 1px solid var(--border-strong);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.set-switch__knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--fg-subtle);
+  transition: left 120ms ease, background 120ms ease;
+}
+.set-switch input:checked + .set-switch__track { background: var(--accent-strong); border-color: var(--accent-strong); }
+.set-switch input:checked + .set-switch__track .set-switch__knob { left: 18px; background: var(--accent-strong-fg); }
+.set-switch input:focus-visible + .set-switch__track { box-shadow: 0 0 0 2px var(--accent); }
+.set-switch input:disabled + .set-switch__track { opacity: 0.5; cursor: not-allowed; }
+
+/* Automation row: what it does, how often, when it last ran, whether it's on.
+   Four facts, because those are the four you want when something didn't run. */
+.set-auto {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-4);
+  padding: var(--space-3); margin-bottom: 6px;
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+}
+.set-auto__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.set-auto__hint { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); }
+.set-auto__when { grid-column: 2; grid-row: 1; text-align: right; color: var(--fg-muted); font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; }
+.set-auto__when.is-bad { color: var(--error); font-weight: var(--fw-semibold); }
+.set-auto__cadence { grid-column: 2; grid-row: 2; text-align: right; color: var(--fg-subtle); font-size: var(--font-size-caption); }
+.set-auto.is-off { opacity: 0.55; }
+
+.set-conn {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-4);
+  padding: var(--space-3); margin-bottom: 6px;
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+}
+.set-conn__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
+.set-conn__detail { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
+.set-conn__state { grid-column: 2; grid-row: 1; text-align: right; font-size: var(--font-size-caption); font-weight: var(--fw-semibold); }
+.set-conn__state.is-ok { color: var(--success); }
+.set-conn__state.is-warn { color: var(--error); }
+.set-conn__state.is-off { color: var(--fg-subtle); }
+
+.set-note { margin: var(--space-2) 0 0; color: var(--fg-subtle); font-size: var(--font-size-caption); }
+.set-note code { font-family: ui-monospace, Menlo, monospace; }
+@media (max-width: 520px) {
+  .set-field, .set-auto, .set-conn { grid-template-columns: 1fr; }
+  .set-field__control { grid-column: 1; grid-row: 3; justify-self: start; margin-top: 6px; }
+  .set-auto__when, .set-auto__cadence, .set-conn__state { grid-column: 1; text-align: left; }
+}
+
+/* --- v3.49.0: stepped drawer (choose, then continue in place) ---
+   An open stretch has two honest answers. The drawer asks first with two inset
+   tiles — same language as the exit tiles, forward-facing — then becomes the
+   flow that was picked, with one way back. Nothing writes until that flow's
+   own commit. */
+.step-choices { display: flex; flex-direction: column; gap: var(--space-2); }
+.step-choice {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px var(--space-3);
+  width: 100%; padding: var(--space-4);
+  background: var(--bg-surface); border: 0; border-radius: var(--radius-md);
+  color: var(--fg); text-align: left;
+  transition: background 80ms ease;
+}
+.step-choice__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-body); font-weight: var(--fw-semibold); }
+.step-choice__hint { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); }
+.step-choice__go { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--fg-subtle); }
+.step-choice:hover { background: var(--bg-overlay); }
+.step-choice:hover .step-choice__go { color: var(--fg); }
+
+.step-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 0; padding: 0 0 var(--space-3);
+  color: var(--fg-muted); font-size: var(--font-size-small); font-weight: var(--fw-semibold);
+}
+.step-back:hover { color: var(--fg); }
+
+/* The listing form was written for a modal; in a 380px drawer its auto-fit
+   grid has to give up and stack. */
+.step-listing .listing-form__grid { grid-template-columns: 1fr; }
+/* No box inside a box: the drawer is already the surface. */
+.step-listing .listing-form {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  background: transparent; border: 0; padding: 0;
+}

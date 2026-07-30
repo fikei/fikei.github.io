@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.48.0';
+const VERSION = '3.49.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -100,7 +100,7 @@ function trialStayFor(applicantId) {
 // Default return date for Save for future: three months out, month start.
 function defaultReturnDate() {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth() + 3, 1).toISOString().slice(0, 10);
+  return new Date(d.getFullYear(), d.getMonth() + setting('save_for_future_months'), 1).toISOString().slice(0, 10);
 }
 
 const VIEWS = {
@@ -110,6 +110,7 @@ const VIEWS = {
   screening: { title: 'Screening', kind: 'applicants' },
   archive: { title: 'Archive', kind: 'applicants' },
   occupancy: { title: 'Occupancy', kind: 'house' },
+  settings: { title: 'Settings', kind: 'settings' },
   activity: { title: 'Activity', kind: 'activity' },
 };
 // Old bookmarks and deep links keep working.
@@ -151,6 +152,55 @@ let listings = [];            // recruit_listings rows
 let onboarding = [];          // recruit_onboarding rows (checklist per resident stay)
 let houseLoaded = false;
 let settings = { open_to_couples: true };
+let isAdmin = false;          // derived from Discord: can see #recruiting-automation
+
+/* --- settings accessors (Sassy: Settings) ---
+   One read path for every knob, whatever store it lives in. The schema's
+   `default` is the fallback, which is why a setting can ship configurable with
+   no migration and no seed row: no row means the default. Callers say
+   setting('followup_stale_days') and never learn where it lives. */
+function setting(key) {
+  const def = SETTING_DEFS[key];
+  if (!def) { console.warn(`[settings] unknown key: ${key}`); return undefined; }
+  let raw;
+  if (def.scope === 'house') raw = settings[key];
+  else if (def.scope === 'local') raw = localStorage.getItem(def.storageKey || key);
+  else if (def.scope === 'profile') raw = profile[def.column || key];
+  if (raw === undefined || raw === null || raw === '') return def.default;
+  if (def.type === 'number') { const n = +raw; return Number.isFinite(n) ? n : def.default; }
+  if (def.type === 'bool') return raw === true || raw === 'true';
+  return raw;
+}
+
+async function setSetting(key, value) {
+  const def = SETTING_DEFS[key];
+  if (!def) return { error: { message: `Unknown setting: ${key}` } };
+  if (def.scope === 'local') {
+    localStorage.setItem(def.storageKey || key, String(value));
+    return {};
+  }
+  if (def.scope === 'profile') {
+    profile[def.column || key] = value;
+    const { error } = await sb.from('recruit_profiles')
+      .upsert({ user_id: me.id, [def.column || key]: value }, { onConflict: 'user_id' });
+    return { error };
+  }
+  // House-wide. RLS allows this only for admins (migration 144); the UI hides
+  // the controls, and this is the wall behind that.
+  const prev = settings[key];
+  settings[key] = value;
+  const { error } = await sb.from('recruit_settings').upsert({
+    key, value,
+    updated_by: me.id,
+    updated_by_name: me.name,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'key' });
+  if (error) settings[key] = prev;
+  return { error };
+}
+
+let profile = {};             // recruit_profiles row for me — display_name, group_email
+let settingsMeta = {};        // key -> { updated_by_name, updated_at }, for the audit line
 let gmailStatus = { connected: false };
 let reviewTab = 'profile';   // 'profile' | 'emails'
 let emailsCache = {};        // applicant_id -> rows
@@ -534,7 +584,7 @@ function openingsCta(a) {
     // nagging; a shared-account invite gets picked up by the calendar sweep.
     const promised = /\b(invite|calendar|schedul|let'?s (chat|talk|meet)|talk (soon|then|tomorrow))\b/i.test(st.lastSnippet || '');
     // Waiting is passive until ~3 quiet days; then the clock arms Follow up.
-    const stale = Date.now() - new Date(st.lastAt).getTime() > 3 * 86400000;
+    const stale = Date.now() - new Date(st.lastAt).getTime() > setting('followup_stale_days') * 86400000;
     return stack(`<button class="btn btn--sm inbox-row__review cta-std ${stale ? 'cta--amber' : ''}" data-email="${a.id}">Follow up</button>`,
       `${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`);
   }
@@ -679,13 +729,10 @@ async function loadAll() {
   screeningsCache = {};
   for (const s of (scRes.data || [])) (screeningsCache[s.applicant_id] ||= []).push(s);
   sb.from('recruit_settings').select('*').then(({ data }) => {
-    for (const row of (data || [])) settings[row.key] = row.value;
-    const box = document.getElementById('pref-couples');
-    if (box) box.checked = settings.open_to_couples !== false;
-    const ap = document.getElementById('pref-autopost');
-    if (ap) ap.checked = settings.discord_auto_post === true;
-    const ud = document.getElementById('pref-update-default');
-    if (ud) ud.checked = updateEmailDefault();
+    for (const row of (data || [])) {
+      settings[row.key] = row.value;
+      settingsMeta[row.key] = { by: row.updated_by_name, at: row.updated_at };
+    }
     sendUpdateWith = updateEmailDefault();
   });
   if (aRes.error) throw aRes.error;
@@ -781,11 +828,11 @@ function qualifiesFor(a, l) {
   if (/^ASAP/.test(norm || '')) {
     const now = new Date();
     const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    return startMonth >= cur && startMonth <= monthShift(cur, 1);
+    return startMonth >= cur && startMonth <= monthShift(cur, setting('movein_flex_months'));
   }
   const range = moveInRange(a);
   if (!range) return false; // no parseable dates — can't confirm they line up
-  const flexPad = /flexible/i.test(norm || '') ? 1 : 0;
+  const flexPad = /flexible/i.test(norm || '') ? setting('movein_flex_months') : 0;
   return monthShift(range.hi, flexPad) >= startMonth && monthShift(range.lo, -flexPad) <= endMonth;
 }
 
@@ -1483,8 +1530,178 @@ async function render() {
     renderActivity();
     return;
   }
+  if (def.kind === 'settings') {
+    root.innerHTML = `<p class="inbox-empty">Loading…</p>`;
+    await loadSettingsExtras();
+    if (view !== 'settings') return;   // navigated away meanwhile
+    renderSettings();
+    return;
+  }
   if (def.kind === 'applicants') renderApplicants();
   else if (view === 'occupancy') renderOccupancy();
+}
+
+/* ---------- Settings (Sassy: Settings) ----------
+   Rendered from SETTING_DEFS / SETTING_SECTIONS, so adding a knob is one object
+   literal in settings-schema.js and nothing here changes. Four field types
+   cover every setting in the app; automations and connections are status rows,
+   not fields, and get their own renderers.
+
+   No Save anywhere: every field writes on `change` (see the drawer-cta rule).
+   The only button in a section is destructive.
+
+   House-wide writes are admin-only in RLS (migration 144). Non-admins see the
+   same values, disabled, with one line saying who decides — read access was
+   never the thing being protected. */
+let cronStatus = [];          // recruit_cron_status() rows
+let gmailStatusFull = null;   // recruit-gmail { action: 'status' }
+
+async function loadSettingsExtras() {
+  const [cron, prof] = await Promise.all([
+    sb.rpc('recruit_cron_status'),
+    sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', me.id).maybeSingle(),
+  ]);
+  cronStatus = cron.data || [];
+  if (cron.error) console.warn('[settings] cron status unavailable:', cron.error.message);
+  if (prof.data) profile = prof.data;
+}
+
+function settingFieldHtml(key) {
+  const def = SETTING_DEFS[key];
+  const val = setting(key);
+  const locked = def.scope === 'house' && !isAdmin;
+  const dis = locked ? 'disabled' : '';
+  let control;
+  if (def.type === 'bool') {
+    control = `<label class="set-switch">
+      <input type="checkbox" data-setting="${key}" ${val ? 'checked' : ''} ${dis}>
+      <span class="set-switch__track" aria-hidden="true"><span class="set-switch__knob"></span></span>
+    </label>`;
+  } else if (def.type === 'number') {
+    control = `<span class="set-num">
+      <input type="number" class="listing-status" data-setting="${key}" value="${val}"
+        min="${def.min ?? 0}" max="${def.max ?? 9999}" step="${def.step ?? 1}" ${dis}>
+      ${def.unit ? `<span class="set-num__unit">${esc(def.unit)}</span>` : ''}
+    </span>`;
+  } else if (def.type === 'enum') {
+    control = `<select class="listing-status set-enum" data-setting="${key}" ${dis}>
+      ${def.options.map(([v, label]) => `<option value="${v}" ${val === v ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+    </select>`;
+  } else {
+    control = `<input type="text" class="listing-status set-text" data-setting="${key}"
+      value="${esc(String(val || ''))}" maxlength="${def.maxlength || 200}" ${dis}>`;
+  }
+  const meta = settingsMeta[key];
+  return `<div class="set-field ${locked ? 'is-locked' : ''}">
+    <span class="set-field__label">${esc(def.label)}</span>
+    <span class="set-field__control">${control}</span>
+    <span class="set-field__hint">${esc(def.hint || '')}${
+      meta?.by ? ` <span class="set-field__by">${esc(meta.by)} changed this ${relTime(meta.at)}</span>` : ''}</span>
+  </div>`;
+}
+
+const CRON_HUMAN = {
+  '*/15 * * * *': 'every 15 min', '*/20 * * * *': 'every 20 min',
+  '7 * * * *': 'hourly', '45 */6 * * *': 'every 6 hours',
+};
+
+function settingsAutomationsHtml() {
+  const byName = Object.fromEntries(cronStatus.map(r => [r.jobname, r]));
+  const rows = SETTING_AUTOMATIONS.map(a => {
+    const r = byName[a.jobname];
+    const cadence = r ? (CRON_HUMAN[r.schedule] || r.schedule) : 'not scheduled';
+    const when = r?.last_run ? `ran ${relTime(r.last_run)}` : 'never run';
+    const bad = r && r.last_status && r.last_status !== 'succeeded';
+    return `<div class="set-auto ${r?.active ? '' : 'is-off'}">
+      <span class="set-auto__label">${esc(a.label)}</span>
+      <span class="set-auto__when ${bad ? 'is-bad' : ''}">${esc(r?.active ? when : 'paused')}${
+        bad ? ` · ${esc(r.last_status)}` : ''}</span>
+      <span class="set-auto__hint">${esc(a.hint)}</span>
+      <span class="set-auto__cadence">${esc(cadence)}</span>
+    </div>`;
+  }).join('');
+  // discord_auto_post is the one automation with a real switch — the cron jobs
+  // are scheduled in the database, and a toggle here that only half-worked
+  // would be worse than saying where they live.
+  return rows + settingFieldHtml('discord_auto_post') +
+    `<p class="set-note">Cadence is set by <code>pg_cron</code> in the database, not here. A paused job means someone unscheduled it.</p>`;
+}
+
+function settingsConnectionsHtml() {
+  const g = gmailStatusFull || gmailStatus || { connected: false };
+  const conn = (label, ok, detail, warn) => `<div class="set-conn">
+    <span class="set-conn__label">${esc(label)}</span>
+    <span class="set-conn__state ${ok ? 'is-ok' : (warn ? 'is-warn' : 'is-off')}">${ok ? '✓ connected' : esc(warn || 'not connected')}</span>
+    ${detail ? `<span class="set-conn__detail">${esc(detail)}</span>` : ''}
+  </div>`;
+  return conn('Shared Gmail', !!g.connected, g.connected
+      ? `${g.email || ''}${g.connected_by_name ? ` · connected by ${g.connected_by_name}` : ''}`
+      : 'Applications and replies stop arriving until this is reconnected.',
+      g.connected ? null : 'reconnect needed')
+    + conn('House calendar', !!g.connected, 'Screening invites land here.', g.connected ? null : 'follows Gmail')
+    + conn('Discord', true, '#recruiting-automation · #recruiting-interviews')
+    + `<p class="set-note">Reconnecting Gmail happens from the account itself — the token is server-side and never reaches this page.</p>`;
+}
+
+function settingsDataHtml() {
+  return `<button type="button" class="drawer-cta__alt" id="set-export">
+      <span>Export decisions</span>
+      <span class="drawer-cta__exit-hint">every review, verdict, and comment as CSV</span>
+    </button>`;
+}
+
+function renderSettings() {
+  const host = document.getElementById('view-root');
+  host.className = 'settings';
+  const section = sec => {
+    let body;
+    if (sec.rows === 'automations') body = settingsAutomationsHtml();
+    else if (sec.rows === 'connections') body = settingsConnectionsHtml();
+    else if (sec.rows === 'data') body = settingsDataHtml();
+    else {
+      const keys = Object.keys(SETTING_DEFS).filter(k => SETTING_DEFS[k].section === sec.id);
+      if (!keys.length) return '';
+      body = keys.map(settingFieldHtml).join('');
+    }
+    const locked = !isAdmin && (sec.id === 'house' || sec.id === 'funnel');
+    return `<section class="set-sec" id="set-${sec.id}">
+      <h2 class="set-sec__title">${esc(sec.title)}</h2>
+      <p class="set-sec__hint">${esc(sec.hint)}${locked ? ' Only housemates who can see #recruiting-automation can change them.' : ''}</p>
+      ${body}
+    </section>`;
+  };
+  host.innerHTML = `
+    <p class="set-lede">${isAdmin
+      ? 'Changes apply the moment you make them.'
+      : 'You can see everything here. Changing the house-wide settings needs access to #recruiting-automation.'}</p>
+    ${SETTING_SECTIONS.map(section).join('')}`;
+
+  host.querySelectorAll('[data-setting]').forEach(el => {
+    el.addEventListener('change', async () => {
+      const key = el.dataset.setting;
+      const def = SETTING_DEFS[key];
+      let value;
+      if (def.type === 'bool') value = el.checked;
+      else if (def.type === 'number') {
+        value = Math.min(def.max ?? Infinity, Math.max(def.min ?? -Infinity, Math.round(+el.value || 0)));
+        el.value = value;   // clamp visibly rather than saving something else
+      } else value = el.value.trim();
+      const { error } = await setSetting(key, value);
+      if (error) { toast(`Could not save: ${error.message}`); renderSettings(); return; }
+      flashSetting(el);
+      if (key === 'theme') applyTheme(value);
+      // A window or a threshold changes what the funnel says about everyone.
+      if (['followup_stale_days', 'movein_flex_months', 'gap_min_days'].includes(key)) renderRailCounts();
+    });
+  });
+  host.querySelector('#set-export')?.addEventListener('click', exportCsv);
+}
+
+function flashSetting(el) {
+  const field = el.closest('.set-field');
+  if (!field) return;
+  field.classList.add('is-saved');
+  setTimeout(() => field.classList.remove('is-saved'), 1400);
 }
 
 /* ---------- activity log ----------
@@ -2696,7 +2913,7 @@ function roomGaps(roomId) {
     if (cursor > winEnd) break;
   }
   if (cursor <= winEnd) gaps.push([cursor, winEnd]);
-  return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= 7);
+  return gaps.filter(([a, b]) => (new Date(b) - new Date(a)) / 86400000 >= setting('gap_min_days'));
 }
 
 /* One room's bars: stays, then the uncovered stretches between them. Module
@@ -2809,10 +3026,10 @@ function openOccDrawer(next) {
    that either side can still make other plans. Both are suggestions the
    drawer prefills; the house can move either date. */
 function trialCheckinDefault(startsOn) {
-  return startsOn ? addMonthsIso2(startsOn, 1) : '';
+  return startsOn ? addMonthsIso2(startsOn, setting('trial_checkin_months')) : '';
 }
 function trialDecisionDefault(endsOn) {
-  return endsOn ? addMonthsIso2(endsOn, -1) : '';
+  return endsOn ? addMonthsIso2(endsOn, -setting('trial_decision_months')) : '';
 }
 /* addMonthsIso() snaps to the first of the month (the timeline needs that);
    milestones keep the day-of-month, clamped when the target month is short. */
@@ -2987,10 +3204,47 @@ function stayFormHtml(s, roomId) {
       ${isNew ? `<div class="drawer-cta__row">
         <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
         <button type="submit" class="btn btn--accent drawer-cta__commit">Add stay</button>
-      </div>` : `<p class="drawer-cta__flag" data-save-flag>Changes save as you go</p>`}
+      </div>` : `<p class="drawer-cta__flag" data-save-flag></p>`}
       ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
     </div>
   </form>`;
+}
+
+/* --- an open stretch: choose, then continue in place ---
+   An empty stretch has exactly two honest answers: open it to candidates, or
+   record who's already moving in. Showing both at once meant a listing button
+   sitting on top of a full stay form, so the drawer now asks first and then
+   becomes the flow you picked. Back returns to the choice; nothing is written
+   until the step's own commit. */
+function gapDrawerBody() {
+  const choice = occDrawer.choice || null;
+  if (!choice) {
+    return `<div class="step-choices">
+      <button type="button" class="step-choice" data-gap-choice="listing">
+        <span class="step-choice__label">Create a listing</span>
+        <span class="step-choice__go" aria-hidden="true">&rarr;</span>
+        <span class="step-choice__hint">Opens the room to candidates. Everyone who qualifies gets placed in it.</span>
+      </button>
+      <button type="button" class="step-choice" data-gap-choice="occupant">
+        <span class="step-choice__label">Add an occupant</span>
+        <span class="step-choice__go" aria-hidden="true">&rarr;</span>
+        <span class="step-choice__hint">Someone is already moving in — record the stay and close the gap.</span>
+      </button>
+    </div>`;
+  }
+  const back = `<button type="button" class="step-back" data-gap-choice="">&larr; ${
+    choice === 'listing' ? 'Create a listing' : 'Add an occupant'}</button>`;
+  if (choice === 'occupant') {
+    return back + stayFormHtml(
+      { kind: 'sublet', starts_on: occDrawer.start, ends_on: occDrawer.end }, occDrawer.roomId);
+  }
+  // The listing form lives in the drawer rather than a modal so the flow never
+  // leaves the sidebar it started in. Same form, same create handler.
+  return back + `<div class="step-listing">${listingForm({
+    room_id: occDrawer.roomId, kind: 'sublet',
+    starts_on: occDrawer.start, ends_on: occDrawer.end,
+    notes: `Open from ${fmtShort(occDrawer.start)} on the occupancy calendar.`,
+  })}</div>`;
 }
 
 function roomDetailsHtml(r) {
@@ -3047,13 +3301,7 @@ function renderOccDrawer() {
     const room = rooms.find(r => r.id === occDrawer.roomId);
     title = `${room?.name || 'Room'} — open`;
     sub = `${fmtShort(occDrawer.start)} – ${fmtShort(occDrawer.end)}`;
-    body = `
-      <button class="drawer-cta__alt" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">
-        <span>Create a listing for this stretch</span>
-        <span class="drawer-cta__exit-hint">opens the room to candidates</span>
-      </button>
-      <p class="occ-drawer__note">…or record who's moving in:</p>
-      ${stayFormHtml({ kind: 'sublet', starts_on: occDrawer.start, ends_on: occDrawer.end }, occDrawer.roomId)}`;
+    body = gapDrawerBody();
   } else if (occDrawer.type === 'room') {
     const r = rooms.find(x => x.id === occDrawer.roomId);
     if (!r) { occDrawer = null; hostWrap.innerHTML = ''; return; }
@@ -3072,6 +3320,18 @@ function renderOccDrawer() {
       </div>
       <div class="occ-drawer__body">${body}</div>
     </aside>`;
+  hostWrap.querySelectorAll('[data-gap-choice]').forEach(btn => btn.addEventListener('click', () => {
+    occDrawer.choice = btn.dataset.gapChoice || null;
+    renderOccDrawer();
+  }));
+  const gapListing = hostWrap.querySelector('.step-listing [data-listing-form]');
+  if (gapListing) {
+    gapListing.addEventListener('submit', onListingCreate);
+    gapListing.querySelector('[data-cancel-listing]')?.addEventListener('click', () => {
+      occDrawer.choice = null;
+      renderOccDrawer();
+    });
+  }
   hostWrap.querySelector('[data-stay-form]')?.addEventListener('submit', onStayFormSubmit);
   hostWrap.querySelector('[data-promote-open]')?.addEventListener('click', e => {
     promoting = e.currentTarget.dataset.promoteOpen;
@@ -3212,7 +3472,6 @@ async function autoSaveStay(form) {
     clearTimeout(staySavedTimer);
     staySavedTimer = setTimeout(() => {
       flag.classList.remove('is-on');
-      flag.textContent = 'Changes save as you go';
     }, 2200);
   }
 }
@@ -3331,23 +3590,6 @@ function occupantsHtml() {
     </section>`;
 }
 
-async function createListingFromGap(roomId, startIso) {
-  const room = rooms.find(r => r.id === roomId);
-  if (!room) return;
-  const pretty = fmtShort(startIso);
-  if (!confirm(`Create a sublet listing for ${room.name} starting ${pretty}?`)) return;
-  const { data, error } = await sb.from('recruit_listings').insert({
-    room_id: roomId, kind: 'sublet', starts_on: startIso, status: 'open',
-    source: 'gap', notes: `Created from the occupancy calendar (open from ${pretty}).`,
-    created_by: me.id, created_by_name: me.name,
-  }).select().single();
-  if (error) { toast(`Listing failed: ${error.message}`); return; }
-  listings.push(data);
-  toast(`Listing created — ${room.name}, from ${pretty}`);
-  occDrawer = null;
-  renderOccupancy();
-  renderRailCounts();
-}
 
 async function markLeaving(roomId, defaultDate) {
   const room = rooms.find(r => r.id === roomId);
@@ -3501,7 +3743,7 @@ function listingForm(l) {
       ${isNew ? `<div class="drawer-cta__row">
         <button type="button" class="drawer-cta__quiet" data-cancel-listing>Cancel</button>
         <button type="submit" class="btn btn--accent drawer-cta__commit">Create listing</button>
-      </div>` : `<p class="drawer-cta__flag" data-save-flag>Changes save as you go</p>
+      </div>` : `<p class="drawer-cta__flag" data-save-flag></p>
       <div class="drawer-cta__exits">
         <button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-delete-listing="${l.id}">
           <span class="drawer-cta__exit-label">Delete listing</span>
@@ -3613,7 +3855,6 @@ async function autoSaveListing(form, changed) {
     clearTimeout(listingSavedTimer);
     listingSavedTimer = setTimeout(() => {
       flag.classList.remove('is-on');
-      flag.textContent = 'Changes save as you go';
     }, 2200);
   }
   if (!PLACEMENT_FIELDS.has(changed)) return;
@@ -4588,22 +4829,6 @@ async function gmailCall(payload) {
   return out;
 }
 
-/* Global shared-account connection row (rail footer). Set once, house-wide. */
-function renderGmailStatus() {
-  const el = document.getElementById('gmail-conn');
-  if (!el) return;
-  if (gmailStatus.connected) {
-    el.textContent = `✓ ${gmailStatus.email || 'shared Gmail'} connected`;
-    el.title = `House email + calendar run through this account${gmailStatus.connected_by_name ? ` · connected by ${gmailStatus.connected_by_name}` : ''}${gmailStatus.connected_at ? ` · ${new Date(gmailStatus.connected_at).toLocaleDateString()}` : ''}. Click to reconnect (e.g. after a scope change).`;
-  } else {
-    el.textContent = 'Connect shared Gmail (house-wide, one time)';
-    el.title = 'All applicant email + screening invites run through live.at.agapesf@gmail.com. Sign into that Google account in this browser first.';
-  }
-  el.onclick = () => {
-    if (!gmailStatus.connected || confirm('Reconnect the shared Google account? Only needed after scope changes or if sending breaks.')) connectSharedGmail();
-  };
-}
-
 /* Throttled inbox-wide sweep: matches recent shared-inbox mail to
    applicants so outreach rows can badge replies. */
 async function scanInbox() {
@@ -4638,8 +4863,7 @@ async function handleGmailCallback() {
   try {
     const out = await gmailCall({ action: 'connect', code });
     gmailStatus = { connected: true, email: out.email, connected_by_name: me?.name };
-    renderGmailStatus();
-    toast(`Shared Gmail connected: ${out.email}`);
+      toast(`Shared Gmail connected: ${out.email}`);
   } catch (e) { toast(`Gmail connect failed: ${e.message}`); }
 }
 
@@ -4809,6 +5033,11 @@ async function _checkMembershipAndEnter() {
     // in — identify self, load data, render
     const user = window.CtrlAuth.getUser();
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
+    // Admin = can see #recruiting-automation. The function derives it from
+    // Discord and writes recruit_admins, which is what RLS actually consults —
+    // so this flag only decides whether the controls are disabled, never
+    // whether a write is allowed.
+    isAdmin = status.isRecruitingAdmin === true;
     // group_email ties this account to its roster identity, which is how a
     // review imported from the sheet becomes yours once you sign in.
     sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
@@ -4821,7 +5050,7 @@ async function _checkMembershipAndEnter() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
       body: JSON.stringify({ action: 'status' }),
-    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; renderGmailStatus(); }).catch(() => {});
+    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; gmailStatusFull = gmailStatus; if (view === 'settings') renderSettings(); }).catch(() => {});
     await loadAll();
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
@@ -5185,8 +5414,6 @@ function init() {
       renderOccupancy();
       return;
     }
-    const listCell = e.target.closest('[data-list-room]');
-    if (listCell) { createListingFromGap(+listCell.dataset.listRoom, listCell.dataset.listStart); return; }
     const stayLeaving = e.target.closest('[data-stay-leaving]');
     if (stayLeaving) { markLeaving(+stayLeaving.dataset.stayLeaving, stayLeaving.dataset.stayLeavingDate || null); return; }
     const stayDel = e.target.closest('[data-stay-delete]');
@@ -5265,41 +5492,10 @@ function init() {
     document.getElementById('rail-scrim').hidden = true;
   };
 
-  document.getElementById('menu-export').onclick = exportCsv;
-  document.getElementById('menu-theme').onclick = () =>
-    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
-  document.getElementById('pref-autopost').onchange = async (e) => {
-    const value = e.target.checked;
-    settings.discord_auto_post = value;
-    const { error } = await sb.from('recruit_settings').upsert({
-      key: 'discord_auto_post', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
-    });
-    if (error) { toast(`Save failed: ${error.message}`); e.target.checked = !value; settings.discord_auto_post = !value; }
-    else toast(value ? 'Coverage asks now post to Discord automatically' : 'Coverage asks are manual again');
-  };
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
   document.getElementById('gd-no').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'no');
-  document.getElementById('pref-update-default').onchange = async (e) => {
-    const value = e.target.checked;
-    settings.update_email_default = value;
-    sendUpdateWith = value;
-    const { error } = await sb.from('recruit_settings').upsert({
-      key: 'update_email_default', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
-    });
-    if (error) { toast(`Save failed: ${error.message}`); e.target.checked = !value; settings.update_email_default = !value; }
-    else toast(value ? 'Not a fit will offer an update email' : 'Not a fit will skip the email unless you ask for one');
-  };
-  document.getElementById('pref-couples').onchange = async (e) => {
-    const value = e.target.checked;
-    settings.open_to_couples = value;
-    const { error } = await sb.from('recruit_settings').upsert({
-      key: 'open_to_couples', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
-    });
-    if (error) { toast(`Preference save failed: ${error.message}`); e.target.checked = !value; settings.open_to_couples = !value; }
-    else toast(value ? 'House preference: open to couples' : 'House preference: not open to couples');
-  };
 
   document.getElementById('remove-close').onclick = hideRemoveSheet;
   document.getElementById('remove-cancel').onclick = hideRemoveSheet;
