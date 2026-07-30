@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.16.0'
+const VERSION = '1.17.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestones + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -205,22 +205,52 @@ async function sha256Hex(s: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+/* Mint a one-time link for a Discord id. Shared by the button, the /signin
+   command and the proactive DM, so there is one definition of a sign-in. */
+async function mintSigninUrl(discordUserId: string, discordUsername: string | null): Promise<string | null> {
+  const raw = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '')
+  const { error } = await db().from('recruit_signin_tokens').insert({
+    token_hash: await sha256Hex(raw), discord_user_id: discordUserId, discord_username: discordUsername,
+  })
+  if (error) return null
+  return `${APP_URL}?signin=${raw}`
+}
+
 async function handleSigninButton(interaction: Record<string, any>): Promise<Response> {
   const discordUserId = interaction.member?.user?.id || interaction.user?.id
   const discordUsername = interaction.member?.user?.username || interaction.user?.username || null
-  if (!discordUserId || !interaction.guild_id) return json(ephemeral('Could not identify you.'))
+  if (!discordUserId) return json(ephemeral('Could not identify you.'))
 
-  const raw = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '')
-  const client = db()
-  const { error } = await client.from('recruit_signin_tokens').insert({
-    token_hash: await sha256Hex(raw), discord_user_id: discordUserId, discord_username: discordUsername,
-  })
-  if (error) return json(ephemeral('Could not mint a link — try again in a minute.'))
+  const url = await mintSigninUrl(discordUserId, discordUsername)
+  if (!url) return json(ephemeral('Could not mint a link — try again in a minute.'))
 
   return json(ephemeral(
-    `🔑 Your one-time sign-in link (10 min, single use):\n${APP_URL}?signin=${raw}\n` +
-    `Opens the applicant inbox already signed in — any browser works.`,
+    `🔑 Your one-time sign-in link (10 min, single use):\n${url}\n` +
+    `Opens the applicant inbox already signed in — any browser works. ` +
+    `If you are reading this inside another app's browser, open the link in Safari or Chrome.`,
   ))
+}
+
+/* Registers /signin on the guild so nobody has to hunt for the button.
+   Idempotent — Discord replaces the command set on every PUT. */
+async function registerCommands(): Promise<Record<string, unknown>> {
+  const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
+  if (!botToken) throw new Error('DISCORD_BOT_TOKEN not set')
+  const app = await (await fetch('https://discord.com/api/v10/applications/@me', {
+    headers: { Authorization: `Bot ${botToken}` },
+  })).json()
+  if (!app?.id) throw new Error('could not resolve application id')
+  const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
+  const resp = await fetch(`https://discord.com/api/v10/applications/${app.id}/guilds/${guildId}/commands`, {
+    method: 'PUT',
+    headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([
+      { name: 'signin', description: 'Get a one-time link into the Agape applicant inbox', type: 1 },
+    ]),
+  })
+  const out = await resp.json()
+  if (!resp.ok) throw new Error(`Discord ${resp.status}: ${JSON.stringify(out).slice(0, 200)}`)
+  return { registered: Array.isArray(out) ? out.map((c: Record<string, unknown>) => c.name) : out, guildId }
 }
 
 // POST /redeem  { token } → { token_hash, email } for supabase-js verifyOtp.
@@ -656,6 +686,63 @@ async function archiveMissingRecordings(client: ReturnType<typeof db>): Promise<
   return archived
 }
 
+/* Proactive sign-in: anyone who can see the Recruiting Society channel but has
+   never completed a sign-in gets one DM with a link. This is the automation
+   that matters — access granted in Discord becomes access to the app without
+   anyone being told to go find a button. One DM per person, ever.
+
+   Listing the roster needs the Server Members privileged intent; without it
+   this no-ops quietly rather than pretending to have swept. */
+async function inviteUnsignedMembers(client: ReturnType<typeof db>): Promise<number> {
+  const { dmUser } = await import('../_shared/discord.ts')
+  const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
+  if (!botToken) return 0
+  const guildId = Deno.env.get('AGAPE_GUILD_ID') || '952961396121931838'
+
+  const resp = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members?limit=1000`, {
+    headers: { Authorization: `Bot ${botToken}` },
+  })
+  if (!resp.ok) {
+    console.log(`[signin-sweep] roster unavailable (${resp.status}) — needs the Server Members intent`)
+    return 0
+  }
+  const members = await resp.json()
+  if (!Array.isArray(members)) return 0
+
+  const [{ data: known }, { data: invited }] = await Promise.all([
+    client.from('user_discord_membership').select('discord_user_id'),
+    client.from('recruit_signin_invites').select('discord_user_id'),
+  ])
+  const hasAccount = new Set((known || []).map((r: Record<string, unknown>) => String(r.discord_user_id)))
+  const alreadyAsked = new Set((invited || []).map((r: Record<string, unknown>) => String(r.discord_user_id)))
+
+  // Reuse the membership function's view of the channel rather than
+  // reimplementing permission maths in a second place.
+  const { canSeeRecruiting } = await import('../_shared/discord.ts')
+  let sent = 0
+  for (const m of members) {
+    const did = String(m.user?.id || '')
+    if (!did || m.user?.bot || hasAccount.has(did) || alreadyAsked.has(did)) continue
+    let allowed = false
+    try { allowed = await canSeeRecruiting(did, m.roles || []) } catch { continue }
+    if (!allowed) continue
+    const url = await mintSigninUrl(did, m.user?.global_name || m.user?.username || null)
+    if (!url) continue
+    try {
+      await dmUser(did,
+        `👋 You have access to the Agape applicant inbox.\n` +
+        `Here is a one-tap link (10 min, single use): ${url}\n` +
+        `After that, type \`/signin\` in the server any time you need a fresh one.`)
+      await client.from('recruit_signin_invites').insert({ discord_user_id: did })
+      sent++
+    } catch (err) {
+      console.warn(`[signin-sweep] DM failed for ${did}: ${(err as Error).message}`)
+    }
+  }
+  if (sent) console.log(`[signin-sweep] ${sent} sign-in link DM(s) sent`)
+  return sent
+}
+
 // Calls whose end time passed flip scheduled -> completed so the app stops
 // showing them as upcoming (the Watch chip takes over once notes land).
 async function completePastCalls(client: ReturnType<typeof db>): Promise<number> {
@@ -835,6 +922,10 @@ serve(async (req) => {
       }
       if (!authorized) return json({ error: 'unauthorized' }, 401)
       const bots = await scheduleMissingBots(client) + await scheduleCalendarBots(client)
+      const invitedIn = await inviteUnsignedMembers(client).catch((e) => {
+        console.warn(`[signin-sweep] ${(e as Error).message}`); return 0
+      })
+      if (invitedIn) console.log(`[signin-sweep] invited ${invitedIn}`)
       const unmatched = await notifyUnmatchedCalls(client)
       if (unmatched) console.log(`[unmatched] ${unmatched} link-nudge DM(s) sent`)
       const live = await announceLiveCalls(client)
@@ -860,6 +951,15 @@ serve(async (req) => {
     const pathname = new URL(req.url).pathname
     if (pathname.endsWith('/redeem')) return await handleRedeem(req)
     if (pathname.endsWith('/signin-post')) return await handleSigninPost(req)
+    if (pathname.endsWith('/register-commands')) {
+      const client = db()
+      const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: u } = await client.auth.getUser(tok)
+      if (!u?.user) return json({ error: 'Not authenticated' }, 401)
+      const { data: adm } = await client.from('recruit_admins').select('user_id').eq('user_id', u.user.id).maybeSingle()
+      if (!adm) return json({ error: 'Admins only' }, 403)
+      return json(await registerCommands())
+    }
 
     const body = await req.text()
     if (!(await verifySignature(req, body))) {
@@ -867,6 +967,12 @@ serve(async (req) => {
     }
     const interaction = JSON.parse(body)
     if (interaction.type === 1) return json(PONG)
+    // Slash command — /signin works anywhere in the guild, including a DM
+    // with the bot, so there is no message to find.
+    if (interaction.type === 2) {
+      if (String(interaction.data?.name || '') === 'signin') return await handleSigninButton(interaction)
+      return json(ephemeral('Unknown command.'))
+    }
     if (interaction.type === 3) {
       if (String(interaction.data?.custom_id || '') === 'signin') return await handleSigninButton(interaction)
       return await handleClaim(interaction)
