@@ -66,6 +66,19 @@ release it: `notify_house_posts = true` in `recruit_settings`, and
 No kind slugs, no lane tags, no clause after an em dash, no buttons, no
 mentions. `{}` in a sentence marks where the linked subject goes.
 
+**Owner** — the housemate on the hook, when one is known: the screener who took
+the call, the reviewer who asked for a second read. Stored on the row
+(`owner_name`, `owner_user_id`) as well as named in the sentence, so the log can
+answer *what is Kate on the hook for*. It reads as "yours" in the app when it is
+you. **Unowned is the common case and is often the news itself** — "nobody has
+reviewed this" is precisely a notification with no owner.
+
+A name only counts as an owner if it's a person. Calls swept off the shared
+calendar carry the organiser's display name — "Agape Internal Calendar", "the
+house" — and those resolve to no owner rather than claiming a calendar is taking
+a call. Ownership populates for calls booked through the app; a swept one has
+nobody attached.
+
 **Repeat** — the `dedupe_key` shape. A key fires exactly once; a key with a step
 or date segment re-fires when that segment changes.
 

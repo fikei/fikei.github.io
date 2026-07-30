@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.54.0';
+const VERSION = '3.55.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1824,6 +1824,15 @@ async function loadActivityCount() {
   renderRailCounts();
 }
 
+/* Who is on the hook. Shown as "you" when it is you, because a log that says
+   "Ian Fike" to Ian reads like it is about somebody else. Notifications with no
+   owner say nothing here — unowned is the common case and often the news. */
+function activityOwner(n) {
+  if (!n.owner_name) return '';
+  const mine = n.owner_user_id && n.owner_user_id === me?.id;
+  return mine ? 'yours' : n.owner_name;
+}
+
 function activityDelivery(n) {
   // What actually happened to this notification, in the order it happened.
   const bits = [];
@@ -1886,7 +1895,7 @@ function renderActivity() {
             <span class="inbox-row__text">
               <span class="inbox-row__title">${esc(kindLabel(n.kind))} · ${esc(n.payload?.title || n.subject_label)}</span>
               <span class="inbox-row__sub">${esc(n.payload?.body || '')}</span>
-              <span class="log-row__meta">${esc(relTime(n.created_at))} · ${esc(activityDelivery(n))}${n.acked_at ? ` · resolved ${esc(relTime(n.acked_at))}` : ''}</span>
+              <span class="log-row__meta">${esc(relTime(n.created_at))}${activityOwner(n) ? ` · ${esc(activityOwner(n))}` : ''} · ${esc(activityDelivery(n))}${n.acked_at ? ` · resolved ${esc(relTime(n.acked_at))}` : ''}</span>
             </span>
           </button>
           <span class="inbox-row__actions">
@@ -2019,7 +2028,8 @@ async function loadProfileActivity(a) {
   // openings they were matched to).
   for (const n of notifs.data || []) {
     const line = (n.payload?.sentence || '').replace('{}', n.payload?.title || fullName(a));
-    add(n.created_at, n.kind, line, n.payload?.body);
+    const owner = n.owner_name ? `${n.owner_user_id === me?.id ? 'yours' : n.owner_name}` : '';
+    add(n.created_at, n.kind, line, [n.payload?.body, owner].filter(Boolean).join(' · '));
   }
 
   feed.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));

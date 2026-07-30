@@ -138,6 +138,12 @@ export interface Notification {
   subject_id: string | null
   subject_label: string
   audience?: 'house' | 'oncall' | 'person' | 'none'
+  /* The housemate on the hook for this, when one is known — the screener who
+     took the call, the reviewer who asked for a second read, whoever opened the
+     listing. Recorded on the row as well as named in the sentence, so the log
+     can answer "what is Kate on the hook for". Unowned is the common case and
+     is often the news itself. */
+  owner?: { name: string; userId?: string | null } | null
   recipient_id?: string | null
   lane?: 'now' | 'daily' | 'weekly'
   dedupe_key: string
@@ -273,6 +279,20 @@ function moveInClause(text: string | null | undefined): string {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
+/* A real person's name, or nothing.
+
+   Calls swept off the shared calendar carry the organiser's display name, which
+   is "Agape Internal Calendar" or "the house" — not somebody who can be on the
+   hook for anything. Every detector runs its candidate owner through here, so
+   they all agree on what counts as a person and no sentence ever claims a
+   calendar is taking a call. */
+function personName(raw: unknown): string | null {
+  const name = String(raw || '').trim()
+  if (!name) return null
+  if (/calendar|the house|^scheduled|@/i.test(name)) return null
+  return name
+}
+
 // ---- write -----------------------------------------------------------------
 
 /* Insert notifications, ignoring any whose dedupe_key already exists. The
@@ -298,6 +318,8 @@ export async function record(db: DB, rows: Notification[]): Promise<number> {
     subject_label: n.subject_label,
     audience: n.audience || 'house',
     recipient_id: n.recipient_id || null,
+    owner_name: n.owner?.name || null,
+    owner_user_id: n.owner?.userId || null,
     lane: n.lane || 'daily',
     dedupe_key: n.dedupe_key,
     payload: {
@@ -598,7 +620,7 @@ const fullName = (a: { first_name: string; last_name?: string }) => `${a.first_n
 async function detectNeedsInput(db: DB): Promise<Notification[]> {
   const since = new Date(Date.now() - 14 * 86400000).toISOString()
   const { data } = await db.from('recruit_votes')
-    .select('id, applicant_id, voter_name, note, updated_at, created_at')
+    .select('id, applicant_id, voter_id, voter_name, note, updated_at, created_at')
     .eq('verdict', 'needs_input').gte('created_at', since)
   if (!data?.length) return []
   const active = await activeApplicants(db)
@@ -611,6 +633,7 @@ async function detectNeedsInput(db: DB): Promise<Notification[]> {
       subject_label: active.get(v.applicant_id)!.first_name,
       lane: 'now' as const,
       dedupe_key: `needs_input:${v.id}`,
+      owner: personName(v.voter_name) ? { name: personName(v.voter_name)!, userId: v.voter_id || null } : null,
       payload: {
         title: fullName(active.get(v.applicant_id)!),
         copy: 'needs_input',
@@ -739,8 +762,7 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
        "Agape Internal Calendar is taking Keerti's call" makes the whole line
        look machine-generated. When the name isn't a person, the call is the
        subject of the sentence instead of the screener. */
-    const named = sc.housemate_name && !/calendar|the house|@|^scheduled/i.test(String(sc.housemate_name))
-      ? String(sc.housemate_name) : null
+    const named = personName(sc.housemate_name)
     out.push({
       kind: 'screening_booked',
       subject_type: 'applicant',
@@ -749,6 +771,7 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
       lane: 'now',
       // Re-fires if the call moves, since a rescheduled call is news again.
       dedupe_key: `screening_booked:${sc.id}:${sc.starts_at}`,
+      owner: named ? { name: named, userId: sc.housemate_user_id || null } : null,
       payload: {
         title: fullName(who),
         copy: named ? 'screening_booked.named' : 'screening_booked',
@@ -816,13 +839,14 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
         subject_label: who.first_name,
         lane: 'now',
         dedupe_key: `screening_today:${sc.id}:${startsPT}`,
+        owner: personName(sc.housemate_name)
+          ? { name: personName(sc.housemate_name)!, userId: sc.housemate_user_id || null } : null,
         payload: {
           title: fullName(who),
           // Safe here: this kind only exists on the day of the call, and its
           // dedupe key carries that date, so it is never re-read on another day.
-          copy: /calendar|the house|@/i.test(String(sc.housemate_name || '')) || !sc.housemate_name
-            ? 'screening_today' : 'screening_today.with',
-          vars: { subject: fullName(who), at, screener: String(sc.housemate_name || '') },
+          copy: personName(sc.housemate_name) ? 'screening_today.with' : 'screening_today',
+          vars: { subject: fullName(who), at, screener: personName(sc.housemate_name) || '' },
           section: 'Screening',
           links: [{ label: ACTIONS.profile, url: applicantLink(sc.applicant_id) }],
         },
@@ -836,10 +860,12 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
         subject_label: who.first_name,
         lane: 'now',
         dedupe_key: `screening_notes:${sc.id}`,
+        owner: personName(sc.housemate_name)
+          ? { name: personName(sc.housemate_name)!, userId: sc.housemate_user_id || null } : null,
         payload: {
           title: fullName(who),
-          copy: 'screening_notes',
-          vars: { subject: fullName(who) },
+          copy: personName(sc.housemate_name) ? 'screening_notes.by' : 'screening_notes',
+          vars: { subject: fullName(who), screener: personName(sc.housemate_name) || '' },
           section: 'Screening',
           links: [{ label: ACTIONS.notes, url: applicantLink(sc.applicant_id) }],
         },
@@ -860,7 +886,7 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
   const ids = candidates.map((a: { id: string }) => a.id)
 
   const [{ data: done }, { data: votes }, { data: placements }, { data: listings }] = await Promise.all([
-    db.from('recruit_screenings').select('applicant_id, starts_at, status')
+    db.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, housemate_user_id')
       .in('applicant_id', ids).eq('status', 'completed'),
     db.from('recruit_decision_votes').select('applicant_id, verdict').in('applicant_id', ids),
     db.from('recruit_listing_candidates').select('applicant_id, listing_id')
@@ -958,7 +984,7 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
   const ids = candidates.map((a: { id: string }) => a.id)
 
   const [{ data: screenings }, { data: emails }, { data: votes }] = await Promise.all([
-    db.from('recruit_screenings').select('applicant_id, starts_at, status')
+    db.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, housemate_user_id')
       .in('applicant_id', ids).eq('status', 'completed'),
     // Anything the house has said to them since. One outbound email after the
     // call is the whole point of the nudge, so it stops as soon as one exists.
@@ -970,9 +996,16 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
 
   // Their most recent completed call.
   const lastCall = new Map<string, string>()
+  // Whoever ran the most recent call is who the house would expect to write.
+  const screener = new Map<string, { name: string; userId: string | null }>()
   for (const sc of screenings) {
     const prev = lastCall.get(sc.applicant_id)
-    if (!prev || sc.starts_at > prev) lastCall.set(sc.applicant_id, sc.starts_at)
+    if (!prev || sc.starts_at > prev) {
+      lastCall.set(sc.applicant_id, sc.starts_at)
+      const name = personName(sc.housemate_name)
+      if (name) screener.set(sc.applicant_id, { name, userId: sc.housemate_user_id || null })
+      else screener.delete(sc.applicant_id)
+    }
   }
   const lastOut = new Map<string, string>()
   for (const e of emails || []) {
@@ -1003,14 +1036,19 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
       audience: days >= 10 ? 'oncall' : 'house',
       lane: step === FOLLOWUP_FIRST ? 'daily' : 'now',
       dedupe_key: `screening_followup:${a.id}:${step}`,
+      owner: screener.get(a.id) || null,
       payload: {
         title: fullName(a),
         /* One sentence, both facts. The candidate is waiting AND the house
            hasn't decided — reporting those separately meant two notifications a
            word apart about the same person on the same day. */
-        copy: undecided ? 'screening_followup.undecided'
+        copy: undecided
+          ? (screener.has(a.id) ? 'screening_followup.undecided_by' : 'screening_followup.undecided')
           : heard ? 'screening_followup.silent' : 'screening_followup.waiting',
-        vars: { subject: fullName(a), days: plural(days, 'day') },
+        vars: {
+          subject: fullName(a), days: plural(days, 'day'),
+          screener: screener.get(a.id)?.name || '',
+        },
         body: undecided ? undefined : 'the decision is in progress, nobody has told them',
         section: 'Owed an answer',
         links: [{ label: ACTIONS.write, url: applicantLink(a.id) }],
