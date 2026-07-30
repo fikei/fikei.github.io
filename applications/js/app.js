@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.42.0';
+const VERSION = '3.42.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -108,6 +108,7 @@ let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
 let sendUpdateWith = true;    // "Send them an update" rides with a Not-a-fit decision
+let noteDraft = { id: null, text: '' };  // review comment in progress, scoped to its applicant
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
@@ -1308,6 +1309,7 @@ async function castVote(applicantId) {
   const verdict = pendingVerdict;
   const wantsUpdate = document.getElementById('vote-send-update')?.checked ?? sendUpdateWith;
   pendingVerdict = null;
+  noteDraft = { id: null, text: '' };
   if (verdict === 'not_fit') {
     // The email decision was made on the decision step, so honour it here
     // rather than asking again.
@@ -3062,6 +3064,7 @@ function openReview(id) {
     if (!queue.includes(id)) queue = [id];
   }
   qIndex = Math.max(0, queue.indexOf(id));
+  noteDraft = { id, text: '' };
   reviewTab = 'profile';
   pendingVerdict = null;
   moveinEditing = false;
@@ -3114,6 +3117,7 @@ function step(delta) {
   qIndex = next;
   pendingVerdict = null;
   sendUpdateWith = true;
+  noteDraft = { id: queue[next], text: '' };
   moveinEditing = false;
   if (!keepBannerOnce) hideReviewBanner();
   keepBannerOnce = false;
@@ -3314,7 +3318,12 @@ function voteSectionHtml(a) {
 function renderReviewFoot(a) {
   const foot = document.getElementById('review-foot');
   if (!foot) return;
-  const keepNote = document.getElementById('vote-note')?.value ?? null;
+  // In-progress typing survives a re-render of the bar, but only for the
+  // applicant it was typed about — carrying it to the next person would put
+  // your words on the wrong profile.
+  const liveNote = document.getElementById('vote-note');
+  if (liveNote) noteDraft = { id: noteDraft.id ?? a.id, text: liveNote.value };
+  const keepNote = noteDraft.id === a.id ? noteDraft.text : null;
   const liveBox = document.getElementById('vote-send-update');
   if (liveBox) sendUpdateWith = liveBox.checked;
   if (a.stage === 'review') {
