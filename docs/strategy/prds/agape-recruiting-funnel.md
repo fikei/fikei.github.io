@@ -113,5 +113,8 @@ Not built: a Discord announcement on promotion. It needs an authenticated
 route on `recruit-discord`, and the checklist already gives the house the
 signal. Worth revisiting if promotions start getting missed.
 
+### Notifications
+Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
+
 ### Design reference
 Row states, chip taxonomy, and subcopy grammar for Inbox/Candidates/Openings: [docs/ux/recruiting-row-states.md](../../ux/recruiting-row-states.md) (v3.5.0 — response dot, room pills, note bubble, ✕ removal, see-more bar).

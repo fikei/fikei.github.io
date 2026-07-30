@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.44.0';
+const VERSION = '3.45.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -110,6 +110,7 @@ const VIEWS = {
   screening: { title: 'Screening', kind: 'applicants' },
   archive: { title: 'Archive', kind: 'applicants' },
   occupancy: { title: 'Occupancy', kind: 'house' },
+  activity: { title: 'Activity', kind: 'activity' },
 };
 // Old bookmarks and deep links keep working.
 const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings' };
@@ -135,6 +136,10 @@ let footFor = null;           // which applicant the review bar in the DOM belon
 let commentCounts = {};       // applicant_id -> n
 let latestNotes = {};         // applicant_id -> { author, body }
 let comments = [];            // comments for the applicant open in review
+let activity = [];            // recruit_notifications, newest first — the running log
+let activityError = null;
+let activityFilter = { kind: 'all', open: false };
+let activityOpenCount = 0;    // unresolved notifications, for the rail badge
 let view = 'inbox';           // current rail view
 let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
 let rooms = [];               // recruit_rooms
@@ -1451,8 +1456,162 @@ async function render() {
     await loadHouse();
     if (VIEWS[view].kind !== 'house') return; // navigated away meanwhile
   }
+  if (def.kind === 'activity') {
+    root.innerHTML = `<p class="inbox-empty">Loading…</p>`;
+    await loadActivity();
+    if (view !== 'activity') return;   // navigated away meanwhile
+    renderActivity();
+    return;
+  }
   if (def.kind === 'applicants') renderApplicants();
   else if (view === 'occupancy') renderOccupancy();
+}
+
+/* ---------- activity log ----------
+   The running log of every notification, exactly as recorded — the same rows
+   #recruiting-automation gets, and the same rows the digest draws from. No
+   filtering by default and nothing hidden: muted kinds and DMs are shown with
+   a label saying so, because the point of the log is that it is complete.
+   Migration 142 / recruit_notifications. */
+/* Kind → how it introduces itself. Must stay in step with KINDS in
+   _shared/recruit-notify.ts: the log and Discord should use the same words for
+   the same thing, and neither should ever show the raw kind slug. */
+const ACTIVITY_KINDS = {
+  application_new:   { icon: '📥', label: 'New application' },
+  review_stalled:    { icon: '⏳', label: 'Waiting on a review' },
+  review_backlog:    { icon: '🗄️', label: 'Inbox backlog' },
+  opening_at_risk:   { icon: '🏠', label: 'Opening at risk' },
+  opening_overdue:   { icon: '🔴', label: 'Opening overdue' },
+  room_emptying:     { icon: '📦', label: 'Room emptying' },
+};
+const kindIcon = k => ACTIVITY_KINDS[k]?.icon || '•';
+const kindLabel = k => ACTIVITY_KINDS[k]?.label
+  || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
+/* Where each subject type lives, so a log line clicks through to the thing it
+   is about rather than being a dead end. */
+const ACTIVITY_TARGET = {
+  applicant: id => `?a=${encodeURIComponent(id)}`,
+  listing: () => `?view=openings`,
+  stay: () => `?view=occupancy`,
+  house: () => `?view=openings`,
+};
+
+async function loadActivity() {
+  const { data, error } = await sb.from('recruit_notifications')
+    .select('*').order('created_at', { ascending: false }).limit(300);
+  if (error) { activityError = error.message; activity = []; return; }
+  activityError = null;
+  activity = data || [];
+  activityOpenCount = activity.filter(n => !n.acked_at).length;
+  renderRailCounts();
+}
+
+/* Just the badge number, for boot — the rail should show what's outstanding
+   without pulling 300 log rows on every page load. */
+async function loadActivityCount() {
+  const { count, error } = await sb.from('recruit_notifications')
+    .select('id', { count: 'exact', head: true }).is('acked_at', null);
+  if (error) return;
+  activityOpenCount = count || 0;
+  renderRailCounts();
+}
+
+function activityDelivery(n) {
+  // What actually happened to this notification, in the order it happened.
+  const bits = [];
+  if (n.members_at) bits.push('housemates');
+  if (n.escalated_at) bits.push('escalated to on-call');
+  if (n.dm_at) bits.push('DM');
+  if (n.log_at) bits.push('#recruiting-automation');
+  if (n.muted) bits.push('muted — logged only');
+  if (!bits.length) bits.push('not sent yet');
+  return bits.join(' · ');
+}
+
+function renderActivity() {
+  const host = document.getElementById('view-root');
+  if (activityError) {
+    host.innerHTML = `<p class="inbox-empty">Couldn't load the log — ${esc(activityError)}</p>`;
+    return;
+  }
+  if (!activity.length) {
+    host.innerHTML = `<p class="inbox-empty">Nothing logged yet. Every notification the house sends lands here.</p>`;
+    return;
+  }
+  const kinds = [...new Set(activity.map(n => n.kind))].sort();
+  const shown = activity.filter(n =>
+    (activityFilter.kind === 'all' || n.kind === activityFilter.kind) &&
+    (activityFilter.open === false || !n.acked_at));
+
+  // Same chip vocabulary as the applicant filter bar — one kind chip per kind
+  // actually present, plus the unresolved toggle.
+  const filterBar = `<div class="filters">
+    <span class="filters__group">
+      <button class="chip ${activityFilter.open ? 'is-on' : ''}" data-activity-open>Unresolved</button>
+    </span>
+    <span class="filters__sep"></span>
+    <span class="filters__group">
+      <button class="chip ${activityFilter.kind === 'all' ? 'is-on' : ''}" data-activity-kind="all">Everything</button>
+      ${kinds.map(k => `<button class="chip ${activityFilter.kind === k ? 'is-on' : ''}" data-activity-kind="${esc(k)}">${kindIcon(k)} ${esc(kindLabel(k))}</button>`).join('')}
+    </span>
+  </div>`;
+
+  // Grouped by day: a log is read by "what happened on Tuesday", not by row.
+  const days = [];
+  for (const n of shown) {
+    const day = new Date(n.created_at).toLocaleDateString('en-US',
+      { weekday: 'long', month: 'short', day: 'numeric' });
+    if (!days.length || days[days.length - 1].day !== day) days.push({ day, items: [] });
+    days[days.length - 1].items.push(n);
+  }
+
+  host.innerHTML = filterBar + (shown.length ? days.map(g => `
+    <section class="inbox-group">
+      <div class="inbox-group__head">
+        <span class="inbox-group__label">${esc(g.day)}</span>
+        <span class="inbox-group__count">${g.items.length}</span>
+      </div>
+      <ul class="inbox-card">
+        ${g.items.map(n => `<li class="inbox-row log-row${n.acked_at ? ' is-done' : ''}">
+          <span class="log-row__icon" title="${esc(kindLabel(n.kind))}">${kindIcon(n.kind)}</span>
+          <button class="inbox-row__main" data-log-go="${esc(n.subject_type)}|${esc(n.subject_id || '')}">
+            <span class="inbox-row__text">
+              <span class="inbox-row__title">${esc(kindLabel(n.kind))} · ${esc(n.payload?.title || n.subject_label)}</span>
+              <span class="inbox-row__sub">${esc(n.payload?.body || '')}</span>
+              <span class="log-row__meta">${esc(relTime(n.created_at))} · ${esc(activityDelivery(n))}${n.acked_at ? ` · resolved ${esc(relTime(n.acked_at))}` : ''}</span>
+            </span>
+          </button>
+          <span class="inbox-row__actions">
+            ${n.acked_at ? '' : `<button class="btn btn--sm" data-ack="${esc(n.id)}">Resolve</button>`}
+          </span>
+        </li>`).join('')}
+      </ul>
+    </section>`).join('') : `<p class="inbox-empty">Nothing matches these filters.</p>`);
+
+  host.querySelectorAll('[data-activity-kind]').forEach(el =>
+    el.onclick = () => { activityFilter.kind = el.dataset.activityKind; renderActivity(); });
+  host.querySelectorAll('[data-activity-open]').forEach(el =>
+    el.onclick = () => { activityFilter.open = !activityFilter.open; renderActivity(); });
+  host.querySelectorAll('[data-ack]').forEach(el => el.onclick = () => ackNotification(el.dataset.ack));
+  host.querySelectorAll('[data-log-go]').forEach(el => el.onclick = () => {
+    const [type, id] = el.dataset.logGo.split('|');
+    if (type === 'applicant' && id) return openReview(id);
+    const target = ACTIVITY_TARGET[type];
+    if (target) setView(new URLSearchParams(target(id).replace(/^\?/, '')).get('view') || 'openings');
+  });
+}
+
+/* Resolving keeps the entry and adds the fact that it was handled — the log
+   never loses a row, and the next digest stops asking. */
+async function ackNotification(id) {
+  const row = activity.find(n => n.id === id);
+  if (row) { row.acked_at = new Date().toISOString(); renderActivity(); }
+  const { error } = await sb.rpc('recruit_ack_notification', { p_id: id });
+  if (error) {
+    if (row) row.acked_at = null;
+    renderActivity();
+    toast(`Couldn't resolve that — ${error.message}`);
+  }
 }
 
 /* ---------- applicants render ---------- */
@@ -1538,6 +1697,10 @@ function renderRailCounts() {
     const el = document.getElementById(`count-${key}`);
     if (el) el.textContent = c[key] || '';
   }
+  // Activity counts what's still unresolved, not the whole log — a log that
+  // badges its own length would never stop badging.
+  const act = document.getElementById('count-activity');
+  if (act) act.textContent = activityOpenCount || '';
 }
 
 function decisionChip(id) {
@@ -4411,6 +4574,7 @@ async function _checkMembershipAndEnter() {
     resolveAvatars(); // background — server resolves any unchecked profile photos
     scanInbox();      // background — badge replies without opening each thread
     loadRecordingLeads(); // background — unfiled Discord recording links
+    loadActivityCount();  // background — unresolved-notification badge on Activity
     const autoFlagged = await applyAutoFlags();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;

@@ -13,13 +13,14 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.15.1'
-console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestone reminders`)
+const VERSION = '1.16.0'
+console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestones + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendIntroEmail, sharedAccessToken, sweepCalendars, HOUSE_CALENDAR_ID, SHARED_EMAIL } from '../_shared/recruit-schedule.ts'
 import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen } from '../_shared/discord.ts'
+import { notifyTick } from '../_shared/recruit-notify.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -844,8 +845,16 @@ serve(async (req) => {
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
       const archived = await archiveMissingRecordings(client)
       if (archived) console.log(`[archive] ${archived} recording(s) copied to storage`)
-      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${trials} trial(s), ${recorded} recording(s)`)
-      return json({ bots, live, reminded: sent, trials, recorded })
+      // The notification ledger: detect what's true now, write it to the log,
+      // then broadcast whatever the house is owed. Isolated from everything
+      // above — a failing detector must not cost the screening reminders their
+      // tick.
+      let notify = { detected: 0, logged: 0, now: 0, digest: 0 }
+      try { notify = await notifyTick(client) } catch (err) {
+        console.warn(`[notify] tick failed: ${(err as Error).message}`)
+      }
+      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${trials} trial(s), ${recorded} recording(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
+      return json({ bots, live, reminded: sent, trials, recorded, notify })
     }
 
     const pathname = new URL(req.url).pathname
