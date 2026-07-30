@@ -126,6 +126,9 @@ let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
+/* How the update-email box starts on a Not-a-fit decision. A house preference
+   rather than a hard default: some houses always write, some rarely do. */
+const updateEmailDefault = () => settings.update_email_default !== false;
 let sendUpdateWith = true;    // "Send them an update" rides with a Not-a-fit decision
 let noteDraft = { id: null, text: '' };  // review comment in progress, scoped to its applicant
 let footFor = null;           // which applicant the review bar in the DOM belongs to
@@ -424,7 +427,7 @@ function avatarHtml(a, large) {
 }
 
 /* The one CTA an Openings row needs right now, from its funnel micro-state:
-   nothing sent yet → Reach out · waiting on them → Follow up · they wrote
+   nothing sent yet → Get started · waiting on them → Follow up · they wrote
    back → Reply · availability in hand → Pick a time · call booked → the
    slot chip (+ Join when there's a Meet link). */
 /* Time-derived call phase — a clock, not a cron, decides these. Stored
@@ -483,7 +486,7 @@ function openingsCta(a) {
       ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
       : (dv.length ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours isn't` : 'no decisions yet');
     return stack(
-      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-icon btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button></span>`,
+      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-watch btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
   }
   if (phase === 'done') {
@@ -523,7 +526,7 @@ function openingsCta(a) {
     return stack(`<button class="btn btn--sm inbox-row__review cta-std ${stale ? 'cta--amber' : ''}" data-email="${a.id}">Follow up</button>`,
       `${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`);
   }
-  return stack(`<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Reach out</button>`, '');
+  return stack(`<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Get started</button>`, '');
 }
 
 /* Blue response dot in the row's left gutter — sits beside the avatar,
@@ -669,6 +672,9 @@ async function loadAll() {
     if (box) box.checked = settings.open_to_couples !== false;
     const ap = document.getElementById('pref-autopost');
     if (ap) ap.checked = settings.discord_auto_post === true;
+    const ud = document.getElementById('pref-update-default');
+    if (ud) ud.checked = updateEmailDefault();
+    sendUpdateWith = updateEmailDefault();
   });
   if (aRes.error) throw aRes.error;
   applicants = (aRes.data || []).map(r => ({
@@ -2144,7 +2150,11 @@ function othersAccordion(listingId) {
             </span>
           </button>
           <span class="inbox-row__actions">
-            ${a.stage === 'review' ? (voteChip(a) || '<span class="note-count">gathering votes</span>') : (removed ? '<span class="note-count" title="Removed from this listing by a recruiter">removed</span>' : '')}
+            ${a.stage === 'review'
+              ? '<span class="note-count" title="Nobody has reviewed them yet — one read decides">not reviewed yet</span>'
+              : removed
+                ? '<span class="note-count" title="A recruiter took them off this listing — the auto-sweep won\'t re-add them, but you can">taken off this listing</span>'
+                : '<span class="note-count" title="Reviewed and moved forward — ready to add">moved forward</span>'}
             ${a.stage === 'candidate' ? `<button class="btn btn--sm inbox-row__review" title="${activePlacements(a.id).length ? 'Moves them here from their current listing' : 'Place them on this listing'}" data-add-placement="${a.id}|${esc(listingId)}">${activePlacements(a.id).length ? 'Move here' : 'Add'}</button>` : ''}
           </span>
         </li>`;
@@ -3001,10 +3011,14 @@ function listingPricing(l) {
    hover). Notes live in the edit modal, not the header. */
 function listingMeta(l) {
   const bits = [];
+  // The date is the first thing anyone needs from a listing — it decides who
+  // qualifies — so it leads and it's emphasised.
   if (l.kind === 'resident') {
-    bits.push(`Opens ${fmtDay(l.starts_on)}`);
+    bits.push(`<b class="listing-when">Opens ${fmtDay(l.starts_on)}</b>`);
   } else {
-    bits.push(l.ends_on ? `${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}` : `From ${fmtDay(l.starts_on)} · end date TBD`);
+    bits.push(l.ends_on
+      ? `<b class="listing-when">${fmtDay(l.starts_on)} – ${fmtDay(l.ends_on)}</b>`
+      : `<b class="listing-when">From ${fmtDay(l.starts_on)}</b> · end date TBD`);
     const len = windowLength(l.starts_on, l.ends_on);
     if (len) bits.push(len);
   }
@@ -3030,16 +3044,24 @@ function listingMenuHtml(l) {
   </span>`;
 }
 
-/* Everyone who'd qualify for this listing but isn't on the active shortlist:
-   candidates a recruiter removed, plus qualifying applicants still in the
-   Inbox gathering votes. */
+/* Everyone still in play for this listing who isn't on the active shortlist.
+   Two groups, in this order:
+     1. moved forward — reviewed, passed, and a recruiter can add them now
+     2. not reviewed yet — the dates fit, nobody has read them
+   Anyone archived is excluded outright, and so is anyone reviewed but not
+   moved forward: a "needs input" verdict is a question, not a shortlist. */
 function otherQualified(listingId) {
   const l = listings.find(x => x.id === listingId);
   if (!l) return [];
   const placed = new Set(placements.filter(p => p.listing_id === listingId && p.status === 'active').map(p => p.applicant_id));
-  return applicants.filter(a => !placed.has(a.id)
-    && (a.stage === 'review' || a.stage === 'candidate')
-    && qualifiesFor(a, l));
+  const forward = [], unread = [];
+  for (const a of applicants) {
+    if (placed.has(a.id) || a.exitReason) continue;
+    if (!qualifiesFor(a, l)) continue;
+    if (a.stage === 'candidate') forward.push(a);
+    else if (a.stage === 'review' && !voteStats(a.id).n) unread.push(a);
+  }
+  return [...forward, ...unread];
 }
 
 function listingWindow(l) {
@@ -3263,7 +3285,7 @@ function step(delta) {
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
   pendingVerdict = null;
-  sendUpdateWith = true;
+  sendUpdateWith = updateEmailDefault();
   noteDraft = { id: queue[next], text: '' };
   moveinEditing = false;
   if (!keepBannerOnce) hideReviewBanner();
@@ -4810,6 +4832,16 @@ function init() {
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
   document.getElementById('gd-no').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'no');
+  document.getElementById('pref-update-default').onchange = async (e) => {
+    const value = e.target.checked;
+    settings.update_email_default = value;
+    sendUpdateWith = value;
+    const { error } = await sb.from('recruit_settings').upsert({
+      key: 'update_email_default', value, updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
+    });
+    if (error) { toast(`Save failed: ${error.message}`); e.target.checked = !value; settings.update_email_default = !value; }
+    else toast(value ? 'Not a fit will offer an update email' : 'Not a fit will skip the email unless you ask for one');
+  };
   document.getElementById('pref-couples').onchange = async (e) => {
     const value = e.target.checked;
     settings.open_to_couples = value;
