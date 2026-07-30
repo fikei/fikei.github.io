@@ -31,7 +31,7 @@
 // twice in a row changes nothing.
 
 import { AUTOMATION_CHANNEL_ID } from './discord.ts'
-import { ACTIONS, KINDS, icon, label, loadCopyOverrides, renderCopy } from './recruit-copy.ts'
+import { ACTIONS, KINDS, icon, label, loadCopyOverrides, renderCopy, renderPrompt } from './recruit-copy.ts'
 import type { CopyVars } from './recruit-copy.ts'
 
 const TZ = 'America/Los_Angeles'
@@ -89,7 +89,7 @@ export function setAllowedChannel(settings: NotifySettings): void {
   allowedChannel = houseChannel(settings)
 }
 
-async function send(channelId: string, payload: Record<string, unknown>): Promise<void> {
+async function send(channelId: string, payload: Record<string, unknown>): Promise<string | null> {
   if (channelId !== allowedChannel) {
     throw new Error(`[notify] refusing to post to ${channelId}: only ${allowedChannel} is permitted`)
   }
@@ -105,7 +105,11 @@ async function send(channelId: string, payload: Record<string, unknown>): Promis
       headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (resp.ok) { await resp.body?.cancel(); return }
+    if (resp.ok) {
+      // The message id is how a reply gets traced back to what it replied to.
+      const created = await resp.json().catch(() => null)
+      return created?.id ? String(created.id) : null
+    }
     const text = await resp.text()
     if (resp.status === 429 && attempt === 0) {
       // Discord tells us exactly how long to wait; honour it rather than guess.
@@ -129,7 +133,7 @@ async function send(channelId: string, payload: Record<string, unknown>): Promis
    a channel that buzzes gets muted — which would cost far more than a late
    reply. Escalation shows up as a distinct kind and its own log entry, not as a
    louder noise. */
-const sendEmbed = (channelId: string, description: string) =>
+const sendEmbed = (channelId: string, description: string): Promise<string | null> =>
   send(channelId, { embeds: [{ description: description.slice(0, 3900), color: 0x378add }] })
 
 export interface Notification {
@@ -1688,8 +1692,16 @@ async function drainLog(db: DB): Promise<number> {
   let sent = 0
   for (const n of data) {
     try {
-      await sendEmbed(AUTOMATION_CHANNEL_ID, oneLine(n))
-      await db.from('recruit_notifications').update({ log_at: new Date().toISOString() }).eq('id', n.id)
+      /* The prompt goes on its own line under the sentence: the sentence says
+         what happened, the prompt asks the house for what only they know.
+         Replies to this message are read back on a later tick and filed as
+         house notes, so answering here is enough. */
+      const prompt = renderPrompt(n.kind, n.payload?.links?.[0]?.url)
+      const messageId = await sendEmbed(AUTOMATION_CHANNEL_ID,
+        oneLine(n) + (prompt ? `\n${prompt}` : ''))
+      await db.from('recruit_notifications')
+        .update({ log_at: new Date().toISOString(), discord_message_id: messageId })
+        .eq('id', n.id)
       sent++
     } catch (err) {
       console.warn(`[notify] log post failed for ${n.id}: ${(err as Error).message}`)
@@ -1855,11 +1867,116 @@ export async function previewTick(db: DB): Promise<Array<Record<string, unknown>
   }))
 }
 
+
+/* ---- replies -------------------------------------------------------------
+
+   Read replies to our own notifications and file them against the applicant.
+
+   The point is that knowing something about an applicant should cost one
+   sentence in the channel where you already are, not a trip into the app to
+   retype it. So a reply to "Monique Nguyen applied…" becomes a house note on
+   Monique, visible everywhere notes already are.
+
+   Two things make this safe to run every fifteen minutes:
+   - Discord's message id is the primary key of recruit_notification_replies, so
+     re-reading the same window cannot file the same reply twice.
+   - Only replies to a message WE posted, by a known recruiting member, are
+     filed. Anything else is a conversation the house is having, and filing it
+     onto someone's application would be both wrong and creepy.
+*/
+async function collectReplies(db: DB): Promise<number> {
+  const { fetchChannelMessages } = await import('./discord.ts')
+
+  // A day's window: long enough that a slow reply still lands, short enough
+  // that the fetch stays small.
+  const since = new Date(Date.now() - 24 * 3600000).toISOString()
+  let messages: Array<Record<string, any>> = []
+  try {
+    messages = await fetchChannelMessages(AUTOMATION_CHANNEL_ID, { limit: 200, sinceIso: since })
+  } catch (err) {
+    console.warn(`[replies] could not read the channel: ${(err as Error).message}`)
+    return 0
+  }
+
+  // Replies carry message_reference; everything else in the channel is not for us.
+  const replies = messages.filter((m) =>
+    m.message_reference?.message_id && String(m.content || '').trim() && !m.author?.bot)
+  if (!replies.length) return 0
+
+  const [{ data: parents }, { data: already }] = await Promise.all([
+    db.from('recruit_notifications')
+      .select('id, subject_type, subject_id, subject_label, discord_message_id')
+      .in('discord_message_id', replies.map((m) => String(m.message_reference.message_id))),
+    db.from('recruit_notification_replies')
+      .select('discord_message_id').in('discord_message_id', replies.map((m) => String(m.id))),
+  ])
+  const byMessage = new Map((parents || []).map((p: Record<string, string>) => [p.discord_message_id, p]))
+  const seen = new Set((already || []).map((r: { discord_message_id: string }) => r.discord_message_id))
+
+  // Who said it. A reply from someone who isn't a recruiting member is left
+  // alone rather than filed under a name the house can't place.
+  const authorIds = [...new Set(replies.map((m) => String(m.author?.id || '')).filter(Boolean))]
+  const { data: members } = await db.from('user_discord_membership')
+    .select('user_id, discord_user_id, discord_username, is_recruiting_member')
+    .in('discord_user_id', authorIds)
+  const memberBy = new Map((members || [])
+    .filter((m: Record<string, unknown>) => m.is_recruiting_member)
+    .map((m: Record<string, string>) => [m.discord_user_id, m]))
+
+  let filed = 0
+  for (const m of replies) {
+    const id = String(m.id)
+    if (seen.has(id)) continue
+    const parent = byMessage.get(String(m.message_reference.message_id))
+    if (!parent) continue                                   // a reply to something else
+    const member = memberBy.get(String(m.author?.id || ''))
+    if (!member) continue                                   // not a housemate we know
+
+    // Discord's own display name is what the house sees in the channel; prefer
+    // the app's display name when we have one, so the note reads the same as
+    // notes written in the app.
+    const { data: profile } = await db.from('recruit_profiles')
+      .select('display_name').eq('user_id', member.user_id).maybeSingle()
+    const author = profile?.display_name || member.discord_username || 'a housemate'
+    const body = String(m.content).trim().slice(0, 4000)
+
+    let commentId: string | null = null
+    if (parent.subject_type === 'applicant' && parent.subject_id) {
+      const { data: comment, error } = await db.from('recruit_comments').insert({
+        applicant_id: parent.subject_id,
+        user_id: member.user_id,
+        author_name: author,
+        body,
+        source: 'discord',
+      }).select('id').single()
+      if (error) {
+        console.warn(`[replies] could not file a note on ${parent.subject_id}: ${error.message}`)
+      } else {
+        commentId = comment.id
+      }
+    }
+
+    await db.from('recruit_notification_replies').insert({
+      discord_message_id: id,
+      notification_id: parent.id,
+      applicant_id: parent.subject_type === 'applicant' ? parent.subject_id : null,
+      author_discord_id: String(m.author?.id || ''),
+      author_name: author,
+      body,
+      comment_id: commentId,
+    })
+    if (commentId) filed++
+  }
+  if (filed) console.log(`[replies] filed ${filed} reply/replies as house notes`)
+  return filed
+}
+
 export interface TickResult {
   detected: number
   logged: number
   now: number
   digest: number
+  replies: number
 }
 
 /* One tick: detect, then log, then broadcast. Called from recruit-discord's
@@ -1867,11 +1984,17 @@ export interface TickResult {
    milestone reminders in v3.39. */
 export async function notifyTick(db: DB): Promise<TickResult> {
   const settings = await loadSettings(db)
-  const out: TickResult = { detected: 0, logged: 0, now: 0, digest: 0 }
+  const out: TickResult = { detected: 0, logged: 0, now: 0, digest: 0, replies: 0 }
   if (!settings.enabled) return out
   setAllowedChannel(settings)
 
   out.detected = await detect(db)
+  /* Read replies before writing anything new, so a housemate's answer is filed
+     against the applicant before the next notification about them goes out. */
+  try { out.replies = await collectReplies(db) } catch (err) {
+    console.warn(`[notify] reply collection failed: ${(err as Error).message}`)
+  }
+
   // The log first, always: #recruiting-automation must never lag the channel
   // the house reads.
   try { out.logged = await drainLog(db) } catch (err) {
