@@ -840,7 +840,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .cal__event { border: 0; cursor: pointer; transition: filter 80ms ease, box-shadow 80ms ease; font: inherit; font-size: var(--font-size-caption); }
 .cal__event:hover { filter: brightness(1.08); box-shadow: 0 0 0 1.5px var(--border-strong); }
 .cal__event.is-editing { box-shadow: 0 0 0 2px var(--accent); }
-.cal__event--sublet { border: 1px solid var(--hold-tint); }
 .seg-form { margin-top: var(--space-4); }
 .seg-form__head { display: flex; align-items: baseline; gap: var(--space-2); }
 .occupants { margin-top: var(--space-6); }

@@ -3,14 +3,14 @@
    the discord-membership edge fn). Applicants, votes, shared decisions, and
    house notes live in Supabase behind RLS (migrations 108 + 120).
 
-   v4 funnel: Inbox (one reviewer decides: not a fit / needs input /
+   v4 funnel: Applicants (one reviewer decides: not a fit / needs input /
    move forward, comment required) → Candidates →
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.45.0';
+const VERSION = '3.46.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -104,7 +104,7 @@ function defaultReturnDate() {
 }
 
 const VIEWS = {
-  inbox: { title: 'Inbox', kind: 'applicants' },
+  inbox: { title: 'Applicants', kind: 'applicants' },
   candidates: { title: 'Candidates', kind: 'applicants' },
   openings: { title: 'Openings', kind: 'applicants' },
   screening: { title: 'Screening', kind: 'applicants' },
@@ -112,7 +112,10 @@ const VIEWS = {
   occupancy: { title: 'Occupancy', kind: 'house' },
 };
 // Old bookmarks and deep links keep working.
-const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings' };
+// `inbox` stays the view key and the URL — renaming it would break every
+// bookmark and deep link — but `?view=applicants` resolves too, since that is
+// what the rail now calls it.
+const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings', applicants: 'inbox' };
 
 let sb = null;                // supabase client (from CtrlAuth)
 let me = null;                // { id, name, groupEmail }
@@ -536,7 +539,7 @@ function openingsCta(a) {
 /* Blue response dot in the row's left gutter — sits beside the avatar,
    never on top of it. */
 function repliedDot(a) {
-  // Same blue dot, two meanings by context: in the Inbox it marks an
+  // Same blue dot, two meanings by context: in Applicants it marks an
   // application nobody on your account has opened yet; elsewhere it marks
   // their reply waiting on you.
   if (view === 'inbox') {
@@ -1283,7 +1286,7 @@ function attachmentLabel(rec) {
    moves the applicant on the most recent decisive one (migration 140). */
 const VERDICTS = {
   not_fit: { label: 'Not a fit', title: 'Archives them — an update email is owed', cls: 'is-not-fit' },
-  needs_input: { label: 'Needs input', title: 'Stays in the Inbox, flagged for another housemate to read', cls: 'is-needs-input' },
+  needs_input: { label: 'Needs input', title: 'Stays in Applicants, flagged for another housemate to read', cls: 'is-needs-input' },
   forward: { label: 'Move forward', title: 'Moves them to Candidates and into every listing they qualify for', cls: 'is-forward' },
 };
 
@@ -2154,7 +2157,7 @@ function qualifiedTag(a, listingId, removed) {
 }
 
 /* Collapsed rail of everyone else who'd fit this listing — removed
-   candidates can be re-added; Inbox folks link to their review page. */
+   candidates can be re-added; Applicants folks link to their review page. */
 function othersAccordion(listingId) {
   const others = otherQualified(listingId);
   if (!others.length) return '';
@@ -3385,7 +3388,7 @@ function renderReview() {
         <span class="decision-banner__meta">${esc(why)}</span>
       </div>
       <span class="decision-banner__actions">
-        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Inbox</button>
+        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Applicants</button>
       </span>
     </div>`;
   };
@@ -3609,7 +3612,7 @@ function renderReviewFoot(a) {
       ${owed ? `<span class="foot-cta"><button class="btn btn--accent review__btn" data-update-edit="${a.id}">Write their update</button></span>` : ''}
       <span class="foot-links">
         ${owed ? `<button type="button" class="cta-link" data-update-skip="${a.id}">Skip the email</button>` : ''}
-        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Inbox</button>
+        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Applicants</button>
       </span>`;
   }
 }
@@ -3633,7 +3636,7 @@ async function reopenApplicant(id) {
     hideReviewBanner();
     toast(st0.decisive
       ? `Reopened — ${reviewerName(st0.decisive)}'s comment is kept as needing input`
-      : 'Reopened — back in the Inbox');
+      : 'Reopened — back in Applicants');
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
