@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.30.2'
+const VERSION = '1.30.3'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
+import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC } from '../_shared/discord.ts'
 import { record } from '../_shared/recruit-notify.ts'
 import { ACTIONS } from '../_shared/recruit-copy.ts'
 
@@ -436,6 +436,17 @@ function extractRecordingUrls(text: string): string[] {
     } catch { /* not a URL we can parse */ }
   }
   return [...out]
+}
+
+// "Thu Jul 31 9:00a–12:00p · Fri Aug 1 1:00p–3:00p" — for reply notifications.
+function fmtWindows(windows?: Array<{ date: string; start: string; end: string }>): string {
+  const t = (d: Date) => d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
+    .toLowerCase().replace(' am', 'a').replace(' pm', 'p')
+  return (windows || []).slice(0, 4).map((w) => {
+    const s = ptToUTC(w.date, w.start)
+    const e = ptToUTC(w.date, w.end)
+    return `${s.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: TZ })} ${t(s)}–${t(e)}`
+  }).join(' · ')
 }
 
 function header(headers: Array<{ name: string; value: string }>, name: string): string {
