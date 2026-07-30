@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.4.0'
+const VERSION = '1.4.1'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel gate + #recruiting-automation admin (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -199,6 +199,9 @@ async function verifyAndCache(userId: string, identity: DiscordIdentity) {
     discord_username: identity.username,
     is_agape_member: isMember,
     is_recruiting_member: isRecruiting,
+    // Cached so a NULL can mean "never checked" — see migration 145. The
+    // authority RLS reads is still recruit_admins, written just below.
+    is_recruiting_admin: isAdmin,
     verified_at: new Date().toISOString(),
   }
   const { error } = await getSupabase()
@@ -252,7 +255,7 @@ async function verifyAndCache(userId: string, identity: DiscordIdentity) {
   }
 
   console.log(`Verified ${identity.discordUserId} (${identity.username || 'unknown'}): member=${isMember} recruiting=${isRecruiting} admin=${isAdmin}`)
-  return { ...row, is_recruiting_admin: isAdmin }
+  return row
 }
 
 serve(async (req) => {
@@ -288,15 +291,18 @@ serve(async (req) => {
     if (action !== 'verify') {
       const { data } = await db
         .from('user_discord_membership')
-        .select('discord_user_id, discord_username, is_agape_member, is_recruiting_member, verified_at')
+        .select('discord_user_id, discord_username, is_agape_member, is_recruiting_member, is_recruiting_admin, verified_at')
         .eq('user_id', user.id)
         .maybeSingle()
       const fresh = data &&
         data.discord_user_id === identity.discordUserId &&
-        (Date.now() - new Date(data.verified_at).getTime()) < REVERIFY_DAYS * 86400_000
+        (Date.now() - new Date(data.verified_at).getTime()) < REVERIFY_DAYS * 86400_000 &&
+        // A null admin verdict means this row predates the admin check, so it
+        // isn't fresh enough to answer the question. One re-verify fixes it.
+        (data.is_recruiting_admin !== null || !data.is_recruiting_member)
       if (fresh) {
-        // Admin isn't cached on the membership row — read it from the table RLS
-        // actually consults, so the UI and the database can never disagree.
+        // Read the verdict from the table RLS actually consults, so the UI and
+        // the database can never disagree about who can write.
         const { data: adm } = await db.from('recruit_admins')
           .select('user_id').eq('user_id', user.id).maybeSingle()
         row = { ...data, is_recruiting_admin: !!adm }
