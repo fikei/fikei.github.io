@@ -257,9 +257,15 @@ that fails can't leave the folder with three ballots for one person.
 Three settings, none of which need a deploy to change:
 `ballot_template_file_id`, `ballot_folder_id`, `ballot_lead_days`.
 
-**It needs Drive write, which the shared account does not yet have.** The
-account is consented to `drive.readonly`; every copy 403s, is caught, and the
-house gets the "no ballot attached yet" line — which is exactly what is true.
+`POST /recruit-discord/remind?ballots=1` forces a pass off-schedule, behind the
+same cron auth — for the morning someone reconnects the account and doesn't want
+to wait until 8am to find out whether it worked.
+
+**Only the copy needs Drive write, and the shared account doesn't have it yet.**
+Everything else already works on `drive.readonly`: a pass finds a ballot that
+exists by name and links it to the stay, which is how a form made by hand gets
+picked up without anyone pasting a URL. Only the copy itself 403s — caught, and
+the house gets the "no ballot attached yet" line, which is exactly what is true.
 Reconnecting the shared Gmail grants `.../auth/drive` and turns provisioning on
 with no code change. `drive.file` would not do: it gives per-file access to what
 the app created, and these copies land in a folder the app didn't make, inside a
