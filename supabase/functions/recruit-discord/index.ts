@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.26.0'
+const VERSION = '1.27.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -130,7 +130,11 @@ async function interviewGuide(
     .replaceAll('{notes}', url || 'https://ctrl.rodeo/applications/')
   if (!guide) return []
 
-  const LIMIT = 1900          // headroom under Discord's 2000
+  /* Discord's real cap, not a rounded-down guess. The house's guide is 1,998
+     characters — it fits, and an arbitrary 1,900 would have split it in two for
+     no reason. The cost of using the true limit is that an edit adding more than
+     two characters splits it, which /guide-preview will show before it matters. */
+  const LIMIT = 2000
   if (guide.length <= LIMIT) return [guide]
 
   console.warn(`[recruit-discord] interview guide is ${guide.length} chars — splitting; it is meant to fit one message`)
