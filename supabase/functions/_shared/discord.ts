@@ -525,12 +525,9 @@ export async function postSigninMessage(channelId: string): Promise<any> {
     method: 'POST',
     body: JSON.stringify({
       embeds: [{
-        description: '📱 **Applicant inbox — sign in from your phone**\n' +
-          'Tap below for a one-time link — or type `/signin` anywhere in the server ' +
-          'to get one without coming back here.\n' +
-          'No password and no Discord redirect, so it works inside Instagram and ' +
-          'Discord in-app browsers, where normal sign-in fails. ' +
-          'Links last 10 minutes and work once.',
+        description: '**Applicant inbox**\n' +
+          'Tap below, or type `/signin` anywhere in the server.',
+        footer: { text: 'Links work once, for 10 minutes. Fine inside Instagram and Discord browsers.' },
         color: 0x5865f2,
       }],
       components: [{
