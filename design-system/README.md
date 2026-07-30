@@ -700,6 +700,61 @@ A sidebar or drawer footer is **three tiers deep, ordered by consequence** — n
 
 *Reference implementation: `applications/css/app.css` — `.drawer-cta`. Story: [Sidebar CTAs](https://ctrl.rodeo/design-system/recruiting/#sidebar-ctas).*
 
+### Settings (`set-*`) and the stepped drawer (`step-*`)
+
+**Settings renders from a schema, not from markup.** `applications/js/settings-schema.js` holds `SETTING_DEFS` — one object per knob — and the view renders it. Adding a setting is appending an object; no template, no handler, no CSS. The stylesheet describes field *types*, never individual settings.
+
+```js
+followup_stale_days: {
+  scope: 'house', type: 'number', section: 'funnel', default: 3,
+  label: 'Follow-up goes amber after', unit: 'days', min: 1, max: 30, step: 1,
+  hint: 'A thread this quiet is worth another email.',
+},
+```
+
+| Property | Meaning |
+|---|---|
+| `scope` | Picks the store: `house` → `recruit_settings`, `profile` → `recruit_profiles`, `local` → localStorage. Callers use `setting(key)` and never learn where a value lives. |
+| `type` | `bool` · `number` · `text` · `enum` — four types cover every knob in the app. |
+| `default` | **Is the code default.** `setting('followup_stale_days')` returns 3 until someone changes it, so exposing a knob needs no migration and no seed row. |
+| `section` | Which section it appears in, or `null` to route it through `setting()` without exposing it — a named constant instead of a magic number. |
+
+Sections borrow the product's own nav vocabulary (`You · House · Funnel · Automations · Connections · Data`). `rows:` marks a section that renders **status objects** rather than fields — automations and connections have a last-run time and a state, not a value, and don't belong in the field renderer.
+
+```html
+<div class="set-field">                       <!-- tile: label, control, hint, no rules -->
+  <span class="set-field__label">Food</span>
+  <span class="set-field__control">…</span>
+  <span class="set-field__hint">Groceries, split evenly.
+    <span class="set-field__by">Ian changed this 3 days ago</span></span>
+</div>
+<div class="set-auto">…</div>   <!-- label · when it last ran · switch · hint · cadence -->
+<div class="set-conn">…</div>   <!-- label · state (is-ok / is-warn / is-off) · detail -->
+```
+
+**Settings rules:**
+- Same as drawer footers: **no hairlines, no Save.** Fields write on `change`; the receipt is a green ring on the field (`.set-field.is-saved`), not a word
+- The only button in a section is destructive
+- A locked field is **disabled, never hidden** — RLS is the wall; the disabled control is courtesy, and hiding a value implies it's secret when it isn't
+- Every field's audit line (`set-field__by`) names who last changed it
+
+**Stepped drawer.** When a surface has two honest next moves, ask before showing a form — two `step-choice` tiles, then the drawer *becomes* the chosen flow with a single `step-back`. Nothing writes until that flow's own commit.
+
+```html
+<div class="step-choices">
+  <button class="step-choice">
+    <span class="step-choice__label">Create a listing</span>
+    <span class="step-choice__go" aria-hidden="true">&rarr;</span>
+    <span class="step-choice__hint">Opens the room to candidates.</span>
+  </button>
+  …
+</div>
+<!-- after choosing -->
+<button class="step-back">&larr; Create a listing</button>
+```
+
+*Reference implementation: `applications/js/app.js` — `renderSettings()`, `gapDrawerBody()`. Story: [Settings](https://ctrl.rodeo/design-system/recruiting/#settings).*
+
 ### Drop Target
 
 Whole-container drop zone for drag-and-drop between groups. Highlighting the **container** rather than an insertion line is what makes an empty group reachable.

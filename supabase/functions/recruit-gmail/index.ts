@@ -440,12 +440,11 @@ function header(headers: Array<{ name: string; value: string }>, name: string): 
    two audiences, and suppressing the second because the first fired is how a
    house ends up unable to answer "did anyone ever get back to her?". */
 /* For most intents the label carries everything: "wants to move their call" is
-   the whole story and the thread has the rest. But for a question, a changed
-   plan, or a reply nobody can parse, the CONTENT is the notification — "asked a
-   question" tells a housemate nothing they can act on. Those quote the
-   applicant's own summary line inside the sentence, which keeps it prose (no
-   trailing annotation) while carrying the thing that matters. */
-/* The summary is a clause meant to slot straight into the sentence ("whether
+   the whole story and the thread has the rest. But for a question or a changed
+   plan the CONTENT is the notification — "asked a question" tells a housemate
+   nothing they can act on — so those splice the ask into the sentence itself.
+
+   The summary is a clause meant to slot straight into the sentence ("whether
    the room is furnished"), so it goes in unquoted and lowercased. Anything that
    still arrives looking like a sentence — a capital first letter and a verb — is
    dropped rather than mangled into the middle of ours. */

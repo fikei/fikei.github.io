@@ -1,7 +1,9 @@
 # Settings — concept & structure
 
-> **Status:** concept, not built. Design system story: [Settings](https://ctrl.rodeo/design-system/recruiting/#settings).
+> **Status:** shipped 2026-07-30 (v3.49.0). Design system story: [Settings](https://ctrl.rodeo/design-system/recruiting/#settings).
 > **Product:** Agape recruiting (`/applications`) · **Written:** 2026-07-30
+>
+> All three open questions are decided and the build is done: `?view=settings`, six sections rendering from `applications/js/settings-schema.js`, automations and connections with live status, admin derived from Discord. What follows is the reasoning, kept because it explains why the shape is the shape.
 
 ---
 
@@ -151,29 +153,35 @@ Section footers use [`drawer-cta`](https://ctrl.rodeo/design-system/recruiting/#
 
 **Autosave, everywhere.** Settled app-wide rather than for Settings alone: nothing in the app gets a Save button unless it **creates**, **confirms**, or **destroys**. Fields write on `change` — text on blur, dates/selects/toggles the instant they settle — and a quiet status line says "Changes save as you go", flashing "Saved" when a write lands. Section footers therefore carry no commit at all; the only button in a Settings section is "Reset this section", which is destructive. See the [Sidebar CTAs](https://ctrl.rodeo/design-system/recruiting/#sidebar-ctas) story.
 
-### 2. Who can change house-wide settings?
+### ~~2. Who can change house-wide settings?~~ — decided Jul 30
 
-- Today every signed-in Recruiting Society member can flip any of the three footer toggles, and nothing records who did.
-- House-wide settings change what everyone sees. Locking them to an admin list is safer but adds a role concept the app doesn't have yet.
-- **Nuance:** the honest middle is an audit trail — `recruit_settings` gains `updated_by` / `updated_at`, and the section shows "Ian changed this 3 days ago". Accountability without a permissions model, the same bet the single-decider review model already made.
+**Admins, derived from Discord: whoever can see #recruiting-automation.** Not a role the app maintains — the same channel that already receives the automation audit trail defines who gets to change the automation. The check needs the bot token, so `discord-membership` computes it (reusing the channel-permission math that already gates the app) and reconciles a `recruit_admins` row on every verify, in both directions: lose channel access, lose admin.
 
-**Recommendation:** no roles. Add `updated_by`/`updated_at` and surface it per setting. Revisit if it's ever abused.
+RLS is the wall (migration 144): `recruit_settings` writes require `is_recruiting_admin()`. The flag deliberately does **not** live on `recruit_profiles` — members write their own profile row, so they could grant themselves admin. `recruit_admins` is service-role-write, member-read, so the UI can say "you can't change this" instead of failing a write.
 
-### 3. How far to go on the hardcoded literals in v1?
+Everyone still reads everything, and every house-wide setting shows `updated_by_name` / `updated_at` — "Ian changed this 3 days ago." Read access was never the thing worth protecting.
 
-- **All of them** (8 knobs) is the most complete, but some — the 30-minute screener slot interval, the timezone — nobody will touch this year, and each one exposed is a setting to maintain and document.
-- **None of them**, and Settings is just the footer reorganized, which doesn't earn a new view.
-- **Nuance:** the ones worth exposing are the ones the house has actually argued about.
+### ~~3. How far to go on the hardcoded literals in v1?~~ — decided Jul 30
 
-**Recommendation:** expose four in v1 — follow-up staleness, move-in flexibility, the two trial milestone offsets. Route the rest through `setting()` with schema defaults but leave them out of the UI; they become one-line exposures the day someone asks. Delete `vote_min_count` and `vote_pass_avg`.
+**Four exposed, four routed.** In the UI: follow-up staleness, move-in flexibility, and the two trial milestone offsets — the ones the house has actually argued about. Routed through `setting()` with schema defaults but left out of the UI (`section: null`): the gap minimum, screener slot length, slots per ask, and the save-for-future window. They are named constants in one place now instead of magic numbers in three, and exposing one is a one-line change.
+
+`vote_min_count` and `vote_pass_avg` are deleted (migration 144) — dead since the single-decider change on Jul 29.
+
+**Not settings, deliberately:** the timezone (`America/Los_Angeles`) and the trial-milestone SQL in migration 139 stay server-side. The frontend suggestion honours `trial_checkin_months` / `trial_decision_months`; the database's own backfill does not, so a house that changes those will see new stays follow the setting while migration 139's one-time pass used ±1 month. Worth a follow-up if the numbers ever diverge in practice.
 
 ---
 
-## Suggested build order
+## What shipped (v3.49.0)
 
-1. `settings-schema.js` + `setting()` / `setSetting()`, and route the four v1 knobs and all existing settings through them. No UI yet — behavior identical, literals gone.
-2. `?view=settings` with the six sections rendering from the schema, every field autosaving on `change`; rail entry added, footer stripped to identity + Settings + Sign out. Move food/dues out of the room drawer into **House**.
-3. Automations + Connections row types, reading `cron.job_run_details` and the Gmail token state for status.
-4. `updated_by` / `updated_at` on `recruit_settings`, surfaced per setting.
+1. **`applications/js/settings-schema.js`** — `SETTING_DEFS` (14 knobs), `SETTING_SECTIONS`, `SETTING_AUTOMATIONS`. Loaded before `app.js` as a classic script.
+2. **`setting()` / `setSetting()`** in `app.js` — schema default as the fallback, `scope` picking the store. Every literal in the table above now reads through it.
+3. **`?view=settings`** — six sections rendered from the schema, `Settings` in the rail under *House keeping*, and the footer stripped to identity · Sign out. Food and dues moved out of the room drawer into **House**.
+4. **Automations** — `recruit_cron_status()` (migration 144, `SECURITY DEFINER`, read-only) gives each job its schedule, last run, and last status. `cron.*` isn't reachable over REST, so this RPC is the one door to it. The cron cadences are **not** editable here: a toggle that only half-worked would be worse than saying where they live.
+5. **Connections** — Gmail (from `recruit-gmail { action: 'status' }`), the house calendar, and Discord's two channels, each with a real state. The Gmail token dying every ~7 days is now a glance instead of an investigation.
+6. **Admin** — `recruit_admins` + `is_recruiting_admin()`, reconciled by `discord-membership` v1.4.0 from #recruiting-automation access.
 
-Step 1 is worth doing even if the view never ships.
+### Still open
+
+- **Automation on/off** is read-only except `discord_auto_post`. Real toggles mean either mutating `pg_cron` from an RPC or giving each edge function an enabled-check; neither is free.
+- **Migration 139's trial milestones** don't read the settings (see decision 3).
+- **`recruit-gmail` reconnect** can't be driven from this page — the token is server-side.

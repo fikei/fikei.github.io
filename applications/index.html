@@ -56,12 +56,7 @@
       </nav>
       <div class="rail-foot">
         <span class="rail-foot__user" id="rail-user"></span>
-        <label class="rail-foot__pref"><input type="checkbox" id="pref-couples"> Open to couples</label>
-        <label class="rail-foot__pref" title="When on, coverage asks post to #recruiting-automation automatically as availability lands"><input type="checkbox" id="pref-autopost"> Auto-post coverage asks</label>
-        <label class="rail-foot__pref" title="Sets how the update-email box starts when someone is marked not a fit — you can still change it per person"><input type="checkbox" id="pref-update-default"> Offer an update email by default</label>
-        <button class="rail-foot__link rail-foot__gmail" id="gmail-conn" type="button">Checking shared Gmail…</button>
-        <button class="rail-foot__link" id="menu-theme" type="button">Toggle theme</button>
-        <button class="rail-foot__link" id="menu-export" type="button">Export decisions (CSV)</button>
+        <a class="rail-foot__link rail-foot__settings" href="?view=settings" data-view-link="settings">Settings</a>
         <button class="rail-foot__link" id="menu-signout" type="button">Sign out</button>
       </div>
     </aside>
@@ -307,7 +302,8 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=3.48.0"></script>
+  <script src="js/settings-schema.js?v=3.50.0"></script>
+  <script src="js/app.js?v=3.50.0"></script>
 
 </body>
 </html>
