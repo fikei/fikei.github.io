@@ -569,7 +569,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   .inbox-row__review { display: none; } /* whole row is tappable on phones */
   .review__foot { gap: var(--space-2); }
   .review__btn { padding-inline: var(--space-2); font-size: var(--font-size-small); }
-  /* Openings rows: the fixed 172px CTA column (its buttons are hidden here
+  /* Openings rows: the fixed CTA column (its buttons are hidden here
      anyway) starved the name column into one-letter-per-line wraps. */
   .inbox-row__actions .cta-stack { width: auto; }
   .inbox-row__actions .cta-context { display: none; }
@@ -1355,9 +1355,12 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .listing-menu__item--danger { color: var(--error); }
 
 /* --- v3.18.0: aligned CTA column, quiet ⋮, confirm-to-book modal --- */
-.inbox-row__actions .cta-stack { width: 172px; align-items: stretch; }
+/* The CTA column is fixed so every row's buttons line up. 258px is what a
+   labelled secondary needs beside the primary — at 172px the pair wrapped onto
+   two lines, which breaks the one-action-per-line read. */
+.inbox-row__actions .cta-stack { width: 258px; align-items: stretch; }
 .inbox-row__actions .cta-stack .cta-std { width: 100%; justify-content: center; }
-.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; flex-wrap: wrap; }
+.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; }
 .inbox-row__actions .cta-pair .cta-std { flex: 1; }
 .inbox-row__actions .cta-context { align-self: flex-end; }
 .listing-menu-btn { border-color: transparent; background: transparent; letter-spacing: 0; font-size: 16px; }
