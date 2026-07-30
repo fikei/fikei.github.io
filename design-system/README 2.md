@@ -1,4 +1,4 @@
-# CTRL Design System
+# Sassy: CTRL (global layer)
 
 > Minimal, high-contrast design system powering all ctrl.rodeo products.
 
@@ -9,7 +9,7 @@
 
 ## Product Overview
 
-The CTRL Design System provides a unified visual language across all ctrl.rodeo applications. It emphasizes clarity, speed, and a distinctive code-like aesthetic.
+Sassy's CTRL layer provides a unified visual language across all ctrl.rodeo applications. It emphasizes clarity, speed, and a distinctive code-like aesthetic.
 
 ### Used By
 - **Boards** - Link curation app

@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.44.1';
+const VERSION = '3.45.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2475,16 +2475,19 @@ function renderOccupancy() {
       const range = `${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
       const active = occDrawer?.type === 'stay' && occDrawer.id === s.id;
       bars.push(`<button type="button" class="cal__event cal__event--${s.kind} ${!s.ends_on ? 'is-open-ended' : ''} ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: ${Math.max(width, 0.8)}%" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
+        style="left: ${left}%; width: calc(${Math.max(width, 0.8)}% - var(--bar-break))" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
         data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
     }
     for (const [a, b] of roomGaps(r.id)) {
       const left = occPos(a) * 100;
       const width = occPos(isoAddDays(b, 1)) * 100 - left;
       const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
+      // No label: a red stretch already reads as empty, and the dates it
+      // spans are the point. Tapping it opens the drawer, which names them.
       bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: ${width}%" title="Open ${fmtShort(a)} – ${fmtShort(b)} — click to fill or list"
-        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}">Open</button>`);
+        style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
+        aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
+        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
     }
     return bars.join('');
   };
@@ -2512,6 +2515,11 @@ function renderOccupancy() {
         </div>
       </div>
       <div class="cal__body">
+        <!-- One gridline overlay for the whole body, on the same
+             repeat(n, 1fr) grid as the header, so a month edge in the header
+             and a month edge behind the bars are the same pixel. Per-lane
+             repeating gradients drifted by a pixel or two per month. -->
+        <div class="cal__grid" aria-hidden="true">${months.map(() => '<span></span>').join('')}</div>
         ${todayPct !== null ? `<span class="cal__today" style="left: calc(var(--room-col) + (100% - var(--room-col)) * ${todayPct / 100})"></span>` : ''}
         ${rooms.map(r => `
           <div class="cal__row">
@@ -2595,8 +2603,10 @@ function promoteBlockHtml(s) {
   const start = trialEnd ? isoAddDays(trialEnd, 1) : new Date().toISOString().slice(0, 10);
   if (promoting !== s.id) {
     return `<div class="occ-drawer__promote">
-      <button type="button" class="btn btn--accent btn--sm" data-promote-open="${s.id}">Welcome them in</button>
-      <span class="occ-drawer__promote-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
+      <button type="button" class="drawer-cta__alt" data-promote-open="${s.id}">
+        <span>Welcome them in</span>
+        <span class="drawer-cta__exit-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
+      </button>
     </div>`;
   }
   return `<form class="occ-drawer__promote occ-drawer__promote--open" data-promote-form="${s.id}">
@@ -2613,9 +2623,11 @@ function promoteBlockHtml(s) {
     </div>
     <p class="occ-drawer__note">The trial closes the day before, so the timeline has no gap. An onboarding checklist gets created for the house to work through.</p>
     <p class="listing-form__error" data-promote-error></p>
-    <div class="decision-sheet__actions seg-form__actions">
-      <button type="button" class="hold-sheet__cancel" data-promote-cancel>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">Welcome them in</button>
+    <div class="drawer-cta">
+      <div class="drawer-cta__row">
+        <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">Welcome them in</button>
+      </div>
     </div>
   </form>`;
 }
@@ -2682,6 +2694,19 @@ async function submitPromote(form) {
 
 function stayFormHtml(s, roomId) {
   const isNew = !s.id;
+  // Tier 3 of the sidebar CTA pattern: the ways out. Each carries a hint so a
+  // red label is never the only thing telling you what it does.
+  const exits = [];
+  if (!isNew && s.kind === 'resident') {
+    exits.push(`<button type="button" class="drawer-cta__exit" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">
+      Mark leaving <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+    </button>`);
+  }
+  if (!isNew) {
+    exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-stay-delete="${s.id}">
+      Remove stay <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+    </button>`);
+  }
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
     <label class="listing-form__field">Who
       <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" autofocus>
@@ -2703,11 +2728,12 @@ function stayFormHtml(s, roomId) {
     <label class="occ-drawer__ongoing"><input type="checkbox" name="ongoing" ${s.id && !s.ends_on ? 'checked' : ''}> Ongoing — no move-out date yet</label>
     ${trialFieldsHtml(s)}
     <p class="listing-form__error" data-form-error></p>
-    <div class="decision-sheet__actions seg-form__actions">
-      ${!isNew ? `<button type="button" class="listing-form__delete" data-stay-delete="${s.id}">Remove stay</button>` : ''}
-      ${!isNew && s.kind === 'resident' ? `<button type="button" class="listing-form__delete" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">Mark leaving — list room</button>` : ''}
-      <button type="button" class="hold-sheet__cancel" data-drawer-close>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">${isNew ? 'Add stay' : 'Save'}</button>
+    <div class="drawer-cta">
+      <div class="drawer-cta__row">
+        <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">${isNew ? 'Add stay' : 'Save'}</button>
+      </div>
+      ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
     </div>
   </form>`;
 }
@@ -2767,7 +2793,10 @@ function renderOccDrawer() {
     title = `${room?.name || 'Room'} — open`;
     sub = `${fmtShort(occDrawer.start)} – ${fmtShort(occDrawer.end)}`;
     body = `
-      <button class="btn btn--sm occ-drawer__list-btn" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">Create listing for this stretch</button>
+      <button class="drawer-cta__alt" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">
+        <span>Create a listing for this stretch</span>
+        <span class="drawer-cta__exit-hint">opens the room to candidates</span>
+      </button>
       <p class="occ-drawer__note">…or record who's moving in:</p>
       ${stayFormHtml({ kind: 'sublet', starts_on: occDrawer.start, ends_on: occDrawer.end }, occDrawer.roomId)}`;
   } else if (occDrawer.type === 'room') {

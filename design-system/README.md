@@ -1,10 +1,10 @@
-# ctrl.rodeo design systems
+# Sassy — the ctrl.rodeo design system
 
-> Centralized home for every product's design system: **https://ctrl.rodeo/design-system/**
+> Sassy is the name of the whole thing: the global CTRL layer and every product system under it. Home: **https://ctrl.rodeo/design-system/**
 
 | System | Scope | Where |
 |---|---|---|
-| Hub | Landing that indexes all systems | `index.html` |
+| Hub | Sassy's landing page, indexes every layer | `index.html` |
 | CTRL | Global — Boards, Events, Soundscape, Systemic, Favicon | `ctrl.html` |
 | Agape recruiting | Product — /applications (Storybook-style stories) | `recruiting/index.html` · behavior source of truth: `docs/ux/recruiting-row-states.md` |
 | Widget audit | Tooling stoplight | `widgets.html` |
@@ -13,7 +13,7 @@ Product systems override the global system for their product. New products add a
 
 ---
 
-# CTRL Design System
+# Sassy: CTRL (global layer)
 
 > Minimal, high-contrast design system powering ctrl.rodeo products.
 
@@ -24,7 +24,7 @@ Product systems override the global system for their product. New products add a
 
 ## Product Overview
 
-The CTRL Design System provides a unified visual language across all ctrl.rodeo applications. It emphasizes clarity, speed, and a distinctive code-like aesthetic.
+Sassy's CTRL layer provides a unified visual language across all ctrl.rodeo applications. It emphasizes clarity, speed, and a distinctive code-like aesthetic.
 
 ### Used By
 - **Boards** - Link curation app
@@ -641,6 +641,52 @@ A destructive or branching action with **more than two outcomes** opens a sheet,
 - The submit button's label mirrors the chosen option, not a generic "Confirm"
 - `btn--danger` **replaces** `btn--accent` rather than stacking on it — danger is an outline style that fills on hover, so the two together produce an accent fill with a red border
 - The parent menu keeps a single entry (`Remove…`), with a `.listing-menu__rule` separating navigation from destructive items
+
+### Sidebar CTAs (`drawer-cta`)
+
+A sidebar or drawer footer is **three tiers deep, ordered by consequence** — not one right-aligned flex row. A ~380px drawer cannot keep four targets honest side by side; the stay editor proved it, with two red underlined links each wrapping onto two lines.
+
+```html
+<div class="drawer-cta">
+  <!-- tier 1 + 2: commit and dismiss, together -->
+  <div class="drawer-cta__row">
+    <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
+    <button type="submit" class="btn btn--accent drawer-cta__commit">Save</button>
+  </div>
+
+  <!-- tier 3: the ways out — full-width rows, one per line -->
+  <div class="drawer-cta__exits">
+    <button type="button" class="drawer-cta__exit">
+      Mark leaving <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+    </button>
+    <button type="button" class="drawer-cta__exit drawer-cta__exit--danger">
+      Remove stay <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+    </button>
+  </div>
+
+  <!-- optional: a second, non-destructive forward path -->
+  <button type="button" class="drawer-cta__alt">
+    <span>Welcome them in</span>
+    <span class="drawer-cta__exit-hint">Ends the trial and starts an open-ended residency.</span>
+  </button>
+</div>
+```
+
+| Class | Tier | Rule |
+|---|---|---|
+| `drawer-cta__commit` | 1 | The one filled primary, bottom-right. **Exactly one per sidebar** — it is the only thing that saves what's on screen. |
+| `drawer-cta__quiet` | 2 | Dismiss. No fill, no border, beside the primary. Cancel is not a decision, so it doesn't look like one. |
+| `drawer-cta__exit` | 3 | The ways out. Full-width row below a rule, label left, hint right. `--danger` for destructive (red label, tinted hover); muted for state changes. |
+| `drawer-cta__alt` | — | Optional second forward path. Outlined, never filled, label stacked over hint. |
+
+**Sidebar CTA rules:**
+- Anything that **removes, ends, or re-routes** a record leaves the commit row entirely
+- Exits never underline — weight and color carry them (see [Removed & deferred states](#removed--deferred-states))
+- Every exit and alt carries a hint; a red label is never the only explanation of what a button does
+- Full-width rows mean labels never truncate, so copy stays plain (`Mark leaving`, not `Mark leaving — list room`). The label is `white-space: nowrap`; the **hint** wraps or ellipsizes first
+- Under 480px the hint drops to its own line rather than squeezing the label
+
+*Reference implementation: `applications/css/app.css` — `.drawer-cta`. Story: [Sidebar CTAs](https://ctrl.rodeo/design-system/recruiting/#sidebar-ctas).*
 
 ### Drop Target
 
