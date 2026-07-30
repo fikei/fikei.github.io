@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.26.0'
+const VERSION = '1.28.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -455,8 +455,38 @@ function clause(s: string | null): string {
   if (/^(the applicant|asking|confirming|brief|interested|they |he |she )/i.test(t)) return ''
   return t.charAt(0).toLowerCase() + t.slice(1)
 }
+/* The offered times, as a housemate would say them: "Thu Jul 24, 9–11am · Fri
+   2–5pm". A notification that says only "sent times for a call" makes the reader
+   open the thread to learn the one fact they wanted, so the times go in the
+   line.
+
+   The date is dropped from a window that shares a day with the one before it,
+   and the am/pm from a start that shares it with its own end — the same
+   shortenings anyone makes when reading times aloud. */
+function fmtWindows(windows: Array<{ date: string; start: string; end: string }>): string {
+  if (!windows?.length) return ''
+  const hhmm = (t: string, withMeridiem: boolean) => {
+    const [h, m] = t.split(':').map(Number)
+    const h12 = h % 12 === 0 ? 12 : h % 12
+    return `${h12}${m ? `:${String(m).padStart(2, '0')}` : ''}${withMeridiem ? (h < 12 ? 'am' : 'pm') : ''}`
+  }
+  const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`)
+    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+  const parts: string[] = []
+  let lastDay = ''
+  for (const w of windows.slice(0, 3)) {
+    const sameMeridiem = (Number(w.start.split(':')[0]) < 12) === (Number(w.end.split(':')[0]) < 12)
+    const range = `${hhmm(w.start, !sameMeridiem)}\u2013${hhmm(w.end, true)}`
+    parts.push(w.date === lastDay ? range : `${dayLabel(w.date)} ${range}`)
+    lastDay = w.date
+  }
+  const more = windows.length > 3 ? ` and ${windows.length - 3} more` : ''
+  return parts.join(' \u00b7 ') + more
+}
+
 const INTENT_SENTENCE: Record<string, (s: string | null) => string> = {
-  availability:    () => `{} sent times for a call.`,
+  availability:    (s) => s ? `{} is free ${s}.` : `{} sent times for a call.`,
   reschedule:      () => `{} wants to move their call.`,
   withdrawing:     () => `{} is no longer looking.`,
   post_acceptance: () => `{} is asking about moving in.`,
@@ -485,13 +515,33 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
 
   // Only people still in the funnel: mail from an archived applicant is logged
   // as email and is nobody's task.
-  const { data: live } = await client.from('recruit_applicants')
-    .select('id, first_name, last_name, stage')
-    .in('id', [...new Set(rows.map((r) => r.applicant_id))])
-    .in('stage', ['review', 'candidate'])
+  const ids = [...new Set(rows.map((r) => r.applicant_id))]
+  const [{ data: live }, { data: avail }] = await Promise.all([
+    client.from('recruit_applicants').select('id, first_name, last_name, stage')
+      .in('id', ids).in('stage', ['review', 'candidate']),
+    // The windows we parsed out of these very replies — the times themselves are
+    // what the house wants to see, not the fact that times exist.
+    client.from('recruit_availability').select('applicant_id, windows').in('applicant_id', ids),
+  ])
   const byId = new Map((live || []).map((a) => [a.id, a]))
+  const windowsBy = new Map((avail || []).map((r) => [r.applicant_id, r.windows || []]))
 
-  const notes = rows.filter((r) => byId.has(r.applicant_id)).map((r) => {
+  /* Availability gets one notification per person — their latest offer only.
+     recruit_availability stores a single current set of windows per applicant,
+     so an older reply rendered with those windows would advertise times the
+     person never named on that day. Keeping the newest reply means the line and
+     the times always agree; when they send new times, updated_at moves and the
+     next day's key fires with the new ones. */
+  const newestAvailability = new Map<string, string>()
+  for (const r of rows) {
+    if (r.intent !== 'availability') continue
+    const prev = newestAvailability.get(r.applicant_id)
+    if (!prev || String(r.sent_at) > prev) newestAvailability.set(r.applicant_id, String(r.sent_at))
+  }
+
+  const notes = rows.filter((r) => byId.has(r.applicant_id)
+      && (r.intent !== 'availability' || newestAvailability.get(r.applicant_id) === String(r.sent_at)))
+    .map((r) => {
     const a = byId.get(r.applicant_id)!
     const intent = String(r.intent)
     const also = (r.intents || []).filter((x: string) => x !== intent)
@@ -514,7 +564,9 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
         : `reply:${r.id}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
-        sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(r.intent_summary),
+        sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(
+          // Availability speaks in times; every other intent speaks in words.
+          intent === 'availability' ? fmtWindows(windowsBy.get(r.applicant_id)) : r.intent_summary),
         body: [
           // Only repeat the summary where the sentence didn't already use it.
           ['plans_changed', 'question'].includes(intent) && clause(r.intent_summary)
