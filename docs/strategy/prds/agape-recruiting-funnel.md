@@ -79,7 +79,7 @@ corrected after the fact isn't news.
 Backfilled on the two live trials (Alejandra, Sophia); Andy's finished Jan–Feb
 trial was left alone.
 
-### v3.41.0 (2026-07-29): candidate → resident
+### v3.43.0 (2026-07-29): candidate → resident
 The end of the funnel finally exists. Migration 141:
 
 - **`recruit_stays.applicant_id`** — the missing link. Until now the person in
