@@ -331,7 +331,15 @@ async function registerCommands(): Promise<Record<string, unknown>> {
   })
   const out = await resp.json()
   if (!resp.ok) throw new Error(`Discord ${resp.status}: ${JSON.stringify(out).slice(0, 200)}`)
-  return { registered: Array.isArray(out) ? out.map((c: Record<string, unknown>) => c.name) : out, guildId }
+  // Registering succeeds even when the bot was invited without the
+  // applications.commands scope — in that case Discord accepts the command
+  // but never shows it to anyone. Hand back the URL that grants the scope.
+  const authorizeUrl = `https://discord.com/oauth2/authorize?client_id=${app.id}` +
+    `&scope=applications.commands%20bot&guild_id=${guildId}&disable_guild_select=true`
+  return {
+    registered: Array.isArray(out) ? out.map((c: Record<string, unknown>) => c.name) : out,
+    guildId, appId: app.id, appName: app.name, authorizeUrl,
+  }
 }
 
 // POST /redeem  { token } → { token_hash, email } for supabase-js verifyOtp.
@@ -724,6 +732,12 @@ async function archiveMissingRecordings(client: ReturnType<typeof db>): Promise<
    Listing the roster needs the Server Members privileged intent; without it
    this no-ops quietly rather than pretending to have swept. */
 async function inviteUnsignedMembers(client: ReturnType<typeof db>): Promise<number> {
+  // OFF by default. Unsolicited DMs to the whole house is not a thing to
+  // enable by accident — flip recruit_settings.signin_sweep_enabled to true
+  // deliberately, and only when the house expects it.
+  const { data: flag } = await client.from('recruit_settings')
+    .select('value').eq('key', 'signin_sweep_enabled').maybeSingle()
+  if (flag?.value !== true) return 0
   const { dmUser } = await import('../_shared/discord.ts')
   const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
   if (!botToken) return 0
@@ -746,15 +760,16 @@ async function inviteUnsignedMembers(client: ReturnType<typeof db>): Promise<num
   const hasAccount = new Set((known || []).map((r: Record<string, unknown>) => String(r.discord_user_id)))
   const alreadyAsked = new Set((invited || []).map((r: Record<string, unknown>) => String(r.discord_user_id)))
 
-  // Reuse the membership function's view of the channel rather than
-  // reimplementing permission maths in a second place.
-  const { canSeeRecruiting } = await import('../_shared/discord.ts')
+  // One channel/role fetch for the whole sweep, not one per member.
+  const { recruitingGate, canSeeWithGate } = await import('../_shared/discord.ts')
+  const gate = await recruitingGate()
+  if (!gate) { console.warn('[signin-sweep] recruiting channel not found'); return 0 }
   let sent = 0
   for (const m of members) {
     const did = String(m.user?.id || '')
     if (!did || m.user?.bot || hasAccount.has(did) || alreadyAsked.has(did)) continue
     let allowed = false
-    try { allowed = await canSeeRecruiting(did, m.roles || []) } catch { continue }
+    try { allowed = canSeeWithGate(gate, did, m.roles || []) } catch { continue }
     if (!allowed) continue
     const url = await mintSigninUrl(did, m.user?.global_name || m.user?.username || null)
     if (!url) continue
