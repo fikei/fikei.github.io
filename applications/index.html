@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.48.0">
+  <link rel="stylesheet" href="css/app.css?v=3.49.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -53,15 +53,11 @@
         <a class="rail-nav__row" href="?view=inbox" data-view-link="inbox">Applicants <span class="rail-nav__count" id="count-inbox"></span></a>
         <a class="rail-nav__row" href="?view=candidates" data-view-link="candidates">Candidates <span class="rail-nav__count" id="count-candidates"></span></a>
         <a class="rail-nav__row" href="?view=archive" data-view-link="archive">Archive <span class="rail-nav__count" id="count-archive"></span></a>
+        <div class="rail-nav__group">House keeping</div>
+        <a class="rail-nav__row" href="?view=settings" data-view-link="settings">Settings</a>
       </nav>
       <div class="rail-foot">
         <span class="rail-foot__user" id="rail-user"></span>
-        <label class="rail-foot__pref"><input type="checkbox" id="pref-couples"> Open to couples</label>
-        <label class="rail-foot__pref" title="When on, coverage asks post to #recruiting-automation automatically as availability lands"><input type="checkbox" id="pref-autopost"> Auto-post coverage asks</label>
-        <label class="rail-foot__pref" title="Sets how the update-email box starts when someone is marked not a fit — you can still change it per person"><input type="checkbox" id="pref-update-default"> Offer an update email by default</label>
-        <button class="rail-foot__link rail-foot__gmail" id="gmail-conn" type="button">Checking shared Gmail…</button>
-        <button class="rail-foot__link" id="menu-theme" type="button">Toggle theme</button>
-        <button class="rail-foot__link" id="menu-export" type="button">Export decisions (CSV)</button>
         <button class="rail-foot__link" id="menu-signout" type="button">Sign out</button>
       </div>
     </aside>
@@ -307,7 +303,8 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=3.48.0"></script>
+  <script src="js/settings-schema.js?v=3.49.0"></script>
+  <script src="js/app.js?v=3.49.0"></script>
 
 </body>
 </html>

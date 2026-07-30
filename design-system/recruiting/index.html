@@ -318,7 +318,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.31</span><a href="/design-system/">← all of Sassy</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.32</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -353,13 +353,13 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <div class="items">
       <a href="#two-tier" data-story="two-tier">Two-tier rail</a>
       <a href="#sidebar-ctas" data-story="sidebar-ctas">Sidebar CTAs</a>
-      <a href="#exit-directions" data-story="exit-directions">Exit rows — directions <span class="tag-concept">pick one</span></a>
+      <a href="#exit-directions" data-story="exit-directions">Exit rows — directions <span class="tag-concept">A won</span></a>
       <a href="#row-states" data-story="row-states">Row states</a>
       <a href="#schedule-modal" data-story="schedule-modal">Schedule modal</a>
       <a href="#listing-header" data-story="listing-header">Listing header</a>
       <a href="#profile" data-story="profile">Profile</a>
       <a href="#stage-machine" data-story="stage-machine">Stage machine</a>
-      <a href="#settings" data-story="settings">Settings <span class="tag-concept">concept</span></a>
+      <a href="#settings" data-story="settings">Settings</a>
       <a href="#automation-audit" data-story="automation-audit">Automation audit</a>
     </div>
   </div>
@@ -406,7 +406,9 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
-      <div class="dec"><span class="d">Jul 30</span><br><b>Nothing has a Save button unless it creates, confirms, or destroys.</b><p>Editing an existing record writes on <code>change</code> — text on blur, dates and selects the instant they settle — and a quiet line says so, flashing "Saved" when a write lands. Save survived only where it means something: <em>Add stay</em> and <em>Create listing</em> (a record that doesn't exist can't autosave), <em>Welcome them in</em> (a confirmation), and the destructive tiles. This also settles the first open question in the Settings concept.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Settings shipped, and admin is a Discord channel.</b><p>Six sections rendered from a field schema, so adding a knob is one object literal. Admin = whoever can see #recruiting-automation — the channel that already gets the audit trail decides who changes the automation — reconciled into <code>recruit_admins</code>, which is what RLS consults. Four literals became real settings (follow-up staleness, move-in flex, the two trial offsets); four more route through <code>setting()</code> with schema defaults but stay out of the UI. See <a href="#settings">Settings</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>An open stretch asks before it shows a form.</b><p>The gap drawer used to stack a listing button on top of a full stay form. Now it offers two inset tiles — <em>Create a listing</em> / <em>Add an occupant</em> — and becomes the flow you pick, with one way back. The listing form moved into the drawer so the flow never leaves the sidebar it started in.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Nothing has a Save button unless it creates, confirms, or destroys.</b><p>Editing an existing record writes on <code>change</code> — text on blur, dates and selects the instant they settle — and a quiet line says so, flashing "Saved" when a write lands. Save survived only where it means something: <em>Add stay</em> and <em>Create listing</em> (a record that doesn't exist can't autosave), <em>Welcome them in</em> (a confirmation), and the destructive tiles. The app says this in no words at all — the line is empty until a write lands, then reads &ldquo;Saved&rdquo; for a moment.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Direction A won: exits are inset tiles, and the footer has no hairlines.</b><p>Each exit is its own filled surface with radius and a 6px gap; the commit row dropped its <code>border-top</code> too. The rules were separating rows that belonged together. The <code>__alt</code> stays outlined — that's now what distinguishes a forward path from a way out.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>The exit rows' hairlines were up for replacement.</b><p>Full-bleed rules between exits read as a 2015 settings list — the rule was separating things that should have been grouped. Five directions drawn side by side (inset tiles · inset-grouped · space only · danger zone · overflow), with a recommendation: group them in one container with no internal rules, and promote only the genuinely irreversible to a tinted danger block. Undecided — see <a href="#exit-directions">Exit rows — directions</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Settings gets the rail's vocabulary, and a schema instead of a page.</b><p>The rail footer was the only place a setting could go, so most settings never became settings — the house's recruiting behavior lives in literals (3 quiet days, ±1 flexible month, +1/−1 trial milestones) that need a deploy to change. The concept: six sections named <code>You · House · Funnel · Automations · Connections · Data</code>, rendered from a field schema where <code>scope</code> picks the store and the schema default <em>is</em> the code default. Concept only — see <a href="#settings">Settings</a>.</p></div>
@@ -697,7 +699,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
   </section>
 
   <section class="story" id="s-exit-directions">
-    <h1>Exit rows — directions <span class="tag-concept">pick one</span></h1>
+    <h1>Exit rows — directions <span class="tag-concept">A won</span></h1>
     <p class="lede">Tier 3 currently separates its rows with full-bleed hairlines. That's a 2015 settings-list move: the rule is doing work that surface, radius, and space should do. Five directions, same content, same 340px frame.</p>
 
     <div class="canvas">
@@ -884,7 +886,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
   </section>
 
   <section class="story" id="s-settings">
-    <h1>Settings <span class="tag-concept">concept</span></h1>
+    <h1>Settings</h1>
     <p class="lede">Six sections that borrow the rail's own vocabulary, rendered from a schema so a new setting is one object literal.</p>
     <div class="canvas">
       <div class="setpage">
@@ -974,9 +976,13 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
         <li><b>Save behavior follows the type.</b> Toggles and enums autosave with an inline tick; numbers and text take an explicit commit. The schema knows the type, so the renderer enforces it — no per-field config.</li>
         <li>Section footers are <a href="#sidebar-ctas">Sidebar CTAs</a> — one commit, and “reset this section” as an exit row with a hint.</li>
       </ul>
+      <h3>Who can change what</h3>
+      <p><b>Admin is derived from Discord: whoever can see #recruiting-automation.</b> Not a role the app maintains — the channel that already receives the automation audit trail decides who gets to change the automation. Lose channel access, lose admin, on the next verify.</p>
+      <p>Everyone reads everything. Non-admins see the same values, disabled, with one line saying so — read access was never the thing worth protecting. Every house-wide setting carries "<i>Ian changed this 3 days ago</i>"; RLS is the actual wall, and the disabled control is just courtesy.</p>
       <h3>Notes</h3>
-      <p>A full view at <code>?view=settings</code>, not a modal — every section is deep-linkable, so a toast or a Discord audit post can point at the exact knob. The rail footer drops to <b>identity · Settings · Sign out</b>; theme moves to You, Gmail to Connections, CSV export to Data, and food/dues move out of the room drawer (a house-wide cost has no business inside one room) into House.</p>
-      <p>Full write-up, open decisions, and build order: <code>docs/ux/recruiting-settings-concept.md</code>.</p>
+      <p>A full view at <code>?view=settings</code>, not a modal — every section is deep-linkable, so a toast or a Discord audit post can point at the exact knob. The rail footer dropped to <b>identity · Sign out</b>; theme moved to You, Gmail to Connections, CSV export to Data, and food/dues left the room drawer (a house-wide cost has no business inside one room) for House.</p>
+      <p><b>Automations report, they don't rule.</b> Each row says what it does, how often, when it last ran, and whether it's on — the four things you want when something didn't happen. Cadence is <code>pg_cron</code>'s, not this page's; a half-working toggle would be worse than saying where it lives.</p>
+      <p>Full write-up, decisions, and what's still open: <code>docs/ux/recruiting-settings-concept.md</code>.</p>
     </div>
   </section>
 

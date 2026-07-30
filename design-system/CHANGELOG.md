@@ -4,6 +4,18 @@
 
 ---
 
+## [1.5.0] - 2026-07-30
+
+### Added
+- **Settings (`set-*`)** — a schema-rendered settings surface. `SETTING_DEFS` describes each knob (`scope` picks the store, `default` is the code default); the CSS describes field types, so a new setting needs none. Sections borrow the product's nav vocabulary; `rows:` sections render status objects (automations, connections) instead of fields.
+- **Stepped drawer (`step-*`)** — when a surface has two honest next moves, two `step-choice` tiles ask first, then the drawer becomes the chosen flow with one `step-back`.
+
+### Changed
+- A locked setting is **disabled, never hidden** — RLS is the wall, and hiding a value implies it's secret when it isn't.
+- The autosave flag says nothing until a write lands (was a persistent "Changes save as you go").
+
+---
+
 ## [1.4.0] - 2026-07-30
 
 ### Changed
