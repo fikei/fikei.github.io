@@ -1580,7 +1580,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .log-row.is-done .inbox-row__sub { opacity: 0.5; }
 .log-row.is-done .log-row__meta { opacity: 0.7; }
 
-/* --- v3.48.0: sidebar CTA tiers (Sassy `drawer-cta`) ---
+/* --- v3.45.0: sidebar CTA tiers (Sassy `drawer-cta`) ---
    Drawer footers had four actions fighting inside one right-aligned flex
    row: two red underlined links (which wrapped onto two lines in a 380px
    sidebar), a text Cancel, and the primary. A sidebar is too narrow to keep
@@ -1653,5 +1653,21 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   color: var(--fg-subtle); font-size: var(--font-size-small); }
 .drawer-cta__exit:hover { background: var(--bg-overlay); }
 .drawer-cta__exit--danger { color: var(--error); }
-.drawer-cta__exit--danger .drawer-cta__exit-icon { color: var(--error); }
-.drawer-cta__exit--danger:hover { background: color-mix(in srgb, var(--error) 14%, transparent); }
+.drawer-cta__exit--danger:hover { color: var(--error); background: var(--pass-tint); }
+/* The hint yields first: it wraps or ellipsizes so the label — the thing that
+   says what the button does — always reads on one line. */
+.drawer-cta__exit-hint {
+  flex: 0 1 auto; min-width: 0; white-space: normal;
+  color: var(--fg-subtle); font-size: var(--font-size-caption); font-weight: 400; text-align: right;
+}
+/* On a full-width phone drawer the hint gets its own line rather than
+   squeezing the label into an ellipsis. */
+@media (max-width: 480px) {
+  .drawer-cta__exit { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .drawer-cta__exit-hint { text-align: left; }
+}
+
+/* Per-profile activity feed (v3.48.0). Reads as prose, so the line wraps
+   instead of ellipsizing the way the scannable rail rows do. */
+.activity-feed .log-row { align-items: flex-start; }
+.activity-feed__line { white-space: normal; font-weight: 400; }

@@ -875,6 +875,13 @@ async function addPlacement(applicantId, listingId, source = 'manual') {
   }, { onConflict: 'applicant_id,listing_id' }).select().single();
   if (error) { toast(`Couldn't add to listing: ${error.message}`); return null; }
   placements = [...placements.filter(p => !(p.applicant_id === applicantId && p.listing_id === listingId)), data];
+  // Only a hand-made placement is an event — the auto-sweep runs constantly and
+  // its results are already visible as the candidate_placed notification.
+  if (source !== 'auto') {
+    const who = applicants.find(x => x.id === applicantId);
+    logEvent('event_placement', applicantId, who ? fullName(who) : '',
+      `${me?.name || 'A housemate'} put {} on ${listingLabel(listingId)}.`);
+  }
   return data;
 }
 
@@ -885,6 +892,9 @@ async function removePlacement(applicantId, listingId, quiet = false) {
   if (error) { toast(`Remove failed: ${error.message}`); return; }
   const row = placements.find(p => p.applicant_id === applicantId && p.listing_id === listingId);
   if (row) row.status = 'removed';
+  const who = applicants.find(x => x.id === applicantId);
+  logEvent('event_placement', applicantId, who ? fullName(who) : '',
+    `${me?.name || 'A housemate'} took {} off ${listingLabel(listingId)}.`);
   if (quiet) return;
   toast('Removed from the listing — the auto-sweep won\'t re-add them');
   renderRailCounts();
@@ -1320,7 +1330,12 @@ async function setStage(id, stage) {
   const { error } = await sb.rpc('recruit_set_stage', { p_applicant: id, p_stage: stage });
   if (error) { toast(`Stage change failed: ${error.message}`); return false; }
   const a = applicants.find(x => x.id === id);
+  const before = a?.stage;
   if (a) a.stage = stage;
+  if (a && before !== stage) {
+    logEvent('event_stage', id, fullName(a),
+      `${me.name || 'A housemate'} moved {} from ${before || 'nowhere'} to ${stage}.`);
+  }
   return true;
 }
 
@@ -1340,6 +1355,8 @@ async function castVote(applicantId) {
   }, { onConflict: 'applicant_id,voter_id' }).select().single();
   if (error) { toast(`Review failed: ${error.message}`); return; }
   votes[applicantId] = [...(votes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
+  logEvent('event_verdict', applicantId, fullName(a),
+    `${me.name || 'A housemate'} reviewed {} as ${VERDICTS[pendingVerdict]?.toLowerCase() || pendingVerdict}.`, note);
   // "Not a fit" is a recruiter decision too, so Archive and the update tray
   // can show the reason in the reviewer's own words.
   if (pendingVerdict === 'not_fit') await saveDecision(applicantId, 'pass', 'fit', me.name, note);
@@ -1487,6 +1504,18 @@ const ACTIVITY_KINDS = {
   opening_overdue:   { icon: '🔴', label: 'Opening overdue' },
   room_emptying:     { icon: '📦', label: 'Room emptying' },
 };
+/* Profile events — things housemates do, appended by recruit_log_event. They
+   share the ledger with notifications because a profile's history is one story;
+   what separates them is audience 'none', meaning recorded and never sent. */
+Object.assign(ACTIVITY_KINDS, {
+  event_verdict:     { icon: '⚖️', label: 'Review written' },
+  event_stage:       { icon: '➡️', label: 'Stage changed' },
+  event_email:       { icon: '📤', label: 'Email sent' },
+  event_placement:   { icon: '📌', label: 'Shortlist changed' },
+  event_move_in:     { icon: '📆', label: 'Move-in confirmed' },
+  event_comment:     { icon: '💬', label: 'Note added' },
+  event_screening:   { icon: '📞', label: 'Call arranged' },
+});
 const kindIcon = k => ACTIVITY_KINDS[k]?.icon || '•';
 const kindLabel = k => ACTIVITY_KINDS[k]?.label
   || (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '));
@@ -1602,6 +1631,58 @@ function renderActivity() {
     const target = ACTIVITY_TARGET[type];
     if (target) setView(new URLSearchParams(target(id).replace(/^\?/, '')).get('view') || 'openings');
   });
+}
+
+/* One applicant's whole history: everything the house was told about them and
+   everything the house did to them, in one order. Both live in
+   recruit_notifications keyed on (subject_type, subject_id) — notifications and
+   profile events differ only in audience, so this is a single query rather than
+   a merge of two sources that could disagree. */
+async function loadProfileActivity(a) {
+  const host = () => document.getElementById('activity-panel');
+  if (!host()) return;
+  const { data, error } = await sb.from('recruit_notifications')
+    .select('*').eq('subject_type', 'applicant').eq('subject_id', a.id)
+    .order('created_at', { ascending: false }).limit(200);
+  // Navigated away while the query was in flight.
+  if (queue[qIndex] !== a.id || reviewTab !== 'activity' || !host()) return;
+  if (error) {
+    host().innerHTML = `<p class="notes__empty">Couldn't load their history — ${esc(error.message)}</p>`;
+    return;
+  }
+  if (!data?.length) {
+    host().innerHTML = `<p class="notes__empty">Nothing recorded yet. Reviews, emails, and shortlist changes show up here as they happen.</p>`;
+    return;
+  }
+  // The subject is this applicant on every row, so the sentence reads better
+  // without their own name repeated in it — "{}" becomes "they".
+  const line = n => (n.payload?.sentence || '')
+    .replace('{}', n.payload?.title || fullName(a) || 'They');
+  host().innerHTML = `<ul class="inbox-card activity-feed">
+    ${data.map(n => `<li class="inbox-row log-row">
+      <span class="log-row__icon" title="${esc(kindLabel(n.kind))}">${kindIcon(n.kind)}</span>
+      <span class="inbox-row__text">
+        <span class="inbox-row__title activity-feed__line">${esc(line(n))}</span>
+        <span class="log-row__meta">${esc(relTime(n.created_at))}${n.payload?.body ? ` · ${esc(n.payload.body)}` : ''}${n.audience === 'none' ? '' : ` · ${esc(activityDelivery(n))}`}</span>
+      </span>
+    </li>`).join('')}
+  </ul>`;
+}
+
+/* Append a profile event. Fire-and-forget on purpose: the log is valuable but
+   never worth failing a housemate's actual action over, so a failure here warns
+   and the action stands. `sentence` uses {} for the subject, same as the
+   notification sentences, so both render identically. */
+async function logEvent(kind, subjectId, subjectLabel, sentence, body) {
+  try {
+    const { error } = await sb.rpc('recruit_log_event', {
+      p_kind: kind, p_subject_type: 'applicant', p_subject_id: subjectId,
+      p_subject_label: subjectLabel || '', p_sentence: sentence, p_body: body || null,
+    });
+    if (error) console.warn('[activity] could not log', kind, error.message);
+  } catch (err) {
+    console.warn('[activity] could not log', kind, err);
+  }
 }
 
 /* Resolving keeps the entry and adds the fact that it was handled — the log
@@ -3359,6 +3440,15 @@ function otherQualified(listingId) {
   return [...forward, ...unread];
 }
 
+/* A listing named the way a housemate would say it: the room, or "a listing"
+   when the house data hasn't loaded yet. Used by the profile event sentences,
+   which must never show a uuid. */
+function listingLabel(listingId) {
+  const l = listings.find(x => x.id === listingId);
+  const room = l && rooms.find(r => r.id === l.room_id);
+  return room?.name ? `the ${room.name} listing` : 'a listing';
+}
+
 function listingWindow(l) {
   const len = windowLength(l.starts_on, l.ends_on);
   if (l.kind === 'resident') {
@@ -3708,8 +3798,9 @@ function renderReview() {
       <button class="review-tabs__tab ${reviewTab === 'profile' ? 'is-on' : ''}" data-review-tab="profile">Profile</button>
       <button class="review-tabs__tab ${reviewTab === 'emails' ? 'is-on' : ''}" data-review-tab="emails">Emails${(emailsCache[a.id] || []).length ? ` (${emailsCache[a.id].length})` : ''}</button>
       ${(screeningState[a.id]?.watch || screeningState[a.id]?.at || screeningState[a.id]?.done) ? `<button class="review-tabs__tab ${reviewTab === 'call' ? 'is-on' : ''}" data-review-tab="call">Call</button>` : ''}
+      <button class="review-tabs__tab ${reviewTab === 'activity' ? 'is-on' : ''}" data-review-tab="activity">Activity</button>
     </div>
-    ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : `
+    ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : reviewTab === 'activity' ? `<div id="activity-panel"><p class="notes__empty">Loading their history…</p></div>` : `
     ${voteSectionHtml(a)}
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
@@ -3732,6 +3823,7 @@ function renderReview() {
 
   if (reviewTab === 'emails') loadEmailsPanel(a);
   else if (reviewTab === 'call') loadCallPanel(a);
+  else if (reviewTab === 'activity') loadProfileActivity(a);
   if (!houseLoaded) loadHouse().then(() => { renderRailCounts(); });
   loadComments(a.id).then(() => {
     // guard against navigating away while the query was in flight
@@ -3779,6 +3871,12 @@ async function saveMoveIn(id, clear = false) {
   if (!clear && !from) { toast('Pick a move-in date (or Cancel)'); return; }
   if (from && to && to < from) { toast('"Through" must be after the move-in date'); return; }
   const { error } = await sb.rpc('recruit_set_move_in', { p_applicant: id, p_from: from, p_to: to, p_name: me.name });
+  if (!error) {
+    const who = applicants.find(x => x.id === id);
+    logEvent('event_move_in', id, who ? fullName(who) : '',
+      from ? `${me.name || 'A housemate'} confirmed {} can move in ${fmtShort(from)}${to && to !== from ? ` to ${fmtShort(to)}` : ''}.`
+           : `${me.name || 'A housemate'} cleared {}'s confirmed move-in window.`);
+  }
   if (error) { toast(`Save failed: ${error.message}`); return; }
   a.moveinFrom = from; a.moveinTo = to; a.moveinSetBy = from ? me.name : null;
   moveinEditing = false;
@@ -3963,6 +4061,9 @@ async function postNote(applicantId) {
     .select().single();
   if (error) { toast(`Note failed: ${error.message}`); input.value = body; return; }
   comments.push(data);
+  const who = applicants.find(x => x.id === applicantId);
+  logEvent('event_comment', applicantId, who ? fullName(who) : '',
+    `${me?.name || 'A housemate'} left a note on {}.`, body.slice(0, 140));
   renderNotes(applicantId);
 }
 
@@ -4477,6 +4578,13 @@ async function gmailCall(payload) {
   });
   const out = await resp.json();
   if (out.error) throw new Error(out.error);
+  // Every outbound message goes through here, so this is the one place an
+  // "email sent" event has to be written.
+  if (payload.action === 'send' && payload.applicantId) {
+    const who = applicants.find(x => x.id === payload.applicantId);
+    logEvent('event_email', payload.applicantId, who ? fullName(who) : '',
+      `${me?.name || 'A housemate'} emailed {}.`, payload.subject || null);
+  }
   return out;
 }
 

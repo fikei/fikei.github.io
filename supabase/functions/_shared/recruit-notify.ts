@@ -1,5 +1,10 @@
 // Shared: the recruiting notification ledger — detect, log, broadcast.
 //
+// Phase 2 adds the active candidate's own journey (needs_input, placement
+// landing, the three call moments, the decision clock, promotion) alongside
+// Phase 1's backlog detectors. Every line is one prose sentence with the
+// subject hyperlinked inside it.
+//
 // One table (recruit_notifications, migration 142) is both the running log and
 // the dispatch queue. A row is written by detect() before anything is
 // delivered, so the log is complete whether or not the house is ever told, and
@@ -130,13 +135,20 @@ export interface Notification {
   subject_type: 'applicant' | 'listing' | 'stay' | 'house'
   subject_id: string | null
   subject_label: string
-  audience?: 'house' | 'oncall' | 'person'
+  audience?: 'house' | 'oncall' | 'person' | 'none'
   recipient_id?: string | null
   lane?: 'now' | 'daily' | 'weekly'
   dedupe_key: string
   payload: {
-    title: string
-    body: string
+    /* The notification, as one brief declarative sentence, with `{}` marking
+       where the subject goes. The subject is substituted as a hyperlink into
+       the app, so the sentence reads normally and the name is the way in:
+       "{} has been waiting 24 days for a review." Sentences, not labelled
+       fields — a housemate reads a line of prose faster than they parse
+       "Waiting on a review · Chloe Revery". */
+    sentence: string
+    title: string     // the subject on its own, for the Activity view and digest rows
+    body?: string     // any detail that doesn't belong in the sentence
     section?: string
     links?: Array<{ label: string; url: string }>
   }
@@ -223,13 +235,32 @@ function shortPhrase(text: string | null | undefined, max = 34): string {
   return cut.slice(0, space > max * 0.5 ? space : max).trim() + '…'
 }
 
-/* Move-in answers are prose in the applicant's voice — "asap (august/sept)",
-   "I start my job August 24th", "Flexible". Prefixing any of those with "wants"
-   produces something ungrammatical about half the time, so quote them instead:
-   it always reads correctly and it is honestly their words, not our summary. */
-function moveInQuote(text: string | null | undefined): string {
-  const phrase = shortPhrase(text)
-  return phrase ? `“${phrase.charAt(0).toLowerCase()}${phrase.slice(1)}”` : ''
+/* Move-in answers are free prose in the applicant's own voice: "asap
+   (august/sept)", "I start my job August 24th but I'm flexible", "Flexible",
+   "september 1st". Dropping any of those into a sentence after "wanting"
+   produces something ungrammatical about half the time ("wanting I start my job
+   August 24th"), so this only speaks when it can do so cleanly:
+
+     vague          → "with flexible timing" / "as soon as possible"
+     a date         → "from September 1st"
+     a whole clause → nothing at all
+
+   The third case is the important one. A notification that omits the date still
+   reads correctly, and the profile has their exact words one tap away — whereas
+   a mangled sentence makes the whole channel look automated and untrustworthy. */
+const MONTHS = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d|early|mid|late|the\b)/i
+
+function moveInClause(text: string | null | undefined): string {
+  const phrase = shortPhrase(text, 28)
+  if (!phrase) return ''
+  const low = phrase.toLowerCase()
+  if (/^(asap|immediately|right away|now)\b/.test(low)) return 'as soon as possible'
+  if (/^(flexible|anytime|any time|whenever|open|tbd|flex)\b/.test(low)) return 'with flexible timing'
+  if (MONTHS.test(phrase)) {
+    // "september 1st" → "September 1st"; their capitalisation shouldn't leak.
+    return `from ${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}`
+  }
+  return ''
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
@@ -302,10 +333,8 @@ async function detectNewApplications(db: DB): Promise<Notification[]> {
       // The kind's label already says "New application" — the title is just
       // who, and the body is the two facts that decide whether to read on.
       title: `${a.first_name} ${a.last_name || ''}`.trim(),
-      body: [
-        /short/i.test(a.residency || '') ? 'sublet' : 'full-time',
-        moveInQuote(a.move_in),
-      ].filter(Boolean).join(' · '),
+      sentence: `{} applied for ${/short/i.test(a.residency || '') ? 'a sublet' : 'a full-time room'}` +
+        `${moveInClause(a.move_in) ? `, ${moveInClause(a.move_in)}` : ''}.`,
       section: 'New applications',
       links: [{ label: `Review ${a.first_name}`, url: applicantLink(a.id) }],
     },
@@ -361,7 +390,7 @@ async function detectReviewStalled(db: DB): Promise<Notification[]> {
       dedupe_key: `review_stalled:${a.id}:${step}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
-        body: `waiting ${plural(days, 'day')}`,
+        sentence: `{} has been waiting ${plural(days, 'day')} for a review.`,
         section: 'Needs a review',
         links: [{ label: `Review ${a.first_name}`, url: applicantLink(a.id) }],
       },
@@ -401,8 +430,8 @@ async function detectReviewBacklog(db: DB): Promise<Notification[]> {
     lane: 'weekly',
     dedupe_key: `review_backlog:${thursday.getUTCFullYear()}-W${week}`,
     payload: {
-      title: `${plural(n, 'application')} nobody has reviewed`,
-      body: `all older than ${REVIEW_RECENT_DAYS} days`,
+      title: `${plural(n, 'application')}`,
+      sentence: `{} have never been reviewed, all of them older than ${REVIEW_RECENT_DAYS} days.`,
       section: 'Backlog',
       links: [{ label: 'Open the inbox', url: viewLink('inbox') }],
     },
@@ -443,10 +472,10 @@ async function detectOpeningsAtRisk(db: DB): Promise<Notification[]> {
       lane: (step === 'soon' ? 'daily' : 'now') as 'daily' | 'now',
       dedupe_key: `opening_risk:${l.id}:${step}`,
       payload: {
-        title: `${room} · ${l.kind === 'sublet' ? 'sublet' : 'resident'}`,
-        body: left < 0
-          ? `should have started ${fmtDay(starts)}, ${plural(Math.abs(left), 'day')} ago`
-          : `starts ${fmtDay(starts)} · ${plural(left, 'day')} out`,
+        title: String(room),
+        sentence: left < 0
+          ? `{} should have opened ${fmtDay(starts)}, ${plural(Math.abs(left), 'day')} ago, and is still empty.`
+          : `{} opens ${fmtDay(starts)}, ${plural(left, 'day')} away, and is still unfilled.`,
         section: 'Openings at risk',
         links: [{ label: 'Open the shortlist', url: viewLink('openings') },
                 { label: 'See the room', url: `${APP}?view=occupancy&room=${l.room_id}` }],
@@ -502,14 +531,335 @@ async function detectRoomsEmptying(db: DB): Promise<Notification[]> {
       lane: step === 'urgent' ? 'now' : 'daily',
       dedupe_key: `room_emptying:${s.id}:${step}`,
       payload: {
-        title: room,
-        body: `${s.occupant || 'the occupant'} leaves ${fmtDay(ends)} · no listing`,
+        title: String(room),
+        sentence: `{} empties ${fmtDay(ends)} when ${s.occupant || 'the occupant'} leaves, and has no listing yet.`,
         section: 'Rooms emptying',
         links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${s.room_id}` }],
       },
     })
   }
   return out
+}
+
+
+/* ---------------------------------------------------------------------------
+   Phase 2: an active candidate's own journey.
+
+   Everything above is about the house's backlog. These are about a person
+   moving through the funnel — what they sent us, what happened to their call,
+   and where the house's decision stands. They matter because a candidate who
+   is mid-process is the most expensive thing to drop: they have already spent
+   their own effort, and a week of silence loses people who were going to say
+   yes.
+
+   All of them read the tables that already exist. Nothing new is written
+   anywhere except the ledger.
+   ------------------------------------------------------------------------- */
+
+// Anyone still live in the funnel. Used by every detector below, so that a
+// rejected or archived applicant never generates candidate chatter.
+const ACTIVE_STAGES = ['review', 'candidate']
+
+async function activeApplicants(db: DB): Promise<Map<string, { first_name: string; last_name: string; stage: string }>> {
+  const { data } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name, stage').in('stage', ACTIVE_STAGES)
+  return new Map((data || []).map((a: Record<string, string>) => [a.id, a as never]))
+}
+const fullName = (a: { first_name: string; last_name?: string }) => `${a.first_name} ${a.last_name || ''}`.trim()
+
+/* A3 — a reviewer asked for another read. The verdict itself is the ask, and it
+   is addressed to the house rather than to whoever wrote it, so it posts once
+   per verdict row. */
+async function detectNeedsInput(db: DB): Promise<Notification[]> {
+  const since = new Date(Date.now() - 14 * 86400000).toISOString()
+  const { data } = await db.from('recruit_votes')
+    .select('id, applicant_id, voter_name, note, updated_at, created_at')
+    .eq('verdict', 'needs_input').gte('created_at', since)
+  if (!data?.length) return []
+  const active = await activeApplicants(db)
+  return (data as Array<Record<string, string>>)
+    .filter((v) => active.has(v.applicant_id))
+    .map((v) => ({
+      kind: 'needs_input',
+      subject_type: 'applicant' as const,
+      subject_id: v.applicant_id,
+      subject_label: active.get(v.applicant_id)!.first_name,
+      lane: 'now' as const,
+      dedupe_key: `needs_input:${v.id}`,
+      payload: {
+        title: fullName(active.get(v.applicant_id)!),
+        sentence: `${v.voter_name || 'A housemate'} wants another read on {}.`,
+        body: shortPhrase(v.note, 140),
+        section: 'Needs a second read',
+        links: [{ label: 'Read the application', url: applicantLink(v.applicant_id) }],
+      },
+    }))
+}
+
+/* A4 / A5 — passed review, and whether a room actually fits. Two outcomes of
+   the same moment: the auto-placement sweep either found them somewhere or it
+   didn't, and "nowhere" is the more useful notification of the two. */
+async function detectCandidateLanding(db: DB): Promise<Notification[]> {
+  const { data: candidates } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name').eq('stage', 'candidate')
+  if (!candidates?.length) return []
+
+  const ids = candidates.map((a: { id: string }) => a.id)
+  const [{ data: placements }, { data: listings }, { data: screenings }] = await Promise.all([
+    db.from('recruit_listing_candidates').select('applicant_id, listing_id, created_at')
+      .in('applicant_id', ids).eq('status', 'active'),
+    db.from('recruit_listings').select('id, room_id, starts_on'),
+    db.from('recruit_screenings').select('applicant_id').in('applicant_id', ids),
+  ])
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+  const listingRoom = new Map((listings || []).map((l: Record<string, unknown>) =>
+    [l.id as string, roomName.get(l.room_id as number) || `room ${l.room_id}`]))
+  const booked = new Set((screenings || []).map((r: { applicant_id: string }) => r.applicant_id))
+
+  const byApplicant = new Map<string, string[]>()
+  for (const p of placements || []) {
+    if (!byApplicant.has(p.applicant_id)) byApplicant.set(p.applicant_id, [])
+    byApplicant.get(p.applicant_id)!.push(listingRoom.get(p.listing_id) || 'a listing')
+  }
+
+  const out: Notification[] = []
+  for (const a of candidates) {
+    const rooms = byApplicant.get(a.id) || []
+    if (rooms.length) {
+      out.push({
+        kind: 'candidate_placed',
+        subject_type: 'applicant',
+        subject_id: a.id,
+        subject_label: a.first_name,
+        lane: 'now',
+        // Keyed on the set of rooms, so a candidate moving between listings is
+        // news again while a candidate sitting still is not.
+        dedupe_key: `candidate_placed:${a.id}:${[...rooms].sort().join('+')}`,
+        payload: {
+          title: fullName(a),
+          sentence: `{} passed review and fits ${rooms.length === 1 ? rooms[0] : `${rooms.length} rooms`}.`,
+          body: rooms.join(', '),
+          section: 'Passed review',
+          links: [{ label: 'Open the shortlist', url: viewLink('openings') }],
+        },
+      })
+    } else if (!booked.has(a.id)) {
+      out.push({
+        kind: 'candidate_parked',
+        subject_type: 'applicant',
+        subject_id: a.id,
+        subject_label: a.first_name,
+        lane: 'weekly',
+        dedupe_key: `candidate_parked:${a.id}:${ptToday().slice(0, 7)}`,
+        payload: {
+          title: fullName(a),
+          sentence: `{} passed review but no open room fits them.`,
+          section: 'Waiting for a room',
+          links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+        },
+      })
+    }
+  }
+  return out
+}
+
+/* The call: taken, imminent, or written up. Three moments the house currently
+   only learns about by being in the right channel at the right minute. */
+async function detectScreeningMoments(db: DB): Promise<Notification[]> {
+  const out: Notification[] = []
+  const active = await activeApplicants(db)
+
+  // Claimed — who took it, and when the call is.
+  const { data: claims } = await db.from('recruit_claim_posts')
+    .select('applicant_id, status, claimed_slot, claimed_at, posted_at')
+    .gte('posted_at', new Date(Date.now() - 21 * 86400000).toISOString())
+  for (const c of claims || []) {
+    const who = active.get(c.applicant_id)
+    if (!who) continue
+    if (c.status === 'claimed' && c.claimed_at) {
+      out.push({
+        kind: 'screening_claimed',
+        subject_type: 'applicant',
+        subject_id: c.applicant_id,
+        subject_label: who.first_name,
+        lane: 'now',
+        dedupe_key: `screening_claimed:${c.applicant_id}:${c.claimed_at}`,
+        payload: {
+          title: fullName(who),
+          sentence: `Someone took {}'s intro call.`,
+          section: 'Screening',
+          links: [{ label: 'Open screening', url: applicantLink(c.applicant_id) }],
+        },
+      })
+    }
+    // Still nobody, three days on. This is the one that costs a candidate:
+    // they did their part and the house went quiet.
+    if (c.status === 'open' && new Date(c.posted_at).getTime() < Date.now() - 72 * 3600000) {
+      out.push({
+        kind: 'screening_unclaimed',
+        subject_type: 'applicant',
+        subject_id: c.applicant_id,
+        subject_label: who.first_name,
+        audience: 'oncall',
+        lane: 'now',
+        dedupe_key: `screening_unclaimed:${c.applicant_id}:${Math.floor((Date.now() - new Date(c.posted_at).getTime()) / (72 * 3600000))}`,
+        payload: {
+          title: fullName(who),
+          sentence: `{} sent times ${plural(Math.floor((Date.now() - new Date(c.posted_at).getTime()) / 86400000), 'day')} ago and nobody has taken the call.`,
+          section: 'Screening',
+          links: [{ label: 'Take the call', url: applicantLink(c.applicant_id) }],
+        },
+      })
+    }
+  }
+
+  // Today's calls, and calls whose notes have landed.
+  const { data: screenings } = await db.from('recruit_screenings')
+    .select('id, applicant_id, housemate_name, starts_at, status, kind, recording_posted_at, share_token')
+    .gte('starts_at', new Date(Date.now() - 14 * 86400000).toISOString())
+  for (const sc of screenings || []) {
+    const who = active.get(sc.applicant_id)
+    if (!who) continue
+    const startsPT = ptToday(new Date(sc.starts_at))
+    if (sc.status === 'scheduled' && startsPT === ptToday()) {
+      const at = new Date(sc.starts_at).toLocaleTimeString('en-US',
+        { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(':00', '')
+      out.push({
+        kind: 'screening_today',
+        subject_type: 'applicant',
+        subject_id: sc.applicant_id,
+        subject_label: who.first_name,
+        lane: 'now',
+        dedupe_key: `screening_today:${sc.id}:${startsPT}`,
+        payload: {
+          title: fullName(who),
+          sentence: `{} has an intro call today at ${at}${sc.housemate_name ? ` with ${sc.housemate_name}` : ''}.`,
+          section: 'Screening',
+          links: [{ label: 'Open their profile', url: applicantLink(sc.applicant_id) }],
+        },
+      })
+    }
+    if (sc.recording_posted_at) {
+      out.push({
+        kind: 'screening_notes',
+        subject_type: 'applicant',
+        subject_id: sc.applicant_id,
+        subject_label: who.first_name,
+        lane: 'now',
+        dedupe_key: `screening_notes:${sc.id}`,
+        payload: {
+          title: fullName(who),
+          sentence: `{}'s recording & summary are ready.`,
+          section: 'Screening',
+          links: [{ label: 'Read the notes', url: applicantLink(sc.applicant_id) }],
+        },
+      })
+    }
+  }
+  return out
+}
+
+/* H3 — the house decision, on a soft clock. Voting activity never fires this;
+   only the approach of the date they would actually move does. A lively
+   decision stays quiet and a stalled one gets louder, which is the correct way
+   round. */
+async function detectDecisionOpen(db: DB): Promise<Notification[]> {
+  const { data: candidates } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name, move_in_from').eq('stage', 'candidate')
+  if (!candidates?.length) return []
+  const ids = candidates.map((a: { id: string }) => a.id)
+
+  const [{ data: done }, { data: votes }, { data: placements }, { data: listings }] = await Promise.all([
+    db.from('recruit_screenings').select('applicant_id, starts_at, status')
+      .in('applicant_id', ids).eq('status', 'completed'),
+    db.from('recruit_decision_votes').select('applicant_id, verdict').in('applicant_id', ids),
+    db.from('recruit_listing_candidates').select('applicant_id, listing_id')
+      .in('applicant_id', ids).eq('status', 'active'),
+    db.from('recruit_listings').select('id, starts_on'),
+  ])
+  const screened = new Map((done || []).map((r: Record<string, string>) => [r.applicant_id, r.starts_at]))
+  const listingStart = new Map((listings || []).map((l: Record<string, unknown>) => [l.id as string, l.starts_on as string]))
+  const placedStart = new Map<string, string>()
+  for (const p of placements || []) {
+    const st = listingStart.get(p.listing_id)
+    if (st && (!placedStart.has(p.applicant_id) || st < placedStart.get(p.applicant_id)!)) {
+      placedStart.set(p.applicant_id, st)
+    }
+  }
+  const tally = new Map<string, number>()
+  for (const v of votes || []) tally.set(v.applicant_id, (tally.get(v.applicant_id) || 0) + 1)
+
+  const out: Notification[] = []
+  for (const a of candidates) {
+    const screenedAt = screened.get(a.id)
+    if (!screenedAt) continue          // nothing to decide yet
+    // The date they would actually move: their confirmed window, else the
+    // listing they are placed on, else a month after the call so a decision
+    // without a room still has a clock.
+    const date = a.move_in_from || placedStart.get(a.id) ||
+      ptToday(new Date(new Date(screenedAt).getTime() + 30 * 86400000))
+    const left = daysUntil(date)
+    if (left > 14) continue
+    const step = left < 0 ? 'passed' : left <= 3 ? 'urgent' : left <= 7 ? 'soon' : 'open'
+    const n = tally.get(a.id) || 0
+    out.push({
+      kind: 'decision_open',
+      subject_type: 'applicant',
+      subject_id: a.id,
+      subject_label: a.first_name,
+      audience: step === 'urgent' || step === 'passed' ? 'oncall' : 'house',
+      lane: step === 'open' ? 'daily' : 'now',
+      dedupe_key: `decision_open:${a.id}:${step}`,
+      payload: {
+        title: fullName(a),
+        sentence: left < 0
+          ? `The house still has not decided on {}, who wanted to move in ${fmtDay(date)}.`
+          : `The house needs to decide on {} before ${fmtDay(date)}, ${plural(left, 'day')} away.`,
+        body: n ? `${plural(n, 'housemate')} have weighed in` : 'nobody has weighed in yet',
+        section: 'Decisions',
+        links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+      },
+    })
+  }
+  return out
+}
+
+/* C4 — a candidate became a housemate. The one purely good notification in the
+   set, and the one the funnel PRD flagged as missing. */
+async function detectPromotions(db: DB): Promise<Notification[]> {
+  const { data: stays } = await db.from('recruit_stays')
+    .select('id, applicant_id, occupant, room_id, starts_on, kind, created_at')
+    .eq('kind', 'resident').not('applicant_id', 'is', null)
+    .gte('created_at', new Date(Date.now() - 14 * 86400000).toISOString())
+  if (!stays?.length) return []
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const { data: owed } = await db.from('recruit_onboarding')
+    .select('stay_id, item, done_at').in('stay_id', stays.map((s: { id: string }) => s.id))
+  const openItems = new Map<string, number>()
+  for (const o of owed || []) {
+    if (!o.done_at) openItems.set(o.stay_id, (openItems.get(o.stay_id) || 0) + 1)
+  }
+
+  return stays.map((s: Record<string, string | number>) => ({
+    kind: 'candidate_promoted',
+    subject_type: 'stay' as const,
+    subject_id: String(s.id),
+    subject_label: String(s.occupant || 'A new housemate'),
+    lane: 'now' as const,
+    dedupe_key: `candidate_promoted:${s.id}`,
+    payload: {
+      title: String(s.occupant || 'A new housemate'),
+      sentence: `{} moved into ${roomName.get(s.room_id as number) || 'the house'} on ${fmtDay(String(s.starts_on))} as a resident.`,
+      body: openItems.get(String(s.id))
+        ? `${plural(openItems.get(String(s.id))!, 'onboarding item')} still to tick`
+        : undefined,
+      section: 'New housemates',
+      links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${s.room_id}` }],
+    },
+  }))
 }
 
 /* Detect everything. Each kind is independent: one failing query must not cost
@@ -521,6 +871,12 @@ export async function detect(db: DB): Promise<number> {
     ['review_backlog', () => detectReviewBacklog(db)],
     ['opening_at_risk', () => detectOpeningsAtRisk(db)],
     ['room_emptying', () => detectRoomsEmptying(db)],
+    // Phase 2 — the active candidate's own journey.
+    ['needs_input', () => detectNeedsInput(db)],
+    ['candidate_landing', () => detectCandidateLanding(db)],
+    ['screening_moments', () => detectScreeningMoments(db)],
+    ['decision_open', () => detectDecisionOpen(db)],
+    ['candidate_promoted', () => detectPromotions(db)],
   ]
   let found = 0
   for (const [name, fn] of kinds) {
@@ -559,7 +915,12 @@ const label = (kind: string) =>
 interface LineRow {
   kind: string
   subject_label: string
-  payload?: { title?: string; body?: string; links?: Array<{ label: string; url: string }> }
+  payload?: {
+    sentence?: string
+    title?: string
+    body?: string
+    links?: Array<{ label: string; url: string }>
+  }
 }
 
 /* One notification, one line, two parts: what kind of thing this is, and who or
@@ -574,7 +935,11 @@ interface LineRow {
 function oneLine(n: LineRow): string {
   const who = n.payload?.title || n.subject_label
   const url = n.payload?.links?.[0]?.url
-  return `${icon(n.kind)} **${label(n.kind)}** · ${url ? `[${who}](${url})` : who}`
+  const subject = url ? `[${who}](${url})` : who
+  const sentence = n.payload?.sentence
+  // Older rows (and any detector that forgets a sentence) still read sensibly.
+  if (!sentence) return `${icon(n.kind)} **${label(n.kind)}** · ${subject}`
+  return `${icon(n.kind)} ${sentence.replace('{}', subject)}`
 }
 
 /* The log's Discord half: every row, unbatched, muted or not. Runs before the
@@ -583,7 +948,8 @@ function oneLine(n: LineRow): string {
 async function drainLog(db: DB): Promise<number> {
   const { data } = await db.from('recruit_notifications')
     .select('id, kind, subject_label, payload, audience, lane, muted')
-    .is('log_at', null).order('created_at').limit(12)
+    .is('log_at', null).neq('audience', 'none')
+    .order('created_at').limit(12)
   if (!data?.length) return 0
   let sent = 0
   for (const n of data) {
@@ -615,7 +981,7 @@ async function drainLane(db: DB, settings: NotifySettings, audience: 'house' | '
   const { data } = await db.from('recruit_notifications')
     .select('id, kind, subject_label, payload')
     .is(stampCol, null).eq('muted', false)
-    .eq('lane', 'now').eq('audience', audience)
+    .eq('lane', 'now').eq('audience', audience)   // never 'none'
     .lte('due_at', new Date().toISOString()).is('acked_at', null)
     .order('created_at').limit(8)
   if (!data?.length) return 0
@@ -634,11 +1000,7 @@ async function drainLane(db: DB, settings: NotifySettings, audience: 'house' | '
         // A batch names the kind once in its heading, so the rows inside drop
         // the repeated label and lead with who.
         const body = `${icon(kind)} **${label(kind)} — ${rows.length}**\n` +
-          rows.map((r: Record<string, any>) => {
-            const who = r.payload?.title || r.subject_label
-            const url = r.payload?.links?.[0]?.url
-            return `• ${url ? `[${who}](${url})` : who}`
-          }).join('\n')
+          rows.map((r: Record<string, any>) => oneLine(r)).join('\n')
         await sendEmbed(channel, body)
       } else {
         for (const r of rows) {
@@ -674,7 +1036,7 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
     .order('created_at').limit(200)
   if (!data?.length) return 0
 
-  const SECTION_ORDER = ['Needs a review', 'Openings at risk', 'Rooms emptying', 'New applications', 'Backlog']
+  const SECTION_ORDER = ['Needs a review', 'Needs a second read', 'Decisions', 'Screening', 'Replies', 'Passed review', 'Waiting for a room', 'Openings at risk', 'Rooms emptying', 'New housemates', 'New applications', 'Backlog']
   const sections = new Map<string, typeof data>()
   for (const n of data) {
     const s = n.payload?.section || 'Other'
@@ -690,12 +1052,8 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
   const blocks = ordered.map(([section, rows]) => {
     // Inside a named section the kind is already established, so each row is
     // just the name, linked. The section heading carries everything else.
-    const shown = rows.slice(0, 5).map((r: Record<string, any>) => {
-      const link = r.payload?.links?.[0]?.url
-      const title = r.payload?.title || r.subject_label
-      return `• ${link ? `[${title}](${link})` : title}`
-    }).join('\n')
-    const more = rows.length > 5 ? `\n• _+${rows.length - 5} more_` : ''
+    const shown = rows.slice(0, 5).map((r: Record<string, any>) => oneLine(r)).join('\n')
+    const more = rows.length > 5 ? `\n_+${rows.length - 5} more_` : ''
     return `**${section} (${rows.length})**\n${shown}${more}`
   })
   const heading = lane === 'daily' ? '☀️ **Recruiting today**' : '🗓️ **Recruiting this week**'
