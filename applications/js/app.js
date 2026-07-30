@@ -561,7 +561,7 @@ function openingsCta(a) {
     const mine = dv.find(v => v.voter_id === me?.id);
     const decCtx = decisionContext(dv, mine);
     return stack(
-      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-watch btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button></span>`,
+      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule visit</button><button type="button" class="btn btn--sm cta-watch btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
   }
   if (phase === 'done') {
@@ -571,7 +571,7 @@ function openingsCta(a) {
     const mine = dv.find(v => v.voter_id === me?.id);
     const decCtx = decisionContext(dv, mine);
     return stack(
-      `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button>`,
+      `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule visit</button>`,
       `${decCtx} · no recording — <button type="button" class="cta-link" data-add-recording="${a.id}">add a link</button>`);
   }
   if (phase === 'processing') return stack(processingChip(), when);
@@ -586,7 +586,7 @@ function openingsCta(a) {
       `no screener yet · ${days === 0 ? 'sent today' : `${days}d`} · <button type="button" class="cta-link" data-avail-review="${a.id}">book it yourself</button>`);
   }
   if (sc?.availability) return stack(
-    `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review availability</button>`,
+    `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review times</button>`,
     sc.nWindows ? `${sc.nWindows} window${sc.nWindows === 1 ? '' : 's'} offered` : '');
   const st = emailState[a.id];
   if (st?.lastDir === 'in') return stack(`<button class="btn btn--sm inbox-row__review cta-std cta--green" data-pick-time="${a.id}">Reply</button>`, `replied ${relTime(st.lastAt)}`);
@@ -2499,7 +2499,7 @@ async function loadCallPanel(a) {
   if (queue[qIndex] !== a.id || reviewTab !== 'call' || !host()) return;
   if (!row) {
     host().innerHTML = `<p class="notes__empty">No intro call yet.</p>
-      <p class="notes__empty"><button type="button" class="cta-link" data-add-recording="${a.id}">Add a recording link</button> — if the call happened on tldv or elsewhere.</p>`;
+      <p class="notes__empty"><button type="button" class="cta-link" data-add-recording="${a.id}">Add recording</button> — if the call happened on tldv or elsewhere.</p>`;
     return;
   }
   host().innerHTML = `
@@ -2512,12 +2512,12 @@ async function loadCallPanel(a) {
         // than pretending to be a player.
         ? `<p class="external-rec"><a class="btn btn--sm btn--watch" href="${esc(row.external_recording_url)}" target="_blank" rel="noopener">Watch on ${esc(row.external_recording_source || 'the host')}</a>
              <span class="notes__empty">added${row.external_recording_by_name ? ` by ${esc(row.external_recording_by_name)}` : ''} · <button type="button" class="cta-link" data-add-recording="${a.id}">replace</button></span></p>`
-        : `<p class="notes__empty">The recording lands here after the call. <button type="button" class="cta-link" data-add-recording="${a.id}">Add a link</button> if it was recorded elsewhere.</p>`}
+        : `<p class="notes__empty">The recording lands here after the call. <button type="button" class="cta-link" data-add-recording="${a.id}">Add link</button> if it was recorded elsewhere.</p>`}
     ${row.recording_summary ? `<section class="review__section"><h3 class="review__section-title">Call summary</h3>${mdLite(row.recording_summary)}</section>` : ''}
     <section class="review__section notes">
       <div class="notes__head">
         <h3 class="review__section-title">Comments</h3>
-        ${streamable ? `<button type="button" class="btn btn--sm" id="call-stamp" title="Prefix your comment with the video's current time">Comment at current time</button>` : ''}
+        ${streamable ? `<button type="button" class="btn btn--sm" id="call-stamp" title="Prefix your comment with the video's current time">Comment</button>` : ''}
       </div>
       <div id="notes-body"><p class="notes__empty">Loading comments…</p></div>
       <form class="notes__form" id="notes-form-call">
@@ -2831,9 +2831,9 @@ function rowMenuHtml(a, listingId) {
     <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${esc(mid)}" aria-label="Applicant actions" aria-haspopup="menu">⋮</button>
     <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
       <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
-      ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
-      ${(screeningState[a.id]?.watch || screeningState[a.id]?.done) ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Give decision…</button>` : ''}
-      <button type="button" class="listing-menu__item" data-add-recording="${a.id}">Add recording link…</button>
+      ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy link</button>` : ''}
+      ${(screeningState[a.id]?.watch || screeningState[a.id]?.done) ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Decide</button>` : ''}
+      <button type="button" class="listing-menu__item" data-add-recording="${a.id}">Add recording</button>
       <span class="listing-menu__rule" aria-hidden="true"></span>
       <button type="button" class="listing-menu__item" data-open-remove="${a.id}|${esc(listingId)}">Remove…</button>
     </span>
@@ -3296,7 +3296,7 @@ function promoteBlockHtml(s) {
   if (promoting !== s.id) {
     return `<div class="occ-drawer__promote">
       <button type="button" class="drawer-cta__alt" data-promote-open="${s.id}">
-        <span>Welcome them in</span>
+        <span>Welcome in</span>
         <span class="drawer-cta__exit-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
       </button>
     </div>`;
@@ -3318,7 +3318,7 @@ function promoteBlockHtml(s) {
     <div class="drawer-cta">
       <div class="drawer-cta__row">
         <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
-        <button type="submit" class="btn btn--accent drawer-cta__commit">Welcome them in</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">Welcome in</button>
       </div>
     </div>
   </form>`;
@@ -4011,7 +4011,7 @@ function listingMenuHtml(l) {
   return `<span class="listing-menu-wrap">
     <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${l.id}" aria-label="Listing actions" aria-haspopup="menu">⋮</button>
     <span class="listing-menu" data-menu-for="${l.id}" hidden>
-      <button type="button" class="listing-menu__item" data-edit-listing="${l.id}">Edit listing…</button>
+      <button type="button" class="listing-menu__item" data-edit-listing="${l.id}">Edit</button>
       ${l.status === 'open'
         ? `<button type="button" class="listing-menu__item" data-set-status="${l.id}|filled">Mark filled</button>
            <button type="button" class="listing-menu__item" data-set-status="${l.id}|closed">Close listing</button>`
@@ -4429,7 +4429,7 @@ function renderReview() {
         <span class="closed-bar__sub">${esc(sub)}</span>
       </div>
       <span class="closed-bar__actions">
-        ${owed ? `<button type="button" class="closed-bar__quiet" data-update-edit="${a.id}">Write their update</button>` : ''}
+        ${owed ? `<button type="button" class="closed-bar__quiet" data-update-edit="${a.id}">Write update</button>` : ''}
         <button type="button" class="closed-bar__reopen" data-reopen="${a.id}">Reopen</button>
       </span>
     </div>`;
@@ -4472,7 +4472,7 @@ function renderReview() {
     <section class="review__section notes" id="notes">
       <div class="notes__head">
         <h3 class="review__section-title">House notes</h3>
-        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">Get an AI read</button>
+        <button type="button" class="btn btn--sm" id="second-opinion" data-second-opinion="${a.id}">AI read</button>
       </div>
       <div id="notes-body"><p class="notes__empty">Loading notes…</p></div>
       <form class="notes__form" id="notes-form">
@@ -4644,7 +4644,7 @@ function renderReviewFoot(a) {
       foot.innerHTML = `
         <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
         <span class="foot-links">
-          <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back now</button>
+          <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back</button>
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     } else {
@@ -4655,7 +4655,7 @@ function renderReviewFoot(a) {
       foot.innerHTML = `
         ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
         <span class="foot-cta">${trial
-          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Welcome them in</button>`
+          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Welcome in</button>`
           : openingsCta(a)}</span>
         <span class="foot-links">
           ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
@@ -4813,7 +4813,7 @@ function paintEmailsPanel(a, note) {
       <span class="notes__empty">${rows.length ? `${rows.length} message${rows.length === 1 ? '' : 's'} with ${esc(a.email)}` : esc(a.email || '')}
         <span class="emails-note" id="emails-note">${esc(note === 'checking' ? 'checking for new…' : note)}</span></span>
       <span class="emails-toolbar__actions">
-        ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy availability link</button>` : ''}
+        ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy link</button>` : ''}
         <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
       </span>
     </div>

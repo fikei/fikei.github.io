@@ -7,9 +7,43 @@ fires it, what it says, what you can do about it, and how it repeats.
 catalogue stops being trusted. The invariants at the bottom are checkable — if
 one of them stops holding, that's a bug, not a documentation gap.
 
-Source of truth for behaviour: `supabase/functions/_shared/recruit-notify.ts`
-(detectors, `KINDS`, dispatch) and `supabase/functions/recruit-gmail/index.ts`
-(reply intents). Design rationale: [agape-recruiting-notifications.md](../strategy/prds/agape-recruiting-notifications.md).
+**All the words live in one file:** `supabase/functions/_shared/recruit-copy.ts`
+— every label, every sentence template, every action. Detectors decide what is
+true and name a copy key; they contain no prose. Read that file top to bottom to
+read all the copy at once.
+
+Source of truth for behaviour: `_shared/recruit-notify.ts` (detectors, dispatch)
+and `recruit-gmail/index.ts` (reply intents). Design rationale:
+[agape-recruiting-notifications.md](../strategy/prds/agape-recruiting-notifications.md).
+
+## Editing the copy
+
+**Without a deploy.** Rows in `recruit_copy` override the module's defaults.
+From the Supabase SQL editor:
+
+```sql
+select recruit_set_copy(
+  'review_stalled',
+  '{subject} has been waiting {days} for someone to read their application.',
+  array['subject','days']          -- what this notification can use
+);
+```
+
+The third argument is checked: a template using a placeholder the detector
+doesn't supply is refused, so a typo can't ship a sentence with a hole in it.
+`recruit_reset_copy('review_stalled')` puts one back; `select * from
+recruit_copy_status` shows everything currently changed and by whom.
+
+**See it before it sends.** `POST /recruit-discord/remind?dry=1` runs the real
+detectors through the real renderer and returns every line it *would* say,
+marking which already exist. It writes nothing and posts nothing.
+
+Checking an edit by deleting rows and forcing a real tick is a **re-send, not a
+preview** — it re-posts every row it recreates.
+
+**With a deploy.** Edit `_shared/recruit-copy.ts` and redeploy `recruit-discord`
+and `recruit-gmail`. That is the version that ships and is reviewable in a PR;
+the table holds only deliberate divergence from it.
 
 ---
 
