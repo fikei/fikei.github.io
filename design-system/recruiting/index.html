@@ -170,6 +170,94 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 }
 .dcta__exits + .dcta__alt { margin-top: 14px; }
 .dcta__alt .dcta__hint { text-align: left; }
+/* Exit-row directions — five treatments for tier 3, side by side. Shared
+   frame so only the exit treatment differs between them. */
+.dirs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dir { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
+.dir > header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.dir > header b { font-size: 12.5px; }
+.dir > header .src { font-size: 10.5px; color: var(--ink-3); }
+.dir .frame { background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px; }
+.dir .cta2 { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.dir .cta2 .q { background: transparent; border: 0; color: var(--ink-2); font: 500 12.5px/1 inherit; padding: 9px 10px; cursor: pointer; }
+.dir .pill { border-radius: 999px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); min-width: 84px; }
+
+/* A — inset tiles: each exit is its own filled surface, separated by gap. */
+.xa { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.xa button {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left;
+  background: var(--tint-gray); border: 0; border-radius: var(--r-sm); padding: 10px 12px;
+  color: var(--ink); font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xa button .l { grid-column: 1; grid-row: 1; }
+.xa button .h { grid-column: 1; grid-row: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xa button .ic { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--ink-3); font-size: 13px; }
+.xa button:hover { background: var(--line); }
+.xa button.dg { color: var(--red); }
+.xa button.dg:hover { background: color-mix(in srgb, var(--red) 14%, transparent); }
+
+/* B — inset-grouped list: one container, no internal hairlines. */
+.xb { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.xb button {
+  display: grid; grid-template-columns: 1fr; gap: 2px; width: 100%; text-align: left;
+  background: transparent; border: 0; padding: 11px 12px; color: var(--ink);
+  font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xb button .l { grid-row: 1; }
+.xb button .h { grid-row: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xb button:hover { background: var(--tint-gray); }
+.xb button.dg { color: var(--red); }
+.xb button.dg:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+/* C — no rules, no container: whitespace and a leading glyph only. */
+.xc { display: flex; flex-direction: column; margin-top: 14px; }
+.xc button {
+  display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; text-align: left;
+  background: transparent; border: 0; border-radius: var(--r-sm); padding: 9px 8px;
+  color: var(--ink-2); font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xc button .ic { grid-row: 1 / 3; align-self: center; color: var(--ink-3); font-size: 13px; }
+.xc button .h { grid-column: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xc button:hover { background: var(--tint-gray); color: var(--ink); }
+.xc button.dg { color: var(--red); }
+
+/* D — danger zone: the irreversible one gets its own tinted block. */
+.xd { margin-top: 12px; }
+.xd .quiet-exit { background: transparent; border: 0; padding: 0; color: var(--ink-2); font: 600 12px/1.3 inherit; cursor: pointer; text-align: left; }
+.xd .quiet-exit span { display: block; font: 400 11px/1.35 inherit; color: var(--ink-3); margin-top: 1px; }
+.xd .zone {
+  margin-top: 12px; display: flex; align-items: center; gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--red) 42%, transparent);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-radius: var(--r-sm); padding: 10px 12px;
+}
+.xd .zone .t { flex: 1; min-width: 0; font: 600 12px/1.3 inherit; }
+.xd .zone .t span { display: block; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xd .zone button {
+  flex-shrink: 0; background: transparent; border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
+  color: var(--red); border-radius: var(--r-xs); padding: 7px 11px; font: 600 11.5px/1 inherit; cursor: pointer;
+}
+.xd .zone button:hover { background: var(--red); color: var(--bg); border-color: var(--red); }
+
+/* E — collapse into the overflow menu the app already has. */
+.xe .menu {
+  margin-top: 12px; width: 236px; margin-left: auto;
+  background: var(--elevated); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  box-shadow: 0 12px 28px rgba(0,0,0,.34); padding: 5px; display: flex; flex-direction: column;
+}
+.xe .menu button {
+  text-align: left; background: transparent; border: 0; border-radius: var(--r-xs);
+  padding: 8px 9px; color: var(--ink); font: 500 12.5px/1.3 inherit; cursor: pointer;
+}
+.xe .menu button:hover { background: var(--tint-gray); }
+.xe .menu button.dg { color: var(--red); }
+.xe .menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
+.xe .kb2 { background: transparent; border: 0; color: var(--ink-2); font-size: 15px; line-height: 1; padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.xe .kb2:hover { background: var(--tint-gray); color: var(--ink); }
+.pick { border-left: 3px solid var(--ok); padding: 4px 0 4px 14px; margin: 4px 0 14px; }
+.pick b { font-size: 13.5px; }
+.pick p { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
+
 /* Settings (concept) */
 .tag-concept { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tint-amber-ink); background: var(--tint-amber); padding: 1px 5px; border-radius: 999px; }
 .setpage { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 22px; }
@@ -224,7 +312,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.29</span><a href="/design-system/">← all of Sassy</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.30</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -259,6 +347,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <div class="items">
       <a href="#two-tier" data-story="two-tier">Two-tier rail</a>
       <a href="#sidebar-ctas" data-story="sidebar-ctas">Sidebar CTAs</a>
+      <a href="#exit-directions" data-story="exit-directions">Exit rows — directions <span class="tag-concept">pick one</span></a>
       <a href="#row-states" data-story="row-states">Row states</a>
       <a href="#schedule-modal" data-story="schedule-modal">Schedule modal</a>
       <a href="#listing-header" data-story="listing-header">Listing header</a>
@@ -311,6 +400,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
+      <div class="dec"><span class="d">Jul 30</span><br><b>The exit rows' hairlines are up for replacement.</b><p>Full-bleed rules between exits read as a 2015 settings list — the rule was separating things that should have been grouped. Five directions drawn side by side (inset tiles · inset-grouped · space only · danger zone · overflow), with a recommendation: group them in one container with no internal rules, and promote only the genuinely irreversible to a tinted danger block. Undecided — see <a href="#exit-directions">Exit rows — directions</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Settings gets the rail's vocabulary, and a schema instead of a page.</b><p>The rail footer was the only place a setting could go, so most settings never became settings — the house's recruiting behavior lives in literals (3 quiet days, ±1 flexible month, +1/−1 trial milestones) that need a deploy to change. The concept: six sections named <code>You · House · Funnel · Automations · Connections · Data</code>, rendered from a field schema where <code>scope</code> picks the store and the schema default <em>is</em> the code default. Concept only — see <a href="#settings">Settings</a>.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>Inbox is Applicants, and Screening left the rail.</b><p>"Inbox" described a queue; "Applicants" names what's in it. Screening was a rail entry nobody navigated to — the work happens on a person's row and in Discord — so the view stays routable for deep links and left the rail.</p></div>
       <div class="dec"><span class="d">Jul 30</span><br><b>The design system got a name: Sassy.</b><p>"The design system" was a description, not a name, so nothing in a review could refer to it without a paragraph of context. Sassy is the whole thing — the global CTRL layer and every product system under it, this one included.</p></div>
@@ -590,6 +680,110 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     </div>
   </section>
 
+  <section class="story" id="s-exit-directions">
+    <h1>Exit rows — directions <span class="tag-concept">pick one</span></h1>
+    <p class="lede">Tier 3 currently separates its rows with full-bleed hairlines. That's a 2015 settings-list move: the rule is doing work that surface, radius, and space should do. Five directions, same content, same 340px frame.</p>
+
+    <div class="canvas">
+      <div class="dirs">
+
+        <div class="dir xa">
+          <header><b>A · Inset tiles</b><span class="src">Linear, Vercel, Raycast</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xa">
+              <button><span class="l">Mark leaving</span><span class="ic">→</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="l">Remove stay</span><span class="ic">✕</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>B · Inset-grouped list</b><span class="src">iOS 18, macOS Settings</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xb">
+              <button><span class="l">Mark leaving</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="l">Remove stay</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>C · Space only</b><span class="src">Notion, Linear menus</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xc">
+              <button><span class="ic">→</span><span>Mark leaving</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="ic">✕</span><span>Remove stay</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>D · Danger zone</b><span class="src">GitHub, Stripe, Vercel</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xd">
+              <button class="quiet-exit">Mark leaving <span>sets a move-out date and lists the room</span></button>
+              <div class="zone">
+                <span class="t">Remove stay <span>deletes it from the timeline</span></span>
+                <button>Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir xe">
+          <header><b>E · Collapse into overflow</b><span class="src">this app's own kebab</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="kb2">⋯</button><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="menu">
+              <button>Mark leaving — list room</button>
+              <div class="sep"></div>
+              <button class="dg">Remove stay…</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>Trade-offs</h3>
+      <div class="tblwrap"><table class="vx">
+        <tr><th>Direction</th><th>What it buys</th><th>What it costs</th></tr>
+        <tr><td><b>A · Inset tiles</b></td>
+            <td>No rules at all — each exit is a discrete object you can hit. Reads the most current of the five. Hover state has somewhere to live.</td>
+            <td>Two filled tiles under a filled primary is a lot of surface in a 340px column; risks looking like three competing buttons.</td></tr>
+        <tr><td><b>B · Inset-grouped</b></td>
+            <td>The exits read as <em>one thing</em> — "the ways out" — rather than unrelated links. No internal hairlines; the container edge does the grouping. Scales to 4+ exits without striping.</td>
+            <td>Still a bordered box; if a section only ever has one exit, the container is overhead.</td></tr>
+        <tr><td><b>C · Space only</b></td>
+            <td>Lightest possible. Nothing but type, a glyph, and whitespace — the most honest reading of "show, don't decorate".</td>
+            <td>Weakest affordance: without a rule or a surface these can read as static text until hovered. Touch targets get ambiguous.</td></tr>
+        <tr><td><b>D · Danger zone</b></td>
+            <td>Consequence is encoded in the container, not just the label color. Unmistakable, and the current standard for irreversible actions.</td>
+            <td>Heavy for two items. The tint competes with the primary for attention — wrong emphasis when Save is the common case.</td></tr>
+        <tr><td><b>E · Overflow</b></td>
+            <td>Footer collapses to commit + dismiss. Reuses a component the app already ships. Zero new visual language.</td>
+            <td>Hides the exits behind a click, and hints don't survive a menu row — the thing that made "Mark leaving" legible goes away.</td></tr>
+      </table></div>
+
+      <h3>Recommendation</h3>
+      <div class="pick">
+        <b>B, with D reserved for the genuinely irreversible.</b>
+        <p>B kills the hairlines and makes the exits one grouped object instead of a striped list, which is the actual complaint — the rules were separating things that should have been grouped. It keeps every hint inline, holds up at one exit or five, and needs no new tokens. Then, when an action can't be undone (deleting a listing with candidates attached, disconnecting Gmail), promote just that one to D's tinted block — the tint means "this one is different," which only works if it's rare.</p>
+      </div>
+      <ul>
+        <li><b>Not A</b> — under a filled accent pill, two filled tiles make three button-ish objects in a 340px column. A is the better choice on a wide surface; Settings sections are where it would earn its keep.</li>
+        <li><b>Not C</b> — the app's rows already lean on hover to reveal affordance, and losing both the rule <em>and</em> the surface leaves destructive actions looking like captions.</li>
+        <li><b>Not E</b> — the hints are the point. "Mark leaving" without "sets a move-out date and lists the room" is exactly the copy problem this pattern was built to fix.</li>
+        <li>B is drawn without a trailing chevron on purpose — the whole row is the target, and a chevron implies a further screen that doesn't exist.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="story" id="s-row-states">
     <h1>Row states</h1>
     <p class="lede">Active means your move; passive means the chip tells you whose it is. Every passive state carries its escalation rule.</p>
@@ -826,7 +1020,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     links.forEach(function (l) {
       var on = l.dataset.story === name;
       l.classList.toggle('on', on);
-      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + l.textContent;
+      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + (l.firstChild ? l.firstChild.textContent : l.textContent).trim();
     });
     window.scrollTo(0, 0);
   }
