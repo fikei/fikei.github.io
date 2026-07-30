@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.55.0';
+const VERSION = '3.56.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -3287,8 +3287,28 @@ function trialFieldsHtml(s) {
         <input type="date" name="decision_on" class="listing-status" value="${s.decision_on || ''}">
       </label>
     </div>
-    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. #recruiting-automation gets a reminder a week ahead of each.</p>
+    <label class="listing-form__field">Check-in ballot
+      <input type="url" name="checkin_form_url" class="listing-status" placeholder="Google Form link"
+             value="${esc(s.checkin_form_url || '')}">
+    </label>
+    <label class="listing-form__field">Decision ballot
+      <input type="url" name="decision_form_url" class="listing-status" placeholder="Google Form link"
+             value="${esc(s.decision_form_url || '')}">
+    </label>
+    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. Each one needs its own copy of the housemate feedback form, named
+      <code>Agape vote · ${esc(s.occupant || 'Name')} · Month 1 · ${voteCloseOn(s.checkin_on) || 'YYYY-MM-DD'}</code> —
+      the date is the Monday meeting the ballot closes at, not the milestone. The house gets nudged a week out, three days before, and on the morning of that meeting.</p>
   </div>`;
+}
+
+/* When a ballot closes: the last Monday house meeting strictly before the
+   milestone, because that meeting is where the house actually decides. Kept
+   in step with lastMondayBefore() in _shared/recruit-notify.ts. */
+function voteCloseOn(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00');
+  d.setDate(d.getDate() - (((d.getDay() + 6) % 7) || 7));
+  return d.toISOString().slice(0, 10);
 }
 
 /* --- candidate → resident ---
@@ -3743,6 +3763,8 @@ async function writeStayForm(form) {
     // Milestones belong to a trial; switching a stay to any other kind clears them.
     checkin_on: fd.get('kind') === 'candidate' ? (fd.get('checkin_on') || null) : null,
     decision_on: fd.get('kind') === 'candidate' ? (fd.get('decision_on') || null) : null,
+    checkin_form_url: fd.get('kind') === 'candidate' ? ((fd.get('checkin_form_url') || '').trim() || null) : null,
+    decision_form_url: fd.get('kind') === 'candidate' ? ((fd.get('decision_form_url') || '').trim() || null) : null,
   };
   if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
   if (rec.ends_on && rec.ends_on < rec.starts_on) { err.textContent = '"Through" must be at or after "From".'; return; }
@@ -3761,6 +3783,14 @@ async function writeStayForm(form) {
   }
   if (rec.checkin_on && rec.decision_on && rec.decision_on < rec.checkin_on) {
     err.textContent = 'The decision comes after the check-in.'; return;
+  }
+  // A ballot that isn't a form link is a typo, and the nudges would send the
+  // house somewhere that isn't the ballot.
+  for (const [field, label] of [['checkin_form_url', 'Check-in'], ['decision_form_url', 'Decision']]) {
+    const v = rec[field];
+    if (v && !/^https:\/\/(docs\.google\.com\/forms\/|forms\.gle\/)/.test(v)) {
+      err.textContent = `${label} ballot has to be a Google Form link.`; return;
+    }
   }
   // A moved milestone is a new milestone — let its reminder fire again.
   const prev = stays.find(s => s.id === id);

@@ -55,7 +55,7 @@ const SETTING_DEFS = {
   trial_checkin_months: {
     scope: 'house', type: 'number', section: 'funnel', default: 1,
     label: 'Trial check-in lands after', unit: 'months', min: 0, max: 6, step: 1,
-    hint: 'Measured from the day they move in. #recruiting-automation gets a reminder a week ahead.',
+    hint: 'Measured from the day they move in. The ballot closes at the Monday meeting before it, and the house is nudged a week out, three days before, and that morning.',
   },
   trial_decision_months: {
     scope: 'house', type: 'number', section: 'funnel', default: 1,

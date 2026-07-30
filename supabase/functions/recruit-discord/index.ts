@@ -13,8 +13,8 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.18.1'
-console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestones + notification ledger`)
+const VERSION = '1.19.0'
+console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -561,81 +561,11 @@ async function notifyUnmatchedCalls(client: ReturnType<typeof db>): Promise<numb
   return notified
 }
 
-// Trial-candidate milestones (migration 139): a check-in a month into the
-// trial, a house decision a month before the sublet ends. Both post once to
-// #recruiting-automation, a week ahead, and stamp themselves so the 15-minute
-// tick can't repeat them. Moving a date in the app clears the stamp, which is
-// how a rescheduled milestone gets a fresh reminder.
-//
-// LEAD_DAYS of notice, but nothing older than STALE_DAYS: a date backdated in
-// the app is a correction, not a thing to announce, so it's stamped silently.
-const MILESTONE_LEAD_DAYS = 7
-const MILESTONE_STALE_DAYS = 14
-
-async function remindTrialMilestones(client: ReturnType<typeof db>): Promise<number> {
-  const { postResilient, AUTOMATION_CHANNEL_ID } = await import('../_shared/discord.ts')
-  const today = new Date()
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
-  const todayIso = iso(today)
-  const horizon = iso(new Date(today.getTime() + MILESTONE_LEAD_DAYS * 86400000))
-  const floor = iso(new Date(today.getTime() - MILESTONE_STALE_DAYS * 86400000))
-
-  const { data: rows } = await client.from('recruit_stays')
-    .select('id, occupant, room_id, starts_on, ends_on, checkin_on, decision_on, checkin_reminded_at, decision_reminded_at')
-    .eq('kind', 'candidate')
-    .or(`and(checkin_on.lte.${horizon},checkin_reminded_at.is.null),and(decision_on.lte.${horizon},decision_reminded_at.is.null)`)
-  if (!rows?.length) return 0
-
-  const { data: rooms } = await client.from('recruit_rooms').select('id, name')
-  const roomName = new Map((rooms || []).map(r => [r.id, r.name as string]))
-
-  const fmt = (d: string) => new Date(d + 'T12:00Z')
-    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
-
-  let posted = 0
-  for (const s of rows) {
-    const kinds: Array<['checkin' | 'decision', string | null, string | null]> = [
-      ['checkin', s.checkin_on, s.checkin_reminded_at],
-      ['decision', s.decision_on, s.decision_reminded_at],
-    ]
-    for (const [which, on, remindedAt] of kinds) {
-      if (!on || remindedAt || on > horizon) continue
-      const stamp = { [`${which}_reminded_at`]: new Date().toISOString() }
-      // Backdated milestone: record it as handled, say nothing.
-      if (on < floor) {
-        await client.from('recruit_stays').update(stamp).eq('id', s.id)
-        continue
-      }
-      const who = s.occupant || 'Trial candidate'
-      const room = roomName.get(s.room_id) || 'their room'
-      const days = Math.round((new Date(on + 'T12:00Z').getTime() - new Date(todayIso + 'T12:00Z').getTime()) / 86400000)
-      const when = days > 1 ? `in ${days} days — ${fmt(on)}`
-        : days === 1 ? `tomorrow — ${fmt(on)}`
-        : days === 0 ? `today — ${fmt(on)}`
-        : `overdue since ${fmt(on)}`
-      const body = which === 'checkin'
-        ? `**${who}** is a month into their trial in ${room}. Time for the check-in: how is it going, both directions, while there's still runway to fix things.`
-        : `**${who}**'s trial in ${room} ends ${s.ends_on ? fmt(s.ends_on) : 'soon'}. The house decides now, so either side can still make other plans.`
-      try {
-        await postResilient(AUTOMATION_CHANNEL_ID, {
-          embeds: [{
-            // "Residency decision", not "trial decision": the question on the
-            // table is whether they become a resident, not how the trial went.
-            title: which === 'checkin' ? `🌱 Trial check-in — ${who}` : `🗳️ Residency decision — ${who}`,
-            description: `${body}\n\nDue ${when}.\nhttps://ctrl.rodeo/applications/?view=occupancy&room=${s.room_id}`,
-            color: which === 'checkin' ? 0x4f8a6b : 0xb8863b,
-          }],
-        }, `Trial ${which} reminder`)
-        await client.from('recruit_stays').update(stamp).eq('id', s.id)
-        posted++
-      } catch (err) {
-        // Leave the stamp unset so the next tick retries rather than losing it.
-        console.warn(`[trial] ${which} reminder for stay ${s.id} failed: ${(err as Error).message}`)
-      }
-    }
-  }
-  return posted
-}
+// Trial-candidate milestones used to post their own one-shot embeds from here.
+// They are now four escalating rungs in the notification ledger
+// (detectTrialVotes in _shared/recruit-notify.ts), so they get copy overrides,
+// dedupe, lanes, and a log entry like every other notification — and the house
+// hears about a milestone once, not from two systems.
 
 // Capability token for a recording's public watch link — 32 random bytes, so
 // links are unguessable. Revoke by nulling share_token.
@@ -935,8 +865,6 @@ serve(async (req) => {
       const live = await announceLiveCalls(client)
       await completePastCalls(client)
       const sent = await remindUpcoming(client)
-      const trials = await remindTrialMilestones(client)
-      if (trials) console.log(`[trial] ${trials} milestone reminder(s) posted`)
       const recorded = await processRecordings(client) + await processMeetingRecordings(client)
       const archived = await archiveMissingRecordings(client)
       if (archived) console.log(`[archive] ${archived} recording(s) copied to storage`)
@@ -948,8 +876,8 @@ serve(async (req) => {
       try { notify = await notifyTick(client) } catch (err) {
         console.warn(`[notify] tick failed: ${(err as Error).message}`)
       }
-      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${trials} trial(s), ${recorded} recording(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
-      return json({ bots, live, reminded: sent, trials, recorded, notify })
+      console.log(`[recruit-discord] tick: ${bots} bot(s), ${live} live post(s), ${sent} reminder(s), ${recorded} recording(s), notify ${notify.detected} new / ${notify.logged} logged / ${notify.now} posted / ${notify.digest} digested`)
+      return json({ bots, live, reminded: sent, recorded, notify })
     }
 
     const pathname = new URL(req.url).pathname

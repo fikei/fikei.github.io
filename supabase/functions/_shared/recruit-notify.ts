@@ -1442,6 +1442,129 @@ async function detectOccupancyConflicts(db: DB): Promise<Notification[]> {
   }]
 }
 
+/* C7 — the trial votes.
+   A trial candidate has two moments the whole house weighs in on: the check-in
+   a month in, and the final decision before their sublet ends (migration 139).
+   Each one is answered by a copy of the housemate feedback form, linked on the
+   stay (migration 152), and the answers are only useful if they are in before
+   the house talks — which is the Monday meeting. So the ballot closes at the
+   last Monday meeting *before* the milestone, and every sentence names it.
+
+   Four rungs, escalating rather than repeating:
+     open      a week before the closing meeting — the ballot exists, go fill it
+     due       three days before the milestone itself
+     last call the day of the closing meeting
+     overdue   the milestone passed undecided — on-call, not the house
+
+   The T-3 rung is skipped when it would land after the closing meeting (a
+   milestone early in the week), because by then last call is the truer
+   sentence and two lines for one fact is the thing the catalogue forbids. */
+const VOTE_OPEN_LEAD = 7      // days before the closing meeting
+const VOTE_DUE_LEAD = 3       // days before the milestone — the house's ask
+const VOTE_STALE_DAYS = 14    // past this, a milestone is history, not news
+
+/* The house meets on Monday nights, so a ballot closes at the last Monday
+   strictly before the milestone. A milestone that falls on a Monday closes at
+   the meeting a week earlier — the answers are wanted going *into* the day,
+   not on it. */
+export function lastMondayBefore(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - (((d.getUTCDay() + 6) % 7) || 7))
+  return d.toISOString().slice(0, 10)
+}
+
+const MILESTONES = [
+  ['checkin', 'month 1 check-in'],
+  ['decision', 'final decision'],
+] as const
+
+async function detectTrialVotes(db: DB): Promise<Notification[]> {
+  const { data: stays } = await db.from('recruit_stays')
+    .select('id, kind, occupant, room_id, starts_on, ends_on, checkin_on, decision_on, checkin_form_url, decision_form_url')
+  if (!stays?.length) return []
+
+  const trials = stays.filter((s: { kind: string; checkin_on: string | null; decision_on: string | null }) =>
+    s.kind === 'candidate' && (s.checkin_on || s.decision_on))
+  if (!trials.length) return []
+
+  /* Already decided in. A trial that turned into a residency doesn't owe the
+     house a vote on whether it should — the promotion was the answer. */
+  const settled = new Map<string, string>()
+  for (const s of stays) {
+    if (s.kind !== 'resident') continue
+    const who = String(s.occupant || '').trim().toLowerCase()
+    if (!who) continue
+    const at = String(s.starts_on || '')
+    if (!settled.has(who) || at > settled.get(who)!) settled.set(who, at)
+  }
+
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const out: Notification[] = []
+  for (const s of trials) {
+    const who = String(s.occupant || '').trim()
+    if (!who) continue
+    const promotedAt = settled.get(who.toLowerCase())
+    if (promotedAt && promotedAt >= String(s.starts_on || '')) continue
+
+    for (const [which, milestone] of MILESTONES) {
+      const on: string | null = which === 'checkin' ? s.checkin_on : s.decision_on
+      if (!on) continue
+      const form: string | null = which === 'checkin' ? s.checkin_form_url : s.decision_form_url
+      const close = lastMondayBefore(on)
+      const toMilestone = daysUntil(on)
+      const toClose = daysUntil(close)
+
+      // A date corrected after the fact isn't news.
+      if (toMilestone < -VOTE_STALE_DAYS) continue
+
+      let step: 'open' | 'due' | 'last_call' | 'overdue' | null = null
+      if (toMilestone < 0) step = 'overdue'
+      else if (toClose <= 0) step = 'last_call'
+      else if (toMilestone <= VOTE_DUE_LEAD) step = 'due'
+      else if (toClose <= VOTE_OPEN_LEAD) step = 'open'
+      if (!step) continue
+
+      // Without a form there is nothing to fill in, so the opening line says
+      // that instead — and the later rungs would just be nagging about a link
+      // that doesn't exist.
+      if (!form && step !== 'open') continue
+      const copy = step === 'open' && !form ? 'trial_vote_open.noform' : `trial_vote_${step}`
+
+      out.push({
+        kind: `trial_vote_${step}`,
+        subject_type: 'stay',
+        subject_id: String(s.id),
+        subject_label: who,
+        audience: step === 'overdue' ? 'oncall' : 'house',
+        lane: step === 'open' ? 'daily' : 'now',
+        dedupe_key: `trial_vote:${s.id}:${which}:${step}`,
+        payload: {
+          title: who,
+          copy,
+          vars: {
+            subject: who,
+            milestone,
+            date: fmtDay(on),
+            close: fmtDay(close),
+            days: plural(Math.abs(toMilestone), 'day'),
+            room: String(roomName.get(s.room_id) || 'their room'),
+          },
+          section: 'Trial votes',
+          links: form
+            ? [{ label: ACTIONS.ballot, url: form }, { label: ACTIONS.calendar, url: viewLink('occupancy') }]
+            : [{ label: ACTIONS.calendar, url: viewLink('occupancy') }],
+        },
+        // No due_at: dispatch only picks up rows that are already due, and a
+        // rung is due the moment it is detected — the milestone is the thing
+        // being announced, not the time to announce it.
+      })
+    }
+  }
+  return out
+}
+
 /* Detect everything. Each kind is independent: one failing query must not cost
    the others their tick, so each is caught on its own. */
 function detectors(db: DB): Array<[string, () => Promise<Notification[]>]> {
@@ -1467,6 +1590,8 @@ function detectors(db: DB): Array<[string, () => Promise<Notification[]>]> {
     ['gone_cold', () => detectGoneCold(db)],
     ['onboarding_owed', () => detectOnboardingOwed(db)],
     ['occupancy_conflict', () => detectOccupancyConflicts(db)],
+    // The people already living here.
+    ['trial_vote', () => detectTrialVotes(db)],
   ]
 }
 
