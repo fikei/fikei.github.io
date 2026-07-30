@@ -1450,35 +1450,27 @@ async function detectOccupancyConflicts(db: DB): Promise<Notification[]> {
    the house talks — which is the Monday meeting. So the ballot closes at the
    last Monday meeting *before* the milestone, and every sentence names it.
 
-   Four rungs, escalating rather than repeating, all anchored on that meeting:
-     open      a week before it — the ballot exists, go fill it
-     due       three days before it — the weekend to do it in
-     last call the day of it
-     overdue   the milestone passed undecided — on-call, not the house */
-const VOTE_OPEN_LEAD = 7      // days before the closing meeting
-const VOTE_DUE_LEAD = 3       // days before the closing meeting
+   Two nudges, plus a backstop:
+     open      four days before the meeting — the Thursday, so the ballot has
+               the weekend to get filled in
+     last call the morning of the meeting
+     overdue   the milestone passed undecided — on-call, not the house
+
+   Two is the whole ladder on purpose. A ballot that is open for four days and
+   bumped once on the day is chased as hard as it can be without the channel
+   learning to skip these. */
+const VOTE_OPEN_LEAD = 4      // days before the closing meeting
 const VOTE_STALE_DAYS = 14    // past this, a milestone is history, not news
 
-/* When a ballot closes: the house's *month-end* meeting — the last Monday of a
-   month — that still falls on or before the milestone.
-
-   Trial milestones sit on month boundaries (month 1 is the 1st, a decision is a
-   month before a sublet ends), and the house settles a month at its last
-   meeting in the month before it. So a Oct 1 decision is taken at the Sep 28
-   meeting, not the one on Sep 21: "before the corresponding month" is the rule
-   the house already runs on, and the nearest Monday would have picked the wrong
-   meeting for every mid-month milestone. */
-function lastMondayOfMonth(year: number, month: number): string {
-  const d = new Date(Date.UTC(year, month + 1, 0))       // last day of that month
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
-  return d.toISOString().slice(0, 10)
-}
+/* When a ballot closes: the Monday house meeting before the milestone. The
+   date on the stay is taken as it stands — a trial's dates are set by hand and
+   moved by hand, and the meeting is found from whatever they say rather than
+   rounded to a month boundary first. A milestone falling on a Monday closes at
+   the meeting the week before: answers are wanted going *into* the day. */
 export function ballotCloses(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00Z`)
-  const own = lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth())
-  // A milestone before its own month's meeting belongs to the month before —
-  // which is every first-of-the-month milestone, i.e. most of them.
-  return own <= isoDate ? own : lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth() - 1)
+  d.setUTCDate(d.getUTCDate() - (((d.getUTCDay() + 6) % 7) || 7))
+  return d.toISOString().slice(0, 10)
 }
 
 const MILESTONES = [
@@ -1527,10 +1519,9 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
       // A date corrected after the fact isn't news.
       if (toMilestone < -VOTE_STALE_DAYS) continue
 
-      let step: 'open' | 'due' | 'last_call' | 'overdue' | null = null
+      let step: 'open' | 'last_call' | 'overdue' | null = null
       if (toMilestone < 0) step = 'overdue'
       else if (toClose <= 0) step = 'last_call'
-      else if (toClose <= VOTE_DUE_LEAD) step = 'due'
       else if (toClose <= VOTE_OPEN_LEAD) step = 'open'
       if (!step) continue
 

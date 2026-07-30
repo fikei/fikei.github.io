@@ -205,27 +205,28 @@ stay (`recruit_stays.checkin_on` / `decision_on`, migration 139) and both are
 answered by a copy of the housemate feedback form linked next to the date
 (`checkin_form_url` / `decision_form_url`, migration 152).
 
-**The ballot closes at the month-end meeting, not on the milestone.** Trial
-milestones sit on month boundaries — month 1 is the 1st, a decision is a month
-before a sublet ends — and the house settles a month at **its last Monday
-meeting in the month before it**. So the closing meeting is the last Monday of a
-month that still falls on or before the milestone: a decision dated Oct 1 is
-taken on Sep 28, and one dated Sep 15 was taken on Aug 31. Every rung names that
-meeting, and all four are counted from it.
+**The ballot closes at the Monday meeting before the milestone.** The dates on
+the stay are taken as they stand — a trial's dates are set by hand and moved by
+hand — and the meeting is found from whatever they say. A milestone falling on a
+Monday closes at the meeting the week before: answers are wanted going into the
+day, not on it.
+
+**Two nudges, plus a backstop.** Four days out is a Thursday, so the ballot has
+the weekend; then one bump on the morning of the meeting. That is as hard as a
+ballot can be chased before the channel learns to skip these.
 
 | Kind | Fires when | Says | Action | Lane · audience | Repeat |
 |---|---|---|---|---|---|
-| 📮 `trial_vote_open` | 7 days before the closing meeting | *Keerti is up for their month 1 check-in on Sep 1, and the house votes at the meeting on Aug 31.* | Open ballot | Daily · house | once per meeting |
-| 📢 `trial_vote_due` | 3 days before the closing meeting | *Keerti's month 1 check-in lands Sep 1, so the ballot has to be in before the meeting on Aug 31.* | Open ballot | Now · house | once per meeting |
-| 🚨 `trial_vote_last_call` | the day of the closing meeting | *The meeting on Aug 31 is the last one before Keerti's month 1 check-in on Sep 1.* | Open ballot | Now · house | once per meeting |
-| 🟥 `trial_vote_overdue` | the milestone passed with nothing settled | *The house still has not settled Keerti's final decision, which was due Sep 1.* | Open ballot | Now · **oncall** | once per meeting |
+| 📮 `trial_vote_open` | 4 days before the closing meeting | *Keerti is up for their month 1 check-in on Sep 3, and the house votes at the meeting on Aug 31.* | Open ballot | Daily · house | once per meeting |
+| 🚨 `trial_vote_last_call` | the morning of the closing meeting | *The meeting on Aug 31 is where the house votes on Keerti's month 1 check-in, due Sep 3.* | Open ballot | Now · house | once per meeting |
+| 🟥 `trial_vote_overdue` | the milestone passed with nothing settled | *The house still has not settled Keerti's final decision, which was due Sep 3.* | Open ballot | Now · **oncall** | once per meeting |
 
 **A trial that gets extended re-runs its ladder.** The `dedupe_key` carries the
 closing meeting (`trial_vote:{stay}:{which}:{close}:{step}`), so extending a
 sublet — which moves `decision_on`, which can move the meeting — nudges the
 house again with the new date rather than leaving them holding the deadline from
-before the extension. A milestone that moves *within* the same meeting's window
-is the same deadline and correctly stays quiet. **Rename the form copy when the
+before the extension. A milestone that moves but stays on the same side of the
+same Monday is the same deadline and correctly stays quiet. **Rename the form copy when the
 meeting moves**: its name carries the old date, and a stale name is how two
 ballots for one person stop being tellable apart.
 
@@ -238,7 +239,7 @@ is a correction.
 **No ballot collapses the ladder, it doesn't silence it.** With no form link
 attached, every rung becomes the one line that says so — *"{} is up for their
 month 1 check-in on Sep 3 and has no ballot attached yet."* — posted once.
-Chasing people three times toward a link that doesn't exist is noise, but a
+Chasing people twice toward a link that doesn't exist is noise, but a
 milestone days away with no ballot is worse news than one with an unfilled
 ballot, not better. `trial_vote_overdue` is exempt: it escalates the missed
 decision itself, which no form would have fixed.
@@ -321,7 +322,7 @@ Batching applies to Discord only; the log is never batched.
 
 These are the rules that keep the catalogue honest. Each is checkable.
 
-- **Every kind has an action.** All 37 payloads carry `links[0]`, which becomes
+- **Every kind has an action.** All 36 payloads carry `links[0]`, which becomes
   the hyperlink on the subject. A notification you can't act on is just news.
 - **Every kind is in `KINDS`.** An unmapped kind renders as `•` with a de-slugged
   label; `icon()`/`label()` warn once when that happens. A merge once dropped two

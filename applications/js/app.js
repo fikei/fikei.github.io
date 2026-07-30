@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.57.0';
+const VERSION = '3.58.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -3289,7 +3289,7 @@ function trialFieldsHtml(s) {
     </div>
     ${ballotFieldHtml('checkin', 'Month 1', s.occupant, s.checkin_on, s.checkin_form_url)}
     ${ballotFieldHtml('decision', 'Final decision', s.occupant, s.decision_on, s.decision_form_url)}
-    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. Each needs its own copy of the housemate feedback form, named as shown — the date is the meeting the ballot closes at, not the milestone. The house is nudged a week out, three days out, and on the day of that meeting. Move a milestone into a different month and the ballot closes at a different meeting, so rename the form and the nudges start again.</p>
+    <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. Each needs its own copy of the housemate feedback form, named as shown — the date is the meeting the ballot closes at, not the milestone. The house is nudged four days out and bumped again the morning of that meeting. Move a milestone past a Monday and the ballot closes at a different meeting, so rename the form — the nudges start again on their own.</p>
   </div>`;
 }
 
@@ -3308,21 +3308,14 @@ function ballotFieldHtml(which, milestone, occupant, on, url) {
     </label>`;
 }
 
-/* When a ballot closes: the house's month-end meeting — the last Monday of a
-   month — that still falls on or before the milestone. Milestones sit on month
-   boundaries and the house settles a month at its last meeting in the month
-   before it, so a Oct 1 decision is taken at the Sep 28 meeting. Kept in step
-   with ballotCloses() in _shared/recruit-notify.ts. */
-function lastMondayOfMonth(year, month) {
-  const d = new Date(Date.UTC(year, month + 1, 0));
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
-}
+/* When a ballot closes: the Monday house meeting before the milestone, taking
+   the date on the stay as it stands. Kept in step with ballotCloses() in
+   _shared/recruit-notify.ts. */
 function voteCloseOn(iso) {
   if (!iso) return '';
   const d = new Date(iso + 'T00:00:00Z');
-  const own = lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth());
-  return own <= iso ? own : lastMondayOfMonth(d.getUTCFullYear(), d.getUTCMonth() - 1);
+  d.setUTCDate(d.getUTCDate() - (((d.getUTCDay() + 6) % 7) || 7));
+  return d.toISOString().slice(0, 10);
 }
 
 /* --- candidate → resident ---
