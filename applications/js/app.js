@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.53.0';
+const VERSION = '3.54.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -559,9 +559,7 @@ function openingsCta(a) {
   if (phase === 'watch') {
     const dv = decisionVotes[a.id] || [];
     const mine = dv.find(v => v.voter_id === me?.id);
-    const decCtx = mine
-      ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
-      : (dv.length ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours isn't` : 'no decisions yet');
+    const decCtx = decisionContext(dv, mine);
     return stack(
       `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button><button type="button" class="btn btn--sm cta-watch btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button></span>`,
       `${decCtx}${when ? ` · ${when}` : ''}`);
@@ -571,9 +569,7 @@ function openingsCta(a) {
     // recording was only ever an aid — plus a way to supply one.
     const dv = decisionVotes[a.id] || [];
     const mine = dv.find(v => v.voter_id === me?.id);
-    const decCtx = mine
-      ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours counted`
-      : (dv.length ? `${dv.length} decision${dv.length === 1 ? '' : 's'} in — yours isn't` : 'no decisions yet');
+    const decCtx = decisionContext(dv, mine);
     return stack(
       `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule a visit</button>`,
       `${decCtx} · no recording — <button type="button" class="cta-link" data-add-recording="${a.id}">add a link</button>`);
@@ -4585,6 +4581,14 @@ function voteSectionHtml(a) {
     <div class="notes__head"><h3 class="review__section-title">Reviews</h3></div>
     <ul class="notes__list">${rows}</ul>
   </section>`;
+}
+
+/* The house reaches ONE decision about a candidate; housemates weigh in on it.
+   The old copy counted "3 decisions in", which read as three separate verdicts
+   needing a quorum — the opposite of how this works. */
+function decisionContext(dv, mine) {
+  if (!dv.length) return 'nobody has weighed in yet';
+  return `${dv.length} weighed in — yours ${mine ? 'counted' : "isn't in"}`;
 }
 
 /* Contextual footer: vote bar in review, recruiter actions for candidates,

@@ -880,7 +880,7 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
         sentence: left < 0
           ? `The house still has not decided on {}, who wanted to move in ${fmtDay(date)}.`
           : `The house needs to decide on {} before ${fmtDay(date)}, ${plural(left, 'day')} away.`,
-        body: n ? `${plural(n, 'housemate')} have weighed in` : 'nobody has weighed in yet',
+        body: n ? `${plural(n, 'housemate')} weighed in so far` : 'nobody has weighed in yet',
         section: 'Decisions',
         links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
       },
@@ -962,7 +962,9 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
     if (step === null) continue
 
     const heard = lastOut.get(a.id) && lastOut.get(a.id)! > call
-    const unvoted = !voted.has(a.id)
+    // The house reaches one decision; housemates weigh in on it. "Votes" made
+    // it sound like a tally that needs a quorum, which is not how this works.
+    const undecided = !voted.has(a.id)
     out.push({
       kind: 'screening_followup',
       subject_type: 'applicant',
@@ -976,12 +978,12 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
         /* One sentence, both facts. The candidate is waiting AND the house
            hasn't decided — reporting those separately meant two notifications a
            word apart about the same person on the same day. */
-        sentence: unvoted
-          ? `{} was interviewed ${plural(days, 'day')} ago and the house still hasn't voted.`
+        sentence: undecided
+          ? `{} was interviewed ${plural(days, 'day')} ago and the house still hasn't decided.`
           : heard
           ? `{} was interviewed and has heard nothing for ${plural(days, 'day')}.`
           : `{} was interviewed ${plural(days, 'day')} ago and is waiting on the house to decide.`,
-        body: unvoted ? undefined : 'voting has started, nobody has told them',
+        body: undecided ? undefined : 'the decision is in progress, nobody has told them',
         section: 'Owed an answer',
         links: [{ label: 'Write to them', url: applicantLink(a.id) }],
       },

@@ -16,6 +16,14 @@ reaches Recruiting Society. Flipping that one setting is the release.
 
 ---
 
+## The catalogue
+
+Every notification that currently exists — trigger, copy, action, lane, and
+repeat rule — is listed in
+[docs/ux/recruiting-notifications-catalog.md](../../ux/recruiting-notifications-catalog.md),
+which is kept current as detectors are added. This document is the reasoning;
+that one is the register.
+
 ## Why now
 
 The funnel is complete end to end (application → review → opening → screening →
