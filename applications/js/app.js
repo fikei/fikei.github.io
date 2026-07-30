@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.40.3';
+const VERSION = '3.41.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -76,8 +76,27 @@ const REMOVE_OPTIONS = [
     hint: 'our no — queues an update email',
     chip: 'not a fit', stage: 'rejected', danger: true,
   },
+  // The residency decision going the other way. Kept distinct from "not a
+  // fit" so the archive can tell "we lived with them and it didn't work"
+  // apart from "we never got that far".
+  {
+    id: 'trial_ended', label: 'Trial ended — not staying',
+    hint: 'they trialled with us and the house said no',
+    chip: 'trial ended', stage: 'archived', danger: true, trialOnly: true,
+  },
 ];
 const removeOption = id => REMOVE_OPTIONS.find(o => o.id === id) || null;
+
+/* Their live trial stay, if they have one. recruit_stays.applicant_id is the
+   link (migration 141) — before it existed the occupant was a bare name and
+   nothing could join the two sides together. Stays that predate the link
+   stay unmatched, which is why this can be null for a real trial candidate. */
+function trialStayFor(applicantId) {
+  if (!applicantId || !houseLoaded) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return stays.find(s => s.kind === 'candidate' && s.applicant_id === applicantId
+    && (!s.ends_on || s.ends_on >= today)) || null;
+}
 // Default return date for Save for future: three months out, month start.
 function defaultReturnDate() {
   const d = new Date();
@@ -115,6 +134,7 @@ let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across ap
 let rooms = [];               // recruit_rooms
 let stays = [];               // recruit_stays rows (date-based tenures)
 let listings = [];            // recruit_listings rows
+let onboarding = [];          // recruit_onboarding rows (checklist per resident stay)
 let houseLoaded = false;
 let settings = { open_to_couples: true };
 let gmailStatus = { connected: false };
@@ -974,8 +994,9 @@ function openRemoveSheet(applicantId, listingId = null) {
 
 function renderRemoveOptions() {
   const listingId = removeTarget?.listingId;
+  const onTrial = !!trialStayFor(removeTarget?.applicantId);
   document.getElementById('remove-options').innerHTML = REMOVE_OPTIONS
-    .filter(o => !o.scope || listingId)
+    .filter(o => (!o.scope || listingId) && (!o.trialOnly || onTrial))
     .map(o => `<button type="button" class="remove-sheet__option${removePick === o.id ? ' is-selected' : ''}${o.danger ? ' remove-sheet__option--danger' : ''}" data-remove-pick="${o.id}">
       <span class="remove-sheet__option-label">${esc(o.label)}</span>
       <span class="remove-sheet__option-hint">${esc(o.hint)}</span>
@@ -1337,14 +1358,16 @@ async function loadComments(applicantId) {
 
 /* ---------- house data ---------- */
 async function loadHouse() {
-  const [rRes, sRes, lRes] = await Promise.all([
+  const [rRes, sRes, lRes, oRes] = await Promise.all([
     sb.from('recruit_rooms').select('*').order('sort'),
     sb.from('recruit_stays').select('*').order('starts_on'),
     sb.from('recruit_listings').select('*').order('starts_on'),
+    sb.from('recruit_onboarding').select('*').order('sort'),
   ]);
   rooms = rRes.data || [];
   stays = sRes.data || [];
   listings = lRes.data || [];
+  onboarding = oRes.data || [];
   houseLoaded = true;
 }
 
@@ -1389,6 +1412,10 @@ async function render() {
 /* ---------- applicants render ---------- */
 function matchesView(a) {
   const out = a.stage !== 'rejected' && a.stage !== 'archived';
+  // They moved in. Not archived (that reads as a no) and not in the pipeline
+  // either — they live on the Occupancy calendar now, and every applicant
+  // rail should be quiet about them.
+  if (a.stage === 'resident') return false;
   // A "not a fit" verdict means archived — never show them here, whatever the
   // stage column says.
   if (view === 'inbox') return a.stage === 'review' && !voteStats(a.id).notFit;
@@ -1449,6 +1476,7 @@ function renderFilterBar(viewList) {
 function counts() {
   const c = { inbox: 0, candidates: 0, openings: 0, screening: 0, archive: 0 };
   for (const a of applicants) {
+    if (a.stage === 'resident') continue; // housed — counted nowhere in the funnel
     if (a.stage === 'rejected' || a.stage === 'archived') { c.archive++; continue; }
     if (a.stage === 'review') c.inbox++;
     else if (a.stage === 'candidate') c.candidates++;
@@ -2437,6 +2465,7 @@ function renderOccupancy() {
 
 /* --- right-hand drawer: stay editor, gap actions, or room details --- */
 function openOccDrawer(next) {
+  if (next?.type !== 'stay' || next.id !== promoting) promoting = null;
   occDrawer = next;
   document.querySelectorAll('.cal__event.is-editing, .cal__room-btn.is-editing').forEach(el => el.classList.remove('is-editing'));
   if (next?.type === 'stay') document.querySelector(`[data-stay="${next.id}"]`)?.classList.add('is-editing');
@@ -2479,6 +2508,105 @@ function trialFieldsHtml(s) {
     </div>
     <p class="occ-drawer__note">Check-in lands a month in; the decision a month before they move out. #recruiting-automation gets a reminder a week ahead of each.</p>
   </div>`;
+}
+
+/* --- candidate → resident ---
+   The decision reminder sends the house here. Promotion is a real state
+   change with three moving parts (close the trial, open the residency, move
+   the applicant's stage), so it goes through one RPC rather than the stay
+   form — a half-applied promotion would leave someone in two rooms or in
+   none. The form below still edits the trial itself; this is the door out. */
+let promoting = null;   // stay id currently showing the confirm strip
+
+function promoteBlockHtml(s) {
+  if (!s.id || s.kind !== 'candidate') return '';
+  const trialEnd = s.ends_on;
+  const start = trialEnd ? isoAddDays(trialEnd, 1) : new Date().toISOString().slice(0, 10);
+  if (promoting !== s.id) {
+    return `<div class="occ-drawer__promote">
+      <button type="button" class="btn btn--accent btn--sm" data-promote-open="${s.id}">Welcome them in</button>
+      <span class="occ-drawer__promote-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
+    </div>`;
+  }
+  return `<form class="occ-drawer__promote occ-drawer__promote--open" data-promote-form="${s.id}">
+    <div class="occ-drawer__section">Welcome ${esc(s.occupant || 'them')} in</div>
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">Room
+        <select name="room_id" class="listing-status">
+          ${rooms.map(r => `<option value="${r.id}" ${r.id === s.room_id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="listing-form__field">Resident from
+        <input type="date" name="starts_on" class="listing-status" value="${start}" required>
+      </label>
+    </div>
+    <p class="occ-drawer__note">The trial closes the day before, so the timeline has no gap. An onboarding checklist gets created for the house to work through.</p>
+    <p class="listing-form__error" data-promote-error></p>
+    <div class="decision-sheet__actions seg-form__actions">
+      <button type="button" class="hold-sheet__cancel" data-promote-cancel>Cancel</button>
+      <button type="submit" class="btn btn--accent btn--sm">Welcome them in</button>
+    </div>
+  </form>`;
+}
+
+/* --- onboarding checklist ---
+   Seeded by the promotion RPC, ticked by hand. Nothing here provisions
+   anything; it's the house's shared memory of what's still owed a new
+   resident. Hidden once every item is done — a finished list is noise. */
+function onboardingHtml(s) {
+  const items = onboarding.filter(o => o.stay_id === s.id)
+    .sort((a, b) => a.sort - b.sort);
+  if (!items.length) return '';
+  const left = items.filter(o => !o.done_at).length;
+  return `<div class="occ-drawer__onboard">
+    <div class="occ-drawer__section">Onboarding ${left ? `· ${left} left` : '· all done'}</div>
+    <ul class="onboard-list">
+      ${items.map(o => `<li class="onboard-item ${o.done_at ? 'is-done' : ''}">
+        <label>
+          <input type="checkbox" data-onboard="${o.id}" ${o.done_at ? 'checked' : ''}>
+          <span>${esc(o.item)}</span>
+        </label>
+      </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+async function toggleOnboarding(id, done) {
+  const row = onboarding.find(o => o.id === id);
+  if (!row) return;
+  const patch = done
+    ? { done_at: new Date().toISOString(), done_by: (await sb.auth.getUser()).data.user?.id || null }
+    : { done_at: null, done_by: null };
+  const { error } = await sb.from('recruit_onboarding').update(patch).eq('id', id);
+  if (error) { toast(`Could not save: ${error.message}`); return; }
+  Object.assign(row, patch);
+  renderOccDrawer();
+}
+
+async function submitPromote(form) {
+  const stayId = form.dataset.promoteForm;
+  const err = form.querySelector('[data-promote-error]');
+  const fd = new FormData(form);
+  const s = stays.find(x => x.id === stayId);
+  const startsOn = fd.get('starts_on');
+  if (!startsOn) { err.textContent = 'Pick the date their residency starts.'; return; }
+  if (s && startsOn <= s.starts_on) {
+    err.textContent = `Their residency has to start after the trial began (${fmtDay(s.starts_on)}).`;
+    return;
+  }
+  const { error } = await sb.rpc('recruit_promote_stay', {
+    p_stay_id: stayId,
+    p_room_id: +fd.get('room_id'),
+    p_starts_on: startsOn,
+  });
+  if (error) { err.textContent = error.message; return; }
+  promoting = null;
+  occDrawer = null;
+  // The RPC touched stays, onboarding, and possibly an applicant's stage.
+  await Promise.all([loadHouse(), loadAll()]);
+  toast(`${s?.occupant || 'They'} are a resident — onboarding checklist created`);
+  renderRailCounts();
+  renderOccupancy();
 }
 
 function stayFormHtml(s, roomId) {
@@ -2562,7 +2690,7 @@ function renderOccDrawer() {
     const room = rooms.find(r => r.id === s.room_id);
     title = s.occupant || KIND_LABELS[s.kind];
     sub = `${room?.name || 'Room'} · ${KIND_LABELS[s.kind]} · ${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
-    body = stayFormHtml(s, s.room_id);
+    body = promoteBlockHtml(s) + stayFormHtml(s, s.room_id) + onboardingHtml(s);
   } else if (occDrawer.type === 'gap') {
     const room = rooms.find(r => r.id === occDrawer.roomId);
     title = `${room?.name || 'Room'} — open`;
@@ -2590,33 +2718,51 @@ function renderOccDrawer() {
       <div class="occ-drawer__body">${body}</div>
     </aside>`;
   hostWrap.querySelector('[data-stay-form]')?.addEventListener('submit', onStaySave);
-  const ongoing = hostWrap.querySelector('input[name="ongoing"]');
-  if (ongoing) ongoing.addEventListener('change', e => {
-    const ends = hostWrap.querySelector('input[name="ends_on"]');
-    ends.disabled = e.target.checked;
-    if (e.target.checked) ends.value = '';
-    syncTrialFields(hostWrap);
+  hostWrap.querySelector('[data-promote-open]')?.addEventListener('click', e => {
+    promoting = e.currentTarget.dataset.promoteOpen;
+    renderOccDrawer();
   });
+  hostWrap.querySelector('[data-promote-cancel]')?.addEventListener('click', () => {
+    promoting = null;
+    renderOccDrawer();
+  });
+  hostWrap.querySelector('[data-promote-form]')?.addEventListener('submit', e => {
+    e.preventDefault();
+    submitPromote(e.target);
+  });
+  hostWrap.querySelectorAll('[data-onboard]').forEach(box => {
+    box.addEventListener('change', () => toggleOnboarding(box.dataset.onboard, box.checked));
+  });
+  // Scoped to the stay form on purpose: the promote form above it has its own
+  // starts_on, and an unscoped lookup here read that instead — recomputing the
+  // check-in default off the residency date rather than the trial's.
   const form = hostWrap.querySelector('[data-stay-form]');
   if (form) {
+    const ongoing = form.querySelector('input[name="ongoing"]');
+    if (ongoing) ongoing.addEventListener('change', e => {
+      const ends = form.querySelector('input[name="ends_on"]');
+      ends.disabled = e.target.checked;
+      if (e.target.checked) ends.value = '';
+      syncTrialFields(form);
+    });
     for (const sel of ['select[name="kind"]', 'input[name="starts_on"]', 'input[name="ends_on"]']) {
-      form.querySelector(sel)?.addEventListener('change', () => syncTrialFields(hostWrap));
+      form.querySelector(sel)?.addEventListener('change', () => syncTrialFields(form));
     }
-    syncTrialFields(hostWrap);
+    syncTrialFields(form);
   }
 }
 
 /* Show the milestone block only for trial candidates, and keep the suggested
    dates in step with the stay window until someone edits them by hand. */
-function syncTrialFields(hostWrap) {
-  const block = hostWrap.querySelector('[data-trial-fields]');
+function syncTrialFields(form) {
+  const block = form.querySelector('[data-trial-fields]');
   if (!block) return;
-  const kind = hostWrap.querySelector('select[name="kind"]')?.value;
+  const kind = form.querySelector('select[name="kind"]')?.value;
   block.hidden = kind !== 'candidate';
   if (block.hidden) return;
-  const startsOn = hostWrap.querySelector('input[name="starts_on"]')?.value || '';
-  const endsOn = hostWrap.querySelector('input[name="ongoing"]')?.checked
-    ? '' : (hostWrap.querySelector('input[name="ends_on"]')?.value || '');
+  const startsOn = form.querySelector('input[name="starts_on"]')?.value || '';
+  const endsOn = form.querySelector('input[name="ongoing"]')?.checked
+    ? '' : (form.querySelector('input[name="ends_on"]')?.value || '');
   const checkin = block.querySelector('input[name="checkin_on"]');
   const decision = block.querySelector('input[name="decision_on"]');
   if (!checkin.dataset.touched) checkin.value = trialCheckinDefault(startsOn);
@@ -3289,11 +3435,17 @@ function renderReviewFoot(a) {
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     } else {
+      // Mid-trial, the question stops being "which listing?" and becomes
+      // "do they stay?". Promotion takes over the primary slot; the listing
+      // controls stay available behind it.
+      const trial = trialStayFor(a.id);
       foot.innerHTML = `
         ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
-        <span class="foot-cta">${openingsCta(a)}</span>
+        <span class="foot-cta">${trial
+          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Welcome them in</button>`
+          : openingsCta(a)}</span>
         <span class="foot-links">
-          <button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>
+          ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     }
@@ -4344,6 +4496,22 @@ function init() {
     if (orm) {
       const [aid, lid] = orm.dataset.openRemove.split('|');
       openRemoveSheet(aid, lid || null);
+      return;
+    }
+    // Promotion is confirmed against the stay (room + start date), so the
+    // profile hands off to the occupancy drawer rather than duplicating the
+    // form here. One place decides what a promotion means.
+    const promo = e.target.closest('[data-promote-applicant]');
+    if (promo) {
+      const trial = trialStayFor(promo.dataset.promoteApplicant);
+      if (!trial) { toast("No trial stay on the calendar for them yet — add one in Occupancy first"); return; }
+      closeReview();
+      setView('occupancy');
+      // After setView, not before: renderOccupancy would otherwise open a
+      // room drawer over the top and clear the pending promotion.
+      promoting = trial.id;
+      openOccDrawer({ type: 'stay', id: trial.id });
+      document.querySelector(`[data-stay="${trial.id}"]`)?.scrollIntoView({ block: 'nearest' });
       return;
     }
     const rpick = e.target.closest('[data-remove-pick]');
