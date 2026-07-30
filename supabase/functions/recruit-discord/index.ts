@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.22.1'
+const VERSION = '1.23.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -87,6 +87,30 @@ const ephemeral = (content: string) => ({ type: 4, data: { content, flags: 64 } 
 
 // ---- claim background work (runs after the 3s ACK) ----
 
+
+/* The interview guide, as the screener should receive it.
+
+   Lives in recruit_settings so it can be rewritten without a deploy — it is the
+   kind of text that gets edited after every second call for a while. Returns
+   null when it has been deliberately emptied, so the house can turn this off by
+   clearing the setting rather than by us shipping a flag for it.
+
+   Discord caps a message at 2000 characters; the guide is sent as its own
+   message after the confirmation so a long one never truncates the part that
+   says when the call is. */
+async function interviewGuide(client: ReturnType<typeof db>): Promise<string | null> {
+  const { data } = await client.from('recruit_settings').select('key, value')
+    .in('key', ['interview_guide', 'interview_guide_url'])
+  const map = new Map((data || []).map((r) => [r.key, r.value]))
+  const guide = String(map.get('interview_guide') || '').trim()
+  const url = String(map.get('interview_guide_url') || '').trim()
+  if (!guide && !url) return null
+
+  const link = url ? `\n\n[The full version lives here](${url})` : ''
+  const body = guide.slice(0, 1800 - link.length)
+  return `**How we run an intro call**\n\n${body}${link}`
+}
+
 async function finishClaim(client: ReturnType<typeof db>, opts: {
   claimPost: Record<string, any>
   applicantId: string
@@ -122,6 +146,17 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
     await dmUser(opts.discordUserId,
       `✅ You're screening **${applicantName}** — Agape intro call — ${slotWhen(startsAt)}.\n` +
       `Calendar invites are out to you both. Meet: ${meetLink || '(see calendar invite)'}${platformLine}`)
+
+    /* And what the house wants out of it. Sent separately so a long guide can
+       never push the time and the Meet link out of view, and after the
+       confirmation because the confirmation is the urgent half. A failure here
+       must not mark the claim as failed — the call is booked either way. */
+    try {
+      const guide = await interviewGuide(client)
+      if (guide) await dmUser(opts.discordUserId, guide)
+    } catch (err) {
+      console.warn(`[recruit-discord] could not send the interview guide: ${(err as Error).message}`)
+    }
 
     try {
       await sendIntroEmail(client, applicant, housemateName, housemateEmail, startsAt, meetLink)
