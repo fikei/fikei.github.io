@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.23.0'
+const VERSION = '1.24.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -91,24 +91,38 @@ const ephemeral = (content: string) => ({ type: 4, data: { content, flags: 64 } 
 /* The interview guide, as the screener should receive it.
 
    Lives in recruit_settings so it can be rewritten without a deploy — it is the
-   kind of text that gets edited after every second call for a while. Returns
-   null when it has been deliberately emptied, so the house can turn this off by
-   clearing the setting rather than by us shipping a flag for it.
+   kind of text that gets edited after every second call for a while. Returns an
+   empty list when deliberately emptied, so the house turns this off by clearing
+   the setting rather than by us shipping a flag for it.
 
-   Discord caps a message at 2000 characters; the guide is sent as its own
-   message after the confirmation so a long one never truncates the part that
-   says when the call is. */
-async function interviewGuide(client: ReturnType<typeof db>): Promise<string | null> {
+   Returned as MESSAGES, not a message. Discord caps one at 2000 characters and
+   the real guide is longer than that, so a single send would cut it off
+   mid-question — which is worse than no guide, because the screener would not
+   know anything was missing. Splitting on blank lines keeps each section whole. */
+async function interviewGuide(client: ReturnType<typeof db>): Promise<string[]> {
   const { data } = await client.from('recruit_settings').select('key, value')
     .in('key', ['interview_guide', 'interview_guide_url'])
   const map = new Map((data || []).map((r) => [r.key, r.value]))
   const guide = String(map.get('interview_guide') || '').trim()
   const url = String(map.get('interview_guide_url') || '').trim()
-  if (!guide && !url) return null
+  if (!guide && !url) return []
 
-  const link = url ? `\n\n[The full version lives here](${url})` : ''
-  const body = guide.slice(0, 1800 - link.length)
-  return `**How we run an intro call**\n\n${body}${link}`
+  const head = '**How we run an intro call**'
+  const tail = url ? `[The full version lives here](${url})` : ''
+  const LIMIT = 1900          // headroom under Discord's 2000
+
+  // Pack whole paragraphs into as few messages as fit.
+  const out: string[] = []
+  let buf = head
+  for (const para of [...guide.split(/\n\s*\n/), tail].filter(Boolean)) {
+    if (buf && `${buf}\n\n${para}`.length > LIMIT) { out.push(buf); buf = '' }
+    buf = buf ? `${buf}\n\n${para}` : para
+    // A single paragraph longer than the limit is the one case we must cut, and
+    // it is better to cut it than to drop it silently.
+    while (buf.length > LIMIT) { out.push(buf.slice(0, LIMIT)); buf = buf.slice(LIMIT) }
+  }
+  if (buf) out.push(buf)
+  return out
 }
 
 async function finishClaim(client: ReturnType<typeof db>, opts: {
@@ -152,8 +166,9 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
        confirmation because the confirmation is the urgent half. A failure here
        must not mark the claim as failed — the call is booked either way. */
     try {
-      const guide = await interviewGuide(client)
-      if (guide) await dmUser(opts.discordUserId, guide)
+      for (const part of await interviewGuide(client)) {
+        await dmUser(opts.discordUserId, part)
+      }
     } catch (err) {
       console.warn(`[recruit-discord] could not send the interview guide: ${(err as Error).message}`)
     }

@@ -40,6 +40,18 @@ export async function createRecordingBot(meetingUrl: string, joinAtISO: string):
       bot_name: 'Agape Notes',
       join_at: joinAtISO,
       ...(loginGroup ? { google_meet: { google_login_group_id: loginGroup } } : {}),
+      /* Leave half a minute after the last human does.
+
+         We previously set no leave rules at all, so Recall's defaults governed
+         and the bot could sit in an empty room long after the call — billable
+         minutes recording nothing, and a Meet that looks still-in-progress to
+         anyone glancing at the calendar.
+
+         Thirty seconds rather than zero because people drop and rejoin: a
+         reconnect, a phone switching networks, someone stepping out to grab the
+         other party. Leaving the instant the room empties would cut the
+         recording off mid-call for a five-second blip. */
+      automatic_leave: { everyone_left_timeout: 30 },
       recording_config: {
         transcript: { provider: { meeting_captions: {} } },
       },
