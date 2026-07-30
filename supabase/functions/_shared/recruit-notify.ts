@@ -957,6 +957,343 @@ async function detectPromotions(db: DB): Promise<Notification[]> {
   }))
 }
 
+
+/* ---------------------------------------------------------------------------
+   Openings, in detail.
+
+   Phase 1 covered the expensive end — a room with no runway left. These cover
+   the quieter ways an opening fails: a draft nobody opened (so auto-placement,
+   which only sees 'open', never ran), an open listing nobody qualifies for, and
+   a listing marked filled with nothing on the calendar to match.
+   ------------------------------------------------------------------------- */
+
+/* O1 / O2 — a draft listing, then a draft nobody has touched. Drafts come from
+   occupancy gaps and from marking a resident as leaving, and they are inert
+   until a human opens them: the placement sweep only ever looks at 'open'. A
+   draft sitting for a week is a room quietly not being filled. */
+async function detectDraftListings(db: DB): Promise<Notification[]> {
+  const { data } = await db.from('recruit_listings')
+    .select('id, room_id, kind, starts_on, status, source, created_at')
+    .eq('status', 'draft')
+  if (!data?.length) return []
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  return data.map((l: Record<string, string | number>) => {
+    const age = Math.floor((Date.now() - new Date(String(l.created_at)).getTime()) / 86400000)
+    const room = roomName.get(l.room_id as number) || `room ${l.room_id}`
+    const stale = age >= 7
+    return {
+      kind: stale ? 'listing_draft_stale' : 'listing_draft',
+      subject_type: 'listing' as const,
+      subject_id: String(l.id),
+      subject_label: String(room),
+      lane: (stale ? 'weekly' : 'now') as 'weekly' | 'now',
+      // A stale draft re-announces weekly; a new one announces once.
+      dedupe_key: stale
+        ? `listing_draft_stale:${l.id}:${ptToday().slice(0, 7)}`
+        : `listing_draft:${l.id}`,
+      payload: {
+        title: String(room),
+        sentence: stale
+          ? `{} has sat as a draft for ${plural(age, 'day')} and is not collecting candidates yet.`
+          : `{} came up as a draft opening from ${fmtDay(String(l.starts_on))}.`,
+        section: 'Draft openings',
+        links: [{ label: 'Open the listing', url: viewLink('openings') }],
+      },
+    }
+  })
+}
+
+/* O5 — the shortlist got its first candidate. This is the cue to send a
+   screening request, and it is the one opening notification that is good news.
+   Keyed on the listing, so it fires once when the shortlist stops being empty
+   and not again as it fills. */
+async function detectFirstCandidate(db: DB): Promise<Notification[]> {
+  const { data: open } = await db.from('recruit_listings')
+    .select('id, room_id, starts_on').eq('status', 'open')
+  if (!open?.length) return []
+  const { data: placements } = await db.from('recruit_listing_candidates')
+    .select('listing_id, applicant_id, created_at').eq('status', 'active')
+    .in('listing_id', open.map((l: { id: string }) => l.id))
+  if (!placements?.length) return []
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const first = new Map<string, { count: number }>()
+  for (const p of placements) {
+    const e = first.get(p.listing_id) || { count: 0 }
+    e.count++
+    first.set(p.listing_id, e)
+  }
+
+  return open.filter((l: { id: string }) => first.has(l.id)).map((l: Record<string, unknown>) => {
+    const room = roomName.get(l.room_id as number) || `room ${l.room_id}`
+    const n = first.get(l.id as string)!.count
+    return {
+      kind: 'listing_has_candidates',
+      subject_type: 'listing' as const,
+      subject_id: String(l.id),
+      subject_label: String(room),
+      lane: 'now' as const,
+      dedupe_key: `listing_has_candidates:${l.id}`,
+      payload: {
+        title: String(room),
+        sentence: `{} has ${plural(n, 'candidate')} on its shortlist and is ready for screening requests.`,
+        section: 'Ready to screen',
+        links: [{ label: 'Open the shortlist', url: viewLink('openings') }],
+      },
+    }
+  })
+}
+
+/* O3 — an open listing nobody qualifies for, with the reason. "No candidates"
+   on its own is not actionable; the useful notification says which of the three
+   gates is closing everyone out, because each has a different fix (move the
+   window, drop the rent, or widen the track). */
+async function detectNoQualifiers(db: DB): Promise<Notification[]> {
+  const week = new Date(Date.now() - 7 * 86400000).toISOString()
+  const { data: open } = await db.from('recruit_listings')
+    .select('id, room_id, kind, starts_on, ends_on, rent_monthly, created_at')
+    .eq('status', 'open').lte('created_at', week)
+  if (!open?.length) return []
+
+  const [{ data: placements }, { data: candidates }, { data: rooms }] = await Promise.all([
+    db.from('recruit_listing_candidates').select('listing_id').eq('status', 'active'),
+    db.from('recruit_applicants')
+      .select('id, residency, budget, move_in, move_in_from, move_in_to').eq('stage', 'candidate'),
+    db.from('recruit_rooms').select('id, name'),
+  ])
+  const filled = new Set((placements || []).map((p: { listing_id: string }) => p.listing_id))
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const out: Notification[] = []
+  for (const l of open) {
+    if (filled.has(l.id)) continue
+    const room = roomName.get(l.room_id) || `room ${l.room_id}`
+
+    /* Why nobody fits. Deliberately coarse — the same three gates the
+       placement sweep uses, counted across the candidate pool, and only the
+       dominant one is reported. A precise per-candidate explanation belongs on
+       the listing page, not in a notification. */
+    let track = 0, budget = 0, dates = 0
+    for (const c of candidates || []) {
+      const wantsSublet = /short/i.test(c.residency || '')
+      if (wantsSublet !== (l.kind === 'sublet')) { track++; continue }
+      const cap = Number(String(c.budget || '').replace(/[^0-9]/g, '')) || null
+      if (cap && l.rent_monthly && cap < l.rent_monthly) { budget++; continue }
+      dates++   // right track, affordable — so it's the window that doesn't line up
+    }
+    const worst = track >= budget && track >= dates ? 'track'
+      : budget >= dates ? 'budget' : 'dates'
+    const because = !(candidates || []).length ? 'there are no candidates at all'
+      : worst === 'track' ? `most candidates want ${l.kind === 'sublet' ? 'a full-time room' : 'a sublet'}`
+      : worst === 'budget' ? `the rent is above what most candidates can pay`
+      : `the dates don't line up for anyone`
+
+    out.push({
+      kind: 'listing_no_qualifiers',
+      subject_type: 'listing',
+      subject_id: String(l.id),
+      subject_label: String(room),
+      lane: 'weekly',
+      dedupe_key: `listing_no_qualifiers:${l.id}:${ptToday().slice(0, 7)}`,
+      payload: {
+        title: String(room),
+        sentence: `Nobody qualifies for {} because ${because}.`,
+        section: 'Nobody qualifies',
+        links: [{ label: 'Open the listing', url: viewLink('openings') }],
+      },
+    })
+  }
+  return out
+}
+
+/* O7 — marked filled, but the calendar disagrees. The two halves of the app
+   drifting apart is exactly what the applicant_id link in migration 141 exists
+   to stop, and this is the drift that costs money: a room believed let, with
+   nobody actually booked into it. */
+async function detectFilledWithoutStay(db: DB): Promise<Notification[]> {
+  const { data: filled } = await db.from('recruit_listings')
+    .select('id, room_id, starts_on, ends_on, status')
+    .eq('status', 'filled')
+  if (!filled?.length) return []
+  const [{ data: stays }, { data: rooms }] = await Promise.all([
+    db.from('recruit_stays').select('room_id, starts_on, ends_on'),
+    db.from('recruit_rooms').select('id, name'),
+  ])
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const out: Notification[] = []
+  for (const l of filled) {
+    // Any stay in that room that covers the listing's start is proof enough.
+    // Overlap, not containment: any stay in that room touching the listing's
+    // window is proof somebody is booked in.
+    const lStart = String(l.starts_on), lEnd = String(l.ends_on || '9999-12-31')
+    const covered = (stays || []).some((s: Record<string, string | number>) =>
+      s.room_id === l.room_id &&
+      String(s.starts_on) <= lEnd &&
+      String(s.ends_on || '9999-12-31') >= lStart)
+    if (covered) continue
+    const room = roomName.get(l.room_id) || `room ${l.room_id}`
+    out.push({
+      kind: 'listing_filled_no_stay',
+      subject_type: 'listing',
+      subject_id: String(l.id),
+      subject_label: String(room),
+      lane: 'weekly',
+      dedupe_key: `listing_filled_no_stay:${l.id}:${ptToday().slice(0, 7)}`,
+      payload: {
+        title: String(room),
+        sentence: `{} is marked filled from ${fmtDay(String(l.starts_on))} but nobody is booked into it on the calendar.`,
+        section: 'Reconcile',
+        links: [{ label: 'Open the calendar', url: `${APP}?view=occupancy&room=${l.room_id}` }],
+      },
+    })
+  }
+  return out
+}
+
+/* ---------------------------------------------------------------------------
+   Phase 3: the slow rot. Things that are nobody's emergency and everybody's
+   problem a month later. All weekly.
+   ------------------------------------------------------------------------- */
+
+/* A10 — gone cold. We spoke, or wrote, and then both sides stopped. Scoped to
+   people who have NOT had a screening, because screening_followup already owns
+   the post-interview silence and says it better. */
+async function detectGoneCold(db: DB): Promise<Notification[]> {
+  const { data: live } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name').in('stage', ACTIVE_STAGES)
+  if (!live?.length) return []
+  const ids = live.map((a: { id: string }) => a.id)
+
+  const [{ data: emails }, { data: screened }] = await Promise.all([
+    db.from('recruit_emails').select('applicant_id, direction, sent_at').in('applicant_id', ids),
+    db.from('recruit_screenings').select('applicant_id').in('applicant_id', ids),
+  ])
+  const hasCall = new Set((screened || []).map((r: { applicant_id: string }) => r.applicant_id))
+  const last = new Map<string, { out?: string; in?: string }>()
+  for (const e of emails || []) {
+    const rec = last.get(e.applicant_id) || {}
+    const key = e.direction === 'out' ? 'out' : 'in'
+    if (!rec[key] || e.sent_at > rec[key]!) rec[key] = e.sent_at
+    last.set(e.applicant_id, rec)
+  }
+
+  const out: Notification[] = []
+  for (const a of live) {
+    if (hasCall.has(a.id)) continue
+    const rec = last.get(a.id)
+    if (!rec?.out) continue                       // never written to — that's the Inbox's job, not this
+    if (rec.in && rec.in > rec.out) continue      // they replied; the reply detectors own it
+    const days = Math.floor((Date.now() - new Date(rec.out).getTime()) / 86400000)
+    if (days < 10) continue
+    out.push({
+      kind: 'gone_cold',
+      subject_type: 'applicant',
+      subject_id: a.id,
+      subject_label: a.first_name,
+      lane: 'weekly',
+      dedupe_key: `gone_cold:${a.id}:${Math.floor(days / 7)}`,
+      payload: {
+        title: fullName(a),
+        sentence: `{} never answered the last email, sent ${plural(days, 'day')} ago.`,
+        section: 'Gone quiet',
+        links: [{ label: 'Open their profile', url: applicantLink(a.id) }],
+      },
+    })
+  }
+  return out
+}
+
+/* C5 — onboarding still owed. The checklist is the house's shared memory of
+   what a new resident hasn't been given yet (Google Group, Notion, Discord
+   role, buddy, keys). Two weeks in, an unticked row usually means nobody picked
+   it up rather than nobody needed it. */
+async function detectOnboardingOwed(db: DB): Promise<Notification[]> {
+  const { data: rows } = await db.from('recruit_onboarding')
+    .select('stay_id, item, done_at, created_at').is('done_at', null)
+  if (!rows?.length) return []
+  const stayIds = [...new Set(rows.map((r: { stay_id: string }) => r.stay_id))]
+  const { data: stays } = await db.from('recruit_stays')
+    .select('id, occupant, created_at').in('id', stayIds)
+
+  const out: Notification[] = []
+  for (const st of stays || []) {
+    const age = Math.floor((Date.now() - new Date(st.created_at).getTime()) / 86400000)
+    if (age < 14) continue
+    const items = rows.filter((r: { stay_id: string }) => r.stay_id === st.id)
+      .map((r: { item: string }) => r.item)
+    if (!items.length) continue
+    out.push({
+      kind: 'onboarding_owed',
+      subject_type: 'stay',
+      subject_id: String(st.id),
+      subject_label: String(st.occupant || 'A new housemate'),
+      lane: 'weekly',
+      dedupe_key: `onboarding_owed:${st.id}:${Math.floor(age / 7)}`,
+      payload: {
+        title: String(st.occupant || 'A new housemate'),
+        sentence: `{} moved in ${plural(age, 'day')} ago and is still owed ${plural(items.length, 'thing')}.`,
+        body: items.slice(0, 6).join(', '),
+        section: 'Onboarding',
+        links: [{ label: 'Open the calendar', url: viewLink('occupancy') }],
+      },
+    })
+  }
+  return out
+}
+
+/* C6 — the calendar contradicting itself: two stays in one room over the same
+   dates. One summary rather than one per clash, because the fix is a single
+   sitting with the calendar open. */
+async function detectOccupancyConflicts(db: DB): Promise<Notification[]> {
+  const [{ data: stays }, { data: rooms }] = await Promise.all([
+    db.from('recruit_stays').select('id, room_id, occupant, starts_on, ends_on').order('starts_on'),
+    db.from('recruit_rooms').select('id, name'),
+  ])
+  if (!stays?.length) return []
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+  const END = '9999-12-31'
+
+  const clashes: string[] = []
+  const byRoom = new Map<number, typeof stays>()
+  for (const s of stays) {
+    if (!byRoom.has(s.room_id)) byRoom.set(s.room_id, [])
+    byRoom.get(s.room_id)!.push(s)
+  }
+  for (const [roomId, list] of byRoom) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j]
+        const aEnd = String(a.ends_on || END), bEnd = String(b.ends_on || END)
+        // Half-open comparison: a stay ending the day another starts is a
+        // handover, not a clash.
+        if (String(a.starts_on) < bEnd && String(b.starts_on) < aEnd) {
+          clashes.push(`${roomName.get(roomId) || `room ${roomId}`}: ${a.occupant || '?'} and ${b.occupant || '?'}`)
+        }
+      }
+    }
+  }
+  if (!clashes.length) return []
+  return [{
+    kind: 'occupancy_conflict',
+    subject_type: 'house',
+    subject_id: null,
+    subject_label: 'The calendar',
+    lane: 'weekly',
+    dedupe_key: `occupancy_conflict:${ptToday().slice(0, 7)}:${clashes.length}`,
+    payload: {
+      title: `${plural(clashes.length, 'room')}`,
+      sentence: `{} have two people booked over the same dates.`,
+      body: clashes.slice(0, 6).join(' · '),
+      section: 'Reconcile',
+      links: [{ label: 'Open the calendar', url: viewLink('occupancy') }],
+    },
+  }]
+}
+
 /* Detect everything. Each kind is independent: one failing query must not cost
    the others their tick, so each is caught on its own. */
 export async function detect(db: DB): Promise<number> {
@@ -973,6 +1310,15 @@ export async function detect(db: DB): Promise<number> {
     ['decision_open', () => detectDecisionOpen(db)],
     ['screening_followup', () => detectScreeningFollowup(db)],
     ['candidate_promoted', () => detectPromotions(db)],
+    // Openings, in detail.
+    ['listing_draft', () => detectDraftListings(db)],
+    ['listing_has_candidates', () => detectFirstCandidate(db)],
+    ['listing_no_qualifiers', () => detectNoQualifiers(db)],
+    ['listing_filled_no_stay', () => detectFilledWithoutStay(db)],
+    // Phase 3 — the slow rot.
+    ['gone_cold', () => detectGoneCold(db)],
+    ['onboarding_owed', () => detectOnboardingOwed(db)],
+    ['occupancy_conflict', () => detectOccupancyConflicts(db)],
   ]
   let found = 0
   for (const [name, fn] of kinds) {
@@ -992,17 +1338,72 @@ export async function detect(db: DB): Promise<number> {
    sentence. Every notification reads as: <icon> <label> · <who or what> — <why
    it matters>. */
 const KINDS: Record<string, { icon: string; label: string }> = {
-  application_new:   { icon: '📥', label: 'New application' },
-  review_stalled:    { icon: '⏳', label: 'Waiting on a review' },
-  review_backlog:    { icon: '🗄️', label: 'Inbox backlog' },
-  opening_at_risk:   { icon: '🏠', label: 'Opening at risk' },
-  opening_overdue:   { icon: '🔴', label: 'Opening overdue' },
-  room_emptying:     { icon: '📦', label: 'Room emptying' },
+  // Every icon here is a SINGLE codepoint. Emoji that need a U+FE0F variation
+  // selector to render as a picture (🗄️, ⚠️, ➡️ …) are a coin-flip in Discord's
+  // font — they fall back to a text glyph or an empty box — so none are used.
+  // And every kind a detector can emit must appear in this map: an unlisted
+  // kind falls back to '•', which is how a channel ends up full of bullets.
+
+  // The backlog (Phase 1).
+  application_new:        { icon: '📥', label: 'New application' },
+  review_stalled:         { icon: '⏳', label: 'Waiting on a review' },
+  review_backlog:         { icon: '📚', label: 'Inbox backlog' },
+  needs_input:            { icon: '🙋', label: 'Second read wanted' },
+  opening_at_risk:        { icon: '🏠', label: 'Opening at risk' },
+  opening_overdue:        { icon: '🔴', label: 'Opening overdue' },
+  room_emptying:          { icon: '📦', label: 'Room emptying' },
+
+  // What arrives in the inbox (Phase 2b). One kind per intent, so each has its
+  // own lane and its own entry in notify_muted.
+  reply_availability:     { icon: '📅', label: 'Sent times' },
+  reply_reschedule:       { icon: '⏰', label: 'Wants to move the call' },
+  reply_plans_changed:    { icon: '🔄', label: 'Plans changed' },
+  reply_withdrawing:      { icon: '👋', label: 'Withdrew' },
+  reply_post_acceptance:  { icon: '🔑', label: 'Asking about moving in' },
+  reply_question:         { icon: '❓', label: 'Asked a question' },
+  reply_info_provided:    { icon: '📎', label: 'Sent something over' },
+  reply_nudge:            { icon: '🔔', label: 'Following up' },
+  reply_unclear:          { icon: '🤔', label: 'Reply needs a read' },
+
+  // The call.
+  screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
+  screening_claimed:      { icon: '🤝', label: 'Call claimed' },
+  screening_today:        { icon: '📞', label: 'Call today' },
+  screening_notes:        { icon: '📝', label: 'Recording ready' },
+  screening_followup:     { icon: '⌛', label: 'Owed an answer' },
+
+  // Where they stand.
+  candidate_placed:       { icon: '✅', label: 'Passed review' },
+  candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
+  decision_open:          { icon: '📊', label: 'Decision open' },
+  candidate_promoted:     { icon: '🎉', label: 'Welcomed in' },
+  gone_cold:              { icon: '💤', label: 'Gone quiet' },
+
+  // Openings, in detail.
+  listing_draft:          { icon: '📄', label: 'Draft opening' },
+  listing_draft_stale:    { icon: '🐌', label: 'Draft going stale' },
+  listing_has_candidates: { icon: '🎯', label: 'Ready to screen' },
+  listing_no_qualifiers:  { icon: '🚫', label: 'Nobody qualifies' },
+  listing_filled_no_stay: { icon: '📋', label: 'Filled but unbooked' },
+
+  // The house.
+  onboarding_owed:        { icon: '🎁', label: 'Onboarding owed' },
+  occupancy_conflict:     { icon: '❗', label: 'Calendar clash' },
 }
-const icon = (kind: string) => KINDS[kind]?.icon || '•'
-// Unknown kinds degrade to a de-slugged label rather than leaking the slug.
-const label = (kind: string) =>
-  KINDS[kind]?.label || (kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, ' '))
+/* An unmapped kind is a bug, not a style choice: it shows up in Discord as a
+   bullet with a de-slugged label, which is exactly how a merge once quietly
+   dropped two thirds of this map. Degrade readably, but say so in the logs. */
+const warned = new Set<string>()
+function checkKind(kind: string): void {
+  if (KINDS[kind] || warned.has(kind)) return
+  warned.add(kind)
+  console.warn(`[notify] kind '${kind}' is missing from KINDS — it will render as a bullet`)
+}
+const icon = (kind: string) => { checkKind(kind); return KINDS[kind]?.icon || '•' }
+const label = (kind: string) => {
+  checkKind(kind)
+  return KINDS[kind]?.label || (kind.charAt(0).toUpperCase() + kind.slice(1).replace(/_/g, ' '))
+}
 
 /* One notification, one line. Deliberately three parts and no more: what kind
    of thing this is, who it concerns, and the single reason it was worth saying.
@@ -1132,7 +1533,7 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
     .order('created_at').limit(200)
   if (!data?.length) return 0
 
-  const SECTION_ORDER = ['Needs a review', 'Needs a second read', 'Owed an answer', 'Decisions', 'Screening', 'Replies', 'Passed review', 'Waiting for a room', 'Openings at risk', 'Rooms emptying', 'New housemates', 'New applications', 'Backlog']
+  const SECTION_ORDER = ['Needs a review', 'Needs a second read', 'Owed an answer', 'Decisions', 'Ready to screen', 'Draft openings', 'Nobody qualifies', 'Gone quiet', 'Onboarding', 'Screening', 'Replies', 'Passed review', 'Waiting for a room', 'Openings at risk', 'Rooms emptying', 'New housemates', 'New applications', 'Backlog']
   const sections = new Map<string, typeof data>()
   for (const n of data) {
     const s = n.payload?.section || 'Other'
@@ -1152,7 +1553,7 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
     const more = rows.length > 5 ? `\n_+${rows.length - 5} more_` : ''
     return `**${section} (${rows.length})**\n${shown}${more}`
   })
-  const heading = lane === 'daily' ? '☀️ **Recruiting today**' : '🗓️ **Recruiting this week**'
+  const heading = lane === 'daily' ? '🌞 **Recruiting today**' : '📅 **Recruiting this week**'
   await sendEmbed(houseChannel(settings), `${heading}\n\n${blocks.join('\n\n')}`)
   await db.from('recruit_notifications')
     .update({ members_at: new Date().toISOString(), digest_id: digestId })

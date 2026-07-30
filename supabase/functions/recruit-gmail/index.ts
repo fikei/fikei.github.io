@@ -16,13 +16,14 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.21.0'
-console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + Discord claim posts`)
+const VERSION = '1.22.0'
+console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
 import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID } from '../_shared/discord.ts'
+import { record } from '../_shared/recruit-notify.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,8 +54,24 @@ interface Extraction {
   platform: { kind: string; handle?: string } | null
   timezone_note: string | null
   needs_human: boolean
+  /* What the reply is actually about. Free to compute — this is the same Haiku
+     call that was already reading the body for availability windows. `intent`
+     routes; `intents` keeps everything the message was doing so the copy can
+     say "sent times and asked something". */
+  intent: string
+  intents: string[]
+  intent_confidence: number
+  intent_summary: string | null
 }
-const NO_EXTRACTION: Extraction = { windows: [], platform: null, timezone_note: null, needs_human: false }
+const INTENTS = ['availability', 'reschedule', 'plans_changed', 'withdrawing',
+  'post_acceptance', 'question', 'info_provided', 'nudge', 'unclear']
+// Below this a human reads the thread. Same discipline as detectAgreedTime:
+// misrouting a withdrawal is worse than not routing it at all.
+const INTENT_FLOOR = 0.6
+const NO_EXTRACTION: Extraction = {
+  windows: [], platform: null, timezone_note: null, needs_human: false,
+  intent: 'unclear', intents: [], intent_confidence: 0, intent_summary: null,
+}
 
 // Extract scheduling info from an applicant's reply (Haiku, v2 prompt):
 // availability windows in PT, platform requests (IG/WhatsApp/phone),
@@ -75,11 +92,29 @@ Extract:
 2. "platform": if they request a specific medium (Instagram video, WhatsApp, phone, "not video"), return {"kind":..., "handle":...}; else null. Default assumption is Google Meet — only capture explicit requests.
 3. "timezone_note": one short string when a conversion happened ("applicant is in Europe, +9h from PT — windows converted"), else null.
 4. "needs_human": true when the email is clearly about scheduling but you cannot produce at least one concrete window (e.g. "whenever works!", a Calendly link, questions instead of times) — a human will read the thread instead. If the email is not about scheduling at all, return windows [] and needs_human false.
+5. "intent": what this reply is FOR, exactly one of:
+   - "availability": offering times for a call.
+   - "reschedule": moving or cancelling a call that is already arranged.
+   - "plans_changed": their move-in date, budget, or length of stay has changed.
+   - "withdrawing": no longer interested, found another place, pausing their search.
+   - "post_acceptance": they are coming, and this is about lease, keys, move-in day, parking.
+   - "question": asking us something (rent, rooms, housemates, process).
+   - "info_provided": sending something we asked for (references, income, socials).
+   - "nudge": following up, chasing an answer, "any update?".
+   - "unclear": you cannot tell.
+6. "intents": every one of the above that applies, most important first. A reply
+   offering times AND asking about parking is ["availability","question"].
+7. "confidence": 0-1, how sure you are of "intent". Be honest and be harsh —
+   below 0.6 we route it to a human instead of acting on it. A polite,
+   ambiguous message ("thanks, I'll think about it") is low confidence, not
+   "withdrawing".
+8. "summary": one short line, in their words, of what they are asking or saying.
+   Max 120 characters, no preamble.
 
 EMAIL START
 ${text.slice(0, 3000)}
 EMAIL END
-Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "needs_human":...}. No prose.`
+Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "needs_human":..., "intent":..., "intents":..., "confidence":..., "summary":...}. No prose.`
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
@@ -103,8 +138,37 @@ Return one JSON object: {"windows":..., "platform":..., "timezone_note":..., "ne
       platform: obj.platform?.kind ? { kind: String(obj.platform.kind).slice(0, 40), ...(obj.platform.handle ? { handle: String(obj.platform.handle).replace(/^@/, '').slice(0, 60) } : {}) } : null,
       timezone_note: obj.timezone_note ? String(obj.timezone_note).slice(0, 200) : null,
       needs_human: Boolean(obj.needs_human) && !windows.length,
+      ...normalizeIntent(obj, windows.length > 0),
     }
   } catch { return NO_EXTRACTION }
+}
+
+/* Turn the model's intent fields into something the ledger can trust.
+
+   Two rules do the real work. The confidence floor sends anything shaky to
+   'unclear', where a human reads it — the cost of a wrong 'withdrawing' is a
+   live candidate archived. And the extraction outranks the classifier on its own
+   turf: if we parsed real availability windows out of the message, then
+   'availability' is one of its intents no matter what the label said. The parse
+   is ground truth; the label is an opinion. */
+function normalizeIntent(obj: Record<string, unknown>, hasWindows: boolean): {
+  intent: string; intents: string[]; intent_confidence: number; intent_summary: string | null
+} {
+  const raw = String(obj.intent || '').toLowerCase().trim()
+  const confidence = Math.max(0, Math.min(1, Number(obj.confidence) || 0))
+  const list = (Array.isArray(obj.intents) ? obj.intents : [])
+    .map((x) => String(x).toLowerCase().trim())
+    .filter((x) => INTENTS.includes(x))
+
+  let intent = INTENTS.includes(raw) ? raw : 'unclear'
+  if (confidence < INTENT_FLOOR) intent = 'unclear'
+  // Ground truth wins on its own turf.
+  if (hasWindows && !list.includes('availability')) list.unshift('availability')
+  if (hasWindows && intent === 'unclear') intent = 'availability'
+  if (intent !== 'unclear' && !list.includes(intent)) list.unshift(intent)
+
+  const summary = String(obj.summary || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+  return { intent, intents: [...new Set(list)].slice(0, 4), intent_confidence: confidence, intent_summary: summary || null }
 }
 
 /* Some calls get agreed entirely in the email thread — "Tuesday at 3 works!"
@@ -359,6 +423,75 @@ function extractRecordingUrls(text: string): string[] {
 
 function header(headers: Array<{ name: string; value: string }>, name: string): string {
   return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
+}
+
+/* One notification per classified reply. Reads the emails the scan just
+   labelled and writes them to the ledger — the same table, sentences, and lanes
+   everything else uses, so a reply reads like every other notification.
+
+   'availability' is included deliberately: the claim post asks *someone* to take
+   the call, while the digest line tells *the house* she replied. Two surfaces,
+   two audiences, and suppressing the second because the first fired is how a
+   house ends up unable to answer "did anyone ever get back to her?". */
+const INTENT_SENTENCE: Record<string, (s: string | null) => string> = {
+  availability:    () => `{} sent times for a call.`,
+  reschedule:      () => `{} wants to move their call.`,
+  plans_changed:   () => `{}'s plans changed.`,
+  withdrawing:     () => `{} is no longer looking.`,
+  post_acceptance: () => `{} is asking about moving in.`,
+  question:        () => `{} asked a question.`,
+  info_provided:   () => `{} sent something over.`,
+  nudge:           () => `{} is following up.`,
+  unclear:         () => `{} replied and it needs a read.`,
+}
+// Which lane each intent earns. The urgent three interrupt; the rest wait for
+// the digest. A reschedule an hour before a call is not a tomorrow problem.
+const INTENT_LANE: Record<string, 'now' | 'daily'> = {
+  reschedule: 'now', withdrawing: 'now', plans_changed: 'now', post_acceptance: 'now',
+  availability: 'daily', question: 'daily', info_provided: 'daily', nudge: 'daily', unclear: 'daily',
+}
+
+async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number> {
+  const since = new Date(Date.now() - 7 * 86400000).toISOString()
+  const { data: rows } = await client.from('recruit_emails')
+    .select('id, applicant_id, intent, intents, intent_summary, sent_at')
+    .eq('direction', 'in').not('intent', 'is', null).gte('sent_at', since)
+    .order('sent_at', { ascending: false }).limit(40)
+  if (!rows?.length) return 0
+
+  // Only people still in the funnel: mail from an archived applicant is logged
+  // as email and is nobody's task.
+  const { data: live } = await client.from('recruit_applicants')
+    .select('id, first_name, last_name, stage')
+    .in('id', [...new Set(rows.map((r) => r.applicant_id))])
+    .in('stage', ['review', 'candidate'])
+  const byId = new Map((live || []).map((a) => [a.id, a]))
+
+  const notes = rows.filter((r) => byId.has(r.applicant_id)).map((r) => {
+    const a = byId.get(r.applicant_id)!
+    const intent = String(r.intent)
+    const also = (r.intents || []).filter((x: string) => x !== intent)
+    return {
+      kind: `reply_${intent}`,
+      subject_type: 'applicant' as const,
+      subject_id: r.applicant_id,
+      subject_label: a.first_name,
+      lane: INTENT_LANE[intent] || 'daily',
+      // Per message, not per person: two questions deserve two answers.
+      dedupe_key: `reply:${r.id}`,
+      payload: {
+        title: `${a.first_name} ${a.last_name || ''}`.trim(),
+        sentence: (INTENT_SENTENCE[intent] || INTENT_SENTENCE.unclear)(r.intent_summary),
+        body: [r.intent_summary, also.length ? `also ${also.join(', ')}` : null]
+          .filter(Boolean).join(' · ') || undefined,
+        section: 'Replies',
+        links: [{ label: 'Read the thread', url: `https://ctrl.rodeo/applications/?a=${encodeURIComponent(r.applicant_id)}` }],
+      },
+    }
+  })
+  const made = await record(client, notes)
+  if (made) console.log(`reply intents: ${made} notification(s) recorded`)
+  return made
 }
 
 serve(async (req) => {
@@ -998,6 +1131,13 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
+            // The same extraction already knows what the reply was about.
+            await client.from('recruit_emails').update({
+              intent: extraction.intent, intents: extraction.intents,
+              intent_confidence: extraction.intent_confidence,
+              intent_summary: extraction.intent_summary,
+              intent_at: new Date().toISOString(),
+            }).eq('gmail_id', msg.id)
             if (await autoPostEnabled(client)) await postClaim(client, applicantId, extraction)
           }
         }
@@ -1030,6 +1170,13 @@ serve(async (req) => {
             applicant_id: r.applicant_id, windows: extraction.windows,
             source_gmail_id: r.gmail_id, updated_at: new Date().toISOString(),
           })
+          // Same call, same cost: label the reply while we have it open.
+          await client.from('recruit_emails').update({
+            intent: extraction.intent, intents: extraction.intents,
+            intent_confidence: extraction.intent_confidence,
+            intent_summary: extraction.intent_summary,
+            intent_at: new Date().toISOString(),
+          }).eq('gmail_id', r.gmail_id)
           if ((extraction.windows.length || extraction.needs_human) && await autoPostEnabled(client)) await postClaim(client, r.applicant_id, extraction)
           backfilled++
           console.log(`availability backfill: ${r.applicant_id} → ${extraction.windows.length} windows`)
@@ -1154,6 +1301,14 @@ serve(async (req) => {
         }
       } catch (err) {
         console.warn(`new-application ping failed: ${(err as Error).message}`)
+      }
+
+      // Classified replies become notifications. Each intent is its own kind, so
+      // each has its own lane and its own entry in notify_muted — the four
+      // consequential ones ship muted (shadow mode) until the confidence
+      // distribution has been read against real replies.
+      try { await recordReplyIntents(client) } catch (err) {
+        console.warn(`reply-intent notifications failed: ${(err as Error).message}`)
       }
 
       await remindStuckPosts(client)
