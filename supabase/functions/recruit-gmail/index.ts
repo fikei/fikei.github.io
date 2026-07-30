@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.28.0'
+const VERSION = '1.29.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -532,6 +532,17 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
      person never named on that day. Keeping the newest reply means the line and
      the times always agree; when they send new times, updated_at moves and the
      next day's key fires with the new ones. */
+  /* Availability goes stale the moment a call is booked: "Katie is free Fri
+     Jul 24 10–11am" is not news when Katie was interviewed on the 23rd — she is
+     owed a follow-up and a vote instead, which other detectors say. So any
+     applicant with a screening on the books is dropped from this intent
+     entirely, and so is any offer whose windows have all passed. */
+  const { data: haveCalls } = await client.from('recruit_screenings')
+    .select('applicant_id').in('applicant_id', ids)
+  const booked = new Set((haveCalls || []).map((r) => r.applicant_id))
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())
+  const stillAhead = (w: Array<{ date: string }>) => (w || []).some((x) => x.date >= today)
+
   const newestAvailability = new Map<string, string>()
   for (const r of rows) {
     if (r.intent !== 'availability') continue
@@ -539,8 +550,10 @@ async function recordReplyIntents(client: ReturnType<typeof db>): Promise<number
     if (!prev || String(r.sent_at) > prev) newestAvailability.set(r.applicant_id, String(r.sent_at))
   }
 
-  const notes = rows.filter((r) => byId.has(r.applicant_id)
-      && (r.intent !== 'availability' || newestAvailability.get(r.applicant_id) === String(r.sent_at)))
+  const notes = rows.filter((r) => byId.has(r.applicant_id) && (r.intent !== 'availability' || (
+      newestAvailability.get(r.applicant_id) === String(r.sent_at)
+      && !booked.has(r.applicant_id)
+      && stillAhead(windowsBy.get(r.applicant_id) || []))))
     .map((r) => {
     const a = byId.get(r.applicant_id)!
     const intent = String(r.intent)
@@ -1385,60 +1398,36 @@ serve(async (req) => {
         console.warn(`calendar sweep failed: ${(err as Error).message}`)
       }
 
-      // Phase B: ping the Recruiting Society channel about new applications —
-      // stage 'review', no votes yet, never pinged. One post per applicant;
-      // a batch of 4+ collapses into a single digest.
+      /* New applications: stamp them, don't post them.
+
+         This used to post its own embed to RECRUITING_PING_CHANNEL_ID — which
+         falls back to #recruiting-society — and postChannelEmbed then mirrored
+         that post into #recruiting-automation. Together with the ledger's own
+         line, one application produced three Discord messages, two of them in
+         the channel the whole house reads while notify_house_posts was false.
+
+         The ledger owns this notification now: detectNewApplications keys off
+         discord_ping_at, so stamping is all that's needed to hand it over, and
+         the announcement goes out once, in the right channel, in the same voice
+         as everything else. */
       let pinged = 0
       try {
-        // New applications go to the members channel; the audit copy lands in
-        // #recruiting-automation automatically.
-        const pingChannel = Deno.env.get('RECRUITING_PING_CHANNEL_ID') || NOTES_CHANNEL_ID
-        if (pingChannel) {
-          // Only genuinely new applications — a 14-day floor keeps switching
-          // this on from dumping the historical backlog into the channel.
-          const pingFloor = new Date(Date.now() - 14 * 86400000).toISOString()
-          const { data: fresh } = await client.from('recruit_applicants')
-            .select('id, first_name, last_name, residency, move_in, why_agape')
-            .eq('stage', 'review').is('discord_ping_at', null).gte('submitted_at', pingFloor)
-            .order('submitted_at', { ascending: false }).limit(12)
-          const { data: votedRows } = await client.from('recruit_votes').select('applicant_id')
-          const voted = new Set((votedRows || []).map((v) => v.applicant_id))
-          const toPing = (fresh || []).filter((a) => !voted.has(a.id))
-          const appLink = (id: string) => `https://ctrl.rodeo/applications/?a=${encodeURIComponent(id)}`
-          if (toPing.length > 3) {
-            const lines = toPing.map((a) => `• [${a.first_name} ${a.last_name || ''}](${appLink(a.id)})`).join('\n')
-            await postChannelEmbed(pingChannel, `📥 **${toPing.length} new applications** are ready for votes:\n${lines}`,
-              0x378add, `${toPing.length} new applications`,
-              [{ label: 'Open the inbox', url: 'https://ctrl.rodeo/applications/?view=inbox' }])
-          } else {
-            for (const a of toPing) {
-              const track = /short/i.test(a.residency || '') ? 'Sublet' : 'Full-time'
-              const why = (a.why_agape || '').trim().replace(/\s+/g, ' ').slice(0, 140)
-              await postChannelEmbed(pingChannel,
-                `📥 **${a.first_name} ${a.last_name || ''}** applied — ${track}${a.move_in ? ` · ${String(a.move_in).slice(0, 60)}` : ''}\n` +
-                (why ? `_${why}_\n` : '') +
-                '', 0x378add, `New application — ${a.first_name}`,
-                [{ label: `Review ${a.first_name}`, url: appLink(a.id) },
-                 { label: 'Open the inbox', url: 'https://ctrl.rodeo/applications/?view=inbox' }])
-            }
-          }
-          if (toPing.length) {
-            await client.from('recruit_applicants')
-              .update({ discord_ping_at: new Date().toISOString() })
-              .in('id', toPing.map((a) => a.id))
-            pinged = toPing.length
-          }
+        const pingFloor = new Date(Date.now() - 14 * 86400000).toISOString()
+        const { data: fresh } = await client.from('recruit_applicants')
+          .select('id')
+          .eq('stage', 'review').is('discord_ping_at', null).gte('submitted_at', pingFloor)
+          .order('submitted_at', { ascending: false }).limit(12)
+        const { data: votedRows } = await client.from('recruit_votes').select('applicant_id')
+        const voted = new Set((votedRows || []).map((v) => v.applicant_id))
+        const toPing = (fresh || []).filter((a) => !voted.has(a.id))
+        if (toPing.length) {
+          await client.from('recruit_applicants')
+            .update({ discord_ping_at: new Date().toISOString() })
+            .in('id', toPing.map((a) => a.id))
+          pinged = toPing.length
         }
       } catch (err) {
-        console.warn(`new-application ping failed: ${(err as Error).message}`)
-      }
-
-      // Classified replies become notifications. Each intent is its own kind, so
-      // each has its own lane and its own entry in notify_muted — the four
-      // consequential ones ship muted (shadow mode) until the confidence
-      // distribution has been read against real replies.
-      try { await recordReplyIntents(client) } catch (err) {
-        console.warn(`reply-intent notifications failed: ${(err as Error).message}`)
+        console.warn(`new-application stamp failed: ${(err as Error).message}`)
       }
 
       await remindStuckPosts(client)
