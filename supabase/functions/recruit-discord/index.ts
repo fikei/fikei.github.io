@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.15.0'
+const VERSION = '1.15.1'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestone reminders`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -592,7 +592,9 @@ async function remindTrialMilestones(client: ReturnType<typeof db>): Promise<num
       try {
         await postResilient(AUTOMATION_CHANNEL_ID, {
           embeds: [{
-            title: which === 'checkin' ? `🌱 Trial check-in — ${who}` : `🗳️ Trial decision — ${who}`,
+            // "Residency decision", not "trial decision": the question on the
+            // table is whether they become a resident, not how the trial went.
+            title: which === 'checkin' ? `🌱 Trial check-in — ${who}` : `🗳️ Residency decision — ${who}`,
             description: `${body}\n\nDue ${when}.\nhttps://ctrl.rodeo/applications/?view=occupancy&room=${s.room_id}`,
             color: which === 'checkin' ? 0x4f8a6b : 0xb8863b,
           }],
