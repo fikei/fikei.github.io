@@ -625,3 +625,12 @@ Improvements flagged while shipping the /ladder product (PRs #633–#645). Track
 | **Rotate GITHUB_PAT to fine-grained PAT** — Currently using the broadly-scoped `gh auth token`. Generate a fine-grained PAT scoped to `fikei/job` only and `supabase secrets set GITHUB_PAT=<token>`. | Pending |
 | **CTRL theme alternate** (Phase 1 milestone i) — Author tokens-ctrl-{light,dark}.css against the abstract token contract; enable in the rail's theme picker. | Pending |
 | **Asset existence detection scaling** — jobs-pipe currently fetches the entire repo tree on every GET to compute hasResume/hasCoverLetter flags. Cache or scope to 03-jobs/. | Pending |
+
+## Agape Recruiting
+
+| Story | Status |
+|-------|--------|
+| **Settings surface** — Concept in `docs/ux/recruiting-settings-concept.md`; mock at [Sassy → Settings](https://ctrl.rodeo/design-system/recruiting/#settings). Six sections (`You · House · Funnel · Automations · Connections · Data`) at `?view=settings`, rendered from a field schema where `scope` picks the store and the schema default is the code default. Step 1 (the `setting()` accessor + schema, no UI) is worth landing on its own — it removes the hardcoded staleness/flexibility/trial-milestone literals. | Pending |
+| **Delete dead vote config** — `recruit_settings.vote_min_count` (3) and `vote_pass_avg` (3.5) survive from the collective-vote model that the single-decider change superseded on Jul 29. Nothing reads them. | Pending |
+| **Move food/dues out of the room drawer** — They're house-wide settings currently edited inside one room's occupancy drawer, next to that room's rent. Belongs in Settings → House. | Pending |
+| **Gmail token expiry is invisible** — The shared-inbox refresh token dies every ~7 days in OAuth Testing mode and the only symptom is no new applications. Settings → Connections should show a real reachable/expired status. Durable fix is publishing the OAuth app to Production. | Pending |

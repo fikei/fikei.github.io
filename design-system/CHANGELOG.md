@@ -1,6 +1,16 @@
-# Design System - Changelog
+# Sassy — Changelog
 
-> Release history for the ctrl.rodeo design system
+> Release history for Sassy, the ctrl.rodeo design system
+
+---
+
+## [1.3.0] - 2026-07-30
+
+### Added
+- **Sidebar CTAs (`drawer-cta`)** — a hierarchical CTA pattern for sidebars and drawer footers: one filled commit, a quiet dismiss beside it, destructive/state-changing exits as full-width rows below a rule, plus an optional outlined `__alt` for a second forward path. Documented in README and as a story in the recruiting system.
+
+### Changed
+- **The design system is named Sassy.** The umbrella name covers the global CTRL layer and every product system under it. Hub, page titles, and stylesheet headers updated; `CTRL` now names the global layer only.
 
 ---
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.44.0">
+  <link rel="stylesheet" href="css/app.css?v=3.47.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
 </head>
@@ -37,7 +37,7 @@
       <button class="mobile-bar__menu" id="mobile-menu" aria-label="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
-      <span class="mobile-bar__title" id="mobile-title">Inbox</span>
+      <span class="mobile-bar__title" id="mobile-title">Applicants</span>
     </header>
 
     <aside class="app__rail" id="rail">
@@ -50,9 +50,8 @@
         <a class="rail-nav__row" href="?view=occupancy" data-view-link="occupancy">Occupancy</a>
         <a class="rail-nav__row" href="?view=activity" data-view-link="activity">Activity <span class="rail-nav__count" id="count-activity"></span></a>
         <div class="rail-nav__group">Funnel</div>
-        <a class="rail-nav__row" href="?view=inbox" data-view-link="inbox">Inbox <span class="rail-nav__count" id="count-inbox"></span></a>
+        <a class="rail-nav__row" href="?view=inbox" data-view-link="inbox">Applicants <span class="rail-nav__count" id="count-inbox"></span></a>
         <a class="rail-nav__row" href="?view=candidates" data-view-link="candidates">Candidates <span class="rail-nav__count" id="count-candidates"></span></a>
-        <a class="rail-nav__row" href="?view=screening" data-view-link="screening">Screening <span class="rail-nav__count" id="count-screening"></span></a>
         <a class="rail-nav__row" href="?view=archive" data-view-link="archive">Archive <span class="rail-nav__count" id="count-archive"></span></a>
       </nav>
       <div class="rail-foot">
@@ -71,7 +70,7 @@
     <main class="app__main">
       <header class="page__head">
         <div class="page__head-text">
-          <h1 class="page__title" id="page-title">Inbox</h1>
+          <h1 class="page__title" id="page-title">Applicants</h1>
           <p class="page__sub" id="page-sub"></p>
         </div>
         <div class="page__head-action" id="page-head-action"></div>
@@ -308,7 +307,7 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=3.44.0"></script>
+  <script src="js/app.js?v=3.46.0"></script>
 
 </body>
 </html>

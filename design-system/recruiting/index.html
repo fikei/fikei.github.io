@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agape recruiting — design system</title>
+<title>Agape recruiting — a Sassy design system</title>
 <style>
 :root {
   --bg: #0d1117; --surface: #161b22; --elevated: #1f2630;
@@ -146,6 +146,152 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 .co { font-size: 12px; color: var(--ink-2); display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
 .co b { color: var(--ink); font-size: 12px; }
 .co .m { width: 18px; height: 18px; border-radius: 50%; background: var(--tint-blue); color: var(--tint-blue-ink); display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+/* Sidebar CTAs — the drawer footer's three tiers. Mirrors .drawer-cta in
+   applications/css/app.css; keep the two in step. */
+.sidebar { width: 340px; max-width: 100%; background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; }
+.sidebar .fieldstub { height: 34px; border: 1px solid var(--line); border-radius: var(--r-xs); background: var(--surface); margin-bottom: 10px; }
+.dcta { display: flex; flex-direction: column; margin-top: 16px; }
+.dcta__row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dcta__commit { min-width: 92px; border-radius: 999px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.dcta__quiet { background: transparent; border: 0; color: var(--ink-2); font: 500 12.5px/1 inherit; padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer; }
+.dcta__exits { display: flex; flex-direction: column; margin-top: 12px; }
+.dcta__exit {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line);
+  background: transparent; color: var(--ink-2); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer; white-space: nowrap;
+}
+.dcta__exit.danger { color: var(--red); }
+.dcta__hint { color: var(--ink-3); font: 400 11px/1.35 inherit; text-align: right; white-space: normal; min-width: 0; }
+.dcta__alt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; padding: 12px; margin-top: 4px;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: transparent; color: var(--ink); text-align: left; font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.dcta__exits + .dcta__alt { margin-top: 14px; }
+.dcta__alt .dcta__hint { text-align: left; }
+/* Exit-row directions — five treatments for tier 3, side by side. Shared
+   frame so only the exit treatment differs between them. */
+.dirs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dir { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
+.dir > header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.dir > header b { font-size: 12.5px; }
+.dir > header .src { font-size: 10.5px; color: var(--ink-3); }
+.dir .frame { background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px; }
+.dir .cta2 { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.dir .cta2 .q { background: transparent; border: 0; color: var(--ink-2); font: 500 12.5px/1 inherit; padding: 9px 10px; cursor: pointer; }
+.dir .pill { border-radius: 999px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); min-width: 84px; }
+
+/* A — inset tiles: each exit is its own filled surface, separated by gap. */
+.xa { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.xa button {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left;
+  background: var(--tint-gray); border: 0; border-radius: var(--r-sm); padding: 10px 12px;
+  color: var(--ink); font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xa button .l { grid-column: 1; grid-row: 1; }
+.xa button .h { grid-column: 1; grid-row: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xa button .ic { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--ink-3); font-size: 13px; }
+.xa button:hover { background: var(--line); }
+.xa button.dg { color: var(--red); }
+.xa button.dg:hover { background: color-mix(in srgb, var(--red) 14%, transparent); }
+
+/* B — inset-grouped list: one container, no internal hairlines. */
+.xb { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.xb button {
+  display: grid; grid-template-columns: 1fr; gap: 2px; width: 100%; text-align: left;
+  background: transparent; border: 0; padding: 11px 12px; color: var(--ink);
+  font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xb button .l { grid-row: 1; }
+.xb button .h { grid-row: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xb button:hover { background: var(--tint-gray); }
+.xb button.dg { color: var(--red); }
+.xb button.dg:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+/* C — no rules, no container: whitespace and a leading glyph only. */
+.xc { display: flex; flex-direction: column; margin-top: 14px; }
+.xc button {
+  display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; text-align: left;
+  background: transparent; border: 0; border-radius: var(--r-sm); padding: 9px 8px;
+  color: var(--ink-2); font: 600 12.5px/1.3 inherit; cursor: pointer;
+}
+.xc button .ic { grid-row: 1 / 3; align-self: center; color: var(--ink-3); font-size: 13px; }
+.xc button .h { grid-column: 2; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xc button:hover { background: var(--tint-gray); color: var(--ink); }
+.xc button.dg { color: var(--red); }
+
+/* D — danger zone: the irreversible one gets its own tinted block. */
+.xd { margin-top: 12px; }
+.xd .quiet-exit { background: transparent; border: 0; padding: 0; color: var(--ink-2); font: 600 12px/1.3 inherit; cursor: pointer; text-align: left; }
+.xd .quiet-exit span { display: block; font: 400 11px/1.35 inherit; color: var(--ink-3); margin-top: 1px; }
+.xd .zone {
+  margin-top: 12px; display: flex; align-items: center; gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--red) 42%, transparent);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-radius: var(--r-sm); padding: 10px 12px;
+}
+.xd .zone .t { flex: 1; min-width: 0; font: 600 12px/1.3 inherit; }
+.xd .zone .t span { display: block; font: 400 11px/1.35 inherit; color: var(--ink-3); }
+.xd .zone button {
+  flex-shrink: 0; background: transparent; border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
+  color: var(--red); border-radius: var(--r-xs); padding: 7px 11px; font: 600 11.5px/1 inherit; cursor: pointer;
+}
+.xd .zone button:hover { background: var(--red); color: var(--bg); border-color: var(--red); }
+
+/* E — collapse into the overflow menu the app already has. */
+.xe .menu {
+  margin-top: 12px; width: 236px; margin-left: auto;
+  background: var(--elevated); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  box-shadow: 0 12px 28px rgba(0,0,0,.34); padding: 5px; display: flex; flex-direction: column;
+}
+.xe .menu button {
+  text-align: left; background: transparent; border: 0; border-radius: var(--r-xs);
+  padding: 8px 9px; color: var(--ink); font: 500 12.5px/1.3 inherit; cursor: pointer;
+}
+.xe .menu button:hover { background: var(--tint-gray); }
+.xe .menu button.dg { color: var(--red); }
+.xe .menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
+.xe .kb2 { background: transparent; border: 0; color: var(--ink-2); font-size: 15px; line-height: 1; padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.xe .kb2:hover { background: var(--tint-gray); color: var(--ink); }
+.pick { border-left: 3px solid var(--ok); padding: 4px 0 4px 14px; margin: 4px 0 14px; }
+.pick b { font-size: 13.5px; }
+.pick p { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
+
+/* Settings (concept) */
+.tag-concept { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tint-amber-ink); background: var(--tint-amber); padding: 1px 5px; border-radius: 999px; }
+.setpage { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 22px; }
+.setnav { display: flex; flex-direction: column; gap: 1px; }
+.setnav a { font-size: 12.5px; color: var(--ink-2); padding: 6px 9px; border-radius: var(--r-xs); }
+.setnav a.on { background: var(--tint-blue); color: var(--ink); font-weight: 600; }
+.setsec { background: var(--elevated); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-bottom: 12px; }
+.setsec > h4 { margin: 0; font-size: 13.5px; }
+.setsec > .shint { margin: 2px 0 14px; font-size: 11.5px; color: var(--ink-3); }
+.fld { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.fld .l { grid-column: 1; grid-row: 1; font-size: 12.5px; font-weight: 600; }
+.fld .h { grid-column: 1; grid-row: 2; font-size: 11px; color: var(--ink-3); }
+.fld .c { grid-column: 2; grid-row: 1 / 3; align-self: center; justify-self: end; }
+.num { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--ink-3); }
+.num input { width: 54px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-xs); color: var(--ink); font: 600 12.5px/1 inherit; padding: 7px 8px; text-align: right; }
+.sw2 { width: 34px; height: 20px; border-radius: 999px; background: var(--tint-gray); border: 1px solid var(--line-2); position: relative; display: inline-block; }
+.sw2 i { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-3); transition: left 120ms ease; }
+.sw2.on { background: var(--accent); border-color: var(--accent); }
+.sw2.on i { left: 16px; background: var(--accent-ink); }
+.saved { font-size: 10.5px; color: var(--ok); }
+.autorow { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.autorow .l { grid-column: 1; grid-row: 1; font-size: 12.5px; font-weight: 600; }
+.autorow .h { grid-column: 1; grid-row: 2; font-size: 11px; color: var(--ink-3); }
+.autorow .when { grid-column: 2; grid-row: 1; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+.autorow .cad { grid-column: 2; grid-row: 2; font-size: 10.5px; color: var(--ink-3); text-align: right; }
+.autorow .c { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.conn { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 11px 0; border-top: 1px solid var(--line); }
+.conn .who { flex: 1; min-width: 0; font-weight: 600; }
+.conn .st { font-size: 11px; }
+.conn .st.ok { color: var(--ok); }
+.conn .st.warn { color: var(--tint-amber-ink); }
+.tiers { display: grid; grid-template-columns: 68px 1fr; gap: 10px 14px; font-size: 13px; color: var(--ink-2); max-width: 66ch; }
+.tiers b { color: var(--ink); }
+.tiers code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--ink-3); }
 .rule { display: grid; grid-template-columns: 16px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .rule:last-child { border-bottom: 0; }
 .rule .n { color: var(--ink-3); padding-top: 2px; }
@@ -166,7 +312,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 
 <div class="app">
 <aside class="side">
-  <span class="brand"><b>Agape recruiting</b><span>design system · v3.27</span><a href="/design-system/">← all design systems</a></span>
+  <span class="brand"><b>Agape recruiting</b><span>Sassy · v3.30</span><a href="/design-system/">← all of Sassy</a></span>
   <div class="grp" data-grp>
     <button type="button">Getting started <span class="tw">▼</span></button>
     <div class="items">
@@ -200,11 +346,14 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <button type="button">Patterns <span class="tw">▼</span></button>
     <div class="items">
       <a href="#two-tier" data-story="two-tier">Two-tier rail</a>
+      <a href="#sidebar-ctas" data-story="sidebar-ctas">Sidebar CTAs</a>
+      <a href="#exit-directions" data-story="exit-directions">Exit rows — directions <span class="tag-concept">pick one</span></a>
       <a href="#row-states" data-story="row-states">Row states</a>
       <a href="#schedule-modal" data-story="schedule-modal">Schedule modal</a>
       <a href="#listing-header" data-story="listing-header">Listing header</a>
       <a href="#profile" data-story="profile">Profile</a>
       <a href="#stage-machine" data-story="stage-machine">Stage machine</a>
+      <a href="#settings" data-story="settings">Settings <span class="tag-concept">concept</span></a>
       <a href="#automation-audit" data-story="automation-audit">Automation audit</a>
     </div>
   </div>
@@ -251,6 +400,12 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <h1>Decision log</h1>
     <p class="lede">Why it is the way it is — dated, so future arguments have receipts.</p>
     <div class="notes">
+      <div class="dec"><span class="d">Jul 30</span><br><b>The exit rows' hairlines are up for replacement.</b><p>Full-bleed rules between exits read as a 2015 settings list — the rule was separating things that should have been grouped. Five directions drawn side by side (inset tiles · inset-grouped · space only · danger zone · overflow), with a recommendation: group them in one container with no internal rules, and promote only the genuinely irreversible to a tinted danger block. Undecided — see <a href="#exit-directions">Exit rows — directions</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Settings gets the rail's vocabulary, and a schema instead of a page.</b><p>The rail footer was the only place a setting could go, so most settings never became settings — the house's recruiting behavior lives in literals (3 quiet days, ±1 flexible month, +1/−1 trial milestones) that need a deploy to change. The concept: six sections named <code>You · House · Funnel · Automations · Connections · Data</code>, rendered from a field schema where <code>scope</code> picks the store and the schema default <em>is</em> the code default. Concept only — see <a href="#settings">Settings</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Inbox is Applicants, and Screening left the rail.</b><p>"Inbox" described a queue; "Applicants" names what's in it. Screening was a rail entry nobody navigated to — the work happens on a person's row and in Discord — so the view stays routable for deep links and left the rail.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>The design system got a name: Sassy.</b><p>"The design system" was a description, not a name, so nothing in a review could refer to it without a paragraph of context. Sassy is the whole thing — the global CTRL layer and every product system under it, this one included.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Sidebar CTAs became three tiers instead of one flex row.</b><p>The stay drawer's footer had four actions crammed right-aligned: two red underlined links (both wrapping onto two lines), a text Cancel, and the primary. Commit, dismiss, and the ways out are now separate tiers, and anything destructive leaves the commit row entirely. See <a href="#sidebar-ctas">Sidebar CTAs</a>.</p></div>
+      <div class="dec"><span class="d">Jul 30</span><br><b>Occupancy bars are exact, and empty stretches are unlabelled.</b><p>The break between back-to-back stays comes off each bar's right edge only, so a left edge still lands on its start date to the pixel. Month gridlines moved to one overlay on the header's own grid — the per-lane repeating gradient drifted a pixel or two per month. Red stretches dropped their "Open" label: the color already says it, and tapping says the dates.</p></div>
       <div class="dec"><span class="d">Jul 29</span><br><b>The single decider came back — with three options and a required comment.</b><p>Quorum stalled: 58 applications sat waiting for a third vote that never came. One read now decides (not a fit / needs input / move forward), and the comment is the accountability that the tally used to pretend to be. "Needs input" is the honest version of a hung vote.</p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>Collective votes replaced the single decider.</b><p>Culture fit is the house's call; the app's job is quorum, blindness until you've voted, and a hard veto. <em>Superseded Jul 29.</em></p></div>
       <div class="dec"><span class="d">Jul 22</span><br><b>AI suggestions replaced by deterministic placement.</b><p>A candidate is in every listing they qualify for, by rule. Confidence percentages were deleted — dates either line up or they don't.</p></div>
@@ -486,6 +641,149 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     <div class="notes"><h3>Notes</h3><p>An icon secondary may split the column with the primary — alignment holds because the pair shares the same 172px. A chip in the top slot means the state is passive: someone else's move. The profile footer reuses this exact component at 200px.</p></div>
   </section>
 
+  <section class="story" id="s-sidebar-ctas">
+    <h1>Sidebar CTAs</h1>
+    <p class="lede">A drawer footer is three tiers deep, ordered by consequence: what saves, what dismisses, and the ways out.</p>
+    <div class="canvas">
+      <div class="sidebar">
+        <div class="fieldstub"></div>
+        <div class="fieldstub"></div>
+        <div class="dcta">
+          <div class="dcta__row">
+            <button class="dcta__quiet">Cancel</button>
+            <button class="btn dcta__commit">Save</button>
+          </div>
+          <div class="dcta__exits">
+            <button class="dcta__exit">Mark leaving <span class="dcta__hint">sets a move-out date and lists the room</span></button>
+            <button class="dcta__exit danger">Remove stay <span class="dcta__hint">deletes it from the timeline</span></button>
+          </div>
+          <button class="dcta__alt"><span>Welcome them in</span><span class="dcta__hint">Ends the trial and starts an open-ended residency on Sep 1, 2026.</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>The tiers</h3>
+      <div class="tiers">
+        <span><code>__commit</code></span><span><b>One filled primary.</b> Bottom-right, pill, accent. Exactly one per sidebar — it is the only thing that saves what's on screen.</span>
+        <span><code>__quiet</code></span><span><b>Dismiss.</b> No fill, no border, beside the primary. Cancel is not a decision, so it does not look like one.</span>
+        <span><code>__exit</code></span><span><b>The ways out.</b> Full-width rows below a rule, one per line, label left and a hint right. Destructive ones take <code>--danger</code> (red label, tinted hover); state changes stay muted.</span>
+        <span><code>__alt</code></span><span><b>Optional second path.</b> Outlined, never filled, label over hint. Used when the sidebar genuinely offers two forward moves ("create a listing instead", "welcome them in").</span>
+      </div>
+      <h3>Notes</h3>
+      <ul>
+        <li>Anything that removes, ends, or re-routes a record <b>leaves the commit row</b>. A 340px sidebar cannot keep four targets honest side by side — this is exactly how the stay drawer ended up with two red underlined links wrapping onto two lines each.</li>
+        <li>Exits never underline. Weight and color carry them; see <a href="#voice">Voice</a> and the transparency-not-decoration rule.</li>
+        <li>Every exit and alt carries a hint. A red label is never the only explanation of what a button does.</li>
+        <li>Full-width rows mean labels never truncate, so the copy can stay plain ("Mark leaving") instead of compressed ("Mark leaving — list room").</li>
+        <li>Under 480px the hint drops to its own line rather than squeezing the label into an ellipsis.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="story" id="s-exit-directions">
+    <h1>Exit rows — directions <span class="tag-concept">pick one</span></h1>
+    <p class="lede">Tier 3 currently separates its rows with full-bleed hairlines. That's a 2015 settings-list move: the rule is doing work that surface, radius, and space should do. Five directions, same content, same 340px frame.</p>
+
+    <div class="canvas">
+      <div class="dirs">
+
+        <div class="dir xa">
+          <header><b>A · Inset tiles</b><span class="src">Linear, Vercel, Raycast</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xa">
+              <button><span class="l">Mark leaving</span><span class="ic">→</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="l">Remove stay</span><span class="ic">✕</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>B · Inset-grouped list</b><span class="src">iOS 18, macOS Settings</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xb">
+              <button><span class="l">Mark leaving</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="l">Remove stay</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>C · Space only</b><span class="src">Notion, Linear menus</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xc">
+              <button><span class="ic">→</span><span>Mark leaving</span><span class="h">sets a move-out date and lists the room</span></button>
+              <button class="dg"><span class="ic">✕</span><span>Remove stay</span><span class="h">deletes it from the timeline</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir">
+          <header><b>D · Danger zone</b><span class="src">GitHub, Stripe, Vercel</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="xd">
+              <button class="quiet-exit">Mark leaving <span>sets a move-out date and lists the room</span></button>
+              <div class="zone">
+                <span class="t">Remove stay <span>deletes it from the timeline</span></span>
+                <button>Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dir xe">
+          <header><b>E · Collapse into overflow</b><span class="src">this app's own kebab</span></header>
+          <div class="frame">
+            <div class="cta2"><button class="kb2">⋯</button><button class="q">Cancel</button><button class="btn pill">Save</button></div>
+            <div class="menu">
+              <button>Mark leaving — list room</button>
+              <div class="sep"></div>
+              <button class="dg">Remove stay…</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>Trade-offs</h3>
+      <div class="tblwrap"><table class="vx">
+        <tr><th>Direction</th><th>What it buys</th><th>What it costs</th></tr>
+        <tr><td><b>A · Inset tiles</b></td>
+            <td>No rules at all — each exit is a discrete object you can hit. Reads the most current of the five. Hover state has somewhere to live.</td>
+            <td>Two filled tiles under a filled primary is a lot of surface in a 340px column; risks looking like three competing buttons.</td></tr>
+        <tr><td><b>B · Inset-grouped</b></td>
+            <td>The exits read as <em>one thing</em> — "the ways out" — rather than unrelated links. No internal hairlines; the container edge does the grouping. Scales to 4+ exits without striping.</td>
+            <td>Still a bordered box; if a section only ever has one exit, the container is overhead.</td></tr>
+        <tr><td><b>C · Space only</b></td>
+            <td>Lightest possible. Nothing but type, a glyph, and whitespace — the most honest reading of "show, don't decorate".</td>
+            <td>Weakest affordance: without a rule or a surface these can read as static text until hovered. Touch targets get ambiguous.</td></tr>
+        <tr><td><b>D · Danger zone</b></td>
+            <td>Consequence is encoded in the container, not just the label color. Unmistakable, and the current standard for irreversible actions.</td>
+            <td>Heavy for two items. The tint competes with the primary for attention — wrong emphasis when Save is the common case.</td></tr>
+        <tr><td><b>E · Overflow</b></td>
+            <td>Footer collapses to commit + dismiss. Reuses a component the app already ships. Zero new visual language.</td>
+            <td>Hides the exits behind a click, and hints don't survive a menu row — the thing that made "Mark leaving" legible goes away.</td></tr>
+      </table></div>
+
+      <h3>Recommendation</h3>
+      <div class="pick">
+        <b>B, with D reserved for the genuinely irreversible.</b>
+        <p>B kills the hairlines and makes the exits one grouped object instead of a striped list, which is the actual complaint — the rules were separating things that should have been grouped. It keeps every hint inline, holds up at one exit or five, and needs no new tokens. Then, when an action can't be undone (deleting a listing with candidates attached, disconnecting Gmail), promote just that one to D's tinted block — the tint means "this one is different," which only works if it's rare.</p>
+      </div>
+      <ul>
+        <li><b>Not A</b> — under a filled accent pill, two filled tiles make three button-ish objects in a 340px column. A is the better choice on a wide surface; Settings sections are where it would earn its keep.</li>
+        <li><b>Not C</b> — the app's rows already lean on hover to reveal affordance, and losing both the rule <em>and</em> the surface leaves destructive actions looking like captions.</li>
+        <li><b>Not E</b> — the hints are the point. "Mark leaving" without "sets a move-out date and lists the room" is exactly the copy problem this pattern was built to fix.</li>
+        <li>B is drawn without a trailing chevron on purpose — the whole row is the target, and a chevron implies a further screen that doesn't exist.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="story" id="s-row-states">
     <h1>Row states</h1>
     <p class="lede">Active means your move; passive means the chip tells you whose it is. Every passive state carries its escalation rule.</p>
@@ -569,6 +867,103 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     </div>
   </section>
 
+  <section class="story" id="s-settings">
+    <h1>Settings <span class="tag-concept">concept</span></h1>
+    <p class="lede">Six sections that borrow the rail's own vocabulary, rendered from a schema so a new setting is one object literal.</p>
+    <div class="canvas">
+      <div class="setpage">
+        <nav class="setnav">
+          <a>You</a>
+          <a class="on">Funnel</a>
+          <a>House</a>
+          <a>Automations</a>
+          <a>Connections</a>
+          <a>Data</a>
+        </nav>
+        <div>
+          <div class="setsec">
+            <h4>Funnel</h4>
+            <p class="shint">How applicants move. Changes here apply to everyone.</p>
+            <div class="fld">
+              <span class="l">Follow-up goes amber after</span>
+              <span class="c"><span class="num"><input value="3"> days</span></span>
+              <span class="h">A thread this quiet is worth another email.</span>
+            </div>
+            <div class="fld">
+              <span class="l">Flexible move-in stretches by</span>
+              <span class="c"><span class="num"><input value="1"> months</span></span>
+              <span class="h">How far a “flexible” date reaches on each side when matching listings.</span>
+            </div>
+            <div class="fld">
+              <span class="l">Offer an update email by default <span class="saved">✓ saved</span></span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">When someone is marked not a fit — you can still change it per person.</span>
+            </div>
+            <div class="dcta">
+              <div class="dcta__row">
+                <button class="dcta__quiet">Cancel</button>
+                <button class="btn dcta__commit">Save</button>
+              </div>
+              <div class="dcta__exits">
+                <button class="dcta__exit">Reset this section <span class="dcta__hint">back to Sassy defaults</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="setsec">
+            <h4>Automations</h4>
+            <p class="shint">Things that run without you.</p>
+            <div class="autorow">
+              <span class="l">Scan the shared inbox</span>
+              <span class="when">ran 4 min ago</span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">Pulls new applications, replies, and availability.</span>
+              <span class="cad">every 20 min</span>
+            </div>
+            <div class="autorow">
+              <span class="l">Remind screeners before a call</span>
+              <span class="when">ran 11 min ago</span>
+              <span class="c"><span class="sw2 on"><i></i></span></span>
+              <span class="h">DMs whoever claimed the call, an hour ahead.</span>
+              <span class="cad">every 15 min</span>
+            </div>
+            <div class="autorow">
+              <span class="l">Auto-post coverage asks</span>
+              <span class="when">off</span>
+              <span class="c"><span class="sw2"><i></i></span></span>
+              <span class="h">Off means a human sees the message before the house does.</span>
+              <span class="cad">on availability</span>
+            </div>
+          </div>
+
+          <div class="setsec">
+            <h4>Connections</h4>
+            <p class="shint">Where recruiting reaches outside the app.</p>
+            <div class="conn"><span class="who">live.at.agapesf@gmail.com</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">House calendar</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">Discord · #recruiting-automation, #recruiting-interviews</span><span class="st ok">✓ connected</span></div>
+            <div class="conn"><span class="who">Agape Notes (call recording)</span><span class="st warn">not set up</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>Structure</h3>
+      <ul>
+        <li><b>The sections are the rail's words.</b> <code>You · House · Funnel · Automations · Connections · Data</code>. The app already teaches House and Funnel; settings shouldn't teach a second taxonomy. If a new setting has no obvious home, the setting is confused — not the taxonomy.</li>
+        <li><b>Rendered from a schema, not hand-written.</b> Each field declares <code>{ key, label, hint, type, scope, default, min, max, unit }</code>; four types (<code>bool · number · text · enum</code>) cover every knob in the app. Adding a setting is appending an object.</li>
+        <li><b><code>scope</code> picks the store</b> — <code>house</code> → <code>recruit_settings</code>, <code>profile</code> → <code>recruit_profiles</code>, <code>local</code> → localStorage. Callers use <code>setting(key)</code> and never learn where a value lives.</li>
+        <li><b>The schema default is the code default.</b> <code>setting('followup_stale_days')</code> returns 3 until someone changes it, so exposing a knob needs no migration and no seed — and today's magic numbers (3 days, ±1 month, +3 months) become one named thing each.</li>
+        <li><b>Automations and connections are their own row types</b>, not fields: what it does, how often, when it last ran, whether it's on. Those are the four things you want when something didn't happen.</li>
+        <li><b>Save behavior follows the type.</b> Toggles and enums autosave with an inline tick; numbers and text take an explicit commit. The schema knows the type, so the renderer enforces it — no per-field config.</li>
+        <li>Section footers are <a href="#sidebar-ctas">Sidebar CTAs</a> — one commit, and “reset this section” as an exit row with a hint.</li>
+      </ul>
+      <h3>Notes</h3>
+      <p>A full view at <code>?view=settings</code>, not a modal — every section is deep-linkable, so a toast or a Discord audit post can point at the exact knob. The rail footer drops to <b>identity · Settings · Sign out</b>; theme moves to You, Gmail to Connections, CSV export to Data, and food/dues move out of the room drawer (a house-wide cost has no business inside one room) into House.</p>
+      <p>Full write-up, open decisions, and build order: <code>docs/ux/recruiting-settings-concept.md</code>.</p>
+    </div>
+  </section>
+
   <section class="story" id="s-automation-audit">
     <h1>Automation audit</h1>
     <p class="lede">Every automated message the app sends is visible in one channel, so the house can audit the robot and subgroups can be given access to just that channel.</p>
@@ -608,7 +1003,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
 <script>
 (function () {
   var stories = document.querySelectorAll('.story');
-  var links = document.querySelectorAll('[data-story]');
+  var links = document.querySelectorAll('.side [data-story]');
   var crumb = document.getElementById('crumb');
   function groupOf(link) {
     var g = link.closest('.grp');
@@ -625,7 +1020,7 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
     links.forEach(function (l) {
       var on = l.dataset.story === name;
       l.classList.toggle('on', on);
-      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + l.textContent;
+      if (on) crumb.innerHTML = '<b>' + groupOf(l) + '</b> / ' + (l.firstChild ? l.firstChild.textContent : l.textContent).trim();
     });
     window.scrollTo(0, 0);
   }

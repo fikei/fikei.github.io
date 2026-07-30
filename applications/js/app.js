@@ -3,14 +3,14 @@
    the discord-membership edge fn). Applicants, votes, shared decisions, and
    house notes live in Supabase behind RLS (migrations 108 + 120).
 
-   v4 funnel: Inbox (one reviewer decides: not a fit / needs input /
+   v4 funnel: Applicants (one reviewer decides: not a fit / needs input /
    move forward, comment required) → Candidates →
    Openings (listing shortlists) → Screening → Archive. The applicant's
    stage column is recomputed server-side by a trigger on recruit_votes;
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.45.0';
+const VERSION = '3.47.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -104,7 +104,7 @@ function defaultReturnDate() {
 }
 
 const VIEWS = {
-  inbox: { title: 'Inbox', kind: 'applicants' },
+  inbox: { title: 'Applicants', kind: 'applicants' },
   candidates: { title: 'Candidates', kind: 'applicants' },
   openings: { title: 'Openings', kind: 'applicants' },
   screening: { title: 'Screening', kind: 'applicants' },
@@ -113,7 +113,10 @@ const VIEWS = {
   activity: { title: 'Activity', kind: 'activity' },
 };
 // Old bookmarks and deep links keep working.
-const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings' };
+// `inbox` stays the view key and the URL — renaming it would break every
+// bookmark and deep link — but `?view=applicants` resolves too, since that is
+// what the rail now calls it.
+const LEGACY_VIEWS = { review: 'inbox', outreach: 'openings', hold: 'inbox', listings: 'openings', applicants: 'inbox' };
 
 let sb = null;                // supabase client (from CtrlAuth)
 let me = null;                // { id, name, groupEmail }
@@ -541,7 +544,7 @@ function openingsCta(a) {
 /* Blue response dot in the row's left gutter — sits beside the avatar,
    never on top of it. */
 function repliedDot(a) {
-  // Same blue dot, two meanings by context: in the Inbox it marks an
+  // Same blue dot, two meanings by context: in Applicants it marks an
   // application nobody on your account has opened yet; elsewhere it marks
   // their reply waiting on you.
   if (view === 'inbox') {
@@ -1288,7 +1291,7 @@ function attachmentLabel(rec) {
    moves the applicant on the most recent decisive one (migration 140). */
 const VERDICTS = {
   not_fit: { label: 'Not a fit', title: 'Archives them — an update email is owed', cls: 'is-not-fit' },
-  needs_input: { label: 'Needs input', title: 'Stays in the Inbox, flagged for another housemate to read', cls: 'is-needs-input' },
+  needs_input: { label: 'Needs input', title: 'Stays in Applicants, flagged for another housemate to read', cls: 'is-needs-input' },
   forward: { label: 'Move forward', title: 'Moves them to Candidates and into every listing they qualify for', cls: 'is-forward' },
 };
 
@@ -2317,7 +2320,7 @@ function qualifiedTag(a, listingId, removed) {
 }
 
 /* Collapsed rail of everyone else who'd fit this listing — removed
-   candidates can be re-added; Inbox folks link to their review page. */
+   candidates can be re-added; Applicants folks link to their review page. */
 function othersAccordion(listingId) {
   const others = otherQualified(listingId);
   if (!others.length) return '';
@@ -2638,16 +2641,19 @@ function renderOccupancy() {
       const range = `${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
       const active = occDrawer?.type === 'stay' && occDrawer.id === s.id;
       bars.push(`<button type="button" class="cal__event cal__event--${s.kind} ${!s.ends_on ? 'is-open-ended' : ''} ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: ${Math.max(width, 0.8)}%" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
+        style="left: ${left}%; width: calc(${Math.max(width, 0.8)}% - var(--bar-break))" title="${esc(`${s.occupant || KIND_LABELS[s.kind]} · ${KIND_LABELS[s.kind]} · ${range}`)}"
         data-stay="${s.id}">${esc(s.occupant || KIND_LABELS[s.kind])}</button>`);
     }
     for (const [a, b] of roomGaps(r.id)) {
       const left = occPos(a) * 100;
       const width = occPos(isoAddDays(b, 1)) * 100 - left;
       const active = occDrawer?.type === 'gap' && occDrawer.roomId === r.id && occDrawer.start === a;
+      // No label: a red stretch already reads as empty, and the dates it
+      // spans are the point. Tapping it opens the drawer, which names them.
       bars.push(`<button type="button" class="cal__event cal__event--vacant ${active ? 'is-editing' : ''}"
-        style="left: ${left}%; width: ${width}%" title="Open ${fmtShort(a)} – ${fmtShort(b)} — click to fill or list"
-        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}">Open</button>`);
+        style="left: ${left}%; width: calc(${width}% - var(--bar-break))" title="Open ${fmtShort(a)} – ${fmtShort(b)} — tap to fill or list"
+        aria-label="Open ${fmtShort(a)} – ${fmtShort(b)}"
+        data-gap-room="${r.id}" data-gap-start="${a}" data-gap-end="${b}"></button>`);
     }
     return bars.join('');
   };
@@ -2675,6 +2681,11 @@ function renderOccupancy() {
         </div>
       </div>
       <div class="cal__body">
+        <!-- One gridline overlay for the whole body, on the same
+             repeat(n, 1fr) grid as the header, so a month edge in the header
+             and a month edge behind the bars are the same pixel. Per-lane
+             repeating gradients drifted by a pixel or two per month. -->
+        <div class="cal__grid" aria-hidden="true">${months.map(() => '<span></span>').join('')}</div>
         ${todayPct !== null ? `<span class="cal__today" style="left: calc(var(--room-col) + (100% - var(--room-col)) * ${todayPct / 100})"></span>` : ''}
         ${rooms.map(r => `
           <div class="cal__row">
@@ -2758,8 +2769,10 @@ function promoteBlockHtml(s) {
   const start = trialEnd ? isoAddDays(trialEnd, 1) : new Date().toISOString().slice(0, 10);
   if (promoting !== s.id) {
     return `<div class="occ-drawer__promote">
-      <button type="button" class="btn btn--accent btn--sm" data-promote-open="${s.id}">Welcome them in</button>
-      <span class="occ-drawer__promote-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
+      <button type="button" class="drawer-cta__alt" data-promote-open="${s.id}">
+        <span>Welcome them in</span>
+        <span class="drawer-cta__exit-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
+      </button>
     </div>`;
   }
   return `<form class="occ-drawer__promote occ-drawer__promote--open" data-promote-form="${s.id}">
@@ -2776,9 +2789,11 @@ function promoteBlockHtml(s) {
     </div>
     <p class="occ-drawer__note">The trial closes the day before, so the timeline has no gap. An onboarding checklist gets created for the house to work through.</p>
     <p class="listing-form__error" data-promote-error></p>
-    <div class="decision-sheet__actions seg-form__actions">
-      <button type="button" class="hold-sheet__cancel" data-promote-cancel>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">Welcome them in</button>
+    <div class="drawer-cta">
+      <div class="drawer-cta__row">
+        <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">Welcome them in</button>
+      </div>
     </div>
   </form>`;
 }
@@ -2845,6 +2860,19 @@ async function submitPromote(form) {
 
 function stayFormHtml(s, roomId) {
   const isNew = !s.id;
+  // Tier 3 of the sidebar CTA pattern: the ways out. Each carries a hint so a
+  // red label is never the only thing telling you what it does.
+  const exits = [];
+  if (!isNew && s.kind === 'resident') {
+    exits.push(`<button type="button" class="drawer-cta__exit" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">
+      Mark leaving <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+    </button>`);
+  }
+  if (!isNew) {
+    exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-stay-delete="${s.id}">
+      Remove stay <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+    </button>`);
+  }
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
     <label class="listing-form__field">Who
       <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" autofocus>
@@ -2866,11 +2894,12 @@ function stayFormHtml(s, roomId) {
     <label class="occ-drawer__ongoing"><input type="checkbox" name="ongoing" ${s.id && !s.ends_on ? 'checked' : ''}> Ongoing — no move-out date yet</label>
     ${trialFieldsHtml(s)}
     <p class="listing-form__error" data-form-error></p>
-    <div class="decision-sheet__actions seg-form__actions">
-      ${!isNew ? `<button type="button" class="listing-form__delete" data-stay-delete="${s.id}">Remove stay</button>` : ''}
-      ${!isNew && s.kind === 'resident' ? `<button type="button" class="listing-form__delete" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">Mark leaving — list room</button>` : ''}
-      <button type="button" class="hold-sheet__cancel" data-drawer-close>Cancel</button>
-      <button type="submit" class="btn btn--accent btn--sm">${isNew ? 'Add stay' : 'Save'}</button>
+    <div class="drawer-cta">
+      <div class="drawer-cta__row">
+        <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
+        <button type="submit" class="btn btn--accent drawer-cta__commit">${isNew ? 'Add stay' : 'Save'}</button>
+      </div>
+      ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
     </div>
   </form>`;
 }
@@ -2930,7 +2959,10 @@ function renderOccDrawer() {
     title = `${room?.name || 'Room'} — open`;
     sub = `${fmtShort(occDrawer.start)} – ${fmtShort(occDrawer.end)}`;
     body = `
-      <button class="btn btn--sm occ-drawer__list-btn" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">Create listing for this stretch</button>
+      <button class="drawer-cta__alt" data-list-room="${occDrawer.roomId}" data-list-start="${occDrawer.start}">
+        <span>Create a listing for this stretch</span>
+        <span class="drawer-cta__exit-hint">opens the room to candidates</span>
+      </button>
       <p class="occ-drawer__note">…or record who's moving in:</p>
       ${stayFormHtml({ kind: 'sublet', starts_on: occDrawer.start, ends_on: occDrawer.end }, occDrawer.roomId)}`;
   } else if (occDrawer.type === 'room') {
@@ -3519,7 +3551,7 @@ function renderReview() {
         <span class="decision-banner__meta">${esc(why)}</span>
       </div>
       <span class="decision-banner__actions">
-        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Inbox</button>
+        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Applicants</button>
       </span>
     </div>`;
   };
@@ -3743,7 +3775,7 @@ function renderReviewFoot(a) {
       ${owed ? `<span class="foot-cta"><button class="btn btn--accent review__btn" data-update-edit="${a.id}">Write their update</button></span>` : ''}
       <span class="foot-links">
         ${owed ? `<button type="button" class="cta-link" data-update-skip="${a.id}">Skip the email</button>` : ''}
-        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Inbox</button>
+        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Applicants</button>
       </span>`;
   }
 }
@@ -3767,7 +3799,7 @@ async function reopenApplicant(id) {
     hideReviewBanner();
     toast(st0.decisive
       ? `Reopened — ${reviewerName(st0.decisive)}'s comment is kept as needing input`
-      : 'Reopened — back in the Inbox');
+      : 'Reopened — back in Applicants');
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
