@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.51.2';
+const VERSION = '3.52.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5415,28 +5415,87 @@ function setGate(sub, btnLabel, hint) {
 }
 
 let _entering = false;
+let _watchdog = null;
+
+/* The spinner is shown for authState 'in' and hides the gate card, so any
+   path that stops without calling setGate(..., button) strands the reader on
+   a spinner forever — which is exactly what happened to a housemate whose
+   membership check never returned. Nothing may fail silently behind it. */
+function stall(sub, hint) {
+  setGate(sub, 'Try again', hint);
+  document.getElementById('gate-btn').onclick = () => { _entering = false; checkMembershipAndEnter(); };
+}
+
 async function checkMembershipAndEnter() {
   // CtrlAuth can dispatch signedin twice (fast-restore + auth event); the
   // enter sequence (load + auto-pass + toast) must only run once.
   if (_entering) return;
   _entering = true;
+  // Backstop for anything that hangs rather than throws (a fetch that never
+  // settles, an await that never resolves): after 25s, offer a way out.
+  clearTimeout(_watchdog);
+  _watchdog = setTimeout(() => {
+    if (!document.getElementById('app').hidden) return; // already in
+    if (document.body.dataset.authState === 'out') return; // a gate is showing
+    stall('This is taking longer than it should.',
+      'Sign-in worked, but checking your Recruiting Society access stalled. Try again — if it keeps happening, say so in the Agape server.');
+  }, 25000);
   try { await _checkMembershipAndEnter(); } finally {
+    clearTimeout(_watchdog);
     if (document.getElementById('app').hidden) _entering = false; // gate paths may retry
   }
 }
 
 async function _checkMembershipAndEnter() {
-  const session = await sb.auth.getSession();
-  const token = session?.data?.session?.access_token;
-  if (!token) return;
+  let token = null;
+  try {
+    const session = await sb.auth.getSession();
+    token = session?.data?.session?.access_token || null;
+  } catch (e) {
+    stall('Couldn’t read your sign-in session.', e.message || 'Try again.');
+    return;
+  }
+  // A signedin event can land a beat before the session is persisted. Give it
+  // a moment rather than returning into a permanent spinner.
+  if (!token) {
+    await new Promise(r => setTimeout(r, 1200));
+    token = (await sb.auth.getSession().catch(() => null))?.data?.session?.access_token || null;
+  }
+  if (!token) {
+    // The classic cause: an in-app browser (Instagram, Discord, Messenger)
+    // whose storage is partitioned, so the session written during the OAuth
+    // round-trip is gone by the time we read it. Name it instead of guessing.
+    stall(
+      inAppBrowser()
+        ? 'Sign-in worked, but this in-app browser threw the session away.'
+        : 'You’re signed in, but the session didn’t stick.',
+      inAppBrowser()
+        ? 'Tap ⋯ and choose “Open in browser”, then sign in again — or use “Get sign-in link” in the recruiting channel for a one-tap link that works anywhere.'
+        : 'The browser dropped the sign-in. Try again, or open ctrl.rodeo in a normal browser window.');
+    return;
+  }
   setGate('Checking your Recruiting Society access…', null);
   try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action: 'status' }),
-    });
-    const status = await resp.json();
+    // No timeout here once cost a housemate a permanent spinner.
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 20000);
+    let resp;
+    try {
+      resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'status' }),
+        signal: ctl.signal,
+      });
+    } finally { clearTimeout(timer); }
+    const status = await resp.json().catch(() => ({}));
+    // A 500 used to fall through to "no Discord linked", sending people off to
+    // re-link an account that was never the problem. Say what actually broke.
+    if (!resp.ok) {
+      stall('The access check failed.',
+        `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+      return;
+    }
     if (!status.linked) {
       setGate('Your account has no Discord linked.', 'Link Discord',
         'Link the Discord account that’s in the Agape server, then try again.');
@@ -5514,8 +5573,9 @@ async function _checkMembershipAndEnter() {
     const linkEv = new URLSearchParams(location.search).get('link');
     if (linkEv) openLinkRecording(linkEv);
   } catch (e) {
-    setGate('Something went wrong checking access.', 'Try again');
-    document.getElementById('gate-btn').onclick = checkMembershipAndEnter;
+    const aborted = e.name === 'AbortError';
+    stall(aborted ? 'The access check timed out.' : 'Something went wrong checking access.',
+      aborted ? 'Discord took too long to answer. Try again — this is usually transient.' : (e.message || ''));
     console.error(e);
   }
 }

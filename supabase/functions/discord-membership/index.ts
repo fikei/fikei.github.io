@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.4.1'
+const VERSION = '1.6.1'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel gate + #recruiting-automation admin (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -75,7 +75,24 @@ function botHeaders() {
 }
 
 async function discordGet(path: string): Promise<Response> {
-  const resp = await fetch(`${DISCORD_API}${path}`, { headers: botHeaders() })
+  // A hung Discord call used to hang the whole request, and the browser had no
+  // timeout either — the caller sat on a spinner indefinitely. Bound it here.
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 10_000)
+  let resp: Response
+  try {
+    resp = await fetch(`${DISCORD_API}${path}`, { headers: botHeaders(), signal: ctl.signal })
+  } catch (err) {
+    throw new Error(`Discord API unreachable ${path}: ${(err as Error).name}`)
+  } finally {
+    clearTimeout(timer)
+  }
+  // One retry for the rate limit Discord tells us how to wait out.
+  if (resp.status === 429) {
+    const retryMs = Math.min(Number(resp.headers.get('retry-after') || 1) * 1000, 5_000)
+    await new Promise((r) => setTimeout(r, retryMs))
+    return await discordGet(path)
+  }
   if (resp.status !== 200 && resp.status !== 404) {
     throw new Error(`Discord API ${resp.status} ${path}: ${(await resp.text()).slice(0, 200)}`)
   }
@@ -269,9 +286,113 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401, headers: jsonHeaders })
     }
     const user = userData.user
-    const action = req.method === 'POST'
-      ? ((await req.json().catch(() => ({})))?.action || 'status')
-      : 'status'
+    // Read the body exactly once — a later req.clone() is too late, the stream
+    // is already consumed ("Body is unusable").
+    const payload = req.method === 'POST' ? (await req.json().catch(() => ({}))) : {}
+    const action = payload?.action || 'status'
+
+    // Admin probe: "why can't <person> get in?" answered from what the bot
+    // actually sees, instead of guessing. Read-only; caches nothing.
+    if (action === 'probe') {
+      const { data: adm } = await db.from('recruit_admins').select('user_id').eq('user_id', user.id).maybeSingle()
+      if (!adm) return new Response(JSON.stringify({ error: 'Admins only' }), { status: 403, headers: jsonHeaders })
+      const target = String(payload?.discordUserId || '')
+      if (!/^[0-9]{5,25}$/.test(target)) {
+        return new Response(JSON.stringify({ error: 'discordUserId required' }), { status: 400, headers: jsonHeaders })
+      }
+      const out: Record<string, unknown> = { discordUserId: target, guildId: AGAPE_GUILD_ID }
+      try {
+        const member = await fetchGuildMember(target)
+        out.inGuild = member !== null
+        if (member) {
+          out.roles = member.roles || []
+          try { out.canSeeRecruiting = await checkRecruitingChannel(target, member.roles || []) }
+          catch (err) { out.recruitingCheckError = (err as Error).message }
+          try { out.canSeeAutomation = await checkAutomationChannel(target, member.roles || []) }
+          catch (err) { out.automationCheckError = (err as Error).message }
+        }
+      } catch (err) {
+        out.error = (err as Error).message
+      }
+      return new Response(JSON.stringify(out), { headers: jsonHeaders })
+    }
+
+    // Admin audit: everyone who can see the Recruiting Society channel, and
+    // whether they have actually managed to sign in. Answers "who is stuck?"
+    // without waiting for each of them to report it.
+    if (action === 'audit') {
+      const { data: adm } = await db.from('recruit_admins').select('user_id').eq('user_id', user.id).maybeSingle()
+      if (!adm) return new Response(JSON.stringify({ error: 'Admins only' }), { status: 403, headers: jsonHeaders })
+      let members: Array<Record<string, any>>
+      try {
+        // Needs the Server Members privileged intent enabled for the bot.
+        const resp = await discordGet(`/guilds/${AGAPE_GUILD_ID}/members?limit=1000`)
+        members = await resp.json()
+        if (!Array.isArray(members)) throw new Error('unexpected member list')
+      } catch (err) {
+        // Listing the roster needs the Server Members privileged intent. Without
+        // it we can still audit in the other direction: everyone who has an
+        // account, and what the bot says their access is right now. That misses
+        // people who have never signed in — which is exactly what the intent
+        // would reveal — so say so rather than implying the list is complete.
+        const { data: known } = await db.from('user_discord_membership')
+          .select('discord_user_id, discord_username, verified_at, is_recruiting_member')
+        const out: Array<Record<string, unknown>> = []
+        for (const r of (known || [])) {
+          const did = String(r.discord_user_id)
+          let inGuild = false, canSee = false, checkError: string | null = null
+          try {
+            const m = await fetchGuildMember(did)
+            inGuild = m !== null
+            if (m) canSee = await checkRecruitingChannel(did, m.roles || [])
+          } catch (e) { checkError = (e as Error).message }
+          out.push({
+            discordUserId: did, name: r.discord_username || did,
+            signedIn: true, inGuild, canSeeRecruiting: canSee,
+            cachedVerdict: Boolean(r.is_recruiting_member), lastVerified: r.verified_at,
+            staleVerdict: Boolean(r.is_recruiting_member) !== canSee,
+            checkError,
+          })
+        }
+        return new Response(JSON.stringify({
+          partial: true,
+          scope: 'accounts-only',
+          note: 'Roster listing needs the Server Members privileged intent; enable it in the Discord developer portal to also see channel members who have never signed in.',
+          reason: (err as Error).message,
+          accounts: out.length,
+          rows: out,
+        }), { headers: jsonHeaders })
+      }
+      const [{ data: cached }, { data: admins }] = await Promise.all([
+        db.from('user_discord_membership').select('discord_user_id, discord_username, verified_at, is_recruiting_member'),
+        db.from('recruit_admins').select('user_id'),
+      ])
+      const byDiscord = new Map((cached || []).map((r: Record<string, unknown>) => [String(r.discord_user_id), r]))
+      const rows: Array<Record<string, unknown>> = []
+      for (const m of members) {
+        const did = String(m.user?.id || '')
+        if (!did || m.user?.bot) continue
+        let canSee = false
+        try { canSee = await checkRecruitingChannel(did, m.roles || []) } catch { canSee = false }
+        if (!canSee) continue
+        const row = byDiscord.get(did)
+        rows.push({
+          discordUserId: did,
+          name: m.user?.global_name || m.nick || m.user?.username || did,
+          signedIn: Boolean(row),
+          lastVerified: row?.verified_at || null,
+          grantedInApp: row ? Boolean(row.is_recruiting_member) : false,
+        })
+      }
+      rows.sort((a, b) => Number(a.signedIn) - Number(b.signedIn))
+      return new Response(JSON.stringify({
+        channelMembers: rows.length,
+        signedIn: rows.filter(r => r.signedIn).length,
+        neverSignedIn: rows.filter(r => !r.signedIn).map(r => r.name),
+        adminCount: (admins || []).length,
+        rows,
+      }), { headers: jsonHeaders })
+    }
 
     const identity = findDiscordIdentity(user as unknown as Record<string, unknown>)
     if (!identity) {
