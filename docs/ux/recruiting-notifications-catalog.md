@@ -197,6 +197,72 @@ fires at the last moment the house can still fill the room without rushing.
 
 ---
 
+## Trial votes
+
+The two moments the house weighs in on someone already living here: the
+**month 1 check-in** and the **final decision**. Both dates live on the trial
+stay (`recruit_stays.checkin_on` / `decision_on`, migration 139) and both are
+answered by a copy of the housemate feedback form linked next to the date
+(`checkin_form_url` / `decision_form_url`, migration 152).
+
+**The ballot closes at a Monday meeting, not on the milestone.** The house
+decides out loud, at the last Monday meeting *strictly before* the milestone —
+so responses are only useful if they are in before that meeting, and every
+sentence names it. A milestone that itself falls on a Monday closes at the
+meeting a week earlier: the answers are wanted going into the day, not on it.
+
+| Kind | Fires when | Says | Action | Lane · audience | Repeat |
+|---|---|---|---|---|---|
+| 📮 `trial_vote_open` | 7 days before the closing meeting | *Keerti is up for their month 1 check-in on Sep 3, and the house votes at the meeting on Aug 31.* | Open ballot | Daily · house | once per milestone |
+| 📢 `trial_vote_due` | 3 days before the milestone⁶ | *Keerti's month 1 check-in lands Sep 3, so the ballot has to be in before the meeting on Aug 31.* | Open ballot | Now · house | once per milestone |
+| 🚨 `trial_vote_last_call` | the day of the closing meeting | *The meeting on Aug 31 is the last one before Keerti's month 1 check-in on Sep 3.* | Open ballot | Now · house | once per milestone |
+| 🟥 `trial_vote_overdue` | the milestone passed with nothing settled | *The house still has not settled Keerti's final decision, which was due Sep 3.* | Open ballot | Now · **oncall** | once per milestone |
+
+⁶ Skipped when three days out already falls *after* the closing meeting — a
+milestone early in the week. By then last call is the truer sentence, and two
+lines for one fact is what "one notification per fact" forbids.
+
+**A trial that already turned into a residency owes no vote.** The promotion
+was the answer, so a resident stay for the same person starting at or after the
+trial's start silences both milestones. A milestone more than 14 days past is
+history rather than news and is dropped silently — a date backdated in the app
+is a correction.
+
+**No ballot, no nagging.** With no form link attached, `trial_vote_open` says
+so — *"{} is up for their month 1 check-in on Sep 3 and has no ballot attached
+yet."* — and the three later rungs stay quiet. Chasing people toward a link
+that doesn't exist is worse than silence.
+
+### Naming the form copies
+
+One copy per person per milestone — never a shared form, because answers about
+two people in one response sheet can't be read separately. Copy
+[the housemate feedback form](https://docs.google.com/forms/d/1UpVuMOeSItoSvXpDn2LukBOl6_y0VWfSrrqXs3RWNrk/edit)
+into an Agape-owned `Housemate votes/{year}` folder (the template's own folder
+isn't writable by the house) and name it:
+
+```
+Agape vote · {member} · {Month 1 | Final decision} · {YYYY-MM-DD}
+```
+
+```
+Agape vote · Keerti Sharma · Month 1 · 2026-08-31
+Agape vote · Keerti Sharma · Final decision · 2026-11-30
+```
+
+- **`{member}`** is the name on the stay, so the form and the calendar agree.
+- **The milestone is one of exactly two strings.** They match the two date
+  fields on the stay and the two sentences above; anything else and a person's
+  two ballots stop sorting next to each other.
+- **The date is the closing meeting, not the milestone.** It is the deadline,
+  it is what the nudges say, and ISO keeps the folder in chronological order.
+  The drawer shows the computed date under the milestone fields — copy it.
+
+The responses sheet inherits the name with `(Responses)` appended, so a ballot
+and its answers stay findable as a pair.
+
+---
+
 ## Profile events — `audience: none`
 
 Recorded in the log and on the profile's Activity tab, **never sent anywhere**.
@@ -241,7 +307,7 @@ Batching applies to Discord only; the log is never batched.
 
 These are the rules that keep the catalogue honest. Each is checkable.
 
-- **Every kind has an action.** All 33 payloads carry `links[0]`, which becomes
+- **Every kind has an action.** All 37 payloads carry `links[0]`, which becomes
   the hyperlink on the subject. A notification you can't act on is just news.
 - **Every kind is in `KINDS`.** An unmapped kind renders as `•` with a de-slugged
   label; `icon()`/`label()` warn once when that happens. A merge once dropped two

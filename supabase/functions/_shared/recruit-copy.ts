@@ -68,6 +68,13 @@ export const KINDS: Record<string, { icon: string; label: string }> = {
   // The house.
   onboarding_owed:        { icon: '🎁', label: 'Onboarding owed' },
   occupancy_conflict:     { icon: '❗', label: 'Calendar clash' },
+
+  // Trial votes — the two moments the whole house weighs in on someone
+  // already living here.
+  trial_vote_open:        { icon: '📮', label: 'Ballot open' },
+  trial_vote_due:         { icon: '📢', label: 'Ballot due' },
+  trial_vote_last_call:   { icon: '🚨', label: 'Last call before the meeting' },
+  trial_vote_overdue:     { icon: '🟥', label: 'Ballot overdue' },
 }
 
 /* ---- sentences ----------------------------------------------------------
@@ -113,6 +120,16 @@ export const TEMPLATES: Record<string, string> = {
   'opening_at_risk':              '{subject} opens {date}, {days} away, and is still unfilled.',
   'opening_overdue':              '{subject} should have opened {date}, {days} ago, and is still empty.',
 
+  // --- trial votes. The house votes at a Monday meeting, so every sentence
+  // names the meeting that closes the ballot ({close}) as well as the
+  // milestone it answers ({date}). No "tonight" or "this week" — the ledger
+  // keeps these lines forever.
+  'trial_vote_open':              '{subject} is up for their {milestone} on {date}, and the house votes at the meeting on {close}.',
+  'trial_vote_open.noform':       '{subject} is up for their {milestone} on {date} and has no ballot attached yet.',
+  'trial_vote_due':               "{subject}'s {milestone} lands {date}, so the ballot has to be in before the meeting on {close}.",
+  'trial_vote_last_call':         "The meeting on {close} is the last one before {subject}'s {milestone} on {date}.",
+  'trial_vote_overdue':           "The house still has not settled {subject}'s {milestone}, which was due {date}.",
+
   // --- the house
   'room_emptying':                '{subject} empties {date} when {occupant} leaves, and has no listing yet.',
   'onboarding_owed':              '{subject} moved in {days} ago and is still owed {count}.',
@@ -156,6 +173,7 @@ export const ACTIONS = {
   queue:      'View queue',
   write:      'Write',
   takeCall:   'Take call',
+  ballot:     'Open ballot',
 } as const
 
 // ---- rendering -------------------------------------------------------------
