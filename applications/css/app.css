@@ -1177,6 +1177,12 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .listing-menu__item:hover { background: var(--bg-overlay); }
 .listing-allin { font-weight: var(--fw-semibold); cursor: help; }
+/* The opening date carries the whole listing: it decides who qualifies. Reads
+   at body size in full contrast while the rest of the meta line stays muted. */
+.listing-when {
+  color: var(--fg); font-weight: var(--fw-semibold);
+  font-size: var(--font-size-body);
+}
 .listing-others { margin-top: var(--space-2); }
 .listing-others summary { color: var(--fg-subtle); font-size: var(--font-size-small); cursor: pointer; }
 
@@ -1341,12 +1347,17 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .avail-foot__ask { font-size: var(--font-size-small); color: var(--fg-muted); }
 .cta-pair { display: inline-flex; align-items: center; gap: 6px; }
 .cta-icon { padding: 0 9px; min-width: 0; }
+/* The play control is labelled now — "Watch" reads at a glance where a bare
+   triangle needed a hover. Still the secondary of the pair, so it shrinks
+   first and keeps its own tint. */
+.cta-watch { padding: 0 10px; min-width: 0; gap: 5px; }
+.foot-cta .cta-pair .cta-watch, .inbox-row__actions .cta-pair .cta-watch { width: auto; flex: 0 0 auto; }
 .listing-menu__item--danger { color: var(--error); }
 
 /* --- v3.18.0: aligned CTA column, quiet ⋮, confirm-to-book modal --- */
 .inbox-row__actions .cta-stack { width: 172px; align-items: stretch; }
 .inbox-row__actions .cta-stack .cta-std { width: 100%; justify-content: center; }
-.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; }
+.inbox-row__actions .cta-pair { display: flex; width: 100%; gap: 6px; flex-wrap: wrap; }
 .inbox-row__actions .cta-pair .cta-std { flex: 1; }
 .inbox-row__actions .cta-context { align-self: flex-end; }
 .listing-menu-btn { border-color: transparent; background: transparent; letter-spacing: 0; font-size: 16px; }

@@ -247,3 +247,12 @@ The Inbox is no longer a group vote. One housemate's read decides, and every rev
 - **Reopening softens rather than deletes.** A decisive verdict becomes "needs input" and keeps its comment, since the trigger would otherwise send the applicant straight back out.
 - **The rejection email is offered, never forced.** Archiving surfaces "Write their update" with "Skip the email" beside it; the draft is a fixed community template plus one paragraph written from the applicant's own survey answers, and an optional newsletter link. Closing the editor leaves it unsent.
 - **Reviews can arrive from the application sheet.** Comment threads on the sheet import as reviews attributed to their author's roster email, so a review written by someone who has never opened the app still shows under their name — and becomes editable by them the moment their sign-in maps to that email. Imported rows are labelled "from the application sheet".
+
+## Amendment — v3.43 (openings cleanup after the review-model change)
+
+- **"See other qualified applicants" only lists people still in play**, in two groups: *moved forward* (reviewed, passed — ready to add) then *not reviewed yet* (dates fit, nobody has read them). Archived applicants are excluded outright — the old filter keyed on stage `review | candidate` without checking for a decisive verdict, so someone archived by a sheet-imported review still appeared. Anyone reviewed but **not** moved forward is excluded too: "needs input" is a question, not a shortlist.
+- **Tags follow the new model.** "gathering votes" is gone — there is no tally to gather. Rows read `not reviewed yet`, `moved forward`, or `taken off this listing` (was the bare "removed", which never said off *what*).
+- **The opening date leads its header**, at body size in full contrast (`.listing-when`) while the rest of the meta stays muted. The date decides who qualifies, so it shouldn't read as fine print.
+- **"Reach out" → "Get started"** — the first-contact CTA on an outreach row.
+- **The play control is labelled "Watch"** rather than a bare triangle. Still the secondary of the pair: it shrinks first and keeps its own tint.
+- **The update email's default is a house preference** (`recruit_settings.update_email_default`, rail footer: "Offer an update email by default"). The checkbox on a Not-a-fit decision starts from it, and can still be changed per person.
