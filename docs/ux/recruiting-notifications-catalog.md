@@ -228,10 +228,13 @@ trial's start silences both milestones. A milestone more than 14 days past is
 history rather than news and is dropped silently — a date backdated in the app
 is a correction.
 
-**No ballot, no nagging.** With no form link attached, `trial_vote_open` says
-so — *"{} is up for their month 1 check-in on Sep 3 and has no ballot attached
-yet."* — and the three later rungs stay quiet. Chasing people toward a link
-that doesn't exist is worse than silence.
+**No ballot collapses the ladder, it doesn't silence it.** With no form link
+attached, every rung becomes the one line that says so — *"{} is up for their
+month 1 check-in on Sep 3 and has no ballot attached yet."* — posted once.
+Chasing people three times toward a link that doesn't exist is noise, but a
+milestone days away with no ballot is worse news than one with an unfilled
+ballot, not better. `trial_vote_overdue` is exempt: it escalates the missed
+decision itself, which no form would have fixed.
 
 ### Naming the form copies
 

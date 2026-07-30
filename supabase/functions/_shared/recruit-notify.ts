@@ -1526,10 +1526,13 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
       else if (toClose <= VOTE_OPEN_LEAD) step = 'open'
       if (!step) continue
 
-      // Without a form there is nothing to fill in, so the opening line says
-      // that instead — and the later rungs would just be nagging about a link
-      // that doesn't exist.
-      if (!form && step !== 'open') continue
+      /* Without a form there is nothing to fill in, so the whole ladder
+         collapses to the one line that says so — chasing people three times
+         toward a link that doesn't exist is noise. It collapses rather than
+         going silent: a milestone days away with no ballot is worse news than
+         one with an unfilled ballot, not better. Overdue is exempt because it
+         escalates the missed decision itself, which no form would have fixed. */
+      if (!form && step !== 'overdue') step = 'open'
       const copy = step === 'open' && !form ? 'trial_vote_open.noform' : `trial_vote_${step}`
 
       out.push({
