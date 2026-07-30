@@ -10,8 +10,22 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.51.1';
+const VERSION = '3.51.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
+
+/* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
+   and those are three separate strings that a merge can move independently —
+   which is exactly what happened: the stylesheet sat at 3.49.0 for four
+   releases while the JS advanced, so every CSS change shipped invisible. This
+   says so in the console instead of letting it go quiet again. */
+(() => {
+  const css = [...document.styleSheets].map(s => s.href || '').find(h => h.includes('/css/app.css'));
+  const tag = css && (css.match(/[?&]v=([\d.]+)/) || [])[1];
+  if (tag && tag !== VERSION) {
+    console.warn(`[applications] stale stylesheet: app.css?v=${tag} but app.js is ${VERSION}. `
+      + 'Bump every ?v= in applications/index.html together.');
+  }
+})();
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
