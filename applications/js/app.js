@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.43.1';
+const VERSION = '3.43.2';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -2130,6 +2130,25 @@ function renderApplicants() {
   if (view === 'openings') wireRowDrag(host);
 }
 
+/* One line of status per qualified applicant. Where they are beats what was
+   done to them: someone shortlisted elsewhere reads as "on DMT Room", not as
+   "taken off this listing", even though both are true. */
+function qualifiedTag(a, listingId, removed) {
+  if (a.stage === 'review') {
+    return '<span class="note-count" title="Nobody has reviewed them yet — one read decides">not reviewed yet</span>';
+  }
+  const elsewhere = activePlacements(a.id).find(p => p.listing_id !== listingId);
+  if (elsewhere) {
+    const l = listings.find(x => x.id === elsewhere.listing_id);
+    const room = rooms.find(r => r.id === l?.room_id);
+    return `<span class="note-count" title="Shortlisted there — adding them here moves them">on ${esc(room?.name || 'another listing')}</span>`;
+  }
+  if (removed) {
+    return '<span class="note-count" title="A recruiter took them off this listing — the auto-sweep won\'t re-add them, but you can">taken off this listing</span>';
+  }
+  return '<span class="note-count" title="Reviewed and moved forward — ready to add">moved forward</span>';
+}
+
 /* Collapsed rail of everyone else who'd fit this listing — removed
    candidates can be re-added; Inbox folks link to their review page. */
 function othersAccordion(listingId) {
@@ -2150,11 +2169,7 @@ function othersAccordion(listingId) {
             </span>
           </button>
           <span class="inbox-row__actions">
-            ${a.stage === 'review'
-              ? '<span class="note-count" title="Nobody has reviewed them yet — one read decides">not reviewed yet</span>'
-              : removed
-                ? '<span class="note-count" title="A recruiter took them off this listing — the auto-sweep won\'t re-add them, but you can">taken off this listing</span>'
-                : '<span class="note-count" title="Reviewed and moved forward — ready to add">moved forward</span>'}
+            ${qualifiedTag(a, listingId, removed)}
             ${a.stage === 'candidate' ? `<button class="btn btn--sm inbox-row__review" title="${activePlacements(a.id).length ? 'Moves them here from their current listing' : 'Place them on this listing'}" data-add-placement="${a.id}|${esc(listingId)}">${activePlacements(a.id).length ? 'Move here' : 'Add'}</button>` : ''}
           </span>
         </li>`;
