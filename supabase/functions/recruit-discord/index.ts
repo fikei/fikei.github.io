@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.18.0'
+const VERSION = '1.18.1'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial milestones + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -224,11 +224,7 @@ async function handleSigninButton(interaction: Record<string, any>): Promise<Res
   const url = await mintSigninUrl(discordUserId, discordUsername)
   if (!url) return json(ephemeral('Could not mint a link — try again in a minute.'))
 
-  return json(ephemeral(
-    `🔑 Your one-time sign-in link (10 min, single use):\n${url}\n` +
-    `Opens the applicant inbox already signed in — any browser works. ` +
-    `If you are reading this inside another app's browser, open the link in Safari or Chrome.`,
-  ))
+  return json(ephemeral(`🔑 ${url}\nOpens the inbox signed in. Works once, for 10 minutes.`))
 }
 
 /* Registers /signin on the guild so nobody has to hunt for the button.
@@ -959,6 +955,23 @@ serve(async (req) => {
     const pathname = new URL(req.url).pathname
     if (pathname.endsWith('/redeem')) return await handleRedeem(req)
     if (pathname.endsWith('/signin-post')) return await handleSigninPost(req)
+    if (pathname.endsWith('/message-delete')) {
+      const client = db()
+      const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: u } = await client.auth.getUser(tok)
+      if (!u?.user) return json({ error: 'Not authenticated' }, 401)
+      const { data: adm } = await client.from('recruit_admins').select('user_id').eq('user_id', u.user.id).maybeSingle()
+      if (!adm) return json({ error: 'Admins only' }, 403)
+      const b = await req.json().catch(() => ({}))
+      const ch = String(b.channelId || ''), msg = String(b.messageId || '')
+      if (!/^\d{5,25}$/.test(ch) || !/^\d{5,25}$/.test(msg)) return json({ error: 'channelId and messageId required' }, 400)
+      const resp = await fetch(`https://discord.com/api/v10/channels/${ch}/messages/${msg}`, {
+        method: 'DELETE', headers: { Authorization: `Bot ${Deno.env.get('DISCORD_BOT_TOKEN')}` },
+      })
+      if (!resp.ok && resp.status !== 404) return json({ error: `Discord ${resp.status}` }, 502)
+      return json({ deleted: true, messageId: msg })
+    }
+
     if (pathname.endsWith('/register-commands')) {
       const client = db()
       const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
