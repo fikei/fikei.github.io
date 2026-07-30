@@ -335,12 +335,31 @@ export async function editSchedulerFailed(
 
 /* DMs are audited as well: a screener's confirmation is an automation the
    house should be able to see happened, without exposing the DM thread. */
-export async function dmUser(discordUserId: string, content: string): Promise<void> {
+/* A DM, optionally with buttons under it.
+
+   Buttons are how a message can offer something without spending the reader's
+   attention on it — the call reminder can mention the interview guide in one
+   tap's worth of space rather than pasting two thousand characters nobody asked
+   for at that moment. */
+export async function dmUser(
+  discordUserId: string,
+  content: string,
+  buttons: Array<{ label: string; customId: string }> = [],
+): Promise<void> {
   const channel = await discordFetch('/users/@me/channels', {
     method: 'POST', body: JSON.stringify({ recipient_id: discordUserId }),
   })
+  const components = buttons.length
+    ? [{
+        type: 1,
+        components: buttons.slice(0, 5).map((b) => ({
+          type: 2, style: 2, label: b.label, custom_id: b.customId,
+        })),
+      }]
+    : []
   await discordFetch(`/channels/${channel.id}/messages`, {
-    method: 'POST', body: JSON.stringify({ content }),
+    method: 'POST',
+    body: JSON.stringify({ content, ...(components.length ? { components } : {}) }),
   })
   await auditMirror('Message sent', content.split('\n')[0], { dmTo: discordUserId })
 }

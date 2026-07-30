@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.27.0'
+const VERSION = '1.29.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -185,17 +185,6 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
       `✅ You're screening **${applicantName}** — Agape intro call — ${slotWhen(startsAt)}.\n` +
       `Calendar invites are out to you both. Meet: ${meetLink || '(see calendar invite)'}${platformLine}`)
 
-    /* And what the house wants out of it. Sent separately so a long guide can
-       never push the time and the Meet link out of view, and after the
-       confirmation because the confirmation is the urgent half. A failure here
-       must not mark the claim as failed — the call is booked either way. */
-    try {
-      for (const part of await interviewGuide(client, applicantId)) {
-        await dmUser(opts.discordUserId, part)
-      }
-    } catch (err) {
-      console.warn(`[recruit-discord] could not send the interview guide: ${(err as Error).message}`)
-    }
 
     try {
       await sendIntroEmail(client, applicant, housemateName, housemateEmail, startsAt, meetLink)
@@ -289,6 +278,27 @@ async function mintSigninUrl(discordUserId: string, discordUsername: string | nu
   })
   if (error) return null
   return `${APP_URL}?signin=${raw}`
+}
+
+/* "How we run an intro call" — answered on request.
+
+   Ephemeral so it never clutters a channel if the button is ever posted in one,
+   and so a screener can tap it twice without leaving two copies behind. It
+   returns the guide as its own message rather than a link, because the moment
+   this gets tapped is five minutes before a call and opening a browser tab is
+   already too much. */
+async function handleGuideButton(interaction: Record<string, any>): Promise<Response> {
+  const applicantId = String(interaction.data?.custom_id || '').split('|')[1] || 'preview'
+  try {
+    const parts = await interviewGuide(db(), applicantId)
+    if (!parts.length) return json(ephemeral('No interview guide is set.'))
+    // One interaction response; anything that spilled to a second message is
+    // joined, since Discord allows more in a response than in a DM.
+    return json({ type: 4, data: { content: parts.join('\n\n').slice(0, 3900), flags: 64 } })
+  } catch (err) {
+    console.warn(`[recruit-discord] guide button failed: ${(err as Error).message}`)
+    return json(ephemeral('Could not load the guide — try the app.'))
+  }
 }
 
 async function handleSigninButton(interaction: Record<string, any>): Promise<Response> {
@@ -392,7 +402,11 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
     .eq('kind', 'intro_call')
     .eq('status', 'scheduled').is('reminder_sent_at', null)
     .gte('starts_at', new Date(now).toISOString())
-    .lte('starts_at', new Date(now + 65 * 60000).toISOString())
+    /* The next quarter hour. The tick runs every fifteen minutes, so a
+       sixteen-minute window catches every call exactly once, and the reminder
+       lands somewhere in the fifteen minutes before it — close enough to be the
+       thing you read on your way into the Meet. */
+    .lte('starts_at', new Date(now + 16 * 60000).toISOString())
   if (!upcoming?.length) return 0
   // One calendar token per tick; if Gmail is disconnected we fail open and
   // remind anyway — a stray reminder beats a silent no-show.
@@ -437,10 +451,16 @@ async function remindUpcoming(client: ReturnType<typeof db>): Promise<number> {
       ])
       if (dm?.discord_user_id && applicant) {
         const name = `${applicant.first_name} ${applicant.last_name || ''}`.trim()
+        /* Offered, not pushed. Two thousand characters of guide arriving the
+           moment somebody claims a call is read once, days before it matters,
+           and never again. Five minutes out is when a screener actually wants
+           it — and a button costs one line of the reminder, so the people who
+           have run twenty of these are not made to scroll past it. */
         await dmUser(dm.discord_user_id,
           `⏰ Coming up: you're interviewing **${name}** at ${slotWhen(new Date(s.starts_at))} PT.\n` +
           `Meet: ${s.meet_link || '(see calendar invite)'}\n` +
-          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(s.applicant_id)}`)
+          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(s.applicant_id)}`,
+          [{ label: 'How we run an intro call', customId: `guide|${s.applicant_id}` }])
         sent++
       }
       // Stamp even without a Discord id so we don't retry forever.
@@ -989,6 +1009,24 @@ serve(async (req) => {
       // A real applicant if one is named, so the {profile} link is clickable;
       // otherwise a placeholder that still shows where the link would go.
       const applicantId = params.get('a') || 'preview'
+
+      /* ?as=reminder sends the call reminder itself, button and all, rather
+         than the guide text. The guide is now offered rather than pushed, so
+         the thing that needs proving is the button — whether it renders in a DM
+         and whether tapping it returns the guide. Previewing only the text
+         would test the half that was never in doubt. */
+      if (params.get('as') === 'reminder') {
+        const { data: who } = await client.from('recruit_applicants')
+          .select('first_name, last_name').eq('id', applicantId).maybeSingle()
+        const name = who ? `${who.first_name} ${who.last_name || ''}`.trim() : 'an applicant'
+        await dmUser(to,
+          `⏰ Coming up: you're interviewing **${name}** at 3:00 PM PT.\n` +
+          `Meet: (see calendar invite)\n` +
+          `Background: https://ctrl.rodeo/applications/?a=${encodeURIComponent(applicantId)}`,
+          [{ label: 'How we run an intro call', customId: `guide|${applicantId}` }])
+        return json({ sent: 1, shape: 'reminder' })
+      }
+
       const parts = await interviewGuide(client, applicantId)
       if (!parts.length) return json({ sent: 0, note: 'interview_guide is empty' })
       for (const part of parts) await dmUser(to, part)
@@ -1039,6 +1077,7 @@ serve(async (req) => {
     }
     if (interaction.type === 3) {
       if (String(interaction.data?.custom_id || '') === 'signin') return await handleSigninButton(interaction)
+      if (String(interaction.data?.custom_id || '').startsWith('guide|')) return await handleGuideButton(interaction)
       return await handleClaim(interaction)
     }
     return json(ephemeral('Unsupported interaction.'))
