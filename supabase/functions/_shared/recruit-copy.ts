@@ -72,7 +72,6 @@ export const KINDS: Record<string, { icon: string; label: string }> = {
   // Trial votes — the two moments the whole house weighs in on someone
   // already living here.
   trial_vote_open:        { icon: '📮', label: 'Ballot open' },
-  trial_vote_due:         { icon: '📢', label: 'Ballot due' },
   trial_vote_last_call:   { icon: '🚨', label: 'Last call before the meeting' },
   trial_vote_overdue:     { icon: '🟥', label: 'Ballot overdue' },
 }
@@ -126,8 +125,9 @@ export const TEMPLATES: Record<string, string> = {
   // keeps these lines forever.
   'trial_vote_open':              '{subject} is up for their {milestone} on {date}, and the house votes at the meeting on {close}.',
   'trial_vote_open.noform':       '{subject} is up for their {milestone} on {date} and has no ballot attached yet.',
-  'trial_vote_due':               "{subject}'s {milestone} lands {date}, so the ballot has to be in before the meeting on {close}.",
-  'trial_vote_last_call':         "The meeting on {close} is the last one before {subject}'s {milestone} on {date}.",
+  // Sent the morning of the meeting — but it says the date, not "tonight".
+  // The ledger keeps the line forever and "tonight" is wrong by tomorrow.
+  'trial_vote_last_call':         "The meeting on {close} is where the house votes on {subject}'s {milestone}, due {date}.",
   'trial_vote_overdue':           "The house still has not settled {subject}'s {milestone}, which was due {date}.",
 
   // --- the house
