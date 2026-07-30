@@ -205,22 +205,29 @@ stay (`recruit_stays.checkin_on` / `decision_on`, migration 139) and both are
 answered by a copy of the housemate feedback form linked next to the date
 (`checkin_form_url` / `decision_form_url`, migration 152).
 
-**The ballot closes at a Monday meeting, not on the milestone.** The house
-decides out loud, at the last Monday meeting *strictly before* the milestone —
-so responses are only useful if they are in before that meeting, and every
-sentence names it. A milestone that itself falls on a Monday closes at the
-meeting a week earlier: the answers are wanted going into the day, not on it.
+**The ballot closes at the month-end meeting, not on the milestone.** Trial
+milestones sit on month boundaries — month 1 is the 1st, a decision is a month
+before a sublet ends — and the house settles a month at **its last Monday
+meeting in the month before it**. So the closing meeting is the last Monday of a
+month that still falls on or before the milestone: a decision dated Oct 1 is
+taken on Sep 28, and one dated Sep 15 was taken on Aug 31. Every rung names that
+meeting, and all four are counted from it.
 
 | Kind | Fires when | Says | Action | Lane · audience | Repeat |
 |---|---|---|---|---|---|
-| 📮 `trial_vote_open` | 7 days before the closing meeting | *Keerti is up for their month 1 check-in on Sep 3, and the house votes at the meeting on Aug 31.* | Open ballot | Daily · house | once per milestone |
-| 📢 `trial_vote_due` | 3 days before the milestone⁶ | *Keerti's month 1 check-in lands Sep 3, so the ballot has to be in before the meeting on Aug 31.* | Open ballot | Now · house | once per milestone |
-| 🚨 `trial_vote_last_call` | the day of the closing meeting | *The meeting on Aug 31 is the last one before Keerti's month 1 check-in on Sep 3.* | Open ballot | Now · house | once per milestone |
-| 🟥 `trial_vote_overdue` | the milestone passed with nothing settled | *The house still has not settled Keerti's final decision, which was due Sep 3.* | Open ballot | Now · **oncall** | once per milestone |
+| 📮 `trial_vote_open` | 7 days before the closing meeting | *Keerti is up for their month 1 check-in on Sep 1, and the house votes at the meeting on Aug 31.* | Open ballot | Daily · house | once per meeting |
+| 📢 `trial_vote_due` | 3 days before the closing meeting | *Keerti's month 1 check-in lands Sep 1, so the ballot has to be in before the meeting on Aug 31.* | Open ballot | Now · house | once per meeting |
+| 🚨 `trial_vote_last_call` | the day of the closing meeting | *The meeting on Aug 31 is the last one before Keerti's month 1 check-in on Sep 1.* | Open ballot | Now · house | once per meeting |
+| 🟥 `trial_vote_overdue` | the milestone passed with nothing settled | *The house still has not settled Keerti's final decision, which was due Sep 1.* | Open ballot | Now · **oncall** | once per meeting |
 
-⁶ Skipped when three days out already falls *after* the closing meeting — a
-milestone early in the week. By then last call is the truer sentence, and two
-lines for one fact is what "one notification per fact" forbids.
+**A trial that gets extended re-runs its ladder.** The `dedupe_key` carries the
+closing meeting (`trial_vote:{stay}:{which}:{close}:{step}`), so extending a
+sublet — which moves `decision_on`, which can move the meeting — nudges the
+house again with the new date rather than leaving them holding the deadline from
+before the extension. A milestone that moves *within* the same meeting's window
+is the same deadline and correctly stays quiet. **Rename the form copy when the
+meeting moves**: its name carries the old date, and a stale name is how two
+ballots for one person stop being tellable apart.
 
 **A trial that already turned into a residency owes no vote.** The promotion
 was the answer, so a resident stay for the same person starting at or after the
@@ -252,6 +259,10 @@ Agape vote · {member} · {Month 1 | Final decision} · {YYYY-MM-DD}
 Agape vote · Keerti Sharma · Month 1 · 2026-08-31
 Agape vote · Keerti Sharma · Final decision · 2026-11-30
 ```
+
+The occupancy drawer prints the exact name under each ballot field, close date
+already computed — working out which Monday it is, twice per person, is how a
+folder ends up with four naming schemes in it.
 
 - **`{member}`** is the name on the stay, so the form and the calendar agree.
 - **The milestone is one of exactly two strings.** They match the two date
