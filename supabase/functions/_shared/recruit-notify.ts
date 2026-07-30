@@ -324,8 +324,17 @@ export async function record(db: DB, rows: Notification[]): Promise<number> {
     dedupe_key: n.dedupe_key,
     payload: {
       ...n.payload,
+      /* {subject} renders as the literal slot `{}`, never as the name. The
+         subject is the hyperlink — oneLine() and the app's Activity view both
+         substitute `{}` with the linked name at display time, which is the only
+         moment the URL is known. Rendering the name here produced sentences
+         with nothing to click: correct words, dead line.
+
+         Forced here rather than asked of each detector, because thirty-odd
+         call sites passing `subject: '{}'` by convention is thirty-odd chances
+         to pass the name instead — which is exactly what happened. */
       sentence: n.payload.copy
-        ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
+        ? renderCopy(n.payload.copy, { ...(n.payload.vars || {}), subject: '{}' }, overrides)
         : n.payload.sentence,
     },
     due_at: n.due_at || new Date().toISOString(),
@@ -1834,6 +1843,11 @@ export async function previewTick(db: DB): Promise<Array<Record<string, unknown>
     lane: n.lane || 'daily',
     audience: n.audience || 'house',
     copy: n.payload.copy || null,
+    /* The preview renders the real name where a stored row keeps `{}` — a dry
+       run is read by a person, and "{} is up for their final decision" tells
+       them nothing about who. Deliberate divergence from record(): don't
+       "fix" this into matching, and don't trust it to prove a line is linked.
+       It won't show the difference. */
     line: `${icon(n.kind)} ${n.payload.copy
       ? renderCopy(n.payload.copy, n.payload.vars || {}, overrides)
       : (n.payload.sentence || '')}`.replace('{subject}', String(n.payload.vars?.subject ?? n.payload.title)),
