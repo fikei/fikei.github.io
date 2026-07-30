@@ -825,6 +825,101 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
   return out
 }
 
+
+/* We interviewed them and went quiet.
+
+   This is the most expensive silence in the funnel. Someone gave up an evening
+   to talk to strangers about living with them, and then heard nothing — and
+   unlike an unreviewed application, they *know* they're waiting. Every day of
+   it costs goodwill with someone the house already thought was worth meeting.
+
+   Distinct from decision_open, which is driven by the date they'd move in: this
+   one is driven purely by how long the house has been quiet, so it fires even
+   for a candidate with no room and no move-in date. Both can be true at once
+   and they say different things.
+
+   Cadence: day 3, day 5, then every 5 days for as long as it stays true. The
+   first two are close together because the fix is cheap early (a two-line email
+   buys weeks of patience), and the tail keeps repeating because a candidate
+   nobody has answered in three weeks is a decision the house is making by
+   default. Escalates once it passes 10 days. */
+const FOLLOWUP_FIRST = 3
+const FOLLOWUP_SECOND = 5
+const FOLLOWUP_EVERY = 5
+
+/* Which nudge, if any, is due after `days` of silence. Returns the step as a
+   number so it doubles as the dedupe key: each step fires exactly once. */
+function followupStep(days: number): number | null {
+  if (days < FOLLOWUP_FIRST) return null
+  if (days < FOLLOWUP_SECOND) return FOLLOWUP_FIRST
+  if (days < FOLLOWUP_SECOND + FOLLOWUP_EVERY) return FOLLOWUP_SECOND
+  // Every 5 days after: 10, 15, 20 … whichever the current run has passed.
+  return Math.floor(days / FOLLOWUP_EVERY) * FOLLOWUP_EVERY
+}
+
+async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
+  const { data: candidates } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name').eq('stage', 'candidate')
+  if (!candidates?.length) return []
+  const ids = candidates.map((a: { id: string }) => a.id)
+
+  const [{ data: screenings }, { data: emails }, { data: votes }] = await Promise.all([
+    db.from('recruit_screenings').select('applicant_id, starts_at, status')
+      .in('applicant_id', ids).eq('status', 'completed'),
+    // Anything the house has said to them since. One outbound email after the
+    // call is the whole point of the nudge, so it stops as soon as one exists.
+    db.from('recruit_emails').select('applicant_id, direction, sent_at')
+      .in('applicant_id', ids).eq('direction', 'out'),
+    db.from('recruit_decision_votes').select('applicant_id').in('applicant_id', ids),
+  ])
+  if (!screenings?.length) return []
+
+  // Their most recent completed call.
+  const lastCall = new Map<string, string>()
+  for (const sc of screenings) {
+    const prev = lastCall.get(sc.applicant_id)
+    if (!prev || sc.starts_at > prev) lastCall.set(sc.applicant_id, sc.starts_at)
+  }
+  const lastOut = new Map<string, string>()
+  for (const e of emails || []) {
+    const prev = lastOut.get(e.applicant_id)
+    if (!prev || e.sent_at > prev) lastOut.set(e.applicant_id, e.sent_at)
+  }
+  const voted = new Set((votes || []).map((v: { applicant_id: string }) => v.applicant_id))
+
+  const out: Notification[] = []
+  for (const a of candidates) {
+    const call = lastCall.get(a.id)
+    if (!call) continue
+    // Silence is measured from the later of the call and our last word to them.
+    const sinceIso = [call, lastOut.get(a.id) || ''].sort().reverse()[0]
+    const days = Math.floor((Date.now() - new Date(sinceIso).getTime()) / 86400000)
+    const step = followupStep(days)
+    if (step === null) continue
+
+    const heard = lastOut.get(a.id) && lastOut.get(a.id)! > call
+    out.push({
+      kind: 'screening_followup',
+      subject_type: 'applicant',
+      subject_id: a.id,
+      subject_label: a.first_name,
+      audience: days >= 10 ? 'oncall' : 'house',
+      lane: step === FOLLOWUP_FIRST ? 'daily' : 'now',
+      dedupe_key: `screening_followup:${a.id}:${step}`,
+      payload: {
+        title: fullName(a),
+        sentence: heard
+          ? `{} was interviewed and has heard nothing for ${plural(days, 'day')}.`
+          : `{} was interviewed ${plural(days, 'day')} ago and has heard nothing back.`,
+        body: voted.has(a.id) ? 'the house has started voting' : 'nobody has voted yet',
+        section: 'Owed an answer',
+        links: [{ label: 'Write to them', url: applicantLink(a.id) }],
+      },
+    })
+  }
+  return out
+}
+
 /* C4 — a candidate became a housemate. The one purely good notification in the
    set, and the one the funnel PRD flagged as missing. */
 async function detectPromotions(db: DB): Promise<Notification[]> {
@@ -876,6 +971,7 @@ export async function detect(db: DB): Promise<number> {
     ['candidate_landing', () => detectCandidateLanding(db)],
     ['screening_moments', () => detectScreeningMoments(db)],
     ['decision_open', () => detectDecisionOpen(db)],
+    ['screening_followup', () => detectScreeningFollowup(db)],
     ['candidate_promoted', () => detectPromotions(db)],
   ]
   let found = 0
@@ -1036,7 +1132,7 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
     .order('created_at').limit(200)
   if (!data?.length) return 0
 
-  const SECTION_ORDER = ['Needs a review', 'Needs a second read', 'Decisions', 'Screening', 'Replies', 'Passed review', 'Waiting for a room', 'Openings at risk', 'Rooms emptying', 'New housemates', 'New applications', 'Backlog']
+  const SECTION_ORDER = ['Needs a review', 'Needs a second read', 'Owed an answer', 'Decisions', 'Screening', 'Replies', 'Passed review', 'Waiting for a room', 'Openings at risk', 'Rooms emptying', 'New housemates', 'New applications', 'Backlog']
   const sections = new Map<string, typeof data>()
   for (const n of data) {
     const s = n.payload?.section || 'Other'
