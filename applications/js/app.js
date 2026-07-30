@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.49.0';
+const VERSION = '3.50.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -1774,6 +1774,7 @@ const ACTIVITY_KINDS = {
   // share the ledger because a profile's history is one story; what separates
   // them is audience 'none', meaning recorded and never sent.
   event_verdict:          { icon: '🔖', label: 'Review written' },
+  event_passed:           { icon: '🚪', label: 'Passed on' },
   event_stage:            { icon: '🔀', label: 'Stage changed' },
   event_email:            { icon: '📤', label: 'Email sent' },
   event_placement:        { icon: '📌', label: 'Shortlist changed' },
@@ -1906,29 +1907,124 @@ function renderActivity() {
 async function loadProfileActivity(a) {
   const host = () => document.getElementById('activity-panel');
   if (!host()) return;
-  const { data, error } = await sb.from('recruit_notifications')
-    .select('*').eq('subject_type', 'applicant').eq('subject_id', a.id)
-    .order('created_at', { ascending: false }).limit(200);
-  // Navigated away while the query was in flight.
+
+  /* The ledger only knows what has happened since it shipped, and a profile's
+     history goes back further than that. So this composes the feed from the
+     source tables — reviews, notes, placements, decisions, email, calls — and
+     folds in the ledger only for the notifications those tables can't explain.
+
+     Deriving rather than backfilling means the panel is complete for every
+     applicant on day one, and can't drift from the records it describes.
+     Profile-event rows (audience 'none') are deliberately skipped: they say the
+     same thing as the source row they were written from. */
+  const [notifs, votesRes, commentsRes, placeRes, decisionRes, emailRes, screenRes] = await Promise.all([
+    sb.from('recruit_notifications').select('*')
+      .eq('subject_type', 'applicant').eq('subject_id', a.id).neq('audience', 'none'),
+    sb.from('recruit_votes').select('*').eq('applicant_id', a.id),
+    sb.from('recruit_comments').select('*').eq('applicant_id', a.id),
+    sb.from('recruit_listing_candidates').select('*').eq('applicant_id', a.id),
+    sb.from('recruit_decisions').select('*').eq('applicant_id', a.id),
+    sb.from('recruit_emails').select('direction, subject, sent_at, sent_by_name, intent, intent_summary')
+      .eq('applicant_id', a.id),
+    sb.from('recruit_screenings').select('starts_at, status, housemate_name, kind, recording_posted_at')
+      .eq('applicant_id', a.id),
+  ]);
+  // Navigated away while the queries were in flight.
   if (queue[qIndex] !== a.id || reviewTab !== 'activity' || !host()) return;
-  if (error) {
-    host().innerHTML = `<p class="notes__empty">Couldn't load their history — ${esc(error.message)}</p>`;
+
+  const err = [votesRes, commentsRes, placeRes, decisionRes, emailRes, screenRes].find(r => r.error);
+  if (err) {
+    host().innerHTML = `<p class="notes__empty">Couldn't load their history — ${esc(err.error.message)}</p>`;
     return;
   }
-  if (!data?.length) {
-    host().innerHTML = `<p class="notes__empty">Nothing recorded yet. Reviews, emails, and shortlist changes show up here as they happen.</p>`;
+
+  const feed = [];
+  const add = (at, kind, sentence, detail) => { if (at) feed.push({ at, kind, sentence, detail }); };
+  const who = n => n || 'a housemate';
+
+  // Applied — always the first thing that happened.
+  add(a.ts_iso, 'application_new', `Applied for ${isSublet(a) ? 'a sublet' : 'a full-time room'}.`);
+
+  // Reviews, with the rationale — this is what "passed on" actually means.
+  for (const v of votesRes.data || []) {
+    const verdict = VERDICTS[v.verdict]?.label || v.verdict || 'reviewed';
+    add(v.updated_at || v.created_at, v.verdict === 'not_fit' ? 'event_passed' : 'event_verdict',
+      `${who(v.voter_name || v.voter_email)} marked them ${verdict.toLowerCase()}.`, v.note);
+  }
+
+  /* Archive decisions — but only when no verdict already explains it. Writing a
+     "not a fit" review also writes a pass decision, so showing both would list
+     one act twice in slightly different words. The decision row is only news on
+     its own for house rules and legacy archives that never had a review. */
+  const hasNotFit = (votesRes.data || []).some(v => v.verdict === 'not_fit');
+  for (const d of decisionRes.data || []) {
+    if (d.decision !== 'pass' || hasNotFit) continue;
+    add(d.decided_at, 'event_passed',
+      `${who(d.decided_by_name)} archived them${d.reason ? ` — ${reasonLabel(d.reason).toLowerCase()}` : ''}.`, d.note);
+  }
+
+  // House comments.
+  for (const c of commentsRes.data || []) {
+    add(c.created_at, 'event_comment',
+      `${who(c.author_name)} left a note.`, c.body);
+  }
+
+  // Listings they were added to or taken off.
+  for (const p of placeRes.data || []) {
+    const room = listingLabel(p.listing_id);
+    const auto = p.source === 'auto';
+    if (p.status === 'removed') {
+      add(p.updated_at || p.created_at, 'event_placement',
+        `${who(p.added_by_name)} took them off ${room}.`);
+    } else {
+      add(p.created_at, 'event_placement', auto
+        ? `Auto-placed on ${room}.`
+        : `${who(p.added_by_name)} added them to ${room}.`);
+    }
+  }
+
+  // Email both ways, and what an inbound one turned out to be about.
+  for (const e of emailRes.data || []) {
+    if (e.direction === 'out') {
+      add(e.sent_at, 'event_email', `${who(e.sent_by_name)} emailed them.`, e.subject);
+    } else {
+      const label = e.intent && ACTIVITY_KINDS[`reply_${e.intent}`]?.label;
+      add(e.sent_at, e.intent ? `reply_${e.intent}` : 'event_email',
+        label ? `They replied — ${label.toLowerCase()}.` : 'They replied.',
+        e.intent_summary || e.subject);
+    }
+  }
+
+  // Calls.
+  for (const s of screenRes.data || []) {
+    const when = s.starts_at ? relTime(s.starts_at) : '';
+    add(s.starts_at, s.status === 'completed' ? 'screening_notes' : 'screening_today',
+      s.status === 'completed'
+        ? `Had an intro call${s.housemate_name ? ` with ${s.housemate_name}` : ''}.`
+        : `Intro call booked${s.housemate_name ? ` with ${s.housemate_name}` : ''}.`,
+      s.recording_posted_at ? 'recording & summary saved' : undefined);
+  }
+
+  // Notifications the tables above can't account for (stalled reviews, nudges,
+  // openings they were matched to).
+  for (const n of notifs.data || []) {
+    const line = (n.payload?.sentence || '').replace('{}', n.payload?.title || fullName(a));
+    add(n.created_at, n.kind, line, n.payload?.body);
+  }
+
+  feed.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));
+  if (!feed.length) {
+    host().innerHTML = `<p class="notes__empty">Nothing recorded yet.</p>`;
     return;
   }
-  // The subject is this applicant on every row, so the sentence reads better
-  // without their own name repeated in it — "{}" becomes "they".
-  const line = n => (n.payload?.sentence || '')
-    .replace('{}', n.payload?.title || fullName(a) || 'They');
+
   host().innerHTML = `<ul class="inbox-card activity-feed">
-    ${data.map(n => `<li class="inbox-row log-row">
-      <span class="log-row__icon" title="${esc(kindLabel(n.kind))}">${kindIcon(n.kind)}</span>
+    ${feed.map(f => `<li class="inbox-row log-row">
+      <span class="log-row__icon" title="${esc(kindLabel(f.kind))}">${kindIcon(f.kind)}</span>
       <span class="inbox-row__text">
-        <span class="inbox-row__title activity-feed__line">${esc(line(n))}</span>
-        <span class="log-row__meta">${esc(relTime(n.created_at))}${n.payload?.body ? ` · ${esc(n.payload.body)}` : ''}${n.audience === 'none' ? '' : ` · ${esc(activityDelivery(n))}`}</span>
+        <span class="inbox-row__title activity-feed__line">${esc(f.sentence)}</span>
+        ${f.detail ? `<span class="inbox-row__sub activity-feed__detail">${esc(String(f.detail).slice(0, 300))}</span>` : ''}
+        <span class="log-row__meta">${esc(relTime(f.at))}</span>
       </span>
     </li>`).join('')}
   </ul>`;
@@ -4128,25 +4224,64 @@ function renderReview() {
   const buNorm = normalizeBudget(a.budget);
 
   const archived = a.stage === 'rejected' || a.stage === 'archived';
-  const archiveBanner = () => {
+
+  /* One bar for a closed application, not two.
+
+     There used to be a banner at the top saying why it closed and a separate
+     action bar at the bottom offering to reopen it — the same subject split
+     across two places, so you read the reason in one and acted in the other.
+     Now it is a single bar: what happened, who decided and why in their own
+     words, and the one action that undoes it.
+
+     Colour carries the kind of closure, because "we said no" and "they said no"
+     and "not right now" are three different things and the reader should know
+     which before reading a word. */
+  const closedTone = () => {
+    if (isAutoDecision(rec)) return 'rule';                    // a house rule, nobody's judgement
+    if (a.exitReason === 'opted_out') return 'theirs';         // they withdrew
+    if (a.exitReason === 'future') return 'later';             // right person, wrong time
+    if (a.exitReason === 'trial_ended') return 'trial';        // we lived together; it didn't work
+    return 'ours';                                             // the house passed
+  };
+  const CLOSED_HEAD = {
+    ours:  'This application is closed',
+    rule:  'Closed by a house rule',
+    theirs:'They withdrew',
+    later: 'Saved for later',
+    trial: 'The trial ended',
+  };
+
+  const closedBar = () => {
     const st = voteStats(a.id);
-    const auto = isAutoDecision(rec);
-    const why = auto ? (rec.note || reasonLabel(rec.reason) || 'A house rule archived them')
-      : st.notFit ? `Not a fit — ${reviewerName(st.notFit)}${st.notFit.note ? `: “${st.notFit.note}”` : ''}`
-      : rec?.note || (rec?.reason ? reasonLabel(rec.reason) : 'Did not pass review');
-    return `<div class="decision-banner decision-banner--pass">
-      <div class="decision-banner__text">
-        <span class="decision-banner__label">${auto ? 'Archived by a house rule' : a.stage === 'rejected' ? 'Archived — update email queued' : 'Archived'}${auto ? `<span class="decision-chip decision-chip--auto">Automatic</span>` : ''}</span>
-        <span class="decision-banner__meta">${esc(why)}</span>
+    const tone = closedTone();
+    // The reason, in the words of whoever gave it — a reviewer's comment first,
+    // then a recruiter's note, then the structured reason as a last resort.
+    const v = st.notFit;
+    const quote = v?.note || rec?.note || '';
+    const by = v ? reviewerName(v) : rec?.byName || '';
+    const fallback = rec?.reason ? reasonLabel(rec.reason)
+      : isAutoDecision(rec) ? 'A house rule closed it'
+      : 'No reason recorded';
+    const sub = quote
+      ? `${quote}${by ? ` — ${by}` : ''}`
+      : `${fallback}${by ? ` — ${by}` : ''}`;
+    // The update email is offered here when one is genuinely owed, and never
+    // demanded: a closed applicant is closed whether or not anyone writes.
+    const owed = a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt;
+    return `<div class="closed-bar closed-bar--${tone}">
+      <div class="closed-bar__text">
+        <span class="closed-bar__head">${CLOSED_HEAD[tone]}</span>
+        <span class="closed-bar__sub">${esc(sub)}</span>
       </div>
-      <span class="decision-banner__actions">
-        <button class="decision-banner__undo" data-reopen="${a.id}">Reopen — back to Applicants</button>
+      <span class="closed-bar__actions">
+        ${owed ? `<button type="button" class="closed-bar__quiet" data-update-edit="${a.id}">Write their update</button>` : ''}
+        <button type="button" class="closed-bar__reopen" data-reopen="${a.id}">Reopen</button>
       </span>
     </div>`;
   };
 
   document.getElementById('review-body').innerHTML = `
-    ${archived ? archiveBanner() : ''}
+    ${archived ? closedBar() : ''}
     <div class="review__card">
       <div class="review__head">
         ${avatarHtml(a, true)}
@@ -4365,16 +4500,15 @@ function renderReviewFoot(a) {
         </span>`;
     }
   } else {
-    // Archived. The update email is offered here, at the moment it's owed, and
-    // is always optional — skipping archives them with nothing sent.
-    const owed = a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt;
-    foot.innerHTML = `
-      ${owed ? `<span class="foot-cta"><button class="btn btn--accent review__btn" data-update-edit="${a.id}">Write their update</button></span>` : ''}
-      <span class="foot-links">
-        ${owed ? `<button type="button" class="cta-link" data-update-skip="${a.id}">Skip the email</button>` : ''}
-        <button type="button" class="cta-link" data-reopen="${a.id}">Reopen — back to Applicants</button>
-      </span>`;
+    /* Closed. Everything this bar used to offer — reopen, and the optional
+       update email — now lives in the closed-bar at the top of the profile,
+       next to the reason it closed. Two bars about one subject meant reading the
+       verdict in one place and acting in another. */
+    foot.innerHTML = '';
+    foot.hidden = true;
+    return;
   }
+  foot.hidden = false;
 }
 
 async function reopenApplicant(id) {
