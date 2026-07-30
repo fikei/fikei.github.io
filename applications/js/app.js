@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.51.0';
+const VERSION = '3.51.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -3505,7 +3505,8 @@ function listingDrawerBody(l) {
     </dl>
     <div class="occ-drawer__section">Candidates ${placed.length ? `· ${placed.length}` : ''}</div>
     ${named.length ? `<div class="listing-row__people">
-      ${named.map(a => `<button class="link-chip" data-review="${a.id}">${esc(a.first_name || 'Applicant')}</button>`).join('')}
+      ${named.map(a => `<button class="link-chip" data-review="${a.id}">${
+        esc([a.first, a.last].filter(Boolean).join(' ') || 'Applicant')}</button>`).join('')}
     </div>` : `<p class="occ-drawer__note">Nobody qualifies for it yet. Candidates are placed by rule as their dates line up.</p>`}
     ${l.notes ? `<p class="occ-drawer__note">${esc(l.notes)}</p>` : ''}
     <div class="drawer-cta">

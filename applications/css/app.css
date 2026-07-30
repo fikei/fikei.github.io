@@ -1630,7 +1630,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   font-size: var(--font-size-small); font-weight: var(--fw-semibold);
 }
 .drawer-cta__alt:hover { background: var(--bg-overlay); }
-.drawer-cta__alt .drawer-cta__exit-hint { text-align: left; }
 /* No Save button on an existing record — the fields are the save, and the app
    doesn't explain that in words. The flag is empty until a write lands, then
    says "Saved" for a moment. It keeps its line either way so nothing shifts. */
@@ -1658,18 +1657,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .drawer-cta__exit:hover { background: var(--bg-overlay); }
 .drawer-cta__exit--danger { color: var(--error); }
 .drawer-cta__exit--danger:hover { color: var(--error); background: var(--pass-tint); }
-/* The hint yields first: it wraps or ellipsizes so the label — the thing that
-   says what the button does — always reads on one line. */
-.drawer-cta__exit-hint {
-  flex: 0 1 auto; min-width: 0; white-space: normal;
-  color: var(--fg-subtle); font-size: var(--font-size-caption); font-weight: 400; text-align: right;
-}
-/* On a full-width phone drawer the hint gets its own line rather than
-   squeezing the label into an ellipsis. */
-@media (max-width: 480px) {
-  .drawer-cta__exit { flex-direction: column; align-items: flex-start; gap: 2px; }
-  .drawer-cta__exit-hint { text-align: left; }
-}
 
 /* Per-profile activity feed (v3.48.0). Reads as prose, so the line wraps
    instead of ellipsizing the way the scannable rail rows do. */
