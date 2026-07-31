@@ -132,19 +132,60 @@ header .sub a:hover { text-decoration: underline; }
 
 /* ---------- markers ---------- */
 .house-marker { background: none; border: none; }
+.house-marker .wrap { position: relative; display: inline-block; }
 .house-marker .pin {
   font-size: 22px;
   line-height: 1;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
-  transition: transform .15s;
+  transition: transform .15s, filter .3s, opacity .3s;
   transform-origin: bottom center;
   display: inline-block;
   cursor: pointer;
 }
+.house-marker .sdot {
+  position: absolute; right: -3px; bottom: -1px;
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid #0a0a0a;
+}
+.house-marker.st-active .sdot { background: var(--active); box-shadow: 0 0 8px var(--active); }
+.house-marker.st-historical .sdot { background: var(--historical); }
+.house-marker.st-closed .sdot { background: var(--closed); }
+.house-marker.st-unknown .sdot { background: var(--muted); }
 .house-marker:hover .pin { transform: scale(1.35) rotate(-6deg); }
-.house-marker.hist .pin { opacity: .75; filter: grayscale(.3) drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+/* ghosts: houses that are gone (in "today" mode) — sepia spirits of communes past */
+.house-marker.ghost .pin { opacity: .55; filter: grayscale(.9) sepia(.5) drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+.house-marker.ghost .sdot { opacity: .7; box-shadow: none; }
 .house-marker.sel .pin { animation: bounce .5s ease infinite alternate; }
 @keyframes bounce { from { transform: translateY(0) scale(1.3); } to { transform: translateY(-6px) scale(1.3); } }
+
+/* ---------- time machine ---------- */
+#timebar {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 1002; display: flex; align-items: center; gap: 12px;
+  background: rgba(17,17,17,.94); border: 1px solid var(--border); border-radius: 999px;
+  padding: 9px 18px; backdrop-filter: blur(6px); box-shadow: 0 6px 30px rgba(0,0,0,.5);
+  max-width: calc(100% - 32px);
+}
+#timebar button {
+  background: none; border: 1px solid var(--border); color: var(--text);
+  font-family: var(--mono); font-size: 12px; border-radius: 50%;
+  width: 30px; height: 30px; cursor: pointer; flex: none;
+}
+#timebar button:hover { border-color: var(--accent); color: var(--accent); }
+#year-label { font-size: 15px; font-weight: 700; color: var(--accent); min-width: 62px; text-align: center; flex: none; }
+#year-label.today { color: var(--active); font-size: 12px; }
+#timeslider { -webkit-appearance: none; appearance: none; width: 300px; max-width: 40vw; height: 4px; border-radius: 2px; background: var(--border); outline: none; }
+#timeslider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); cursor: grab; box-shadow: 0 0 10px rgba(255,209,102,.5);
+}
+#timeslider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: grab; border: none; }
+#era-label { font-size: 9px; color: var(--muted); min-width: 110px; flex: none; }
+@media (max-width: 760px) {
+  #timebar { bottom: auto; top: 10px; left: 8px; right: 8px; transform: none; max-width: none; padding: 7px 12px; }
+  #era-label { display: none; }
+  #timeslider { max-width: none; flex: 1; }
+}
 
 /* ---------- detail panel ---------- */
 #detail {
@@ -177,6 +218,16 @@ header .sub a:hover { text-decoration: underline; }
 #detail .fact { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
 #detail .fact .k { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
 #detail .fact .v { font-size: 12px; margin-top: 3px; }
+#detail .d-events { margin-top: 14px; }
+#detail .d-events .k { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+#detail .ev { border-left: 2px solid var(--accent); padding: 4px 0 4px 10px; margin-bottom: 8px; }
+#detail .ev .ev-top { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+#detail .ev .ev-title { font-size: 11.5px; font-weight: 700; }
+#detail .ev .ev-title a { color: var(--text); text-decoration: none; }
+#detail .ev .ev-title a:hover { color: var(--accent); }
+#detail .ev .ev-date { font-size: 9.5px; color: var(--accent); }
+#detail .ev .ev-kind { font-size: 8.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; }
+#detail .ev .ev-detail { font-size: 10.5px; color: #aaa; margin-top: 2px; line-height: 1.5; }
 #detail .d-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 #detail .d-links a {
   font-size: 10px; color: var(--text); text-decoration: none;
@@ -223,7 +274,7 @@ header .sub a:hover { text-decoration: underline; }
     <button id="mobile-toggle" aria-label="Toggle list">house list</button>
     <header>
       <h1>SF COMMUNE ATLAS <span class="blink">▮</span></h1>
-      <div class="sub">co-ops, communes &amp; intentional communities of San Francisco — seeded from <a href="https://www.haightstreetcommons.org" target="_blank" rel="noopener">Haight Street Commons</a>. locations are neighborhood-approximate out of respect for residents.</div>
+      <div class="sub">co-ops, communes &amp; intentional communities of San Francisco — seeded from <a href="https://www.haightstreetcommons.org" target="_blank" rel="noopener">Haight Street Commons</a>. active houses are pinned to the block, not the door; historical addresses are exact. scrub the timeline to visit 1967.</div>
     </header>
     <div id="controls">
       <input id="search" type="search" placeholder="search houses, vibes, neighborhoods…" autocomplete="off">
@@ -235,6 +286,12 @@ header .sub a:hover { text-decoration: underline; }
     <div id="list"></div>
   </aside>
   <div id="map"></div>
+  <div id="timebar">
+    <button id="timeplay" title="Play through time" aria-label="Play">▶</button>
+    <span id="year-label" class="today">today</span>
+    <input id="timeslider" type="range" min="1965" max="2027" step="1" value="2027" aria-label="Year">
+    <span id="era-label">all eras at once</span>
+  </div>
   <div id="detail"></div>
   <div id="toast"></div>
 </div>
@@ -242,7 +299,7 @@ header .sub a:hover { text-decoration: underline; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="data.js"></script>
 <script>
-const VERSION = '1.0.0';
+const VERSION = '1.2.0';
 console.log(`[communes] v${VERSION} - SF Commune Atlas`);
 
 /* ============ setup ============ */
@@ -250,7 +307,7 @@ const map = L.map('map', { zoomControl: true, attributionControl: true })
   .setView([37.7679, -122.4383], 13);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  maxZoom: 19
+  maxZoom: 17 /* capped: pins are block-anonymized, no point zooming to doorsteps */
 }).addTo(map);
 
 const HOUSES = window.COMMUNE_DATA.houses;
@@ -266,15 +323,23 @@ const state = {
   statuses: new Set(['active', 'historical', 'closed', 'unknown']),
   vibe: null,
   selected: null,
+  year: null, // null = "today" mode (all eras, ghosts for the departed)
 };
+
+/* founded/closed with estimates for timeline math */
+function foundedEff(h) { return h.founded || h.foundedEst || 2012; }
+function closedEff(h) {
+  if (h.closedYear) return h.closedYear;
+  if (h.status === 'historical') return foundedEff(h) + 5; // unknown end: assume a 5-year run
+  return null; // still with us
+}
 
 /* ============ markers ============ */
 const markers = {};
 function makeMarker(h) {
-  const hist = h.status !== 'active';
   const icon = L.divIcon({
-    className: `house-marker ${hist ? 'hist' : ''}`,
-    html: `<span class="pin">${h.emoji}</span>`,
+    className: `house-marker st-${h.status}`,
+    html: `<span class="wrap"><span class="pin">${h.emoji}</span><span class="sdot"></span></span>`,
     iconSize: [26, 26],
     iconAnchor: [13, 24],
   });
@@ -285,10 +350,17 @@ function makeMarker(h) {
 HOUSES.forEach(h => { markers[h.id] = makeMarker(h); });
 
 /* ============ filtering ============ */
+function aliveInYear(h, y) {
+  const f = foundedEff(h), c = closedEff(h);
+  return f <= y && (c === null || c >= y);
+}
+
 function visibleHouses() {
   const q = state.q.trim().toLowerCase();
   return HOUSES.filter(h => {
-    if (!state.statuses.has(h.status)) return false;
+    if (state.year !== null) {
+      if (!aliveInYear(h, state.year)) return false;
+    } else if (!state.statuses.has(h.status)) return false;
     if (state.vibe && !h.tags.includes(state.vibe)) return false;
     if (q) {
       const hay = `${h.name} ${h.neighborhood} ${h.vibe} ${h.description} ${h.tags.join(' ')}`.toLowerCase();
@@ -303,16 +375,24 @@ function render() {
   const visIds = new Set(vis.map(h => h.id));
   HOUSES.forEach(h => {
     const m = markers[h.id];
-    if (visIds.has(h.id)) { if (!map.hasLayer(m)) m.addTo(map); }
+    if (visIds.has(h.id)) {
+      if (!map.hasLayer(m)) m.addTo(map);
+      const el = m.getElement();
+      // ghosts only in "today" mode: houses that no longer exist fade to sepia.
+      // while time-traveling, everything alive that year glows in full color.
+      if (el) el.classList.toggle('ghost',
+        state.year === null && (h.status === 'closed' || h.status === 'historical'));
+    }
     else if (map.hasLayer(m)) m.remove();
   });
-  document.getElementById('count').textContent =
-    `${vis.length} of ${HOUSES.length} houses on the map`;
+  document.getElementById('count').textContent = state.year !== null
+    ? `${vis.length} house${vis.length === 1 ? '' : 's'} alive in ${state.year}`
+    : `${vis.length} of ${HOUSES.length} houses on the map`;
   const list = document.getElementById('list');
   list.innerHTML = vis.map(h => `
     <div class="house-card ${state.selected === h.id ? 'selected' : ''}" data-id="${h.id}">
       <div class="top"><span class="emoji">${h.emoji}</span><span class="name">${h.name}</span></div>
-      <div class="meta"><span class="dot ${h.status}"></span>${h.neighborhood}${h.founded ? ` · est. ${h.founded}` : ''}${h.residents ? ` · ~${h.residents} people` : ''}</div>
+      <div class="meta"><span class="dot ${h.status}"></span>${h.neighborhood}${h.founded ? ` · ${h.founded}${h.closedYear ? '–' + h.closedYear : ''}` : ''}${h.residents ? ` · ~${h.residents} people` : ''}</div>
     </div>`).join('');
   list.querySelectorAll('.house-card').forEach(el =>
     el.addEventListener('click', () => select(el.dataset.id, { fly: true })));
@@ -340,13 +420,26 @@ function select(id, { fly }) {
     <div class="d-vibe">${esc(h.vibe)}</div>
     <div class="d-desc">${esc(h.description)}</div>
     <div class="d-facts">
-      ${h.founded ? `<div class="fact"><div class="k">founded</div><div class="v">${h.founded}</div></div>` : ''}
+      ${h.founded ? `<div class="fact"><div class="k">founded</div><div class="v">${h.founded}</div></div>`
+        : (h.foundedEst ? `<div class="fact"><div class="k">founded</div><div class="v">~${h.foundedEst} (est.)</div></div>` : '')}
       ${h.residents ? `<div class="fact"><div class="k">residents</div><div class="v">~${h.residents}</div></div>` : ''}
       ${h.inHSC === 'yes' ? `<div class="fact"><div class="k">network</div><div class="v">Haight St Commons</div></div>` : ''}
+      ${(h.status !== 'active' && h.address) ? `<div class="fact" style="grid-column:1/-1"><div class="k">address</div><div class="v">${esc(h.address)}</div></div>` : ''}
       ${h.funFact ? `<div class="fact" style="grid-column:1/-1"><div class="k">fun fact</div><div class="v">${esc(h.funFact)}</div></div>` : ''}
     </div>
+    ${h.events && h.events.length ? `<div class="d-events"><div class="k">happenings &amp; updates</div>${h.events.map(ev => `
+      <div class="ev">
+        <div class="ev-top">
+          <span class="ev-title">${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">${esc(ev.title)} ↗</a>` : esc(ev.title)}</span>
+          <span class="ev-date">${esc(ev.date)}</span>
+          <span class="ev-kind">${esc(ev.kind)}</span>
+        </div>
+        <div class="ev-detail">${esc(ev.detail)}</div>
+      </div>`).join('')}</div>` : ''}
     ${h.links && h.links.length ? `<div class="d-links">${h.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join('')}</div>` : ''}
-    ${h.coordsApprox ? `<div class="d-approx">📍 location is approximate (neighborhood-level)</div>` : ''}
+    ${h.status === 'active' || h.status === 'unknown'
+      ? `<div class="d-approx">📍 pin anonymized to the block — not an exact address</div>`
+      : (h.address ? '' : `<div class="d-approx">📍 approximate — exact historical address not recorded</div>`)}
   `;
   d.classList.add('open');
   d.querySelector('.close').addEventListener('click', () => {
@@ -401,6 +494,63 @@ document.getElementById('lucky').addEventListener('click', () => {
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+});
+
+/* ============ time machine ============ */
+const TIME_MAX = 2027; // rightmost slider stop = "today" mode
+const ERAS = [
+  [1965, 1966, 'the scene assembles'],
+  [1967, 1967, '☮ the Summer of Love'],
+  [1968, 1969, 'the communal explosion'],
+  [1970, 1974, 'hundreds of communes strong'],
+  [1975, 1979, 'the long comedown'],
+  [1980, 1989, 'survivors & holdouts'],
+  [1990, 1999, 'the quiet decades'],
+  [2000, 2009, 'co-ops regroup'],
+  [2010, 2015, 'hacker houses arrive'],
+  [2016, 2020, 'the commons network forms'],
+  [2021, 2026, 'the new wave'],
+];
+function eraFor(y) {
+  const e = ERAS.find(([a, b]) => y >= a && y <= b);
+  return e ? e[2] : '';
+}
+const slider = document.getElementById('timeslider');
+const yearLabel = document.getElementById('year-label');
+const eraLabel = document.getElementById('era-label');
+const playBtn = document.getElementById('timeplay');
+
+function setYear(v) {
+  if (v >= TIME_MAX) {
+    state.year = null;
+    yearLabel.textContent = 'today';
+    yearLabel.classList.add('today');
+    eraLabel.textContent = 'all eras at once';
+  } else {
+    state.year = v;
+    yearLabel.textContent = v;
+    yearLabel.classList.remove('today');
+    eraLabel.textContent = eraFor(v);
+  }
+  render();
+}
+slider.addEventListener('input', () => { stopPlay(); setYear(+slider.value); });
+
+let playTimer = null;
+function stopPlay() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; playBtn.textContent = '▶'; }
+}
+playBtn.addEventListener('click', () => {
+  if (playTimer) { stopPlay(); return; }
+  let y = state.year === null || state.year >= 2026 ? 1965 : state.year;
+  playBtn.textContent = '⏸';
+  slider.value = y; setYear(y);
+  playTimer = setInterval(() => {
+    y += 1;
+    slider.value = y;
+    setYear(y >= TIME_MAX ? TIME_MAX : y);
+    if (y >= TIME_MAX) stopPlay();
+  }, 350);
 });
 
 /* ============ search + mobile ============ */
