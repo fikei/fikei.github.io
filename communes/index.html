@@ -280,6 +280,7 @@ header .sub a:hover { text-decoration: underline; }
     <div id="controls">
       <input id="search" type="search" placeholder="search houses, vibes, neighborhoods…" autocomplete="off">
       <div class="chip-row" id="status-chips"></div>
+      <div class="chip-row" id="kind-chips"></div>
       <div class="chip-row" id="vibe-chips"></div>
       <button id="lucky">⚂ take me somewhere</button>
     </div>
@@ -300,7 +301,7 @@ header .sub a:hover { text-decoration: underline; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="data.js"></script>
 <script>
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 console.log(`[communes] v${VERSION} - SF Commune Atlas`);
 
 /* ============ setup ============ */
@@ -325,7 +326,14 @@ const state = {
   vibe: null,
   selected: null,
   year: null, // null = "today" mode (all eras, ghosts for the departed)
+  kinds: new Set(['commune', 'coop', 'cohousing']),
 };
+const KIND_META = {
+  commune:   { label: '🏠 communes' },
+  coop:      { label: '🏢 housing co-ops' },
+  cohousing: { label: '🏘️ cohousing' },
+};
+function kindOf(h) { return h.kind || 'commune'; }
 
 /* founded/closed with estimates for timeline math */
 function foundedEff(h) { return h.founded || h.foundedEst || 2012; }
@@ -362,6 +370,7 @@ function visibleHouses() {
     if (state.year !== null) {
       if (!aliveInYear(h, state.year)) return false;
     } else if (!state.statuses.has(h.status)) return false;
+    if (!state.kinds.has(kindOf(h))) return false;
     if (state.vibe && !h.tags.includes(state.vibe)) return false;
     if (q) {
       const hay = `${h.name} ${h.neighborhood} ${h.vibe} ${h.description} ${h.tags.join(' ')}`.toLowerCase();
@@ -425,6 +434,7 @@ function select(id, { fly }) {
         : (h.foundedEst ? `<div class="fact"><div class="k">founded</div><div class="v">~${h.foundedEst} (est.)</div></div>` : '')}
       ${h.residents ? `<div class="fact"><div class="k">residents</div><div class="v">~${h.residents}</div></div>` : ''}
       ${h.inHSC === 'yes' ? `<div class="fact"><div class="k">network</div><div class="v">Haight St Commons</div></div>` : ''}
+      ${kindOf(h) !== 'commune' ? `<div class="fact"><div class="k">type</div><div class="v">${kindOf(h) === 'coop' ? 'housing co-op' : 'cohousing'}</div></div>` : ''}
       ${(h.status !== 'active' && h.address) ? `<div class="fact" style="grid-column:1/-1"><div class="k">address</div><div class="v">${esc(h.address)}</div></div>` : ''}
       ${h.funFact ? `<div class="fact" style="grid-column:1/-1"><div class="k">fun fact</div><div class="v">${esc(h.funFact)}</div></div>` : ''}
     </div>
@@ -462,6 +472,19 @@ function buildChips() {
     else { state.statuses.add(s); el.classList.add('on'); }
     render();
   }));
+
+  const kc = document.getElementById('kind-chips');
+  const kindsPresent = Object.keys(KIND_META).filter(k => HOUSES.some(h => kindOf(h) === k));
+  if (kindsPresent.length > 1) {
+    kc.innerHTML = kindsPresent.map(k =>
+      `<span class="chip on" data-kind="${k}">${KIND_META[k].label} (${HOUSES.filter(h => kindOf(h) === k).length})</span>`).join('');
+    kc.querySelectorAll('.chip').forEach(el => el.addEventListener('click', () => {
+      const k = el.dataset.kind;
+      if (state.kinds.has(k)) { state.kinds.delete(k); el.classList.remove('on'); }
+      else { state.kinds.add(k); el.classList.add('on'); }
+      render();
+    }));
+  }
 
   const tagCounts = {};
   HOUSES.forEach(h => h.tags.forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
