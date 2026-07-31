@@ -1053,6 +1053,28 @@ serve(async (req) => {
     const pathname = new URL(req.url).pathname
     if (pathname.endsWith('/redeem')) return await handleRedeem(req)
     if (pathname.endsWith('/signin-post')) return await handleSigninPost(req)
+    // Send ONE named person a sign-in link. Deliberately one-at-a-time: the
+    // bulk sweep DM'd the house unasked once, and never should again.
+    if (pathname.endsWith('/signin-dm')) {
+      const client = db()
+      const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: u } = await client.auth.getUser(tok)
+      if (!u?.user) return json({ error: 'Not authenticated' }, 401)
+      const { data: adm } = await client.from('recruit_admins').select('user_id').eq('user_id', u.user.id).maybeSingle()
+      if (!adm) return json({ error: 'Admins only' }, 403)
+      const b = await req.json().catch(() => ({}))
+      const did = String(b.discordUserId || '')
+      if (!/^\d{5,25}$/.test(did)) return json({ error: 'discordUserId required' }, 400)
+      const url = await mintSigninUrl(did, b.username ? String(b.username) : null)
+      if (!url) return json({ error: 'could not mint link' }, 500)
+      const { dmUser } = await import('../_shared/discord.ts')
+      await dmUser(did,
+        `🔑 Sign-in link for the Agape applicant inbox:\n${url}\n` +
+        `Works once, for 10 minutes. Opens signed in — no password, and it works ` +
+        `inside Instagram or Discord's own browser, where the normal sign-in fails.`)
+      return json({ sent: true, discordUserId: did })
+    }
+
     if (pathname.endsWith('/message-delete')) {
       const client = db()
       const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
