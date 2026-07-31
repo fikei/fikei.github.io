@@ -98,6 +98,7 @@ supabase link --project-ref yfhudwakpgzswiylhfbh
 supabase functions deploy enrich-link
 supabase functions deploy generate-widget
 supabase functions deploy categorize
+supabase functions deploy analytics-dashboard   # owner-only aggregates for /analytics
 
 # Recruiting (Agape) functions — Boards project
 supabase functions deploy recruit-gmail
