@@ -15,11 +15,12 @@
 //     For a Fillout/Apps Script webhook when seconds matter.
 //   dryRun: true on either reports the mapping and writes nothing.
 //
-// Idempotent: the row's id is derived from the applicant's name + submission
-// timestamp, and inserts ignore duplicates — so resending the whole sheet is
-// a safe backfill, not a mess of copies.
+// Idempotent: rows dedupe by EMAIL before insert, so resending the whole
+// sheet is a safe backfill, not a mess of copies. Ids are normalized name
+// slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
+// stable uuid from the DB default (migration 159).
 
-const VERSION = '1.4.0'
+const VERSION = '1.5.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -117,13 +118,23 @@ function mapRow(row: Record<string, unknown>): Record<string, string> {
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 48)
 
-// Same id shape the original import produced: name-slug + YYYYMMDDHHMMSS,
-// so a row ingested here can never duplicate one already in the table.
-function deriveId(first: string, last: string, submittedAt: Date): string {
-  const p = (n: number, w = 2) => String(n).padStart(w, '0')
-  const stamp = `${submittedAt.getFullYear()}${p(submittedAt.getMonth() + 1)}${p(submittedAt.getDate())}` +
-    `${p(submittedAt.getHours())}${p(submittedAt.getMinutes())}${p(submittedAt.getSeconds())}`
-  return `${slug([first, last].filter(Boolean).join(' ')) || 'applicant'}-${stamp}`
+// Human-readable id: "jane-doe", numbered "jane-doe-2", "-3"… only when a
+// name genuinely repeats. Checked against the table plus ids minted earlier
+// in this batch; legacy "<slug>-YYYYMMDDHHMMSS" ids can't collide with the
+// numbered form. Deduping is by email (below), so ids don't need to be
+// deterministic across re-ingests. Every row also carries a stable `uuid`
+// (migration 159, DB default) that survives any future id cleanup.
+// deno-lint-ignore no-explicit-any
+async function deriveId(client: any, first: string, last: string, used: Set<string>): Promise<string> {
+  const base = slug([first, last].filter(Boolean).join(' ')) || 'applicant'
+  const { data } = await client.from('recruit_applicants')
+    .select('id').or(`id.eq.${base},id.like.${base}-%`)
+  const taken = new Set<string>([...((data || []) as Array<{ id: string }>).map((r) => r.id), ...used])
+  if (!taken.has(base)) { used.add(base); return base }
+  for (let n = 2; ; n++) {
+    const cand = `${base}-${n}`
+    if (!taken.has(cand)) { used.add(cand); return cand }
+  }
 }
 
 serve(async (req) => {
@@ -334,7 +345,8 @@ serve(async (req) => {
       const when = m.submitted_at ? new Date(m.submitted_at) : new Date()
       const submittedAt = isNaN(when.getTime()) ? new Date() : when
       prepared.push({
-        id: deriveId(m.first_name, m.last_name || '', submittedAt),
+        // id assigned after the email dedupe below, so numbering is only
+        // consumed by rows that actually insert.
         submitted_at: submittedAt.toISOString(),
         first_name: m.first_name, last_name: m.last_name || '',
         pronouns: m.pronouns || '', email: m.email, social: m.social || '',
@@ -359,12 +371,16 @@ serve(async (req) => {
     }
     const { data: existing } = await client.from('recruit_applicants').select('id, email')
     const knownEmails = new Set((existing || []).map((e) => String(e.email || '').toLowerCase()))
-    const knownIds = new Set((existing || []).map((e) => e.id))
     const fresh: Array<Record<string, string>> = []
     for (const r of byEmail.values()) {
       if (knownEmails.has(r.email.toLowerCase())) { skipped.push(`already an applicant: ${r.email}`); continue }
-      if (knownIds.has(r.id)) { skipped.push(`already an applicant (id): ${r.id}`); continue }
       fresh.push(r)
+    }
+    // Ids only for rows that will actually insert — normalized name slugs,
+    // numbered on duplicate names.
+    const usedIds = new Set<string>()
+    for (const r of fresh) {
+      r.id = await deriveId(client, r.first_name, r.last_name || '', usedIds)
     }
 
     if (dryRun) {
