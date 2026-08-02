@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.62.0';
+const VERSION = '3.63.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5735,7 +5735,21 @@ async function _checkMembershipAndEnter() {
     render();
     if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
     const deep = new URLSearchParams(location.search).get('a');
-    if (deep && applicants.some(x => x.id === deep)) openReview(deep);
+    if (deep) {
+      // Exact id first; then the short name form for legacy timestamp ids
+      // (?a=jane-doe finds jane-doe-20260101120000 — newest wins if the name
+      // repeats); then the stable uuid (migration 159).
+      let hit = applicants.find(x => x.id === deep);
+      if (!hit) {
+        hit = applicants
+          .filter(x => x.id.replace(/-\d{14}$/, '') === deep)
+          .sort((a, b) => b.id.localeCompare(a.id))[0];
+      }
+      if (!hit && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(deep)) {
+        hit = applicants.find(x => x.uuid === deep);
+      }
+      if (hit) openReview(hit.id);
+    }
     const linkEv = new URLSearchParams(location.search).get('link');
     if (linkEv) openLinkRecording(linkEv);
   } catch (e) {
