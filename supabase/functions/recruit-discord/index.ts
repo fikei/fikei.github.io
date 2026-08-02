@@ -262,6 +262,11 @@ const SIGNIN_TTL_MS = 10 * 60_000
 const APP_URL = 'https://ctrl.rodeo/applications/'
 // Shadow email for members who've never OAuth'd on desktop; deterministic so
 // repeat sign-ins land on the same account.
+// Jump link to the pinned sign-in message, so "get another link" is a tap
+// rather than an instruction to go and find something.
+const SIGNIN_MESSAGE_URL = Deno.env.get('SIGNIN_MESSAGE_URL')
+  || 'https://discord.com/channels/952961396121931838/1529576830514762029/1532462592872808539'
+
 const shadowEmail = (discordUserId: string) => `discord-${discordUserId}@signin.ctrl.rodeo`
 
 async function sha256Hex(s: string): Promise<string> {
@@ -353,7 +358,12 @@ async function handleRedeem(req: Request): Promise<Response> {
     .eq('token_hash', await sha256Hex(token)).is('used_at', null)
     .gte('created_at', new Date(Date.now() - SIGNIN_TTL_MS).toISOString())
     .select().maybeSingle()
-  if (!row) return json({ error: 'Link expired or already used — get a fresh one from the Discord button.' }, 401)
+  if (!row) {
+    return json({
+      error: 'This link already expired or was used. Grab a fresh one — it takes a second.',
+      rerequestUrl: SIGNIN_MESSAGE_URL,
+    }, 401)
+  }
 
   // Prefer the member's existing account (from a past desktop OAuth sign-in).
   const { data: membership } = await client.from('user_discord_membership')
@@ -1065,13 +1075,23 @@ serve(async (req) => {
       const b = await req.json().catch(() => ({}))
       const did = String(b.discordUserId || '')
       if (!/^\d{5,25}$/.test(did)) return json({ error: 'discordUserId required' }, 400)
+      const { dmUser } = await import('../_shared/discord.ts')
+      // mode 'pointer' tells someone where to self-serve, without minting a
+      // token that will have expired by the time they read the message.
+      if (b.mode === 'pointer') {
+        await dmUser(did,
+          `Need another sign-in link? Tap here any time: ${SIGNIN_MESSAGE_URL}\n` +
+          `That message has a **Get sign-in link** button — each link works once, for 10 minutes. ` +
+          `Typing \`/signin\` in the server does the same thing.`)
+        return json({ sent: true, mode: 'pointer', discordUserId: did })
+      }
       const url = await mintSigninUrl(did, b.username ? String(b.username) : null)
       if (!url) return json({ error: 'could not mint link' }, 500)
-      const { dmUser } = await import('../_shared/discord.ts')
       await dmUser(did,
         `🔑 Sign-in link for the Agape applicant inbox:\n${url}\n` +
         `Works once, for 10 minutes. Opens signed in — no password, and it works ` +
-        `inside Instagram or Discord's own browser, where the normal sign-in fails.`)
+        `inside Instagram or Discord's own browser, where the normal sign-in fails.\n` +
+        `Expired? Get another here: ${SIGNIN_MESSAGE_URL}`)
       return json({ sent: true, discordUserId: did })
     }
 
