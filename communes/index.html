@@ -99,6 +99,30 @@ header .sub a:hover { text-decoration: underline; }
 }
 #lucky:hover { transform: rotate(-2deg) scale(1.04); }
 #lucky:active { transform: scale(.96); }
+#viewbtns { position: absolute; top: 56px; left: 392px; z-index: 1001; display: flex; gap: 4px; }
+#viewbtns button {
+  background: rgba(17,17,17,.92); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--mono); font-size: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer;
+}
+#viewbtns button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- filter chip bar over the map ---------- */
+#chipbar {
+  position: absolute; top: 12px; left: 392px; right: 12px; z-index: 1001;
+  display: flex; gap: 6px; align-items: center;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+#chipbar::-webkit-scrollbar { display: none; }
+#chipbar .chip { background: rgba(17,17,17,.92); flex: none; backdrop-filter: blur(4px); }
+#chipbar .chip.on { background: rgba(255, 209, 102, .14); }
+#chipbar .chip.on.c-active { background: rgba(110, 231, 160, .14); }
+#chipbar .chip.on.c-historical { background: rgba(180, 140, 242, .14); }
+#chipbar .chip.on.c-closed { background: rgba(242, 122, 122, .14); }
+.chip-sep { width: 1px; align-self: stretch; background: var(--border); flex: none; margin: 3px 3px; }
+@media (max-width: 760px) {
+  #chipbar { top: 64px; left: 8px; right: 8px; }
+  #viewbtns { top: 102px; left: 8px; }
+}
 
 /* ---------- house list ---------- */
 #count { padding: 8px 18px 0; font-size: 10px; color: var(--muted); }
@@ -279,15 +303,18 @@ header .sub a:hover { text-decoration: underline; }
     </header>
     <div id="controls">
       <input id="search" type="search" placeholder="search houses, vibes, neighborhoods…" autocomplete="off">
-      <div class="chip-row" id="status-chips"></div>
-      <div class="chip-row" id="kind-chips"></div>
-      <div class="chip-row" id="vibe-chips"></div>
       <button id="lucky">⚂ take me somewhere</button>
     </div>
     <div id="count"></div>
     <div id="list"></div>
   </aside>
   <div id="map"></div>
+  <div id="chipbar"></div>
+  <div id="viewbtns">
+    <button id="view-sf" title="Back to San Francisco">SF</button>
+    <button id="view-all" title="Fit every house on screen">⤢ all</button>
+    <button id="view-eastbay" title="Oakland & Berkeley houses">🌉 east bay</button>
+  </div>
   <div id="timebar">
     <button id="timeplay" title="Play through time" aria-label="Play">▶</button>
     <span id="year-label" class="today">today</span>
@@ -299,14 +326,15 @@ header .sub a:hover { text-decoration: underline; }
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="data.js"></script>
+<script src="data.js?v=1.5.0"></script>
 <script>
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 console.log(`[communes] v${VERSION} - SF Commune Atlas`);
 
 /* ============ setup ============ */
-const map = L.map('map', { zoomControl: true, attributionControl: true })
+const map = L.map('map', { zoomControl: false, attributionControl: true })
   .setView([37.7679, -122.4383], 13);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
   maxZoom: 17 /* capped: pins are block-anonymized, no point zooming to doorsteps */
@@ -320,13 +348,16 @@ const STATUS_META = {
   unknown:    { label: 'unknown',    cls: '' },
 };
 
+/* Filter semantics: an EMPTY set means "show everything" (the Google Maps /
+   Airbnb chip convention). Tapping a chip narrows to it; tapping more ORs
+   them in; tapping an active chip releases it. */
 const state = {
   q: '',
-  statuses: new Set(['active', 'historical', 'closed', 'unknown']),
+  statuses: new Set(),
   vibe: null,
   selected: null,
   year: null, // null = "today" mode (all eras, ghosts for the departed)
-  kinds: new Set(['commune', 'coop', 'cohousing']),
+  kinds: new Set(),
 };
 const KIND_META = {
   commune:   { label: '🏠 communes' },
@@ -367,10 +398,9 @@ function aliveInYear(h, y) {
 function visibleHouses() {
   const q = state.q.trim().toLowerCase();
   return HOUSES.filter(h => {
-    if (state.year !== null) {
-      if (!aliveInYear(h, state.year)) return false;
-    } else if (!state.statuses.has(h.status)) return false;
-    if (!state.kinds.has(kindOf(h))) return false;
+    if (state.year !== null && !aliveInYear(h, state.year)) return false;
+    if (state.statuses.size && !state.statuses.has(h.status)) return false;
+    if (state.kinds.size && !state.kinds.has(kindOf(h))) return false;
     if (state.vibe && !h.tags.includes(state.vibe)) return false;
     if (q) {
       const hay = `${h.name} ${h.neighborhood} ${h.vibe} ${h.description} ${h.tags.join(' ')}`.toLowerCase();
@@ -448,8 +478,8 @@ function select(id, { fly }) {
         <div class="ev-detail">${esc(ev.detail)}</div>
       </div>`).join('')}</div>` : ''}
     ${h.links && h.links.length ? `<div class="d-links">${h.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join('')}</div>` : ''}
-    ${h.status === 'active' || h.status === 'unknown'
-      ? `<div class="d-approx">📍 pin anonymized to the block — not an exact address</div>`
+    ${(h.status === 'active' || h.status === 'unknown')
+      ? (h.coordsApprox ? `<div class="d-approx">📍 pin anonymized to the block — not an exact address</div>` : '')
       : (h.address ? '' : `<div class="d-approx">📍 approximate — exact historical address not recorded</div>`)}
   `;
   d.classList.add('open');
@@ -461,42 +491,43 @@ function select(id, { fly }) {
   render();
 }
 
-/* ============ chips ============ */
+/* ============ chip bar (over the map) ============
+   Nothing selected = everything shown. Tap to narrow, tap again to release. */
 function buildChips() {
-  const sc = document.getElementById('status-chips');
-  sc.innerHTML = Object.entries(STATUS_META).map(([k, v]) =>
-    `<span class="chip on ${v.cls}" data-status="${k}">● ${v.label} (${HOUSES.filter(h => h.status === k).length})</span>`).join('');
-  sc.querySelectorAll('.chip').forEach(el => el.addEventListener('click', () => {
+  const bar = document.getElementById('chipbar');
+  const kindsPresent = Object.keys(KIND_META).filter(k => HOUSES.some(h => kindOf(h) === k));
+  const tagCounts = {};
+  HOUSES.forEach(h => h.tags.forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+  const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
+
+  bar.innerHTML = [
+    Object.entries(STATUS_META).map(([k, v]) =>
+      `<span class="chip ${v.cls}" data-status="${k}">● ${v.label} (${HOUSES.filter(h => h.status === k).length})</span>`).join(''),
+    '<span class="chip-sep"></span>',
+    kindsPresent.map(k =>
+      `<span class="chip" data-kind="${k}">${KIND_META[k].label} (${HOUSES.filter(h => kindOf(h) === k).length})</span>`).join(''),
+    '<span class="chip-sep"></span>',
+    topTags.map(t => `<span class="chip" data-tag="${t}">${t}</span>`).join(''),
+  ].join('');
+
+  bar.querySelectorAll('.chip[data-status]').forEach(el => el.addEventListener('click', () => {
     const s = el.dataset.status;
     if (state.statuses.has(s)) { state.statuses.delete(s); el.classList.remove('on'); }
     else { state.statuses.add(s); el.classList.add('on'); }
     render();
   }));
-
-  const kc = document.getElementById('kind-chips');
-  const kindsPresent = Object.keys(KIND_META).filter(k => HOUSES.some(h => kindOf(h) === k));
-  if (kindsPresent.length > 1) {
-    kc.innerHTML = kindsPresent.map(k =>
-      `<span class="chip on" data-kind="${k}">${KIND_META[k].label} (${HOUSES.filter(h => kindOf(h) === k).length})</span>`).join('');
-    kc.querySelectorAll('.chip').forEach(el => el.addEventListener('click', () => {
-      const k = el.dataset.kind;
-      if (state.kinds.has(k)) { state.kinds.delete(k); el.classList.remove('on'); }
-      else { state.kinds.add(k); el.classList.add('on'); }
-      render();
-    }));
-  }
-
-  const tagCounts = {};
-  HOUSES.forEach(h => h.tags.forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
-  const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
-  const vc = document.getElementById('vibe-chips');
-  vc.innerHTML = topTags.map(t => `<span class="chip" data-tag="${t}">${t}</span>`).join('');
-  vc.querySelectorAll('.chip').forEach(el => el.addEventListener('click', () => {
+  bar.querySelectorAll('.chip[data-kind]').forEach(el => el.addEventListener('click', () => {
+    const k = el.dataset.kind;
+    if (state.kinds.has(k)) { state.kinds.delete(k); el.classList.remove('on'); }
+    else { state.kinds.add(k); el.classList.add('on'); }
+    render();
+  }));
+  bar.querySelectorAll('.chip[data-tag]').forEach(el => el.addEventListener('click', () => {
     const t = el.dataset.tag;
     if (state.vibe === t) { state.vibe = null; el.classList.remove('on'); }
     else {
       state.vibe = t;
-      vc.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+      bar.querySelectorAll('.chip[data-tag]').forEach(x => x.classList.remove('on'));
       el.classList.add('on');
     }
     render();
@@ -577,6 +608,20 @@ playBtn.addEventListener('click', () => {
   }, 350);
 });
 
+/* ============ view buttons ============ */
+document.getElementById('view-sf').addEventListener('click', () =>
+  map.flyTo([37.7679, -122.4383], 13, { duration: 0.8 }));
+document.getElementById('view-all').addEventListener('click', () => {
+  const vis = visibleHouses();
+  if (vis.length) map.flyToBounds(L.latLngBounds(vis.map(h => [h.lat, h.lng])).pad(0.06), { duration: 0.9 });
+});
+document.getElementById('view-eastbay').addEventListener('click', () => {
+  const eb = visibleHouses().filter(h => h.lng > -122.35);
+  const b = eb.length ? L.latLngBounds(eb.map(h => [h.lat, h.lng])).pad(0.15)
+                      : L.latLngBounds([[37.75, -122.32], [37.89, -122.22]]);
+  map.flyToBounds(b, { duration: 0.9 });
+});
+
 /* ============ search + mobile ============ */
 document.getElementById('search').addEventListener('input', e => {
   state.q = e.target.value;
@@ -588,6 +633,10 @@ document.getElementById('mobile-toggle').addEventListener('click', () =>
 /* ============ go ============ */
 buildChips();
 render();
+
+/* deep link: /communes/?house=<id> opens that house's card */
+const deepId = new URLSearchParams(location.search).get('house');
+if (deepId && HOUSES.some(h => h.id === deepId)) select(deepId, { fly: true });
 </script>
 </body>
 </html>
