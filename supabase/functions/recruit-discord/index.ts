@@ -369,7 +369,12 @@ async function handleSigninButton(interaction: Record<string, any>): Promise<Res
 
   const url = await mintSigninUrl(discordUserId, discordUsername)
   if (!url) return json(ephemeral('Could not mint a link — try again in a minute.'))
-  await logAuth(db(), 'link_sent', { discordUserId, discordUsername, channel: interaction.type === 2 ? 'slash' : 'button' }, true)
+  // Discord discards an interaction that takes more than 3 seconds, and
+  // logAuth posts to a channel — never make the reply wait on it.
+  const logging = logAuth(db(), 'link_sent',
+    { discordUserId, discordUsername, channel: interaction.type === 2 ? 'slash' : 'button' }, true)
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(logging)
+  else logging.catch(() => {})
 
   return json(ephemeral(`🔑 ${url}\nOpens the inbox signed in. Works once, for 10 minutes.`))
 }
@@ -401,6 +406,11 @@ async function registerCommands(): Promise<Record<string, unknown>> {
   return {
     registered: Array.isArray(out) ? out.map((c: Record<string, unknown>) => c.name) : out,
     guildId, appId: app.id, appName: app.name, authorizeUrl,
+    // Without this set, Discord has nowhere to deliver a button press or a
+    // slash command, and both fail silently — which looks identical to a
+    // missing scope from the outside.
+    interactionsEndpointUrl: app.interactions_endpoint_url || null,
+    expectedEndpointUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/recruit-discord`,
   }
 }
 
@@ -1204,18 +1214,25 @@ serve(async (req) => {
     }
     const interaction = JSON.parse(body)
     if (interaction.type === 1) return json(PONG)
-    // Slash command — /signin works anywhere in the guild, including a DM
-    // with the bot, so there is no message to find.
-    if (interaction.type === 2) {
-      if (String(interaction.data?.name || '') === 'signin') return await handleSigninButton(interaction)
-      return json(ephemeral('Unknown command.'))
+    // Anything thrown past here would reach the user as Discord's opaque
+    // "the application did not respond". Answer with words instead.
+    try {
+      // Slash command — /signin works anywhere in the guild, including a DM
+      // with the bot, so there is no message to find.
+      if (interaction.type === 2) {
+        if (String(interaction.data?.name || '') === 'signin') return await handleSigninButton(interaction)
+        return json(ephemeral('Unknown command.'))
+      }
+      if (interaction.type === 3) {
+        if (String(interaction.data?.custom_id || '') === 'signin') return await handleSigninButton(interaction)
+        if (String(interaction.data?.custom_id || '').startsWith('guide|')) return await handleGuideButton(interaction)
+        return await handleClaim(interaction)
+      }
+      return json(ephemeral('Unsupported interaction.'))
+    } catch (err) {
+      console.error('[recruit-discord] interaction failed:', (err as Error).message)
+      return json(ephemeral(`Something broke on our side: ${(err as Error).message.slice(0, 140)}`))
     }
-    if (interaction.type === 3) {
-      if (String(interaction.data?.custom_id || '') === 'signin') return await handleSigninButton(interaction)
-      if (String(interaction.data?.custom_id || '').startsWith('guide|')) return await handleGuideButton(interaction)
-      return await handleClaim(interaction)
-    }
-    return json(ephemeral('Unsupported interaction.'))
   } catch (err) {
     console.error('[recruit-discord] error:', (err as Error).message)
     return json({ error: (err as Error).message }, 500)
