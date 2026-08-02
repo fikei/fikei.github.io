@@ -1,4 +1,4 @@
-// SF Commune Atlas — dataset v1.4.0
+// SF Commune Atlas — dataset v1.5.0
 // Compiled 2026-07-31 from haight-st-commons.org, supernuclear.substack.com, ic.org,
 // SF Standard, SFist, Wikipedia, FoundSF, OutHistory, diggers.org, The Bold Italic,
 // KQED, house websites & era press.
@@ -102,12 +102,13 @@ window.COMMUNE_DATA = {
     {
       id: 'template', name: 'Template House', emoji: '✊',
       neighborhood: 'Lower Haight', lat: 37.773, lng: -122.427, coordsApprox: true,
-      residents: 5, foundedEst: 2020, status: 'active', inHSC: 'yes',
+      residents: 5, founded: 2019, status: 'active', inHSC: 'yes',
       vibe: 'second chances & solidarity',
       tags: ['justice'],
-      description: 'Five residents exploring co-creation and solidarity in a substance- and weapon-free space. Home of the Second Life community for formerly incarcerated people, with a semi-public community living room that hosts "Revolution Sunday."',
+      description: 'A community-owned 4-unit mixed-use building (founded December 2019) — home of the Second Life community for formerly incarcerated people, with a garden, redwood deck, fish pond, and a semi-public living room that hosts "Revolution Sunday." Now transitioning to community land trust ownership; Supernuclear called it the most inspiring coliving example in SF.',
       links: [
         { label: 'second life project', url: 'https://www.secondlifeproject.net/spaces' },
+        { label: 'supernuclear case study', url: 'https://supernuclear.substack.com/p/case-study-template-house' },
       ],
     },
     {
@@ -837,6 +838,60 @@ window.COMMUNE_DATA = {
       description: 'A compact Fruitvale cohousing community of roughly eight households sharing meals, decisions, and a courtyard — part of the East Bay\'s quiet second wave of resident-built cohousing.',
       links: [
         { label: 'cohousing directory', url: 'https://www.cohousing.org/directory/kingfisher-cohousing/' },
+      ],
+    },
+
+    {
+      id: 'thefold', name: 'The Fold', emoji: '🌯',
+      neighborhood: 'Mission', address: '3359 26th St',
+      lat: 37.7493, lng: -122.4177, coordsApprox: false,
+      residents: null, foundedEst: 2024, status: 'active', inHSC: 'no',
+      vibe: 'residence / cultural think tank',
+      tags: ['art', 'events', 'community space'],
+      description: 'A 6,000 sq ft two-floor industrial space in the Mission — the former Laundry gallery reborn as a residence, café, and cultural hub with a Moroccan mezzanine, rotating art installations, and a busy public events calendar. (Public venue, so the pin is exact.)',
+      events: [
+        { title: 'Public events calendar', date: 'ongoing', kind: 'event', detail: 'Workshops, pop-ups, and small concerts — full calendar on Luma.', url: 'https://luma.com/calendar/cal-c8NaXU0kb1q43Bb' },
+      ],
+      links: [
+        { label: 'instagram', url: 'https://www.instagram.com/thefoldsf/' },
+        { label: 'luma calendar', url: 'https://luma.com/calendar/cal-c8NaXU0kb1q43Bb' },
+      ],
+    },
+
+    {
+      id: 'bauhaus', name: 'Bauhaus', emoji: '📐',
+      neighborhood: 'West Oakland', lat: 37.810, lng: -122.290, coordsApprox: true,
+      residents: 5, founded: 2015, status: 'active', inHSC: 'no',
+      vibe: 'semi-intentional, deliberately unhyped',
+      tags: ['events'],
+      description: 'The top floor of a West Oakland Victorian duplex running quietly since 2015 — deliberately not ideology-first: honest communication, consensus-seeking meetings, a guarantor-based chore system, and 25 residents housed over the years at a defiantly reasonable rent.',
+      funFact: 'Their Supernuclear case study is a love letter to being a normal, good house.',
+      links: [
+        { label: 'supernuclear case study', url: 'https://supernuclear.substack.com/p/case-study-the-story-of-bauhaus' },
+      ],
+    },
+    {
+      id: 'chaletcottage', name: 'The Chalet & the Cottage', emoji: '🏔',
+      neighborhood: 'Berkeley flatlands', lat: 37.870, lng: -122.290, coordsApprox: true,
+      residents: 3, founded: 2024, status: 'active', inHSC: 'no',
+      vibe: 'three friends, one deed',
+      tags: ['family'],
+      description: 'Three friends — no tech salaries, no family money — co-bought a 720 sq ft house and its 450 sq ft backyard cottage as tenants-in-common in May 2024, with a real legal agreement covering everything from cost splits to breakups. The small, replicable end of the friend-compound spectrum.',
+      funFact: 'A legal easement lets neighbors walk through for the annual jazz festival; they kept it, happily.',
+      links: [
+        { label: 'supernuclear case study', url: 'https://supernuclear.substack.com/p/case-study-the-chalet-and-the-cottage' },
+      ],
+    },
+    {
+      id: 'dhammapad', name: 'The Dhamma Pad', emoji: '🧘‍♂️',
+      neighborhood: 'Central Berkeley', lat: 37.866, lng: -122.262, coordsApprox: true,
+      residents: 8, founded: 2012, closedYear: 2018, status: 'closed', inHSC: 'no',
+      vibe: 'a house that was also a sangha',
+      tags: ['spiritual', 'wellness'],
+      description: 'A six-bedroom Berkeley house (2012–2018) that doubled as an urban meditation center: two meditation rooms, twice-weekly group sits with vegetarian dinners, and community gatherings of 50–100. Original entry requirement: a completed 10-day Vipassana retreat.',
+      funFact: '"We created a community and a whole world around meditation" — their own epitaph, in Supernuclear.',
+      links: [
+        { label: 'supernuclear case study', url: 'https://supernuclear.substack.com/p/case-study-the-dhamma-pad' },
       ],
     },
 
