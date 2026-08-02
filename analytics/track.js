@@ -7,7 +7,7 @@
  */
 (function () {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
   var ENDPOINT = SUPABASE_URL + '/rest/v1/analytics_events';
@@ -28,6 +28,19 @@
         sessionStorage.setItem('ctrl-analytics-sid', id);
       }
       return id;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Signed-in Supabase user, read from the shared CtrlAuth session storage.
+  function userId() {
+    try {
+      var raw = localStorage.getItem('sb-yfhudwakpgzswiylhfbh-auth-token');
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      var id = parsed && parsed.user && parsed.user.id;
+      return (typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)) ? id : null;
     } catch (e) {
       return null;
     }
@@ -61,6 +74,7 @@
       path: (location.pathname + location.search).slice(0, 512),
       referrer: (document.referrer || '').slice(0, 512) || null,
       session_id: sessionId(),
+      user_id: userId(),
       viewport: window.innerWidth + 'x' + window.innerHeight,
       ua: (navigator.userAgent || '').slice(0, 512)
     };

@@ -33,13 +33,24 @@
     .gate__sub { color: var(--fg-muted); margin: 0; max-width: 360px; line-height: 1.6; }
 
     /* Header */
-    .head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-6); }
+    .head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
     .head__title { font-family: var(--font-display); font-size: 22px; margin: 0; }
     .head__meta { color: var(--fg-subtle); font-size: var(--text-xs); }
     .head__actions { display: flex; gap: var(--space-2); align-items: center; }
 
+    /* Tabs */
+    .tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--border-subtle); margin-bottom: var(--space-6); overflow-x: auto; }
+    .tab {
+      appearance: none; background: none; border: 0; color: var(--fg-muted);
+      font: inherit; font-size: var(--text-sm); padding: var(--space-2) var(--space-3);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+    }
+    .tab:hover { color: var(--fg); }
+    .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+    .tab__badge { color: var(--color-error); margin-left: var(--space-1); }
+
     /* Filter row */
-    .filters { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); }
+    .filters { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); align-items: center; }
     .range-btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 
     /* Stat tiles */
@@ -91,6 +102,23 @@
     .err-row { cursor: pointer; }
     .table-scroll { overflow-x: auto; }
 
+    /* People (accounts tab) */
+    .person { border: 1px solid var(--border-subtle); background: var(--bg-surface); margin-bottom: var(--space-2); }
+    .person__head {
+      display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+      padding: var(--space-3) var(--space-4); cursor: pointer;
+    }
+    .person__head:hover { background: var(--bg-elevated); }
+    .person__email { font-weight: 600; }
+    .person__meta { color: var(--fg-muted); font-size: var(--text-xs); }
+    .person__spacer { flex: 1; }
+    .person__last { color: var(--fg-subtle); font-size: var(--text-xs); }
+    .person__body { display: none; border-top: 1px solid var(--border-subtle); padding: var(--space-3) var(--space-4); }
+    .person.is-open .person__body { display: block; }
+    .person__facts { display: flex; gap: var(--space-4); flex-wrap: wrap; color: var(--fg-muted); font-size: var(--text-xs); margin-bottom: var(--space-3); }
+    .person__facts strong { color: var(--fg); font-weight: 600; }
+    .visit-type--error { color: var(--color-error); }
+
     .status { color: var(--fg-muted); padding: var(--space-8) 0; text-align: center; }
     .status--error { color: var(--color-error); }
   </style>
@@ -113,6 +141,13 @@
       </div>
     </header>
 
+    <nav class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" data-tab="overview" aria-selected="true" type="button">Overview</button>
+      <button class="tab" role="tab" data-tab="traffic" aria-selected="false" type="button">Traffic</button>
+      <button class="tab" role="tab" data-tab="errors" aria-selected="false" type="button">Errors<span class="tab__badge" id="errors-badge"></span></button>
+      <button class="tab" role="tab" data-tab="accounts" aria-selected="false" type="button">Accounts</button>
+    </nav>
+
     <div class="filters" id="range-filters" role="group" aria-label="Date range">
       <button class="btn btn--sm range-btn" data-days="7" aria-pressed="false" type="button">7 days</button>
       <button class="btn btn--sm range-btn" data-days="30" aria-pressed="true" type="button">30 days</button>
@@ -123,73 +158,81 @@
     <div class="status status--error" id="load-error" hidden></div>
 
     <div id="content" hidden>
-      <div class="tiles" id="tiles"></div>
 
-      <section class="section">
-        <h2 class="section__title">views per day</h2>
-        <div class="panel chart-wrap" id="chart-wrap">
-          <svg class="chart-svg" id="chart" role="img" aria-label="Daily pageviews bar chart"></svg>
-          <div class="chart-tip" id="chart-tip"></div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2 class="section__title">projects</h2>
-        <div class="panel table-scroll">
-          <table>
-            <thead><tr><th>app</th><th class="num">views</th><th class="num">sessions</th><th class="num">errors</th><th>last seen</th></tr></thead>
-            <tbody id="by-app"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <div class="grid-2 section">
-        <section>
-          <h2 class="section__title">top pages</h2>
-          <div class="panel table-scroll">
-            <table>
-              <thead><tr><th>path</th><th class="num">views</th></tr></thead>
-              <tbody id="top-paths"></tbody>
-            </table>
+      <!-- Overview -->
+      <div class="tabpanel" id="panel-overview" role="tabpanel">
+        <div class="tiles" id="tiles"></div>
+        <section class="section">
+          <h2 class="section__title">views per day</h2>
+          <div class="panel chart-wrap" id="chart-wrap">
+            <svg class="chart-svg" id="chart" role="img" aria-label="Daily pageviews bar chart"></svg>
+            <div class="chart-tip" id="chart-tip"></div>
           </div>
         </section>
-        <section>
-          <h2 class="section__title">top referrers</h2>
+        <section class="section">
+          <h2 class="section__title">projects</h2>
           <div class="panel table-scroll">
             <table>
-              <thead><tr><th>referrer</th><th class="num">views</th></tr></thead>
-              <tbody id="top-referrers"></tbody>
+              <thead><tr><th>app</th><th class="num">views</th><th class="num">sessions</th><th class="num">errors</th><th>last seen</th></tr></thead>
+              <tbody id="by-app"></tbody>
             </table>
           </div>
         </section>
       </div>
 
-      <section class="section">
-        <h2 class="section__title">recent errors</h2>
-        <div class="panel table-scroll">
-          <table>
-            <thead><tr><th>when</th><th>app</th><th>error</th></tr></thead>
-            <tbody id="recent-errors"></tbody>
-          </table>
+      <!-- Traffic -->
+      <div class="tabpanel" id="panel-traffic" role="tabpanel" hidden>
+        <div class="grid-2 section">
+          <section>
+            <h2 class="section__title">top pages</h2>
+            <div class="panel table-scroll">
+              <table>
+                <thead><tr><th>path</th><th class="num">views</th></tr></thead>
+                <tbody id="top-paths"></tbody>
+              </table>
+            </div>
+          </section>
+          <section>
+            <h2 class="section__title">top referrers</h2>
+            <div class="panel table-scroll">
+              <table>
+                <thead><tr><th>referrer</th><th class="num">views</th></tr></thead>
+                <tbody id="top-referrers"></tbody>
+              </table>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
-      <section class="section">
-        <h2 class="section__title">accounts</h2>
-        <div class="panel table-scroll">
-          <table>
-            <thead><tr><th>email</th><th>providers</th><th>created</th><th>last sign-in</th></tr></thead>
-            <tbody id="accounts"></tbody>
-          </table>
-        </div>
-      </section>
+      <!-- Errors -->
+      <div class="tabpanel" id="panel-errors" role="tabpanel" hidden>
+        <section class="section">
+          <h2 class="section__title">recent errors <span class="subtle">(click a row for the stack)</span></h2>
+          <div class="panel table-scroll">
+            <table>
+              <thead><tr><th>when</th><th>app</th><th>error</th></tr></thead>
+              <tbody id="recent-errors"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- Accounts -->
+      <div class="tabpanel" id="panel-accounts" role="tabpanel" hidden>
+        <div class="tiles" id="account-tiles"></div>
+        <section class="section">
+          <h2 class="section__title">people <span class="subtle">(click a person for their visit history)</span></h2>
+          <div id="people"></div>
+        </section>
+      </div>
+
     </div>
   </div>
 
   <script>
   (function () {
     'use strict';
-    var VERSION = '1.0.1';
+    var VERSION = '1.1.0';
     console.log('[analytics] v' + VERSION + ' - private site analytics dashboard');
 
     var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -220,6 +263,30 @@
         load();
       };
     });
+
+    // ---------- tabs (hash-routed: /analytics/#accounts) ----------
+    var TABS = ['overview', 'traffic', 'errors', 'accounts'];
+    function currentTab() {
+      var h = (location.hash || '').replace('#', '');
+      return TABS.indexOf(h) >= 0 ? h : 'overview';
+    }
+    function showTab(name) {
+      TABS.forEach(function (t) {
+        el('panel-' + t).hidden = (t !== name);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+        b.setAttribute('aria-selected', String(b.dataset.tab === name));
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+      b.onclick = function () {
+        if (history.replaceState) history.replaceState(null, '', '#' + b.dataset.tab);
+        else location.hash = b.dataset.tab;
+        showTab(b.dataset.tab);
+      };
+    });
+    window.addEventListener('hashchange', function () { showTab(currentTab()); });
+    showTab(currentTab());
 
     document.addEventListener('ctrl:auth:signedin', onSignedIn);
     document.addEventListener('ctrl:auth:signedout', function () {
@@ -286,6 +353,16 @@
       return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
              d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     }
+    function fmtAgo(iso) {
+      if (!iso) return 'never';
+      var mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return mins + 'm ago';
+      var hrs = Math.round(mins / 60);
+      if (hrs < 24) return hrs + 'h ago';
+      var d = Math.round(hrs / 24);
+      return d + 'd ago';
+    }
     function hostOf(url) {
       try { return new URL(url).host || url; } catch (e) { return url; }
     }
@@ -293,23 +370,21 @@
     function render() {
       var s = data.summary || {};
       var a = data.accounts || {};
+      var people = data.people || [];
       el('loading').hidden = true;
       el('content').hidden = false;
       el('generated-at').textContent = 'updated ' + fmtDate(data.generatedAt);
+      el('errors-badge').textContent = s.errors_total > 0 ? '•' : '';
 
+      // Overview
       var tiles = [
         ['views today', fmtNum(s.views_today)],
         ['views · ' + s.days + 'd', fmtNum(s.views_total)],
         ['sessions · ' + s.days + 'd', fmtNum(s.uniques_total)],
         ['errors · ' + s.days + 'd', fmtNum(s.errors_total), s.errors_total > 0 ? 'error' : null],
-        ['accounts', fmtNum(a.total)],
-        ['new accounts · 7d', fmtNum(a.new_7d)],
-        ['active accounts · 7d', fmtNum(a.active_7d)]
+        ['accounts', fmtNum(a.total)]
       ];
-      el('tiles').innerHTML = tiles.map(function (t) {
-        return '<div class="tile"><div class="tile__label">' + esc(t[0]) + '</div>' +
-          '<div class="tile__value' + (t[2] === 'error' ? ' tile__value--error' : '') + '">' + esc(t[1]) + '</div></div>';
-      }).join('');
+      el('tiles').innerHTML = tiles.map(tileHtml).join('');
 
       renderChart(s.daily || []);
 
@@ -320,6 +395,7 @@
           '</td><td class="subtle">' + esc(fmtDate(r.last_seen)) + '</td></tr>';
       }).join('') || emptyRow(5, 'no traffic yet');
 
+      // Traffic
       el('top-paths').innerHTML = (s.top_paths || []).map(function (r) {
         return '<tr><td class="cell-path">' + esc(r.path) + '</td><td class="num">' + fmtNum(r.views) + '</td></tr>';
       }).join('') || emptyRow(2, 'no pageviews yet');
@@ -328,6 +404,7 @@
         return '<tr><td class="cell-path">' + esc(hostOf(r.referrer)) + '</td><td class="num">' + fmtNum(r.views) + '</td></tr>';
       }).join('') || emptyRow(2, 'no external referrers yet');
 
+      // Errors
       el('recent-errors').innerHTML = (s.recent_errors || []).map(function (r) {
         return '<tr class="err-row" onclick="this.classList.toggle(\'is-open\')">' +
           '<td class="subtle">' + esc(fmtDate(r.occurred_at)) + '</td>' +
@@ -338,12 +415,61 @@
           '</td></tr>';
       }).join('') || emptyRow(3, 'no errors recorded');
 
-      el('accounts').innerHTML = (a.recent || []).map(function (u) {
-        return '<tr><td>' + esc(u.email || '—') + '</td>' +
-          '<td class="muted">' + esc((u.providers || []).join(', ') || '—') + '</td>' +
-          '<td class="subtle">' + esc(fmtDate(u.created_at)) + '</td>' +
-          '<td class="subtle">' + esc(fmtDate(u.last_sign_in_at)) + '</td></tr>';
-      }).join('') || emptyRow(4, 'no accounts yet');
+      // Accounts
+      el('account-tiles').innerHTML = [
+        ['accounts', fmtNum(a.total)],
+        ['new · 7d', fmtNum(a.new_7d)],
+        ['new · 30d', fmtNum(a.new_30d)],
+        ['active · 7d', fmtNum(a.active_7d)],
+        ['active · 30d', fmtNum(a.active_30d)]
+      ].map(tileHtml).join('');
+
+      el('people').innerHTML = people.map(personHtml).join('') ||
+        '<div class="panel subtle">no accounts yet</div>';
+      Array.prototype.forEach.call(document.querySelectorAll('.person__head'), function (h) {
+        h.onclick = function () { h.parentNode.classList.toggle('is-open'); };
+      });
+    }
+
+    function tileHtml(t) {
+      return '<div class="tile"><div class="tile__label">' + esc(t[0]) + '</div>' +
+        '<div class="tile__value' + (t[2] === 'error' ? ' tile__value--error' : '') + '">' + esc(t[1]) + '</div></div>';
+    }
+
+    function personHtml(p) {
+      var apps = (p.apps || []).join(', ');
+      var visits = (p.recent || []).map(function (v) {
+        return '<tr>' +
+          '<td class="subtle">' + esc(fmtDate(v.occurred_at)) + '</td>' +
+          '<td>' + esc(v.app) + '</td>' +
+          '<td class="cell-path">' +
+            (v.type === 'error'
+              ? '<span class="visit-type--error">error</span> ' + esc(v.message || '') + ' <span class="muted">' + esc(v.path) + '</span>'
+              : esc(v.path)) +
+          '</td></tr>';
+      }).join('') || emptyRow(3, 'no tracked visits yet — tracking attributes visits made while signed in');
+      return '<div class="person">' +
+        '<div class="person__head">' +
+          '<span class="person__email">' + esc(p.email || '—') + '</span>' +
+          '<span class="person__meta">' + esc((p.providers || []).join(', ') || '') + '</span>' +
+          '<span class="person__spacer"></span>' +
+          '<span class="person__meta">' + fmtNum(p.views) + ' views · ' + fmtNum(p.sessions) + ' sessions</span>' +
+          '<span class="person__last">last visit ' + esc(fmtAgo(p.last_visit)) + '</span>' +
+        '</div>' +
+        '<div class="person__body">' +
+          '<div class="person__facts">' +
+            '<span>joined <strong>' + esc(fmtDate(p.created_at)) + '</strong></span>' +
+            '<span>last sign-in <strong>' + esc(fmtDate(p.last_sign_in_at)) + '</strong></span>' +
+            '<span>last visit <strong>' + esc(fmtDate(p.last_visit)) + '</strong></span>' +
+            (apps ? '<span>uses <strong>' + esc(apps) + '</strong></span>' : '') +
+            (p.errors > 0 ? '<span class="visit-type--error">' + fmtNum(p.errors) + ' errors · ' + data.summary.days + 'd</span>' : '') +
+          '</div>' +
+          '<div class="table-scroll"><table>' +
+            '<thead><tr><th>when</th><th>app</th><th>page</th></tr></thead>' +
+            '<tbody>' + visits + '</tbody>' +
+          '</table></div>' +
+        '</div>' +
+      '</div>';
     }
 
     function emptyRow(cols, text) {
@@ -372,7 +498,6 @@
       var step = plotW / series.length;
       var barW = Math.max(2, Math.min(28, step - 2));
       var html = '';
-      // gridlines: baseline + midline + top, recessive
       [0, 0.5, 1].forEach(function (f) {
         var y = padT + plotH - plotH * f;
         html += '<line class="chart-grid" x1="' + padL + '" y1="' + y + '" x2="' + W + '" y2="' + y + '"/>';
@@ -391,7 +516,6 @@
         }
         html += '<rect class="chart-hit" data-i="' + i + '" x="' + (padL + i * step) + '" y="' + padT + '" width="' + step + '" height="' + plotH + '"/>';
       });
-      // x labels: ~6 ticks
       var tickEvery = Math.max(1, Math.round(series.length / 6));
       series.forEach(function (d, i) {
         if (i % tickEvery !== 0) return;

@@ -6,7 +6,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 console.log(`[analytics-dashboard] v${VERSION} - admin-only analytics aggregates`)
 
 const ADMIN_EMAILS = ['fike101@gmail.com']
@@ -54,9 +54,10 @@ Deno.serve(async (req: Request) => {
     } catch (_) { /* empty body is fine */ }
   }
 
-  const [summaryRes, accountsRes] = await Promise.all([
+  const [summaryRes, accountsRes, peopleRes] = await Promise.all([
     supabase.rpc('analytics_summary', { days }),
     supabase.rpc('analytics_account_stats'),
+    supabase.rpc('analytics_people', { days }),
   ])
   if (summaryRes.error) {
     console.error(`[analytics-dashboard] v${VERSION} - summary error:`, summaryRes.error)
@@ -66,11 +67,16 @@ Deno.serve(async (req: Request) => {
     console.error(`[analytics-dashboard] v${VERSION} - accounts error:`, accountsRes.error)
     return json({ error: 'accounts_failed', details: accountsRes.error.message }, 500)
   }
+  if (peopleRes.error) {
+    console.error(`[analytics-dashboard] v${VERSION} - people error:`, peopleRes.error)
+    return json({ error: 'people_failed', details: peopleRes.error.message }, 500)
+  }
 
   return json({
     version: VERSION,
     generatedAt: new Date().toISOString(),
     summary: summaryRes.data,
     accounts: accountsRes.data,
+    people: peopleRes.data,
   })
 })
