@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.60.0';
+const VERSION = '3.61.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5520,14 +5520,26 @@ async function redeemSigninToken() {
       body: JSON.stringify({ token }),
     });
     const out = await resp.json();
-    if (!resp.ok) throw new Error(out.error || 'redeem failed');
+    if (!resp.ok) {
+      // An expired link is the common case, not an error to explain — hand
+      // back the button that mints another one.
+      const err = new Error(out.error || 'redeem failed');
+      err.rerequestUrl = out.rerequestUrl;
+      throw err;
+    }
     // token_hash and type ONLY — supabase-js rejects the call if email rides along
     const { error } = await sb.auth.verifyOtp({ type: 'email', token_hash: out.token_hash });
     if (error) throw error;
   } catch (e) {
-    setGate(e.message || 'Sign-in link failed.', 'Continue with Discord',
-      'Get a fresh link from the "Get sign-in link" button on Discord, or sign in with Discord here.');
-    document.getElementById('gate-btn').onclick = signInWithDiscord;
+    if (e.rerequestUrl) {
+      setGate(e.message, 'Get a fresh link',
+        'Opens the sign-in message on Discord. You can also type /signin in the Agape server.');
+      document.getElementById('gate-btn').onclick = () => { location.href = e.rerequestUrl; };
+    } else {
+      setGate(e.message || 'Sign-in link failed.', 'Continue with Discord',
+        'Get a fresh link from the sign-in message on Discord, or sign in with Discord here.');
+      document.getElementById('gate-btn').onclick = signInWithDiscord;
+    }
   }
 }
 
