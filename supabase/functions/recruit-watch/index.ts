@@ -11,8 +11,8 @@
 // returned beyond what the recording itself shows, and a bad or revoked
 // token is indistinguishable from a missing one (404 either way).
 
-const VERSION = '1.0.0'
-console.log(`[recruit-watch] v${VERSION} — capability-link recording playback`)
+const VERSION = '1.1.0'
+console.log(`[recruit-watch] v${VERSION} — capability-link recording playback, short tokens, nameless titles`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -33,28 +33,41 @@ serve(async (req) => {
   try {
     const token = new URL(req.url).searchParams.get('t') || ''
     // Shape check first — never let a malformed token reach a query.
-    if (!/^[0-9a-f]{64}$/.test(token)) return json({ error: 'Not found' }, 404)
+    // 20 hex is the current short form (~80 bits); 64 hex is the legacy form.
+    // A 20-char token also opens a legacy recording by matching the first 20
+    // chars of its stored 64-char token, so any old link can be re-shared
+    // short and any clipped-but-long-enough copy still works.
+    if (!/^[0-9a-f]{20}$/.test(token) && !/^[0-9a-f]{64}$/.test(token)) {
+      return json({ error: 'Not found' }, 404)
+    }
 
     const client = db()
-    const { data: screening } = await client.from('recruit_screenings')
-      .select('id, applicant_id, housemate_name, starts_at, recording_summary, recording_path')
-      .eq('share_token', token).maybeSingle()
+    // deno-lint-ignore no-explicit-any
+    const byToken = (q: any) =>
+      token.length === 64 ? q.eq('share_token', token) : q.like('share_token', `${token}%`)
 
+    const { data: screenings } = await byToken(
+      client.from('recruit_screenings')
+        .select('id, starts_at, recording_summary, recording_path'),
+    ).limit(1)
+    const screening = screenings?.[0]
+
+    // Titles are deliberately nameless: this page is reachable by anyone
+    // holding the link, so it identifies the call, not the people on it.
     let title: string, when: string | null, summary: string | null, path: string | null
     if (screening) {
-      const { data: applicant } = await client.from('recruit_applicants')
-        .select('first_name, last_name').eq('id', screening.applicant_id).maybeSingle()
-      const name = `${applicant?.first_name || 'Applicant'} ${applicant?.last_name || ''}`.trim()
-      title = `${name} × ${screening.housemate_name || 'Agape'} — Intro Call`
+      title = 'Agape intro call'
       when = screening.starts_at
       summary = screening.recording_summary
       path = screening.recording_path
     } else {
-      const { data: event } = await client.from('recruit_recorded_events')
-        .select('title, starts_at, recording_summary, recording_path')
-        .eq('share_token', token).maybeSingle()
+      const { data: events } = await byToken(
+        client.from('recruit_recorded_events')
+          .select('starts_at, recording_summary, recording_path'),
+      ).limit(1)
+      const event = events?.[0]
       if (!event) return json({ error: 'Not found' }, 404)
-      title = event.title || 'Agape call'
+      title = 'Agape call'
       when = event.starts_at
       summary = event.recording_summary
       path = event.recording_path
