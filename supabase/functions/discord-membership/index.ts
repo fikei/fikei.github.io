@@ -20,7 +20,7 @@
 // roles + channel permission overwrites. Cached as is_recruiting_member and
 // used by the recruit_* RLS policies (migration 108).
 
-const VERSION = '1.7.0'
+const VERSION = '1.8.0'
 console.log(`[discord-membership] v${VERSION} — Agape guild + recruiting-channel gate + #recruiting-automation admin (OAuth or bot magic-link)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -187,6 +187,46 @@ function checkAutomationChannel(discordUserId: string, memberRoles: string[]) {
     ? channels.find(c => String(c.id) === wantedId)
     : namedChannel(channels, /recruit.*automation|automation.*recruit/i),
     '#recruiting-automation')
+}
+
+/* Mirror of recruit-discord's logger. This function is deliberately
+   standalone (no _shared import), so the write is duplicated rather than
+   hidden behind a dependency. */
+async function logAuth(
+  event: string,
+  opts: { discordUserId?: string | null; discordUsername?: string | null; userId?: string | null; detail?: string | null } = {},
+  notify = false,
+): Promise<void> {
+  const db = getSupabase()
+  try {
+    await db.from('recruit_auth_events').insert({
+      event,
+      discord_user_id: opts.discordUserId ?? null,
+      discord_username: opts.discordUsername ?? null,
+      user_id: opts.userId ?? null,
+      detail: opts.detail ?? null,
+      channel: 'gate',
+    })
+  } catch (err) { console.warn(`[auth-log] ${event}: ${(err as Error).message}`) }
+  if (!notify) return
+  try {
+    const botToken = Deno.env.get('DISCORD_BOT_TOKEN')
+    const channelId = Deno.env.get('RECRUITING_AUTOMATION_CHANNEL_ID')
+      || Deno.env.get('SCREENING_CLAIMS_CHANNEL_ID') || '1529576830514762029'
+    const who = opts.discordUsername || opts.discordUserId || 'someone'
+    const FACE: Record<string, { t: string; c: number }> = {
+      gate_pass:       { t: `${who} opened the inbox`, c: 0x1D9E75 },
+      gate_no_channel: { t: `${who} was refused — not in Recruiting Society`, c: 0xBA7517 },
+      gate_not_linked: { t: `${who} has no Discord linked`, c: 0xBA7517 },
+      gate_error:      { t: `Access check failed for ${who}`, c: 0xE24B4A },
+    }
+    const face = FACE[event] || { t: `${who}: ${event}`, c: 0x888780 }
+    await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [{ description: `**${face.t}**${opts.detail ? `\n${opts.detail}` : ''}`, color: face.c }] }),
+    })
+  } catch (err) { console.warn(`[auth-log] notify: ${(err as Error).message}`) }
 }
 
 async function verifyAndCache(userId: string, identity: DiscordIdentity) {
@@ -432,6 +472,7 @@ serve(async (req) => {
       // Discord unlinked: drop any stale membership so RLS stops granting access
       await db.from('user_discord_membership').delete().eq('user_id', user.id)
       await db.from('recruit_admins').delete().eq('user_id', user.id)
+      await logAuth('gate_not_linked', { userId: user.id, detail: user.email || null }, true)
       return new Response(JSON.stringify({ linked: false, isMember: false, isRecruitingMember: false, isRecruitingAdmin: false, discordUsername: null, verifiedAt: null }), { headers: jsonHeaders })
     }
 
@@ -464,6 +505,10 @@ serve(async (req) => {
     }
     if (!row) row = await verifyAndCache(user.id, identity)
 
+    await logAuth(row.is_recruiting_member ? 'gate_pass' : 'gate_no_channel', {
+      userId: user.id, discordUserId: identity.discordUserId, discordUsername: row.discord_username,
+      detail: row.is_recruiting_member ? null : (row.is_agape_member ? 'in the guild, but cannot see the channel' : 'not in the Agape guild'),
+    }, !row.is_recruiting_member) // successes are logged quietly; refusals ping
     return new Response(JSON.stringify({
       linked: true,
       isMember: row.is_agape_member,
@@ -474,6 +519,7 @@ serve(async (req) => {
     }), { headers: jsonHeaders })
   } catch (err) {
     console.error('discord-membership error:', (err as Error).message)
+    await logAuth('gate_error', { detail: (err as Error).message.slice(0, 200) }, true)
     return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500, headers: jsonHeaders })
   }
 })

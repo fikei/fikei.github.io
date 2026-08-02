@@ -262,6 +262,55 @@ const SIGNIN_TTL_MS = 10 * 60_000
 const APP_URL = 'https://ctrl.rodeo/applications/'
 // Shadow email for members who've never OAuth'd on desktop; deterministic so
 // repeat sign-ins land on the same account.
+/* Every auth attempt lands in recruit_auth_events and, for anything a human
+   should see, pings #recruiting-automation. Login failures used to be
+   invisible — the only signal was somebody saying "it doesn't work". */
+async function logAuth(
+  client: ReturnType<typeof db>,
+  event: string,
+  opts: { discordUserId?: string | null; discordUsername?: string | null; userId?: string | null;
+          detail?: string | null; channel?: string | null; inAppBrowser?: boolean | null } = {},
+  notify = false,
+): Promise<void> {
+  try {
+    await client.from('recruit_auth_events').insert({
+      event,
+      discord_user_id: opts.discordUserId ?? null,
+      discord_username: opts.discordUsername ?? null,
+      user_id: opts.userId ?? null,
+      detail: opts.detail ?? null,
+      channel: opts.channel ?? null,
+      in_app_browser: opts.inAppBrowser ?? null,
+    })
+  } catch (err) {
+    console.warn(`[auth-log] ${event}: ${(err as Error).message}`)
+  }
+  if (!notify) return
+  try {
+    const { postChannelEmbed, AUTOMATION_CHANNEL_ID } = await import('../_shared/discord.ts')
+    const who = opts.discordUsername || opts.discordUserId || 'someone'
+    const FACE: Record<string, { title: string; color: number }> = {
+      link_sent:       { title: `Sign-in link sent to ${who}`, color: 0x5865f2 },
+      link_redeemed:   { title: `${who} signed in`, color: 0x1D9E75 },
+      link_expired:    { title: `${who} tapped an expired link`, color: 0xBA7517 },
+      gate_pass:       { title: `${who} opened the inbox`, color: 0x1D9E75 },
+      gate_no_channel: { title: `${who} was refused — not in Recruiting Society`, color: 0xBA7517 },
+      gate_not_linked: { title: `${who} has no Discord linked`, color: 0xBA7517 },
+      gate_error:      { title: `Sign-in failed for ${who}`, color: 0xE24B4A },
+      client_stall:    { title: `${who} got stuck signing in`, color: 0xE24B4A },
+    }
+    const face = FACE[event] || { title: `${who}: ${event}`, color: 0x888780 }
+    const bits = [opts.detail, opts.channel ? `via ${opts.channel}` : null,
+                  opts.inAppBrowser ? 'in an in-app browser' : null].filter(Boolean)
+    await postChannelEmbed(AUTOMATION_CHANNEL_ID, {
+      description: `**${face.title}**${bits.length ? `\n${bits.join(' · ')}` : ''}`,
+      color: face.color,
+    })
+  } catch (err) {
+    console.warn(`[auth-log] notify ${event}: ${(err as Error).message}`)
+  }
+}
+
 // Jump link to the pinned sign-in message, so "get another link" is a tap
 // rather than an instruction to go and find something.
 const SIGNIN_MESSAGE_URL = Deno.env.get('SIGNIN_MESSAGE_URL')
@@ -276,10 +325,17 @@ async function sha256Hex(s: string): Promise<string> {
 
 /* Mint a one-time link for a Discord id. Shared by the button, the /signin
    command and the proactive DM, so there is one definition of a sign-in. */
-async function mintSigninUrl(discordUserId: string, discordUsername: string | null): Promise<string | null> {
+async function mintSigninUrl(
+  discordUserId: string,
+  discordUsername: string | null,
+  // 10 minutes suits a link you just asked for; a DM sits unread far longer.
+  // Four of the first five DM'd links expired before anyone opened them.
+  ttlMinutes = 10,
+): Promise<string | null> {
   const raw = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '')
   const { error } = await db().from('recruit_signin_tokens').insert({
     token_hash: await sha256Hex(raw), discord_user_id: discordUserId, discord_username: discordUsername,
+    expires_at: new Date(Date.now() + ttlMinutes * 60_000).toISOString(),
   })
   if (error) return null
   return `${APP_URL}?signin=${raw}`
@@ -313,6 +369,7 @@ async function handleSigninButton(interaction: Record<string, any>): Promise<Res
 
   const url = await mintSigninUrl(discordUserId, discordUsername)
   if (!url) return json(ephemeral('Could not mint a link — try again in a minute.'))
+  await logAuth(db(), 'link_sent', { discordUserId, discordUsername, channel: interaction.type === 2 ? 'slash' : 'button' }, true)
 
   return json(ephemeral(`🔑 ${url}\nOpens the inbox signed in. Works once, for 10 minutes.`))
 }
@@ -356,14 +413,17 @@ async function handleRedeem(req: Request): Promise<Response> {
   const { data: row } = await client.from('recruit_signin_tokens')
     .update({ used_at: new Date().toISOString() })
     .eq('token_hash', await sha256Hex(token)).is('used_at', null)
-    .gte('created_at', new Date(Date.now() - SIGNIN_TTL_MS).toISOString())
+    .gt('expires_at', new Date().toISOString())
     .select().maybeSingle()
   if (!row) {
+    await logAuth(client, 'link_expired', { detail: 'tapped a dead link', channel: 'link' }, true)
     return json({
       error: 'This link already expired or was used. Grab a fresh one — it takes a second.',
       rerequestUrl: SIGNIN_MESSAGE_URL,
     }, 401)
   }
+  await logAuth(client, 'link_redeemed',
+    { discordUserId: row.discord_user_id, discordUsername: row.discord_username, channel: 'link' }, true)
 
   // Prefer the member's existing account (from a past desktop OAuth sign-in).
   const { data: membership } = await client.from('user_discord_membership')
@@ -1065,6 +1125,21 @@ serve(async (req) => {
     if (pathname.endsWith('/signin-post')) return await handleSigninPost(req)
     // Send ONE named person a sign-in link. Deliberately one-at-a-time: the
     // bulk sweep DM'd the house unasked once, and never should again.
+    // Unauthenticated beacon: the app reports a gate that stranded someone.
+    // Anonymous by nature — if sign-in failed we may not know who they are.
+    if (pathname.endsWith('/auth-event')) {
+      const b = await req.json().catch(() => ({}))
+      const allowed = ['client_stall', 'gate_error']
+      const ev = String(b.event || '')
+      if (!allowed.includes(ev)) return json({ error: 'unsupported event' }, 400)
+      await logAuth(db(), ev, {
+        detail: String(b.detail || '').slice(0, 300),
+        channel: String(b.channel || 'app').slice(0, 20),
+        inAppBrowser: b.inAppBrowser === true,
+      }, true)
+      return json({ logged: true })
+    }
+
     if (pathname.endsWith('/signin-dm')) {
       const client = db()
       const tok = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
@@ -1085,11 +1160,12 @@ serve(async (req) => {
           `Typing \`/signin\` in the server does the same thing.`)
         return json({ sent: true, mode: 'pointer', discordUserId: did })
       }
-      const url = await mintSigninUrl(did, b.username ? String(b.username) : null)
+      const url = await mintSigninUrl(did, b.username ? String(b.username) : null, 24 * 60)
       if (!url) return json({ error: 'could not mint link' }, 500)
+      await logAuth(client, 'link_sent', { discordUserId: did, discordUsername: b.username ? String(b.username) : null, channel: 'dm', detail: 'valid for 24 hours' }, true)
       await dmUser(did,
         `🔑 Sign-in link for the Agape applicant inbox:\n${url}\n` +
-        `Works once, for 10 minutes. Opens signed in — no password, and it works ` +
+        `Works once, and lasts 24 hours. Opens signed in — no password, and it works ` +
         `inside Instagram or Discord's own browser, where the normal sign-in fails.\n` +
         `Expired? Get another here: ${SIGNIN_MESSAGE_URL}`)
       return json({ sent: true, discordUserId: did })
