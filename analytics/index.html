@@ -243,7 +243,7 @@
   <script>
   (function () {
     'use strict';
-    var VERSION = '1.2.0';
+    var VERSION = '1.3.0';
     console.log('[analytics] v' + VERSION + ' - private site analytics dashboard');
 
     var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -395,6 +395,10 @@
         ['errors · ' + s.days + 'd', fmtNum(s.errors_total), s.errors_total > 0 ? 'error' : null],
         ['accounts', fmtNum(a.total)]
       ];
+      var VITAL_FMT = { lcp: function (v) { return (v / 1000).toFixed(2) + 's'; }, inp: function (v) { return Math.round(v) + 'ms'; }, ttfb: function (v) { return Math.round(v) + 'ms'; }, cls: function (v) { return v.toFixed(3); } };
+      (s.vitals || []).forEach(function (v) {
+        if (VITAL_FMT[v.name]) tiles.push([v.name + ' p75', VITAL_FMT[v.name](Number(v.p75))]);
+      });
       el('tiles').innerHTML = tiles.map(tileHtml).join('');
 
       renderChart(s.daily || []);
@@ -419,7 +423,7 @@
       el('recent-errors').innerHTML = (s.recent_errors || []).map(function (r) {
         return '<tr class="err-row" onclick="this.classList.toggle(\'is-open\')">' +
           '<td class="subtle">' + esc(fmtDate(r.occurred_at)) + '</td>' +
-          '<td>' + esc(r.app) + '</td>' +
+          '<td>' + esc(r.app) + (r.type === 'server_error' ? ' <span class="subtle">(server)</span>' : '') + '</td>' +
           '<td><span class="err-msg">' + esc(r.message) + '</span>' +
           '<div class="muted">' + esc(r.path) + '</div>' +
           (r.stack ? '<pre class="err-stack">' + esc(r.stack) + '</pre>' : '') +

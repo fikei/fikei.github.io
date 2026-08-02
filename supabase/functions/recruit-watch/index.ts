@@ -11,7 +11,7 @@
 // returned beyond what the recording itself shows, and a bad or revoked
 // token is indistinguishable from a missing one (404 either way).
 
-const VERSION = '1.1.0'
+const VERSION = '1.1.1'
 console.log(`[recruit-watch] v${VERSION} — capability-link recording playback, short tokens, nameless titles`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -83,6 +83,10 @@ serve(async (req) => {
     return json({ title, when, summary, url: signed.signedUrl })
   } catch (err) {
     console.error('[recruit-watch] error:', (err as Error).message)
+    try {
+      const { logServerError } = await import('../_shared/telemetry.ts')
+      await logServerError(db(), 'recruit-watch', err)
+    } catch { /* telemetry is best-effort */ }
     return json({ error: 'Something went wrong' }, 500)
   }
 })

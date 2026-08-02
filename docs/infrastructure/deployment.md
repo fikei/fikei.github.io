@@ -99,6 +99,7 @@ supabase functions deploy enrich-link
 supabase functions deploy generate-widget
 supabase functions deploy categorize
 supabase functions deploy analytics-dashboard   # owner-only aggregates for /analytics
+supabase functions deploy analytics-alerts      # error-spike DM watchdog (cron-invoked)
 
 # Recruiting (Agape) functions — Boards project
 supabase functions deploy recruit-gmail

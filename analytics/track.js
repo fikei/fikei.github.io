@@ -7,7 +7,7 @@
  */
 (function () {
   'use strict';
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
   var ENDPOINT = SUPABASE_URL + '/rest/v1/analytics_events';
@@ -108,4 +108,52 @@
   });
 
   send(base('pageview'));
+
+  // ---- web vitals (hand-rolled: LCP, CLS, INP, TTFB) ----
+  // Collected passively, sent once per page when it first goes hidden.
+  (function vitals() {
+    if (typeof PerformanceObserver === 'undefined') return;
+    var lcp = null, cls = 0, inp = null, sent = false;
+    try {
+      new PerformanceObserver(function (list) {
+        var entries = list.getEntries();
+        if (entries.length) lcp = entries[entries.length - 1].startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+    } catch (e) { /* unsupported */ }
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (en) {
+          if (!en.hadRecentInput) cls += en.value;
+        });
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch (e) { /* unsupported */ }
+    try {
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (en) {
+          if (en.interactionId && (inp === null || en.duration > inp)) inp = en.duration;
+        });
+      }).observe({ type: 'event', durationThreshold: 40, buffered: true });
+    } catch (e) { /* unsupported */ }
+
+    function flush() {
+      if (sent) return;
+      sent = true;
+      var rows = [];
+      var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      var common = base('vital');
+      function push(name, value) {
+        if (value === null || value === undefined || !isFinite(value)) return;
+        rows.push(Object.assign({}, common, { meta: { name: name, value: Math.round(value * 1000) / 1000 } }));
+      }
+      push('lcp', lcp);
+      push('cls', cls);
+      push('inp', inp);
+      if (nav && nav.responseStart > 0) push('ttfb', nav.responseStart);
+      if (rows.length) send(rows);
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flush();
+    });
+    window.addEventListener('pagehide', flush);
+  })();
 })();
