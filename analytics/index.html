@@ -119,8 +119,10 @@
     .person__facts strong { color: var(--fg); font-weight: 600; }
     .visit-type--error { color: var(--color-error); }
 
-    .status { color: var(--fg-muted); padding: var(--space-8) 0; text-align: center; }
-    .status--error { color: var(--color-error); }
+    /* No display property here — an author display would defeat the [hidden] attribute (the v1.1.0 bug). */
+    .load-status { color: var(--fg-muted); padding: var(--space-8) 0; text-align: center; }
+    .load-status[hidden] { display: none; }
+    .load-status--error { color: var(--color-error); }
   </style>
 </head>
 <body>
@@ -154,8 +156,8 @@
       <button class="btn btn--sm range-btn" data-days="90" aria-pressed="false" type="button">90 days</button>
     </div>
 
-    <div class="status" id="loading">Loading…</div>
-    <div class="status status--error" id="load-error" hidden></div>
+    <div class="load-status" id="loading">Loading…</div>
+    <div class="load-status load-status--error" id="load-error" hidden></div>
 
     <div id="content" hidden>
 
@@ -232,7 +234,7 @@
   <script>
   (function () {
     'use strict';
-    var VERSION = '1.1.0';
+    var VERSION = '1.1.1';
     console.log('[analytics] v' + VERSION + ' - private site analytics dashboard');
 
     var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
