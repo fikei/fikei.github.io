@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.61.0';
+const VERSION = '3.62.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5581,6 +5581,15 @@ let _watchdog = null;
 function stall(sub, hint) {
   setGate(sub, 'Try again', hint);
   document.getElementById('gate-btn').onclick = () => { _entering = false; checkMembershipAndEnter(); };
+  // Report it. A stall is invisible from the server — the request either never
+  // arrived or never came back — so the only witness is this browser.
+  try {
+    fetch(`${SUPABASE_URL}/functions/v1/recruit-discord/auth-event`, {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ event: 'client_stall', detail: sub, channel: 'app', inAppBrowser: inAppBrowser() }),
+    }).catch(() => {});
+  } catch { /* never let reporting break the gate */ }
 }
 
 async function checkMembershipAndEnter() {

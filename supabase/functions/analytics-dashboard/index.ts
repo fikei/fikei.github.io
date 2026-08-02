@@ -1,12 +1,12 @@
 // analytics-dashboard — admin-only aggregate feed for ctrl.rodeo/analytics
 // GET/POST /functions/v1/analytics-dashboard   (Authorization: Bearer <user JWT>)
 // Body (optional): { days?: number }
-// Response: { version, generatedAt, summary, accounts }
+// Response: { version, generatedAt, summary, accounts, people, auth }
 // Access: only ADMIN_EMAILS may call; everyone else gets 403.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const VERSION = '1.1.0'
+const VERSION = '1.2.0'
 console.log(`[analytics-dashboard] v${VERSION} - admin-only analytics aggregates`)
 
 const ADMIN_EMAILS = ['fike101@gmail.com']
@@ -54,10 +54,16 @@ Deno.serve(async (req: Request) => {
     } catch (_) { /* empty body is fine */ }
   }
 
-  const [summaryRes, accountsRes, peopleRes] = await Promise.all([
+  const [summaryRes, accountsRes, peopleRes, authRes] = await Promise.all([
     supabase.rpc('analytics_summary', { days }),
     supabase.rpc('analytics_account_stats'),
     supabase.rpc('analytics_people', { days }),
+    // Sign-in attempts. Failures were previously visible only to the person
+    // they happened to, which is how a whole house went uninvestigated.
+    supabase.from('recruit_auth_events')
+      .select('at, event, discord_username, discord_user_id, detail, channel, in_app_browser')
+      .gte('at', new Date(Date.now() - days * 86400_000).toISOString())
+      .order('at', { ascending: false }).limit(300),
   ])
   if (summaryRes.error) {
     console.error(`[analytics-dashboard] v${VERSION} - summary error:`, summaryRes.error)
@@ -78,5 +84,6 @@ Deno.serve(async (req: Request) => {
     summary: summaryRes.data,
     accounts: accountsRes.data,
     people: peopleRes.data,
+    auth: authRes.error ? { error: authRes.error.message, events: [] } : { events: authRes.data || [] },
   })
 })

@@ -148,6 +148,7 @@
       <button class="tab" role="tab" data-tab="traffic" aria-selected="false" type="button">Traffic</button>
       <button class="tab" role="tab" data-tab="errors" aria-selected="false" type="button">Errors<span class="tab__badge" id="errors-badge"></span></button>
       <button class="tab" role="tab" data-tab="accounts" aria-selected="false" type="button">Accounts</button>
+      <button class="tab" role="tab" data-tab="signins" aria-selected="false" type="button">Sign-ins<span class="tab__badge" id="signins-badge"></span></button>
     </nav>
 
     <div class="filters" id="range-filters" role="group" aria-label="Date range">
@@ -220,6 +221,14 @@
       </div>
 
       <!-- Accounts -->
+      <div class="tabpanel" id="panel-signins" role="tabpanel" hidden>
+        <div class="tiles" id="signin-tiles"></div>
+        <section class="section">
+          <h2 class="section__title">sign-in attempts <span class="subtle">(newest first)</span></h2>
+          <div id="signin-log"></div>
+        </section>
+      </div>
+
       <div class="tabpanel" id="panel-accounts" role="tabpanel" hidden>
         <div class="tiles" id="account-tiles"></div>
         <section class="section">
@@ -234,7 +243,7 @@
   <script>
   (function () {
     'use strict';
-    var VERSION = '1.1.1';
+    var VERSION = '1.2.0';
     console.log('[analytics] v' + VERSION + ' - private site analytics dashboard');
 
     var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -267,7 +276,7 @@
     });
 
     // ---------- tabs (hash-routed: /analytics/#accounts) ----------
-    var TABS = ['overview', 'traffic', 'errors', 'accounts'];
+    var TABS = ['overview', 'traffic', 'errors', 'accounts', 'signins'];
     function currentTab() {
       var h = (location.hash || '').replace('#', '');
       return TABS.indexOf(h) >= 0 ? h : 'overview';
@@ -416,6 +425,43 @@
           (r.stack ? '<pre class="err-stack">' + esc(r.stack) + '</pre>' : '') +
           '</td></tr>';
       }).join('') || emptyRow(3, 'no errors recorded');
+
+      // Sign-ins
+      var ev = (data.auth && data.auth.events) || [];
+      var LABEL = {
+        link_sent: 'link sent', link_redeemed: 'signed in via link', link_expired: 'link expired',
+        gate_pass: 'opened the inbox', gate_no_channel: 'refused — no channel access',
+        gate_not_linked: 'no Discord linked', gate_error: 'access check failed',
+        client_stall: 'stuck on the gate'
+      };
+      var BAD = { link_expired: 1, gate_no_channel: 1, gate_not_linked: 1, gate_error: 1, client_stall: 1 };
+      var failures = ev.filter(function (e) { return BAD[e.event]; });
+      var success = ev.filter(function (e) { return e.event === 'gate_pass' || e.event === 'link_redeemed'; });
+      var stuck = ev.filter(function (e) { return e.event === 'client_stall' || e.event === 'gate_error'; });
+      var whoFailed = {};
+      failures.forEach(function (e) { whoFailed[e.discord_username || e.discord_user_id || 'unknown'] = 1; });
+      el('signins-badge').textContent = stuck.length > 0 ? '•' : '';
+      el('signin-tiles').innerHTML = [
+        ['attempts', fmtNum(ev.length)],
+        ['succeeded', fmtNum(success.length)],
+        ['failed', fmtNum(failures.length)],
+        ['people affected', fmtNum(Object.keys(whoFailed).length)],
+        ['stuck / errored', fmtNum(stuck.length)]
+      ].map(function (t) {
+        return '<div class="tile"><div class="tile__label">' + t[0] + '</div><div class="tile__value">' + t[1] + '</div></div>';
+      }).join('');
+      el('signin-log').innerHTML = ev.length
+        ? '<table class="table"><thead><tr><th>when</th><th>who</th><th>what happened</th><th>how</th></tr></thead><tbody>' +
+          ev.map(function (e) {
+            var bad = BAD[e.event];
+            var extra = [e.detail, e.in_app_browser ? 'in-app browser' : null].filter(Boolean).join(' · ');
+            return '<tr><td class="subtle">' + esc(fmtDate(e.at)) + '</td>' +
+              '<td>' + esc(e.discord_username || e.discord_user_id || '—') + '</td>' +
+              '<td' + (bad ? ' class="err-msg"' : '') + '>' + esc(LABEL[e.event] || e.event) +
+              (extra ? '<div class="subtle">' + esc(extra) + '</div>' : '') + '</td>' +
+              '<td class="subtle">' + esc(e.channel || '—') + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<div class="panel subtle">no sign-in attempts recorded yet</div>';
 
       // Accounts
       el('account-tiles').innerHTML = [
