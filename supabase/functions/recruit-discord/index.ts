@@ -760,10 +760,13 @@ function ptHour(now = new Date()): number {
 // dedupe, lanes, and a log entry like every other notification — and the house
 // hears about a milestone once, not from two systems.
 
-// Capability token for a recording's public watch link — 32 random bytes, so
-// links are unguessable. Revoke by nulling share_token.
+// Capability token for a recording's public watch link — 10 random bytes
+// (20 hex, ~80 bits) so the link stays short enough to paste anywhere without
+// getting clipped, and still unguessable. Legacy 64-hex tokens keep working:
+// recruit-watch accepts them whole or by their first 20 chars. Revoke by
+// nulling share_token.
 function newShareToken(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)))
+  return Array.from(crypto.getRandomValues(new Uint8Array(10)))
     .map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
