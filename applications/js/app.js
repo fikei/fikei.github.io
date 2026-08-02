@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.63.0';
+const VERSION = '3.64.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -141,6 +141,7 @@ let votes = {};               // applicant_id -> recruit_votes rows
 let placements = [];          // recruit_listing_candidates rows
 let viewedIds = new Set();    // applicants I've opened (recruit_applicant_views)
 let claimPosts = {};          // applicant_id -> { status, posted_at }
+let tourState = {};           // applicant_id -> { status, confirmedSlot?, askedAt? }
 let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
@@ -499,10 +500,10 @@ function avatarHtml(a, large) {
   return `<span class="${cls}">${esc(initials(a))}<img class="avatar__img" src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
 }
 
-/* The one CTA an Openings row needs right now, from its funnel micro-state:
-   nothing sent yet → Get started · waiting on them → Follow up · they wrote
-   back → Reply · availability in hand → Pick a time · call booked → the
-   slot chip (+ Join when there's a Meet link). */
+/* The Openings row's funnel micro-state, read as a status chip: nothing sent
+   yet · waiting on them · they wrote back · availability in hand · call
+   booked · call done · tour cycle. The matching verbs all live in the ⋮
+   menu (rowMenuHtml). */
 /* Time-derived call phase — a clock, not a cron, decides these. Stored
    status only carries facts time can't tell us (cancelled). Join renders
    ONLY while the call is actually live (T-10min through end). */
@@ -547,59 +548,57 @@ function joinBtn(sc) {
   return sc.link ? `<a class="btn btn--sm inbox-row__review cta-std btn--join" href="${esc(sc.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>Join</a>` : '';
 }
 
+/* Status only. Every verb for a row lives in its ⋮ menu (rowMenuHtml) — the
+   singular highlighted CTA is gone. The chip answers "where are they?"; the
+   menu answers "what can I do?". The one clickable exception is Join, which
+   exists only for the ~10 minutes a call is actually live and would be
+   useless buried in a menu. */
 function openingsCta(a) {
+  const chip = (txt, mod, title) => `<span class="decision-chip ${mod || ''}"${title ? ` title="${esc(title)}"` : ''}>${txt}</span>`;
+  const stack = (top) => `<span class="cta-stack">${top}</span>`;
   const sc = screeningState[a.id];
   const phase = callPhase(sc);
-  /* One tier only. The caption under the primary ("no decisions yet", "replied
-     2d ago") repeated what the row, the dot, and the profile already say, and
-     it made every row two lines tall. Callers still pass context; it's dropped
-     here so the call sites keep reading as intent rather than markup. */
-  const stack = (top) => `<span class="cta-stack">${top}</span>`;
-  const when = sc?.at ? `${fmtSlot(sc.at)}${sc.with ? ` · ${esc(sc.with)}` : ''}` : '';
-  if (phase === 'watch') {
-    const dv = decisionVotes[a.id] || [];
-    const mine = dv.find(v => v.voter_id === me?.id);
-    const decCtx = decisionContext(dv, mine);
-    return stack(
-      `<span class="cta-pair"><button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule visit</button><button type="button" class="btn btn--sm cta-watch btn--watch" title="Play in the docked player — View opens the Call tab" data-play-mini="${a.id}"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Watch</button></span>`,
-      `${decCtx}${when ? ` · ${when}` : ''}`);
+
+  // Once a tour cycle is underway it owns the row's status.
+  const tour = tourState[a.id];
+  if (tour?.status === 'confirmed' && tour.confirmedSlot) {
+    return stack(chip(`visit ${fmtSlot(tour.confirmedSlot)}`, 'decision-chip--outreach', 'House tour confirmed — they have the address and details'));
   }
-  if (phase === 'done') {
-    // Same move as after a watched call — the decision is the point, the
-    // recording was only ever an aid — plus a way to supply one.
-    const dv = decisionVotes[a.id] || [];
-    const mine = dv.find(v => v.voter_id === me?.id);
-    const decCtx = decisionContext(dv, mine);
-    return stack(
-      `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-email="${a.id}" data-email-kind="visit" title="Invite them to a house visit — opens the email draft">Schedule visit</button>`,
-      `${decCtx} · no recording — <button type="button" class="cta-link" data-add-recording="${a.id}">add a link</button>`);
+  if (tour?.status === 'polled') {
+    return stack(chip('house poll open', 'decision-chip--vote', `Housemates are reacting in Discord — the visit confirms itself past ${setting('tour_confirm_votes')} of them`));
   }
-  if (phase === 'processing') return stack(processingChip(), when);
-  if (phase === 'live') return stack(joinBtn(sc) || processingChip(), when);
+  if (tour?.status === 'asked') {
+    return stack(chip('tour ask sent', 'decision-chip--outreach', 'Waiting on their availability — the house poll posts itself when they reply'));
+  }
+
+  if (phase === 'watch' || phase === 'done') {
+    const dv = decisionVotes[a.id] || [];
+    return stack(chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Watch, decide, or schedule a house tour from the ⋮ menu'));
+  }
+  if (phase === 'processing') return stack(processingChip());
+  if (phase === 'live') return stack(joinBtn(sc) || processingChip());
   if (phase === 'scheduled') {
-    return stack(`<span class="decision-chip decision-chip--outreach" title="Intro call${sc.with ? ` with ${esc(sc.with)}` : ''}">${fmtSlot(sc.at)}</span>`, sc.with ? `with ${esc(sc.with)}` : '');
+    return stack(chip(fmtSlot(sc.at), 'decision-chip--outreach', `Intro call${sc.with ? ` with ${esc(sc.with)}` : ''}`));
   }
   const claim = claimPosts[a.id];
   if (sc?.availability && claim && (claim.status === 'open' || claim.status === 'manual')) {
     const days = Math.max(0, Math.round((Date.now() - new Date(claim.postedAt).getTime()) / 86400000));
-    return stack(`<span class="decision-chip decision-chip--outreach">◆ sent to housemates</span>`,
-      `no screener yet · ${days === 0 ? 'sent today' : `${days}d`} · <button type="button" class="cta-link" data-avail-review="${a.id}">book it yourself</button>`);
+    return stack(chip('◆ sent to housemates', 'decision-chip--outreach', `No screener yet · ${days === 0 ? 'sent today' : `${days}d ago`} — book it yourself from the ⋮ menu`));
   }
-  if (sc?.availability) return stack(
-    `<button class="btn btn--sm inbox-row__review cta-std cta--blue" data-avail-review="${a.id}">Review times</button>`,
-    sc.nWindows ? `${sc.nWindows} window${sc.nWindows === 1 ? '' : 's'} offered` : '');
+  if (sc?.availability) {
+    return stack(chip(`times in${sc.nWindows ? ` · ${sc.nWindows} window${sc.nWindows === 1 ? '' : 's'}` : ''}`, 'decision-chip--replied', 'They offered availability — review times from the ⋮ menu'));
+  }
   const st = emailState[a.id];
-  if (st?.lastDir === 'in') return stack(`<button class="btn btn--sm inbox-row__review cta-std cta--green" data-pick-time="${a.id}">Reply</button>`, `replied ${relTime(st.lastAt)}`);
+  if (st?.lastDir === 'in') return stack(chip(`replied ${relTime(st.lastAt)}`, 'decision-chip--replied', 'They wrote back — reply from the ⋮ menu'));
   if (st?.lastDir === 'out') {
     // "I'll send an invite" reads as manual scheduling — say so instead of
     // nagging; a shared-account invite gets picked up by the calendar sweep.
     const promised = /\b(invite|calendar|schedul|let'?s (chat|talk|meet)|talk (soon|then|tomorrow))\b/i.test(st.lastSnippet || '');
-    // Waiting is passive until ~3 quiet days; then the clock arms Follow up.
+    // Waiting is passive until ~3 quiet days; then the clock flags the row.
     const stale = Date.now() - new Date(st.lastAt).getTime() > setting('followup_stale_days') * 86400000;
-    return stack(`<button class="btn btn--sm inbox-row__review cta-std ${stale ? 'cta--amber' : ''}" data-email="${a.id}">Follow up</button>`,
-      `${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`);
+    return stack(chip(`${promised ? 'invite promised · ' : ''}sent ${relTime(st.lastAt)}`, stale ? 'decision-chip--auto' : 'decision-chip--vote', stale ? 'Quiet for a while — a follow-up is worth sending (⋮ menu)' : 'Waiting on them'));
   }
-  return stack(`<button class="btn btn--sm inbox-row__review cta-std" data-email="${a.id}">Get started</button>`, '');
+  return stack(chip('no outreach yet', 'decision-chip--vote', 'Start the thread from the ⋮ menu'));
 }
 
 /* Blue response dot in the row's left gutter — sits beside the avatar,
@@ -656,7 +655,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes, tRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at, source').order('created_at'),
@@ -672,11 +671,14 @@ async function loadAll() {
     sb.from('recruit_applicant_views').select('applicant_id'),
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
     sb.from('recruit_decision_votes').select('*'),
+    sb.from('recruit_tours').select('applicant_id, status, asked_at, confirmed_slot, off_hours'),
   ]);
   placements = pRes.data || [];
   viewedIds = new Set((vwRes.data || []).map(v => v.applicant_id));
   claimPosts = {};
   for (const c of (cpRes.data || [])) claimPosts[c.applicant_id] = { status: c.status, postedAt: c.posted_at };
+  tourState = {};
+  for (const t of (tRes?.data || [])) tourState[t.applicant_id] = { status: t.status, askedAt: t.asked_at, confirmedSlot: t.confirmed_slot, offHours: t.off_hours };
   decisionVotes = {};
   for (const d of (dvRes.data || [])) (decisionVotes[d.applicant_id] ||= []).push(d);
   votes = {};
@@ -752,7 +754,7 @@ async function loadAll() {
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
-    movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url, scheduleToken: r.schedule_token,
+    movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url,
     stage: r.stage || 'review',
     moveinFrom: r.move_in_from, moveinTo: r.move_in_to, moveinSetBy: r.move_in_set_by_name,
     updateSentAt: r.update_email_sent_at, updateSkippedAt: r.update_email_skipped_at,
@@ -1204,7 +1206,7 @@ function flushPendingExits() {
 let emailApplicantId = null;
 
 let emailMode = 'outreach';   // 'outreach' | 'update' (rejection queue)
-let emailKind = null;         // typed draft override, e.g. 'visit'
+let emailKind = null;         // typed draft override, e.g. 'tour'
 
 async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
@@ -1221,10 +1223,14 @@ async function openEmailModal(applicantId, kind) {
   emailMode = 'outreach';
   emailKind = kind || null;
   document.getElementById('email-send').textContent = 'Send via Agape Gmail';
-  document.getElementById('email-title').textContent = kind === 'visit' ? `Invite ${a.first} to visit` : `Email ${fullName(a)}`;
+  document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour` : `Email ${fullName(a)}`;
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
-  document.getElementById('email-status').textContent = 'Drafting from their application, the listing, and any flags…';
+  const addedHost = document.getElementById('email-added');
+  if (addedHost) { addedHost.hidden = true; addedHost.innerHTML = ''; }
+  document.getElementById('email-status').textContent = kind === 'tour'
+    ? 'Drafting the availability ask — Tue–Thu 5–7pm is stated as the preference, with no reasoning exposed…'
+    : 'Drafting from their application, the listing, and any flags…';
   document.getElementById('email-modal').hidden = false;
   await generateEmail(applicantId);
 }
@@ -1311,9 +1317,19 @@ async function generateEmail(applicantId) {
     if (emailApplicantId !== applicantId) return; // closed / switched meanwhile
     document.getElementById('email-subject').value = out.subject || '';
     document.getElementById('email-body').value = out.body || '';
-    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask' };
+    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask', tour: 'House tour ask', visit: 'House tour ask' };
     document.getElementById('email-status').textContent =
       `${typeLabels[out.emailType] || 'Outreach'}${out.reason ? ` — ${out.reason}` : ''}. Edit freely, then send.`;
+    // What the drafter folded in beyond the scheduling ask, and why — so the
+    // sender knows before hitting send rather than by diffing the copy.
+    const addedHost = document.getElementById('email-added');
+    if (addedHost) {
+      if (out.added?.length) {
+        addedHost.innerHTML = `<p class="email-added__title">Also added to this email:</p>` +
+          out.added.map(x => `<p class="email-added__item"><strong>${esc(x.what)}</strong>${x.why ? ` — ${esc(x.why)}` : ''}</p>`).join('');
+        addedHost.hidden = false;
+      } else { addedHost.hidden = true; addedHost.innerHTML = ''; }
+    }
   } catch (e) {
     document.getElementById('email-status').textContent = `Draft failed: ${e.message}`;
   }
@@ -2834,20 +2850,37 @@ function othersAccordion(listingId) {
   </details>`;
 }
 
-/* Row-level ⋯: navigation up top, one Remove… below the rule. The four
-   removal outcomes live in the sheet rather than the menu — each needs a
+/* Row-level ⋮ — the whole verb set, context-aware, suggested next step
+   first (same funnel logic the old highlighted CTA ran on, now just the top
+   row of the menu, unstyled). Both schedule actions live here. The four
+   removal outcomes stay in the sheet rather than the menu — each needs a
    consequence line ("queues an update email") that a menu can't carry. */
 function rowMenuHtml(a, listingId) {
   const mid = `row-${a.id}-${listingId}`;
+  const sc = screeningState[a.id] || {};
+  const st = emailState[a.id];
+  const tour = tourState[a.id];
+  const item = (attrs, label) => `<button type="button" class="listing-menu__item" ${attrs}>${label}</button>`;
+  const items = [];
+  // Suggested next step, by funnel state.
+  if (sc.availability) items.push(item(`data-avail-review="${a.id}"`, 'Review times'));
+  else if (st?.lastDir === 'in') items.push(item(`data-pick-time="${a.id}"`, 'Reply'));
+  else if (st?.lastDir === 'out') items.push(item(`data-email="${a.id}"`, 'Follow up'));
+  else if (!sc.at && !sc.done) items.push(item(`data-email="${a.id}"`, 'Email them'));
+  // The two schedule actions. An intro-call ask only makes sense before one
+  // exists; a tour ask is reachable any time a cycle isn't already running.
+  if (!sc.at && !sc.done && !sc.availability) items.push(item(`data-email="${a.id}" data-email-kind="availability"`, 'Schedule intro call'));
+  if (!tour || tour.status === 'cancelled' || tour.status === 'confirmed') items.push(item(`data-email="${a.id}" data-email-kind="tour"`, 'Schedule house tour'));
+  if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
+  if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, 'Decide'));
+  items.push(item(`data-review="${a.id}"`, 'Open profile'));
+  items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
     <button type="button" class="btn btn--sm listing-menu-btn" data-listing-menu="${esc(mid)}" aria-label="Applicant actions" aria-haspopup="menu">⋮</button>
     <span class="listing-menu" data-menu-for="${esc(mid)}" hidden>
-      <button type="button" class="listing-menu__item" data-review="${a.id}">Open profile</button>
-      ${a.scheduleToken ? `<button type="button" class="listing-menu__item" data-copy-schedule="${a.id}">Copy link</button>` : ''}
-      ${(screeningState[a.id]?.watch || screeningState[a.id]?.done) ? `<button type="button" class="listing-menu__item" data-give-decision="${a.id}">Decide</button>` : ''}
-      <button type="button" class="listing-menu__item" data-add-recording="${a.id}">Add recording</button>
+      ${items.join('')}
       <span class="listing-menu__rule" aria-hidden="true"></span>
-      <button type="button" class="listing-menu__item" data-open-remove="${a.id}|${esc(listingId)}">Remove…</button>
+      ${item(`data-open-remove="${a.id}|${esc(listingId)}"`, 'Remove…')}
     </span>
   </span>`;
 }
@@ -4636,11 +4669,6 @@ function voteSectionHtml(a) {
 /* The house reaches ONE decision about a candidate; housemates weigh in on it.
    The old copy counted "3 decisions in", which read as three separate verdicts
    needing a quorum — the opposite of how this works. */
-function decisionContext(dv, mine) {
-  if (!dv.length) return 'nobody has weighed in yet';
-  return `${dv.length} weighed in — yours ${mine ? 'counted' : "isn't in"}`;
-}
-
 /* Contextual footer: vote bar in review, recruiter actions for candidates,
    reopen for archived. */
 function renderReviewFoot(a) {
@@ -4863,7 +4891,6 @@ function paintEmailsPanel(a, note) {
       <span class="notes__empty">${rows.length ? `${rows.length} message${rows.length === 1 ? '' : 's'} with ${esc(a.email)}` : esc(a.email || '')}
         <span class="emails-note" id="emails-note">${esc(note === 'checking' ? 'checking for new…' : note)}</span></span>
       <span class="emails-toolbar__actions">
-        ${a.scheduleToken ? `<button type="button" class="btn btn--sm" data-copy-schedule="${a.id}">Copy link</button>` : ''}
         <button type="button" class="btn btn--sm" data-email="${a.id}">Compose</button>
       </span>
     </div>
@@ -4976,17 +5003,25 @@ function stagesHtml(a) {
   const past = visits.filter(e => new Date(e.ends_at || e.starts_at) < new Date());
   const upcoming = visits.filter(e => new Date(e.ends_at || e.starts_at) >= new Date());
   let visitState = 'none', visitDetail = '', visitAction = '';
+  const tour = tourState[a.id];
   if (past.length) {
     visitState = 'done';
     visitDetail = esc(fmtSlot(past[past.length - 1].starts_at));
   } else if (upcoming.length) {
     visitState = 'scheduled';
     visitDetail = esc(fmtSlot(upcoming[0].starts_at));
+  } else if (tour?.status === 'confirmed' && tour.confirmedSlot) {
+    visitState = 'scheduled';
+    visitDetail = `${esc(fmtSlot(tour.confirmedSlot))} · confirmed by house poll`;
+  } else if (tour?.status === 'polled') {
+    visitDetail = 'house poll open — confirms itself when enough housemates react';
+  } else if (tour?.status === 'asked') {
+    visitDetail = 'tour ask sent — the house poll posts when they reply with times';
   } else {
     // Only worth offering once they have actually been interviewed.
     visitDetail = sc.done ? 'ready to invite' : 'after the intro call';
     visitAction = sc.done
-      ? `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="visit">Invite them</button>`
+      ? `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="tour">Invite them</button>`
       : '';
   }
 
@@ -5881,13 +5916,6 @@ function init() {
       renderReview();
       return;
     }
-    const cps = e.target.closest('[data-copy-schedule]');
-    if (cps) {
-      const a = applicants.find(x => x.id === cps.dataset.copySchedule);
-      navigator.clipboard.writeText(`https://ctrl.rodeo/applications/schedule/?t=${a?.scheduleToken}`)
-        .then(() => toast('Availability link copied'));
-      return;
-    }
     const slot = e.target.closest('[data-slot]');
     if (slot) { scheduleSlot(slot.dataset.slotApplicant, slot.dataset.slot, slot); return; }
     const rtab = e.target.closest('[data-review-tab]');
@@ -6207,7 +6235,14 @@ function init() {
         action: emailMode === 'update' ? 'send-update' : 'send', applicantId: sentFor,
         subject: document.getElementById('email-subject').value,
         body: document.getElementById('email-body').value,
+        // A tour ask opens the tour cycle server-side: the next availability
+        // reply becomes a house poll instead of a screener claim.
+        ...(emailKind === 'tour' || emailKind === 'visit' ? { kind: 'tour' } : {}),
       });
+      if ((emailKind === 'tour' || emailKind === 'visit') && emailMode !== 'update') {
+        tourState[sentFor] = { status: 'asked', askedAt: new Date().toISOString() };
+        if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+      }
       if (emailMode === 'update') {
         const a = applicants.find(x => x.id === sentFor);
         if (a) { a.updateSentAt = new Date().toISOString(); a.stage = 'archived'; }

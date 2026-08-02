@@ -642,6 +642,31 @@ A destructive or branching action with **more than two outcomes** opens a sheet,
 - `btn--danger` **replaces** `btn--accent` rather than stacking on it — danger is an outline style that fills on hover, so the two together produce an accent fill with a red border
 - The parent menu keeps a single entry (`Remove…`), with a `.listing-menu__rule` separating navigation from destructive items
 
+### Status rows + kebab-first actions (v3.64)
+
+List rows in a work queue show **status, not buttons**: one `decision-chip` on the right whose tooltip names where the action lives, and a `.listing-menu` (⋮) that carries **every** verb. There is no highlighted primary CTA in the row.
+
+**Rules:**
+- The chip answers *"where are they?"*; the menu answers *"what can I do?"*
+- The menu is context-aware: items render only when valid, and the **suggested next step sits first, unstyled** — position is the recommendation, never an accent
+- The one exception to no-buttons-in-rows: an action whose entire useful lifetime is minutes (a live-call **Join** link) stays inline
+- Destructive items stay below a `.listing-menu__rule`, consequences stay in a Reason Sheet
+
+*Reference implementation: `applications/js/app.js` — `openingsCta()` / `rowMenuHtml()`.*
+
+### Drafter-added context callout (`email-added`)
+
+When an AI-drafted email folds in anything beyond its single ask (answers to the recipient's unanswered questions, owed context), the compose modal shows a `.email-added` callout above the draft — one line per addition, **what** in medium weight, an em-dash, then **why**. Sender-facing only; never part of the sent email.
+
+```html
+<div class="email-added">
+  <p class="email-added__title">Also added to this email:</p>
+  <p class="email-added__item"><strong>Answered their parking question</strong> — asked in their Jul 12 reply, never answered.</p>
+</div>
+```
+
+Tint is the hold/amber pair (`--hold-tint` / `--hold-fg`): it's a heads-up, not an error.
+
 ### Sidebar CTAs (`drawer-cta`)
 
 A sidebar or drawer footer is **three tiers deep, ordered by consequence** — not one right-aligned flex row. A ~380px drawer cannot keep four targets honest side by side; the stay editor proved it, with two red underlined links each wrapping onto two lines.

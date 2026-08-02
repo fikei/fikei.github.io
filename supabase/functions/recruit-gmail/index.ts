@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.30.5'
-console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
+const VERSION = '1.31.0'
+console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC } from '../_shared/discord.ts'
+import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC, postTourPoll, tourPollCounts, editTourConfirmed, TOUR_EMOJIS } from '../_shared/discord.ts'
 import { record } from '../_shared/recruit-notify.ts'
 import { ACTIONS } from '../_shared/recruit-copy.ts'
 
@@ -360,6 +360,172 @@ async function postClaim(client: ReturnType<typeof db>, applicantId: string, ext
   } catch (err) {
     console.warn(`claim post failed for ${applicantId}: ${(err as Error).message}`)
   }
+}
+
+/* ---------- house-tour polls ----------
+   The second schedule action. Preferred visit hours are Tue–Thu 5–7pm PT —
+   the most housemates are around and it clears family dinner (which tour
+   guests never join). That WHY lives here and in Settings, never in any
+   email the applicant sees. */
+const TOUR_DAYS = new Set([2, 3, 4]) // Tue, Wed, Thu
+const TOUR_START = '17:00'
+const TOUR_END = '19:00'
+
+// Weekday of a PT wall-clock date. Noon UTC on that calendar date is always
+// the same calendar day in Pacific, so getUTCDay is safe here.
+function weekdayPT(date: string): number {
+  return new Date(`${date}T12:00:00Z`).getUTCDay()
+}
+
+// Their windows ∩ Tue–Thu 5–7pm → poll slots. When nothing overlaps, fall
+// back to their raw windows and flag the poll off-hours for a human call.
+function tourSlotsFrom(windows: Array<{ date: string; start: string; end: string }>): { slots: Array<{ start: string; label: string; emoji: string }>; offHours: boolean } {
+  const now = Date.now()
+  const hits: Array<{ start: Date; end: Date }> = []
+  for (const w of windows) {
+    if (!TOUR_DAYS.has(weekdayPT(w.date))) continue
+    const s = ptToUTC(w.date, w.start > TOUR_START ? w.start : TOUR_START)
+    const e = ptToUTC(w.date, w.end < TOUR_END ? w.end : TOUR_END)
+    if (s.getTime() >= e.getTime() || e.getTime() < now) continue
+    hits.push({ start: s, end: e })
+  }
+  const offHours = !hits.length
+  const source = offHours
+    ? windows.map((w) => ({ start: ptToUTC(w.date, w.start), end: ptToUTC(w.date, w.end) }))
+        .filter((x) => x.end.getTime() > now)
+    : hits
+  const fmtEnd = (d: Date) => d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
+    .toLowerCase().replace(' am', 'a').replace(' pm', 'p')
+  const slots = source.sort((a, b) => a.start.getTime() - b.start.getTime())
+    .slice(0, TOUR_EMOJIS.length)
+    .map((x, i) => ({ start: x.start.toISOString(), label: `${slotLabel(x.start)}–${fmtEnd(x.end)}`, emoji: TOUR_EMOJIS[i] }))
+  return { slots, offHours }
+}
+
+// "More than N housemates" — the poll confirms strictly above this number.
+async function tourThreshold(client: ReturnType<typeof db>): Promise<number> {
+  try {
+    const { data } = await client.from('recruit_settings').select('value').eq('key', 'tour_confirm_votes').maybeSingle()
+    const n = Number(data?.value)
+    return Number.isFinite(n) && n >= 1 ? n : 4
+  } catch { return 4 }
+}
+
+/* When availability lands for someone with an open tour ask, the windows
+   belong to the tour: post (or refresh) the emoji poll. Returns true when a
+   tour is open — the caller then skips the screener claim post, so one reply
+   never spawns two competing Discord asks. Warn-only, like postClaim. */
+async function maybePostTourPoll(
+  client: ReturnType<typeof db>, applicantId: string,
+  windows: Array<{ date: string; start: string; end: string }>,
+): Promise<boolean> {
+  try {
+    const { data: tour } = await client.from('recruit_tours')
+      .select('*').eq('applicant_id', applicantId).in('status', ['asked', 'polled']).maybeSingle()
+    if (!tour) return false
+    if (!windows?.length) return true
+    const { slots, offHours } = tourSlotsFrom(windows)
+    if (!slots.length) return true
+    const { data: applicant } = await client.from('recruit_applicants')
+      .select('first_name').eq('id', applicantId).maybeSingle()
+    const message = await postTourPoll({
+      firstName: applicant?.first_name || 'An applicant', applicantId, slots, offHours,
+      threshold: await tourThreshold(client),
+      existing: tour.discord_message_id
+        ? { channelId: tour.discord_channel_id, messageId: tour.discord_message_id }
+        : null,
+    })
+    await client.from('recruit_tours').update({
+      windows, slots, off_hours: offHours,
+      discord_channel_id: message.channel_id || tour.discord_channel_id || NOTES_CHANNEL_ID,
+      discord_message_id: message.id,
+      status: 'polled', polled_at: tour.polled_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('applicant_id', applicantId)
+    console.log(`tour poll ${tour.status === 'polled' ? 'refreshed' : 'posted'} for ${applicantId}: ${slots.length} slot(s)${offHours ? ' (off-hours)' : ''}`)
+    return true
+  } catch (err) {
+    console.warn(`tour poll failed for ${applicantId}: ${(err as Error).message}`)
+    return true
+  }
+}
+
+/* Reaction sweep, on the same scan tick as everything else. A slot that
+   clears the threshold auto-sends the confirmation — address + the shape of
+   the visit (casual kitchen conversation, house tour) — and closes the poll.
+   The address comes from Settings; without it the sweep holds off rather
+   than send an email that can't say where to go. */
+async function sweepTourPolls(client: ReturnType<typeof db>): Promise<number> {
+  const { data: polls } = await client.from('recruit_tours')
+    .select('*').eq('status', 'polled').not('discord_message_id', 'is', null).limit(10)
+  if (!polls?.length) return 0
+  const threshold = await tourThreshold(client)
+  let confirmed = 0
+  for (const tour of polls) {
+    try {
+      const counts = await tourPollCounts(tour.discord_channel_id, tour.discord_message_id)
+      let best: { slot: { start: string; label: string; emoji: string }; n: number } | null = null
+      for (const s of (tour.slots || [])) {
+        const n = counts.get(s.emoji) || 0
+        if (new Date(s.start).getTime() < Date.now()) continue
+        if (!best || n > best.n) best = { slot: s, n }
+      }
+      if (!best || best.n <= threshold) continue
+      const { data: addrRow } = await client.from('recruit_settings')
+        .select('value').eq('key', 'house_address').maybeSingle()
+      const address = typeof addrRow?.value === 'string' ? addrRow.value.trim() : ''
+      if (!address) {
+        console.warn(`tour for ${tour.applicant_id} cleared ${best.n} votes but house_address is unset — set it in Settings to enable auto-confirm`)
+        continue
+      }
+      const { data: applicant } = await client.from('recruit_applicants')
+        .select('first_name, email').eq('id', tour.applicant_id).maybeSingle()
+      if (!applicant?.email?.includes('@')) continue
+      const when = slotWhen(new Date(best.slot.start))
+      const subject = `You're on — house visit at Agape (${best.slot.label.split(' · ')[0]})`
+      const text = [
+        `Hi ${applicant.first_name},`,
+        '',
+        `${when} works on our end — you're confirmed for a house visit!`,
+        '',
+        `We're at ${address}. Plan on a casual conversation in the kitchen and a tour of the house — a bunch of housemates will be around to say hi.`,
+        '',
+        'See you then!',
+        '— the Agape house',
+      ].join('\n')
+      const at = await accessToken(client)
+      const encSubject = `=?UTF-8?B?${b64url(subject).replace(/-/g, '+').replace(/_/g, '/')}?=`
+      const raw = [
+        `From: Agape <${SHARED_EMAIL}>`, `To: ${applicant.email}`, `Subject: ${encSubject}`,
+        'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', '', text,
+      ].join('\r\n')
+      const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: b64url(raw) }),
+      })
+      const sent = await resp.json()
+      if (!resp.ok) throw new Error(`confirm send failed: ${JSON.stringify(sent).slice(0, 160)}`)
+      await client.from('recruit_emails').upsert({
+        applicant_id: tour.applicant_id, gmail_id: sent.id, thread_id: sent.threadId,
+        direction: 'out', subject, snippet: text.slice(0, 180), body_text: text,
+        from_email: SHARED_EMAIL, to_email: applicant.email,
+        sent_by_name: 'tour poll', sent_at: new Date().toISOString(),
+      }, { onConflict: 'gmail_id' })
+      await client.from('recruit_tours').update({
+        status: 'confirmed', confirmed_slot: best.slot.start, confirmed_count: best.n,
+        confirmed_at: new Date().toISOString(), confirm_gmail_id: sent.id,
+        updated_at: new Date().toISOString(),
+      }).eq('applicant_id', tour.applicant_id)
+      await editTourConfirmed(tour.discord_channel_id, tour.discord_message_id,
+        applicant.first_name, tour.applicant_id, when, best.n)
+      confirmed++
+      console.log(`tour confirmed for ${tour.applicant_id}: ${best.slot.label} (${best.n} in)`)
+    } catch (err) {
+      console.warn(`tour sweep failed for ${tour.applicant_id}: ${(err as Error).message}`)
+    }
+  }
+  return confirmed
 }
 
 // 96h stuck-metric: one channel nudge per unclaimed post. Piggybacks on scan
@@ -800,6 +966,20 @@ serve(async (req) => {
         sent_by_name: rp?.display_name || membership.discord_username || null,
         sent_at: new Date().toISOString(),
       }, { onConflict: 'gmail_id' })
+      // A tour ask opens (or restarts) the applicant's tour cycle: the next
+      // availability reply becomes an emoji poll instead of a screener claim.
+      if (String(body.kind || '') === 'tour') {
+        await client.from('recruit_tours').upsert({
+          applicant_id: applicant.id, status: 'asked',
+          asked_at: new Date().toISOString(),
+          asked_by_name: rp?.display_name || membership.discord_username || null,
+          windows: null, slots: null, off_hours: false,
+          polled_at: null, confirmed_slot: null, confirmed_count: null,
+          confirmed_at: null, confirm_gmail_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        console.log(`tour ask opened for ${applicant.id}`)
+      }
       console.log(`sent → ${applicant.email} (${sent.id})`)
       return json({ sent: true, gmailId: sent.id })
     }
@@ -1270,7 +1450,10 @@ serve(async (req) => {
               intent_summary: extraction.intent_summary,
               intent_at: new Date().toISOString(),
             }).eq('gmail_id', msg.id)
-            if (await autoPostEnabled(client)) await postClaim(client, applicantId, extraction)
+            // An open tour ask claims the reply's windows for the emoji poll;
+            // otherwise they feed the screener claim flow as before.
+            const tourOpen = await maybePostTourPoll(client, applicantId, extraction.windows)
+            if (!tourOpen && await autoPostEnabled(client)) await postClaim(client, applicantId, extraction)
           }
         }
       }
@@ -1309,7 +1492,8 @@ serve(async (req) => {
             intent_summary: extraction.intent_summary,
             intent_at: new Date().toISOString(),
           }).eq('gmail_id', r.gmail_id)
-          if ((extraction.windows.length || extraction.needs_human) && await autoPostEnabled(client)) await postClaim(client, r.applicant_id, extraction)
+          const tourOpen = await maybePostTourPoll(client, r.applicant_id, extraction.windows)
+          if (!tourOpen && (extraction.windows.length || extraction.needs_human) && await autoPostEnabled(client)) await postClaim(client, r.applicant_id, extraction)
           backfilled++
           console.log(`availability backfill: ${r.applicant_id} → ${extraction.windows.length} windows`)
         }
@@ -1420,6 +1604,11 @@ serve(async (req) => {
       }
 
       await remindStuckPosts(client)
+      // Tour polls: count reactions, auto-confirm anything over threshold.
+      let tourConfirms = 0
+      try { tourConfirms = await sweepTourPolls(client) } catch (err) {
+        console.warn(`tour poll sweep failed: ${(err as Error).message}`)
+      }
       // Last: calls agreed purely in email get a real calendar event, so the
       // Meet link exists and the bot cron has something to join. Runs after
       // the calendar sweep so anything already on a calendar is known.
@@ -1427,8 +1616,8 @@ serve(async (req) => {
       try { autoScheduled = (await scheduleFromEmail(client)).made } catch (err) {
         console.warn(`email autoschedule failed: ${(err as Error).message}`)
       }
-      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills, ${autoScheduled} scheduled from email`)
-      return json({ matched, replied: [...replied], manualPickups, backfilled, pinged, autoScheduled })
+      console.log(`scan: ${matched} new messages matched, ${replied.size} applicants replied, ${manualPickups} manual screenings picked up, ${backfilled} availability backfills, ${autoScheduled} scheduled from email, ${tourConfirms} tours confirmed`)
+      return json({ matched, replied: [...replied], manualPickups, backfilled, pinged, autoScheduled, tourConfirms })
     }
 
     return json({ error: 'Unknown action' }, 400)

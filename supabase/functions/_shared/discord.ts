@@ -693,6 +693,78 @@ export async function _unusedCanSeeRecruiting(discordUserId: string, memberRoles
   return (perms & VIEW_CHANNEL) === VIEW_CHANNEL
 }
 
+// ---- house-tour polls -----------------------------------------------------
+
+// Number emojis for tour poll slots. Reactions, not buttons: a tour is a
+// headcount question ("who can be around?"), and everyone answering is the
+// point — buttons are for the first-taker-wins claim flow.
+export const TOUR_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
+
+export interface TourSlot { start: string; label: string; emoji: string }
+
+// Post (or refresh) the tour poll and seed each slot's reaction so
+// housemates tap rather than hunt the emoji picker. Returns the message.
+export async function postTourPoll(input: {
+  firstName: string; applicantId: string; slots: TourSlot[]
+  offHours: boolean; threshold: number
+  existing?: { channelId: string; messageId: string } | null
+}): Promise<any> {
+  const lines = input.slots.map((s) => `${s.emoji} ${s.label}`).join('\n')
+  const description =
+    `🏠 **House tour poll — ${input.firstName}** sent ${input.slots.length === 1 ? 'a time' : 'times'} for a visit.\n\n` +
+    (input.offHours ? `⚠️ None of their windows fit Tue–Thu 5–7pm — these are their raw times; confirming may need a human call.\n\n` : '') +
+    `React with every slot you can make — the visit confirms automatically once **more than ${input.threshold}** housemates are in on one.\n\n` +
+    `${lines}\n\n` +
+    `See their [application](${appLink(input.applicantId)}).`
+  const payload = { embeds: [{ description, color: 0x1abc9c }] }
+  const message = await postOrPatch(
+    input.existing?.channelId || NOTES_CHANNEL_ID,
+    input.existing?.messageId || null, payload,
+  )
+  const channelId = message.channel_id || input.existing?.channelId || NOTES_CHANNEL_ID
+  for (const s of input.slots) {
+    try {
+      await discordFetch(`/channels/${channelId}/messages/${message.id}/reactions/${encodeURIComponent(s.emoji)}/@me`, { method: 'PUT' })
+    } catch (err) {
+      console.warn(`[discord] seeding reaction ${s.emoji} failed: ${(err as Error).message}`)
+    }
+  }
+  await auditMirror('House tour poll', `${input.firstName} — ${input.slots.length} slot(s)`, { channelId })
+  return message
+}
+
+// Read live per-emoji headcounts off a poll message. Subtracts the bot's
+// own seeded reaction so the number is real housemates.
+export async function tourPollCounts(channelId: string, messageId: string): Promise<Map<string, number>> {
+  const msg = await discordFetch(`/channels/${channelId}/messages/${messageId}`, { method: 'GET' })
+  const counts = new Map<string, number>()
+  for (const r of (msg.reactions || [])) {
+    const emoji = r.emoji?.name
+    if (emoji) counts.set(emoji, Math.max(0, (r.count || 0) - (r.me ? 1 : 0)))
+  }
+  return counts
+}
+
+// Close a confirmed poll in place: the message becomes the announcement.
+export async function editTourConfirmed(
+  channelId: string, messageId: string,
+  firstName: string, applicantId: string, when: string, count: number,
+): Promise<void> {
+  try {
+    await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        embeds: [{
+          description: `✅ **${firstName}'s house tour is on — ${when}** (${count} housemates in). They've been emailed the address and details. [Application](${appLink(applicantId)})`,
+          color: 0x2ecc71,
+        }],
+      }),
+    })
+  } catch (err) {
+    console.warn(`[discord] tour confirm edit failed: ${(err as Error).message}`)
+  }
+}
+
 // One channel nudge for a post nobody claimed within 96h.
 // Plain embed post to any channel (new-application pings etc.).
 export async function postChannelEmbed(

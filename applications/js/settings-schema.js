@@ -18,7 +18,7 @@
  *
  * Classic script, not a module: it runs before app.js and hands over globals.
  */
-const SETTINGS_VERSION = '1.0.0';
+const SETTINGS_VERSION = '1.1.0';
 console.log(`[settings-schema] v${SETTINGS_VERSION}`);
 
 /* Every knob, exposed or not. `section: null` means "routed through setting()
@@ -39,6 +39,16 @@ const SETTING_DEFS = {
     scope: 'house', type: 'bool', section: 'house', default: true,
     label: 'Open to couples',
     hint: 'Off hides couple applications from placement suggestions.',
+  },
+  house_address: {
+    scope: 'house', type: 'text', section: 'house', default: '', maxlength: 200,
+    label: 'House address',
+    hint: 'Sent in the auto-confirmation when a house-tour poll clears. Tours don’t confirm without it.',
+  },
+  tour_confirm_votes: {
+    scope: 'house', type: 'number', section: 'house', default: 4,
+    label: 'Tour confirms past', unit: 'housemates', min: 1, max: 12, step: 1,
+    hint: 'A poll slot with MORE than this many reactions auto-emails the confirmation. Tue–Thu 5–7pm is preferred so the most roommates are around without touching family dinner — tour guests don’t join dinner.',
   },
 
   /* --- Funnel ----------------------------------------------------------- */

@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.10.1'
+const VERSION = '1.11.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -198,8 +198,7 @@ function classifyOutreach(emails: any[], screening: any): { type: string; reason
 
 // Draft a tailored outreach email for an applicant + their listing.
 // deno-lint-ignore no-explicit-any
-async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string, ctx?: { type: string; emails: any[]; screening: any }): Promise<{ subject: string; body: string }> {
-  const scheduleUrl = applicant.schedule_token ? `https://ctrl.rodeo/applications/schedule/?t=${applicant.schedule_token}` : null
+async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string, ctx?: { type: string; emails: any[]; screening: any }): Promise<{ subject: string; body: string; added?: Array<{ what: string; why: string }> }> {
   const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
   const pricing = listing ? [
     listing.rent_monthly != null ? `$${listing.rent_monthly} rent (covers utilities and cleaners for common spaces)` : null,
@@ -216,15 +215,26 @@ async function draftEmail(applicant: any, listing: any, room: any, flags: any[],
       // deno-lint-ignore no-explicit-any
       .map((e: any) => `[${e.direction === 'in' ? applicant.first_name : (e.sent_by_name || 'Agape')} — ${String(e.sent_at).slice(0, 10)}]\n${trim(e.body_text, 500)}`)
       .join('\n---\n') || '(no emails on file)'
-    const cta = scheduleUrl ? `pick a time at ${scheduleUrl} (include the URL on its own line)` : 'reply with 3 days where they have a couple hours free'
+    const cta = 'reply with 3 days where they have a couple hours free'
     const briefs: Record<string, string> = {
       follow_up: `They have not replied to our last email. Write a SHORT warm nudge (under 80 words): reference what we asked last time, make replying effortless, restate the single CTA — ${cta}. No re-pitching the house, no guilt.`,
       reply: `They wrote back last — respond directly and concretely to what they said (use the listing details below for pricing/dates if asked). If no call is booked yet, close with the call CTA — ${cta}. Under 140 words.`,
       post_call: `Their Intro Call with ${ctx.screening?.housemate_name || 'a housemate'} just happened. Thank them warmly, one specific human touch, and say the house will be in touch about next steps soon. Do NOT promise an outcome or timeline beyond "soon". Under 80 words.`,
       reschedule: `Their scheduled call fell through. Own it lightly (no blame either way) and reopen scheduling — ${cta}. Under 90 words.`,
-      visit: `Their intro call went well and we want to invite them to VISIT THE HOUSE in person (a house tour + hang, usually an evening; they'll meet more housemates). Warm and concrete: propose that they come by, ask for 2–3 evenings that work for them in the next two weeks. Do NOT promise an outcome — a visit is the next step, not an offer. Under 110 words.`,
+      tour: `We want to invite them to VISIT THE HOUSE in person: a casual hang and a house tour where they'll meet more housemates. Warm and concrete. The ONE ask: send a few times in the next two weeks that work for them, and state plainly that Tuesday–Thursday evenings between 5 and 7pm work best on our end. State ONLY that general constraint — never explain WHY those hours work, and never mention family dinner or any other house ritual. Do NOT promise an outcome — a visit is the next step, not an offer. Under 120 words before any added items (see below).`,
     }
+    briefs.visit = briefs.tour
     const situationBrief = briefs[ctx.type] || briefs.follow_up
+    const isTour = ctx.type === 'tour' || ctx.type === 'visit'
+    // The tour draft also sweeps the thread for anything of theirs still
+    // unanswered and folds it in — and reports each addition separately so
+    // the sender sees WHY it's there before hitting send.
+    const addedRules = isTour
+      ? `\nALSO: scan the thread for questions ${applicant.first_name} asked that we never answered, or context we owe them (pricing they asked about, a promised follow-up). Fold each into the email naturally, AFTER the scheduling ask. For each one, add an entry to "added": {"what": "one line describing what you added", "why": "one line on why (e.g. their unanswered question from their last reply)"}. If nothing is outstanding, "added" is [].`
+      : ''
+    const returnShape = isTour
+      ? `Return exactly: {"subject": "...", "body": "...", "added": [{"what": "...", "why": "..."}]}.`
+      : `Return exactly: {"subject": "...", "body": "..."}.`
     const ctxPrompt = `Write the NEXT email in an ongoing thread from ${senderName} at Agape (13-bedroom co-op near Dolores Park, SF) to applicant ${applicant.first_name}.
 
 SITUATION — this determines the entire shape of the email:
@@ -240,11 +250,14 @@ Hard rules:
 - They applied and we are mid-conversation — never re-introduce or pitch Agape, never ask them to apply.
 - Match the thread's tone; reference the thread naturally, don't recap it.
 - Subject: thread naturally — reuse "Re: <last subject>" when continuing the conversation.
-- Body with real newlines, no markdown. Sign off with ${senderName}.
-Return exactly: {"subject": "...", "body": "..."}.`
-    const text = await callClaudeRaw(OPINION_MODEL, 'You write warm, concise community-house emails. Respond with a single JSON object only.', ctxPrompt, 700)
+- Body with real newlines, no markdown. Sign off with ${senderName}.${addedRules}
+${returnShape}`
+    const text = await callClaudeRaw(OPINION_MODEL, 'You write warm, concise community-house emails. Respond with a single JSON object only.', ctxPrompt, 900)
     const parsed = JSON.parse(text.replace(/^```json?\s*|\s*```$/g, ''))
-    return { subject: String(parsed.subject || 'Re: Hi from Agape!').slice(0, 150), body: String(parsed.body || '').slice(0, 3000) }
+    const added = Array.isArray(parsed.added)
+      ? parsed.added.slice(0, 5).map((x: any) => ({ what: String(x?.what || '').slice(0, 200), why: String(x?.why || '').slice(0, 200) })).filter((x: any) => x.what)
+      : undefined
+    return { subject: String(parsed.subject || 'Re: Hi from Agape!').slice(0, 150), body: String(parsed.body || '').slice(0, 3000), ...(added ? { added } : {}) }
   }
 
   const prompt = `Draft a reply from ${senderName} at Agape (13-bedroom intentional community / co-op in a Victorian near Dolores Park, SF) to someone who ALREADY APPLIED to live at Agape. We reviewed their application and want to move forward.
@@ -269,7 +282,7 @@ ${conflictLines}
 Hard rules:
 - This is a RESPONSE to their application, never cold outreach. Open by acknowledging their application to Agape ("thanks for applying", "we read your application", etc.). Do NOT introduce or pitch Agape as if they don't know it — they applied; skip the agapesf.org/instagram links and the "come live with artists..." pitch line entirely.
 - Never say "apply on our website" — they already did.
-- The CTA is ALWAYS to set up an initial screening call with a housemate. ${scheduleUrl ? `Primary ask: pick your availability at ${scheduleUrl} (takes a minute) — include this exact URL on its own line. Secondary: or just reply with 3 days where you have a couple hours free.` : 'Ask them to reply with 3 days where they have at least a couple hours of availability.'} This is the single ask — don't offer dinners/visits as the first step.
+- The CTA is ALWAYS to set up an initial screening call with a housemate. Ask them to reply with 3 days where they have at least a couple hours of availability. This is the single ask — don't offer dinners/visits as the first step.
 - Reference one specific thing they wrote so it reads personally — ideally connect it to house life.
 - Details block: tailor to the listing kind. Sublet → the window and dates matter most. Resident trial → explain plainly: the room starts as a 3-month trial, then the house votes on full residency. General interest → no room right now, we liked their application, we'll reach out when one opens (no details block).
 - Pricing: if the listing carries exact numbers, use them verbatim in the details block; if a room is offered without numbers, keep the reference $1490 + $210 structure but phrase availability/pricing as "roughly" so nobody quotes it as final.

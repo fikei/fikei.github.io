@@ -256,3 +256,44 @@ The Inbox is no longer a group vote. One housemate's read decides, and every rev
 - **"Reach out" → "Get started"** — the first-contact CTA on an outreach row.
 - **The play control is labelled "Watch"** rather than a bare triangle. Still the secondary of the pair: it shrinks first and keeps its own tint.
 - **The update email's default is a house preference** (`recruit_settings.update_email_default`, rail footer: "Offer an update email by default"). The checkbox on a Not-a-fit decision starts from it, and can still be changed per person.
+
+## v3.64 (2026-08-02) — status rows, kebab-first actions, the house-tour cycle
+
+Three structural changes at once; each supersedes earlier sections where they conflict.
+
+### 1. The row shows status; the ⋮ menu holds every verb
+
+The singular highlighted CTA (**Get started / Follow up / Reply / Review times / Schedule visit**) is gone. An Openings row's right side is now **one status chip** (with a tooltip that names where the action lives) plus the ⋮ menu. The two-tier right rail (v3.14) collapses to one tier.
+
+| Micro-state | Chip |
+|---|---|
+| Nothing sent yet | `no outreach yet` |
+| Waiting on them | `sent 3h ago` (amber tint once stale) |
+| They replied | `replied 2h ago` (green tint) |
+| Availability in hand | `times in · 2 windows` |
+| Coverage ask posted | `◆ sent to housemates` |
+| Call booked | slot chip `Fri, Jul 25, 9:00 AM` |
+| Call done | `call done · 2 weighed in` |
+| Tour ask sent | `tour ask sent` |
+| House poll open | `house poll open` |
+| Tour confirmed | `visit Tue, Aug 11, 5:30 PM` |
+
+The **only** clickable thing left in the row is **Join**, which exists solely for the ~10 minutes a call is live — a live-call entry buried in a menu would defeat its purpose.
+
+The ⋮ menu is context-aware and ordered: **suggested next step first** (same funnel logic the old CTA ran on, rendered unstyled — no accent, per "no singular highlighted action"), then the two schedule actions (**Schedule intro call**, **Schedule house tour**), then Watch recording / Decide / Open profile / Add recording, rule, **Remove…**.
+
+### 2. The scheduling link is dead
+
+`Copy link` (row ⋮ and Emails toolbar) and the `/applications/schedule/?t=` URL in email drafts are removed. Availability is asked for **and parsed** in natural language — the applicant just replies with times, and the existing Gmail extraction turns the reply into windows. The legacy schedule page stays deployed only so links already in the wild don't 404; nothing generates new ones. Counterpart backlog item: accept *their* scheduler links (cal.com/Calendly).
+
+### 3. The house-tour cycle (second schedule action)
+
+`Schedule house tour` (⋮ menu, or **Invite them** on the profile's House visit stage row) runs a five-step cycle, tracked in `recruit_tours` (migration 160), one row per applicant:
+
+1. **Ask** — the email draft (emailType `tour`) asks for times in the next two weeks and states the preference plainly: *Tuesday–Thursday evenings between 5 and 7pm work best on our end*. The reasoning (most roommates around; clear of family dinner, which tour guests never join) is deliberately **never** in the email — it lives only in Settings hints and this doc. If the thread holds unanswered questions from the applicant, the drafter folds the answers in after the ask and the compose modal shows an **"Also added to this email"** callout (`.email-added`) listing each addition with its why, so the sender knows before sending.
+2. **Reply** — the scan's availability extraction claims the windows for the tour (an open tour ask suppresses the screener-scheduler claim post for that reply, so one email never spawns two Discord asks).
+3. **Poll** — the bot posts an emoji poll to the house: their windows ∩ Tue–Thu 5–7pm as numbered slots (1️⃣ 2️⃣ …), reactions pre-seeded. No overlap → their raw windows post with an off-hours ⚠️ for a human call.
+4. **Confirm** — the scan tick counts reactions; a future slot with **more than `tour_confirm_votes`** (default 4) housemates auto-sends the confirmation email — the house address (Settings → House, required: no address, no auto-send) plus the shape of the visit: *a casual conversation in the kitchen and a tour of the house* — then edits the poll to a green ✅ announcement.
+5. **Row state** — the tour cycle owns the row chip while active (`tour ask sent` → `house poll open` → `visit <slot>`); the profile's House visit stage row narrates the same states.
+
+New settings: `house_address` (House), `tour_confirm_votes` (House). New table: `recruit_tours` (member-read, service-role write).
