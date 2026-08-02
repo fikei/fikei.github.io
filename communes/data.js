@@ -1,4 +1,4 @@
-// SF Commune Atlas — dataset v1.3.0
+// SF Commune Atlas — dataset v1.4.0
 // Compiled 2026-07-31 from haight-st-commons.org, supernuclear.substack.com, ic.org,
 // SF Standard, SFist, Wikipedia, FoundSF, OutHistory, diggers.org, The Bold Italic,
 // KQED, house websites & era press.
@@ -788,6 +788,55 @@ window.COMMUNE_DATA = {
       ],
       links: [
         { label: 'supernuclear classifieds', url: 'https://supernuclear.substack.com/p/supernuclear-classifieds-5' },
+      ],
+    },
+
+    {
+      id: 'euclidmanor', name: 'Euclid Manor', emoji: '🦋',
+      neighborhood: 'Adams Point (Oakland)', lat: 37.812, lng: -122.256, coordsApprox: true,
+      residents: 11, founded: 2015, status: 'active', inHSC: 'no',
+      vibe: 'purpose-driven changemakers',
+      tags: ['events', 'wellness'],
+      description: 'A 1910 Oakland manor turned co-living house for entrepreneurs, artists, and changemakers since 2015, themed around transformation and social impact — resident-led ventures, salons, and public events near Lake Merritt.',
+      funFact: 'Named for "Dr. Euclid Von Imaginal," a resident the house may or may not have entirely invented.',
+      links: [
+        { label: 'open door', url: 'https://opendoor.io/properties/euclid-manor/' },
+        { label: 'eventbrite', url: 'https://www.eventbrite.com/o/euclid-manor-56914460803' },
+      ],
+    },
+    {
+      id: 'canticlefarm', name: 'Canticle Farm / Casa de Paz', emoji: '🕊',
+      neighborhood: 'Fruitvale (Oakland)', lat: 37.779, lng: -122.227, coordsApprox: true,
+      residents: 30, founded: 2011, status: 'active', inHSC: 'no',
+      vibe: 'eight houses, one garden, zero locked doors',
+      tags: ['justice', 'spiritual', 'family'],
+      description: 'Eight houses around one big urban garden in Fruitvale, founded by secular Franciscans Anne and Terry Symens-Bucher as an experiment in faith-based, Earth-based nonviolence. Casa de Paz, its anchor house, famously never locks its doors on a block shared by three gangs.',
+      funFact: 'Founder Anne Symens-Bucher lived with Dorothy Day at the New York Catholic Worker in the 1970s.',
+      links: [
+        { label: 'canticlefarmoakland.org', url: 'https://canticlefarmoakland.org/about/' },
+        { label: 'opendemocracy profile', url: 'https://www.opendemocracy.net/en/transformation/from-empire-to-earth-community-casa-de-paz/' },
+      ],
+    },
+    {
+      id: 'fortawesome', name: 'Fort Awesome', emoji: '🏕️',
+      neighborhood: 'South Berkeley', lat: 37.854, lng: -122.268, coordsApprox: true,
+      residents: 15, foundedEst: 2011, status: 'active', inHSC: 'no',
+      vibe: 'solar-powered co-op with open dinners',
+      tags: ['events', 'wellness'],
+      description: 'A 15-bedroom South Berkeley cooperative in the Cooperative Roots family — solar panels, a backyard mini-farm, and a standing tradition of open community dinners. The name is not ironic.',
+      links: [
+        { label: 'cooperative roots', url: 'https://www.cooperativeroots.org/' },
+      ],
+    },
+    {
+      id: 'kingfisher', name: 'Kingfisher Cohousing', emoji: '🐟', kind: 'cohousing',
+      neighborhood: 'Fruitvale (Oakland)', lat: 37.776, lng: -122.224, coordsApprox: true,
+      residents: 20, foundedEst: 2020, status: 'active', inHSC: 'no',
+      vibe: 'small-flock cohousing',
+      tags: ['family'],
+      description: 'A compact Fruitvale cohousing community of roughly eight households sharing meals, decisions, and a courtyard — part of the East Bay\'s quiet second wave of resident-built cohousing.',
+      links: [
+        { label: 'cohousing directory', url: 'https://www.cohousing.org/directory/kingfisher-cohousing/' },
       ],
     },
 
