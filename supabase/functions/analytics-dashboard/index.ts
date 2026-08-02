@@ -5,8 +5,9 @@
 // Access: only ADMIN_EMAILS may call; everyone else gets 403.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { logServerError } from '../_shared/telemetry.ts'
 
-const VERSION = '1.2.0'
+const VERSION = '1.3.0'
 console.log(`[analytics-dashboard] v${VERSION} - admin-only analytics aggregates`)
 
 const ADMIN_EMAILS = ['fike101@gmail.com']
@@ -54,6 +55,7 @@ Deno.serve(async (req: Request) => {
     } catch (_) { /* empty body is fine */ }
   }
 
+  try {
   const [summaryRes, accountsRes, peopleRes, authRes] = await Promise.all([
     supabase.rpc('analytics_summary', { days }),
     supabase.rpc('analytics_account_stats'),
@@ -86,4 +88,9 @@ Deno.serve(async (req: Request) => {
     people: peopleRes.data,
     auth: authRes.error ? { error: authRes.error.message, events: [] } : { events: authRes.data || [] },
   })
+  } catch (err) {
+    console.error(`[analytics-dashboard] v${VERSION} - unhandled:`, (err as Error).message)
+    await logServerError(supabase, 'analytics-dashboard', err)
+    return json({ error: 'internal', details: (err as Error).message }, 500)
+  }
 })

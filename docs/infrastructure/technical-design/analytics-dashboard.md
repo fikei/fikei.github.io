@@ -39,6 +39,11 @@ ctrl.rodeo/analytics ──▶ analytics-dashboard edge fn ──▶ analytics_s
 - **Only Ian can read anything.** Read path is: owner JWT → edge function email check → service-role RPCs. The table itself is unreadable via PostgREST for every client role, and both SQL functions are non-executable for anon/authenticated.
 - Writes are open to the anon key by design (it's public telemetry), constrained by column length checks and a type whitelist.
 
+## Visibility build-out (migration `158_analytics_vitals_alerts.sql`)
+- **Server-side errors** — `_shared/telemetry.ts` `logServerError()` writes type `server_error` rows (app `fn:<name>`) from the top-level catch of analytics-dashboard, recruit-watch, recruit-gmail, and recruit-discord. Service-role-only: the anon insert policy excludes `server_error`. They appear on the errors tab labeled "(server)" and count in error totals. Add the same two lines to any function's catch to enroll it.
+- **Web vitals** — track.js v1.2.0 hand-rolls LCP/CLS/INP/TTFB via PerformanceObserver (no external lib), batched as type `vital` rows when the page first goes hidden. `analytics_summary` exposes p75 per metric; the overview shows them as tiles.
+- **Alerts** — `analytics-alerts` fn v1.0.0, pg_cron every 30 min (`analytics_alerts_tick`, nonce handshake per migrations 123/136, no new secrets). DMs Ian via the recruiting bot on ≥3 client errors/hour or ≥1 server error/hour, deduped to one DM per kind per 6h via the `analytics_alerts` ledger.
+
 ## Operations
 - Deploy: `supabase functions deploy analytics-dashboard` (Boards project).
 - Retention: no automatic purge yet; add a cron delete if the table grows past ~1M rows.

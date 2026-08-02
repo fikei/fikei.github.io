@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.30.4'
+const VERSION = '1.30.5'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -1434,6 +1434,10 @@ serve(async (req) => {
     return json({ error: 'Unknown action' }, 400)
   } catch (err) {
     console.error('recruit-gmail error:', (err as Error).message)
+    try {
+      const { logServerError } = await import('../_shared/telemetry.ts')
+      await logServerError(db(), 'recruit-gmail', err)
+    } catch { /* telemetry is best-effort */ }
     return json({ error: (err as Error).message }, 500)
   }
 })

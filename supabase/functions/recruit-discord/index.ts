@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.30.1'
+const VERSION = '1.30.3'
 console.log(`[recruit-discord] v${VERSION} — screening claims + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -1238,6 +1238,10 @@ serve(async (req) => {
     }
   } catch (err) {
     console.error('[recruit-discord] error:', (err as Error).message)
+    try {
+      const { logServerError } = await import('../_shared/telemetry.ts')
+      await logServerError(db(), 'recruit-discord', err)
+    } catch { /* telemetry is best-effort */ }
     return json({ error: (err as Error).message }, 500)
   }
 })
