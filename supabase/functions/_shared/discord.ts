@@ -472,21 +472,41 @@ export async function postResilient(channelId: string, payload: Record<string, u
   throw new Error(`all posting fallbacks failed for ${label}`)
 }
 
+// Cap an already-assembled description without cutting into its trailing
+// link lines: trim ahead of the last 🎥 line instead of the tail.
+function fitDescription(desc: string, cap = 4000): string {
+  if (desc.length <= cap) return desc
+  const at = desc.lastIndexOf('\n🎥 ')
+  if (at < 0) return desc.slice(0, cap)
+  const tail = desc.slice(at)
+  return desc.slice(0, Math.max(0, cap - tail.length - 1)).trimEnd() + '…' + tail
+}
+
+// Fit an embed description under Discord's cap by trimming the SUMMARY,
+// never the trailing link lines. A blunt .slice(0, 4000) on the whole
+// description used to amputate the watch URL when a summary ran long,
+// which is how "expired" recording links were actually born.
+function summaryWithLinks(summary: string | null, links: string[], cap = 4000): string {
+  const linksBlock = links.length ? '\n\n' + links.join('\n') : ''
+  const body = summary || '_No transcript captured (captions may have been off)._'
+  const room = cap - linksBlock.length
+  const trimmed = body.length > room ? body.slice(0, Math.max(0, room - 1)).trimEnd() + '…' : body
+  return trimmed + linksBlock
+}
+
 // Post the recording + summary back to the claims channel after a call ends.
 export async function postRecordingNote(
   firstName: string, applicantId: string, residentName: string,
   summary: string | null, shareToken: string | null,
 ): Promise<void> {
-  const lines = [
-    summary || '_No transcript captured (captions may have been off)._',
-    '',
+  const links = [
     shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
     `📋 [Full profile](${appLink(applicantId)})`,
   ]
   await postResilient(NOTES_CHANNEL_ID, {
     embeds: [{
       title: `${firstName} × ${residentName} — Intro Call notes`,
-      description: lines.join('\n').slice(0, 4000),
+      description: summaryWithLinks(summary, links),
       color: 0x9b59b6,
     }],
   }, `intro-call notes (${firstName})`)
@@ -496,13 +516,11 @@ export async function postRecordingNote(
 export async function postMeetingNote(
   title: string, summary: string | null, shareToken: string | null,
 ): Promise<void> {
-  const lines = [
-    summary || '_No transcript captured (captions may have been off)._',
-    '',
+  const links = [
     shareToken ? `🎥 [Watch the recording](${watchLink(shareToken)})` : '🎥 Recording unavailable.',
   ]
   await postResilient(NOTES_CHANNEL_ID, {
-    embeds: [{ title: `${title} — meeting notes`, description: lines.join('\n').slice(0, 4000), color: 0x9b59b6 }],
+    embeds: [{ title: `${title} — meeting notes`, description: summaryWithLinks(summary, links), color: 0x9b59b6 }],
   }, `meeting notes (${title})`)
 }
 
@@ -523,20 +541,30 @@ export async function relinkRecordingPosts(
   for (const msg of (messages || [])) {
     const embed = (msg.embeds || [])[0]
     const desc: string = embed?.description || ''
-    // Only touch posts whose recording line is a stale non-watch link.
-    if (!/🎥 \[Recording\]\(/.test(desc)) continue
+    // Two repairable shapes: a stale pre-capability Recall link, and a watch
+    // link whose token isn't 64 hex — the old whole-description slice used to
+    // amputate URLs mid-token, so those posts 404 exactly like expired ones.
+    const stale = /🎥 \[Recording\]\(/.test(desc)
+    const truncated = !stale &&
+      /🎥 \[Watch the recording\]\(https:\/\/ctrl\.rodeo\/applications\/watch\/\?t=(?![0-9a-f]{64}\))/.test(desc)
+    if (!stale && !truncated) continue
     const idMatch = desc.match(/\/applications\/\?a=([0-9a-zA-Z-]+)/)?.[1]
     const applicantId = idMatch ? decodeURIComponent(idMatch) : null
     const token = await resolve(applicantId, String(embed?.title || ''))
     if (!token) { skipped.push(`${msg.id}: ${embed?.title || 'untitled'} — no archived recording`); continue }
-    const fixed = desc.replace(
-      /🎥 \[Recording\]\([^)]*\)(\s*_\([^)]*\)_)?/,
-      `🎥 [Watch the recording](${watchLink(token)})`,
-    )
+    const watchLine = `🎥 [Watch the recording](${watchLink(token)})`
+    const fixed = stale
+      ? desc.replace(/🎥 \[Recording\]\([^)]*\)(\s*_\([^)]*\)_)?/, watchLine)
+      // The slice destroyed everything from the 🎥 line to the end (including
+      // any profile line after it), so rebuild that whole tail.
+      : desc.replace(/🎥 \[Watch the recording\]\([\s\S]*$/,
+          watchLine + (applicantId ? `\n📋 [Full profile](${appLink(applicantId)})` : ''))
     if (fixed === desc) { skipped.push(`${msg.id}: line not matched`); continue }
     await discordFetch(`/channels/${NOTES_CHANNEL_ID}/messages/${msg.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ embeds: [{ ...embed, description: fixed.slice(0, 4000) }] }),
+      // Guarded trim (summary, never links) — a plain slice here would
+      // recreate the very truncation this repair exists to undo.
+      body: JSON.stringify({ embeds: [{ ...embed, description: fitDescription(fixed) }] }),
     })
     updated++
   }
