@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.64.0';
+const VERSION = '3.64.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -571,9 +571,16 @@ function openingsCta(a) {
     return stack(chip('tour ask sent', 'decision-chip--outreach', 'Waiting on their availability — the house poll posts itself when they reply'));
   }
 
-  if (phase === 'watch' || phase === 'done') {
+  if (phase === 'watch') {
+    // Watch earns its inline spot back: the recording is the review artifact,
+    // and burying it made every decision one menu deeper. Still no primary —
+    // it sits beside the status chip, everything else stays in the ⋮.
     const dv = decisionVotes[a.id] || [];
-    return stack(chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Watch, decide, or schedule a house tour from the ⋮ menu'));
+    return stack(`<span class="cta-pair">${chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Decide or schedule a house tour from the ⋮ menu')}${watchBtn(sc, a.id)}</span>`);
+  }
+  if (phase === 'done') {
+    const dv = decisionVotes[a.id] || [];
+    return stack(chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Decide, add a recording, or schedule a house tour from the ⋮ menu'));
   }
   if (phase === 'processing') return stack(processingChip());
   if (phase === 'live') return stack(joinBtn(sc) || processingChip());
