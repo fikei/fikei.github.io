@@ -44,6 +44,9 @@ export const KINDS: Record<string, { icon: string; label: string }> = {
   reply_nudge:            { icon: '🔔', label: 'Following up' },
   reply_unclear:          { icon: '🤔', label: 'Reply needs a read' },
 
+  // The visit.
+  tour_availability:      { icon: '🏠', label: 'Tour times in' },
+
   // The call.
   screening_unclaimed:    { icon: '📣', label: 'Call needs a screener' },
   screening_booked:       { icon: '🤝', label: 'Call booked' },
@@ -139,6 +142,9 @@ export const TEMPLATES: Record<string, string> = {
   // is the point splice the applicant's own ask in as a clause.
   'reply_availability':           '{subject} is free {times}.',
   'reply_availability.plain':     '{subject} sent times for a call.',
+  'tour_availability':            '{subject} sent times for a house tour — the poll is up.',
+  'tour_availability.updated':    '{subject} updated their house-tour availability — the poll now shows {times}.',
+  'tour_availability.updated.plain': '{subject} updated their house-tour availability — the poll is refreshed.',
   'reply_reschedule':             '{subject} wants to move their call.',
   'reply_withdrawing':            '{subject} is no longer looking.',
   'reply_post_acceptance':        '{subject} is asking about moving in.',
