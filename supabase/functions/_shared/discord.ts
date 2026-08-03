@@ -698,12 +698,10 @@ export async function _unusedCanSeeRecruiting(discordUserId: string, memberRoles
 
 // ---- house-tour polls -----------------------------------------------------
 
-// Number emojis for tour poll slots. Reactions, not buttons: a tour is a
-// headcount question ("who can be around?"), and everyone answering is the
-// point — buttons are for the first-taker-wins claim flow.
-export const TOUR_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+// Two rows of five buttons is the ceiling worth reading.
+export const TOUR_MAX_SLOTS = 10
 
-export interface TourSlot { start: string; label: string; emoji: string }
+export interface TourSlot { start: string; label: string; emoji?: string }
 
 // Test records never reach the members channel — the house shouldn't get
 // pinged about a pipeline test.
@@ -727,65 +725,56 @@ export async function schedulingSocietyChannel(db: any, applicantId: string): Pr
   return SOCIETY_CHANNEL_ID
 }
 
-// Post (or refresh) the tour poll and seed each slot's reaction so
-// housemates tap rather than hunt the emoji picker. Returns the message.
-export async function postTourPoll(input: {
+/* The poll message: one button per slot, count in the label. A tap toggles
+   your vote (handled in recruit-discord, custom_id "tourvote|…") and the
+   handler re-renders this same payload with fresh counts — no reactions, no
+   seeding, nothing to hunt in an emoji picker. Exported so the interaction
+   handler and the poster render identically. */
+export function buildTourPollPayload(input: {
   firstName: string; applicantId: string; slots: TourSlot[]
   offHours: boolean; threshold: number
-  channelId?: string
-  existing?: { channelId: string; messageId: string } | null
-}): Promise<any> {
-  const lines = input.slots.map((s) => `${s.emoji} ${s.label}`).join('\n')
+  counts?: Map<string, number>
+}): Record<string, unknown> {
   const description =
     `🏠 **House tour poll — ${input.firstName}** sent ${input.slots.length === 1 ? 'a time' : 'times'} for a visit.\n\n` +
     (input.offHours ? `⚠️ None of their windows fit Tue–Thu 5–7pm — these are their raw times; confirming may need a human call.\n\n` : '') +
-    `React with every slot you can make — the visit confirms automatically once **more than ${input.threshold}** housemates are in on one.\n\n` +
-    `${lines}\n\n` +
+    `Tap every slot you can make (tap again to back out) — the visit confirms automatically once **more than ${input.threshold}** housemates are in on one.\n\n` +
     `See their [application](${appLink(input.applicantId)}).`
-  const payload = { embeds: [{ description, color: 0x1abc9c }] }
+  const components: Array<Record<string, unknown>> = []
+  let row: Array<Record<string, unknown>> = []
+  for (const s of input.slots.slice(0, TOUR_MAX_SLOTS)) {
+    const n = input.counts?.get(s.start) || 0
+    row.push({
+      type: 2, style: n > 0 ? 1 : 2,
+      label: `${s.label}${n ? ` · ${n} in` : ''}`,
+      custom_id: `tourvote|${input.applicantId}|${Date.parse(s.start)}`,
+    })
+    if (row.length === 5) { components.push({ type: 1, components: row }); row = [] }
+  }
+  if (row.length) components.push({ type: 1, components: row })
+  return { embeds: [{ description, color: 0x1abc9c }], components }
+}
+
+// Post (or refresh) the tour poll. Returns the message.
+export async function postTourPoll(input: {
+  firstName: string; applicantId: string; slots: TourSlot[]
+  offHours: boolean; threshold: number
+  counts?: Map<string, number>
+  channelId?: string
+  existing?: { channelId: string; messageId: string } | null
+}): Promise<any> {
+  const payload = buildTourPollPayload(input)
   const message = await postOrPatch(
     input.existing?.channelId || input.channelId || NOTES_CHANNEL_ID,
     input.existing?.messageId || null, payload,
   )
   const channelId = message.channel_id || input.existing?.channelId || input.channelId || NOTES_CHANNEL_ID
-  /* Seed EVERY slot's reaction. Discord's reaction bucket is ~1 add per
-     300ms per channel — the first version fired PUTs back-to-back and the
-     429s silently ate half the row, so a poll shipped with 1️⃣ and 3️⃣ but
-     no 2️⃣. Space the adds and retry the rate-limited ones. */
-  for (const s of input.slots) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        await discordFetch(`/channels/${channelId}/messages/${message.id}/reactions/${encodeURIComponent(s.emoji)}/@me`, { method: 'PUT' })
-        break
-      } catch (err) {
-        // deno-lint-ignore no-explicit-any
-        if ((err as any).status === 429 && attempt < 2) {
-          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)))
-          continue
-        }
-        console.warn(`[discord] seeding reaction ${s.emoji} failed: ${(err as Error).message}`)
-        break
-      }
-    }
-    await new Promise((r) => setTimeout(r, 350))
-  }
   await auditMirror('House tour poll', `${input.firstName} — ${input.slots.length} slot(s)`, { channelId })
   return message
 }
 
-// Read live per-emoji headcounts off a poll message. Subtracts the bot's
-// own seeded reaction so the number is real housemates.
-export async function tourPollCounts(channelId: string, messageId: string): Promise<Map<string, number>> {
-  const msg = await discordFetch(`/channels/${channelId}/messages/${messageId}`, { method: 'GET' })
-  const counts = new Map<string, number>()
-  for (const r of (msg.reactions || [])) {
-    const emoji = r.emoji?.name
-    if (emoji) counts.set(emoji, Math.max(0, (r.count || 0) - (r.me ? 1 : 0)))
-  }
-  return counts
-}
-
-// Close a confirmed poll in place: the message becomes the announcement.
+// Close a confirmed poll in place: buttons gone, the message becomes the
+// announcement.
 export async function editTourConfirmed(
   channelId: string, messageId: string,
   firstName: string, applicantId: string, when: string, count: number,
@@ -798,6 +787,7 @@ export async function editTourConfirmed(
           description: `✅ **${firstName}'s house tour is on — ${when}** (${count} housemates in). They've been emailed the address and details. [Application](${appLink(applicantId)})`,
           color: 0x2ecc71,
         }],
+        components: [],
       }),
     })
   } catch (err) {
