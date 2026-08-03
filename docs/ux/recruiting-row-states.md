@@ -300,3 +300,7 @@ New settings: `house_address` (House), `tour_confirm_votes` (House). New table: 
 
 ### v3.64.1 — Watch returns to the row
 The recording is the review artifact; hiding it made every decision one menu deeper. Rows in the watch state show the small **Watch** button beside the `call done` chip — still no primary CTA, and every other verb stays in the ⋮.
+
+### v3.65 — tour polls publish every recommended start; scheduling asks reach the society channel
+- A qualifying Tue–Thu day publishes **all** recommended starts — 5, 6, and 7pm — as separate emoji slots (up to 10 emojis), so "any evening works" becomes a real choice instead of ratifying the first slot. Slot seeding now paces reaction adds (~350ms apart, 429-retry) so every emoji ships pre-seeded.
+- **Scheduling asks post to #recruiting-society** — house-visit polls and screener schedulers, gated by the new `society_scheduling_posts` setting (Automations, default on). Narrower than the held `RECRUITING_SOCIETY_POSTS` env switch, which still gates notes/recordings. Test applicants (`e2e-*`/`test-*` ids) never post there — they stay in #recruiting-automation.

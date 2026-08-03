@@ -18,7 +18,7 @@
  *
  * Classic script, not a module: it runs before app.js and hands over globals.
  */
-const SETTINGS_VERSION = '1.1.0';
+const SETTINGS_VERSION = '1.2.0';
 console.log(`[settings-schema] v${SETTINGS_VERSION}`);
 
 /* Every knob, exposed or not. `section: null` means "routed through setting()
@@ -83,6 +83,11 @@ const SETTING_DEFS = {
     scope: 'house', type: 'bool', section: 'automations', default: false,
     label: 'Auto-post coverage asks',
     hint: 'Off means a human sees the message before the house does.',
+  },
+  society_scheduling_posts: {
+    scope: 'house', type: 'bool', section: 'automations', default: true,
+    label: 'Scheduling asks reach #recruiting-society',
+    hint: 'House-visit polls and screener schedulers post to the members channel. Test applicants never do — they stay in #recruiting-automation.',
   },
 
   /* --- You -------------------------------------------------------------- */

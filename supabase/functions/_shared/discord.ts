@@ -38,7 +38,7 @@ export const CLAIMS_CHANNEL_ID = AUTOMATION_CHANNEL_ID
    ping kept landing there while the ledger's own switch said not to.
 
    Set RECRUITING_SOCIETY_POSTS=true to hand the channel back its traffic. */
-const SOCIETY_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
+export const SOCIETY_CHANNEL_ID = Deno.env.get('SCREENING_NOTES_CHANNEL_ID') || '1503490895469609211'
 const SOCIETY_POSTS_ON = Deno.env.get('RECRUITING_SOCIETY_POSTS') === 'true'
 export const NOTES_CHANNEL_ID = SOCIETY_POSTS_ON ? SOCIETY_CHANNEL_ID : AUTOMATION_CHANNEL_ID
 
@@ -252,12 +252,15 @@ export async function upsertScreenerScheduler(db: any, input: ScreenerSchedulerI
 
   const message = await postOrPatch(CLAIMS_CHANNEL_ID, live?.discord_message_id || null, payload)
   // Mirror copy is best-effort: missing channel perms must not kill the post.
-  // While society posts are held, NOTES resolves to the same channel as the
-  // primary — mirroring then would just duplicate the scheduler post.
+  // Scheduling asks reach the members channel via society_scheduling_posts
+  // (test applicants never do); otherwise fall back to the held NOTES route.
+  // Skipped when it would just duplicate the post into the same channel.
   let mirror: any = null
-  if (NOTES_CHANNEL_ID !== CLAIMS_CHANNEL_ID) {
+  const mirrorChannel = (await schedulingSocietyChannel(db, input.applicantId))
+    || (NOTES_CHANNEL_ID !== CLAIMS_CHANNEL_ID ? NOTES_CHANNEL_ID : null)
+  if (mirrorChannel && mirrorChannel !== CLAIMS_CHANNEL_ID) {
     try {
-      mirror = await postOrPatch(NOTES_CHANNEL_ID, live?.mirror_message_id || null, payload)
+      mirror = await postOrPatch(mirrorChannel, live?.mirror_message_id || null, payload)
     } catch (err) {
       console.warn(`[discord] mirror post failed for ${input.applicantId}: ${(err as Error).message}`)
     }
@@ -698,15 +701,38 @@ export async function _unusedCanSeeRecruiting(discordUserId: string, memberRoles
 // Number emojis for tour poll slots. Reactions, not buttons: a tour is a
 // headcount question ("who can be around?"), and everyone answering is the
 // point — buttons are for the first-taker-wins claim flow.
-export const TOUR_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
+export const TOUR_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 
 export interface TourSlot { start: string; label: string; emoji: string }
+
+// Test records never reach the members channel — the house shouldn't get
+// pinged about a pipeline test.
+export function isTestApplicant(applicantId: string): boolean {
+  return /^(e2e-|test-)/i.test(applicantId)
+}
+
+/* Where scheduling asks (screener schedulers, tour polls) reach the house.
+   recruit_settings.society_scheduling_posts (default ON) routes them to
+   #recruiting-society — deliberately narrower than the held
+   RECRUITING_SOCIETY_POSTS env switch, which still gates notes, recordings,
+   and everything else. Null = keep the ask out of the members channel. */
+// deno-lint-ignore no-explicit-any
+export async function schedulingSocietyChannel(db: any, applicantId: string): Promise<string | null> {
+  if (isTestApplicant(applicantId)) return null
+  try {
+    const { data } = await db.from('recruit_settings')
+      .select('value').eq('key', 'society_scheduling_posts').maybeSingle()
+    if (data?.value === false) return null
+  } catch { /* default on */ }
+  return SOCIETY_CHANNEL_ID
+}
 
 // Post (or refresh) the tour poll and seed each slot's reaction so
 // housemates tap rather than hunt the emoji picker. Returns the message.
 export async function postTourPoll(input: {
   firstName: string; applicantId: string; slots: TourSlot[]
   offHours: boolean; threshold: number
+  channelId?: string
   existing?: { channelId: string; messageId: string } | null
 }): Promise<any> {
   const lines = input.slots.map((s) => `${s.emoji} ${s.label}`).join('\n')
@@ -718,16 +744,30 @@ export async function postTourPoll(input: {
     `See their [application](${appLink(input.applicantId)}).`
   const payload = { embeds: [{ description, color: 0x1abc9c }] }
   const message = await postOrPatch(
-    input.existing?.channelId || NOTES_CHANNEL_ID,
+    input.existing?.channelId || input.channelId || NOTES_CHANNEL_ID,
     input.existing?.messageId || null, payload,
   )
-  const channelId = message.channel_id || input.existing?.channelId || NOTES_CHANNEL_ID
+  const channelId = message.channel_id || input.existing?.channelId || input.channelId || NOTES_CHANNEL_ID
+  /* Seed EVERY slot's reaction. Discord's reaction bucket is ~1 add per
+     300ms per channel — the first version fired PUTs back-to-back and the
+     429s silently ate half the row, so a poll shipped with 1️⃣ and 3️⃣ but
+     no 2️⃣. Space the adds and retry the rate-limited ones. */
   for (const s of input.slots) {
-    try {
-      await discordFetch(`/channels/${channelId}/messages/${message.id}/reactions/${encodeURIComponent(s.emoji)}/@me`, { method: 'PUT' })
-    } catch (err) {
-      console.warn(`[discord] seeding reaction ${s.emoji} failed: ${(err as Error).message}`)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await discordFetch(`/channels/${channelId}/messages/${message.id}/reactions/${encodeURIComponent(s.emoji)}/@me`, { method: 'PUT' })
+        break
+      } catch (err) {
+        // deno-lint-ignore no-explicit-any
+        if ((err as any).status === 429 && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)))
+          continue
+        }
+        console.warn(`[discord] seeding reaction ${s.emoji} failed: ${(err as Error).message}`)
+        break
+      }
     }
+    await new Promise((r) => setTimeout(r, 350))
   }
   await auditMirror('House tour poll', `${input.firstName} — ${input.slots.length} slot(s)`, { channelId })
   return message

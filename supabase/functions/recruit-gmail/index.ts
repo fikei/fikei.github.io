@@ -16,13 +16,13 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.31.0'
+const VERSION = '1.32.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
-import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC, postTourPoll, tourPollCounts, editTourConfirmed, TOUR_EMOJIS } from '../_shared/discord.ts'
+import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC, postTourPoll, tourPollCounts, editTourConfirmed, TOUR_EMOJIS, schedulingSocietyChannel } from '../_shared/discord.ts'
 import { record } from '../_shared/recruit-notify.ts'
 import { ACTIONS } from '../_shared/recruit-copy.ts'
 
@@ -368,8 +368,12 @@ async function postClaim(client: ReturnType<typeof db>, applicantId: string, ext
    guests never join). That WHY lives here and in Settings, never in any
    email the applicant sees. */
 const TOUR_DAYS = new Set([2, 3, 4]) // Tue, Wed, Thu
-const TOUR_START = '17:00'
-const TOUR_END = '19:00'
+// Every recommended start publishes for a qualifying day — a vague "any
+// evening works" must not collapse to one slot. 7pm is a valid start even
+// though it's the window's edge; the poll is a headcount, not a fence.
+const TOUR_SLOT_STARTS = ['17:00', '18:00', '19:00']
+const TOUR_EVENING_START = '17:00'
+const TOUR_EVENING_END = '20:00'
 
 // Weekday of a PT wall-clock date. Noon UTC on that calendar date is always
 // the same calendar day in Pacific, so getUTCDay is safe here.
@@ -377,28 +381,40 @@ function weekdayPT(date: string): number {
   return new Date(`${date}T12:00:00Z`).getUTCDay()
 }
 
-// Their windows ∩ Tue–Thu 5–7pm → poll slots. When nothing overlaps, fall
-// back to their raw windows and flag the poll off-hours for a human call.
+/* Poll slots from their windows: every Tue–Thu date whose windows touch the
+   evening (5–8pm) publishes ALL recommended starts — 5, 6, and 7pm — so
+   housemates pick the hour, not just ratify the first one. When no day
+   qualifies, fall back to their raw windows and flag the poll off-hours for
+   a human call. */
 function tourSlotsFrom(windows: Array<{ date: string; start: string; end: string }>): { slots: Array<{ start: string; label: string; emoji: string }>; offHours: boolean } {
   const now = Date.now()
-  const hits: Array<{ start: Date; end: Date }> = []
+  const days = new Set<string>()
   for (const w of windows) {
     if (!TOUR_DAYS.has(weekdayPT(w.date))) continue
-    const s = ptToUTC(w.date, w.start > TOUR_START ? w.start : TOUR_START)
-    const e = ptToUTC(w.date, w.end < TOUR_END ? w.end : TOUR_END)
-    if (s.getTime() >= e.getTime() || e.getTime() < now) continue
-    hits.push({ start: s, end: e })
+    if (w.end <= TOUR_EVENING_START || w.start >= TOUR_EVENING_END) continue
+    days.add(w.date)
   }
-  const offHours = !hits.length
-  const source = offHours
-    ? windows.map((w) => ({ start: ptToUTC(w.date, w.start), end: ptToUTC(w.date, w.end) }))
-        .filter((x) => x.end.getTime() > now)
-    : hits
-  const fmtEnd = (d: Date) => d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
-    .toLowerCase().replace(' am', 'a').replace(' pm', 'p')
-  const slots = source.sort((a, b) => a.start.getTime() - b.start.getTime())
+  const starts: Date[] = []
+  for (const date of [...days].sort()) {
+    for (const hh of TOUR_SLOT_STARTS) {
+      const d = ptToUTC(date, hh)
+      if (d.getTime() > now) starts.push(d)
+    }
+  }
+  const offHours = !starts.length
+  if (offHours) {
+    const fmtEnd = (d: Date) => d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: TZ })
+      .toLowerCase().replace(' am', 'a').replace(' pm', 'p')
+    const raw = windows.map((w) => ({ start: ptToUTC(w.date, w.start), end: ptToUTC(w.date, w.end) }))
+      .filter((x) => x.end.getTime() > now)
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+      .slice(0, TOUR_EMOJIS.length)
+      .map((x, i) => ({ start: x.start.toISOString(), label: `${slotLabel(x.start)}–${fmtEnd(x.end)}`, emoji: TOUR_EMOJIS[i] }))
+    return { slots: raw, offHours }
+  }
+  const slots = starts.sort((a, b) => a.getTime() - b.getTime())
     .slice(0, TOUR_EMOJIS.length)
-    .map((x, i) => ({ start: x.start.toISOString(), label: `${slotLabel(x.start)}–${fmtEnd(x.end)}`, emoji: TOUR_EMOJIS[i] }))
+    .map((d, i) => ({ start: d.toISOString(), label: slotLabel(d), emoji: TOUR_EMOJIS[i] }))
   return { slots, offHours }
 }
 
@@ -431,6 +447,9 @@ async function maybePostTourPoll(
     const message = await postTourPoll({
       firstName: applicant?.first_name || 'An applicant', applicantId, slots, offHours,
       threshold: await tourThreshold(client),
+      // Members channel for real applicants (society_scheduling_posts, on by
+      // default); test records and opted-out houses stay in automation.
+      channelId: (await schedulingSocietyChannel(client, applicantId)) || NOTES_CHANNEL_ID,
       existing: tour.discord_message_id
         ? { channelId: tour.discord_channel_id, messageId: tour.discord_message_id }
         : null,
