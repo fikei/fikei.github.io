@@ -297,3 +297,6 @@ The ⋮ menu is context-aware and ordered: **suggested next step first** (same f
 5. **Row state** — the tour cycle owns the row chip while active (`tour ask sent` → `house poll open` → `visit <slot>`); the profile's House visit stage row narrates the same states.
 
 New settings: `house_address` (House), `tour_confirm_votes` (House). New table: `recruit_tours` (member-read, service-role write).
+
+### v3.64.1 — Watch returns to the row
+The recording is the review artifact; hiding it made every decision one menu deeper. Rows in the watch state show the small **Watch** button beside the `call done` chip — still no primary CTA, and every other verb stays in the ⋮.
