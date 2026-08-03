@@ -1689,22 +1689,57 @@ async function drainLog(db: DB): Promise<number> {
     .is('log_at', null).neq('audience', 'none')
     .order('created_at').limit(12)
   if (!data?.length) return 0
-  let sent = 0
+
+  /* Four of the same thing at once is one piece of news.
+
+     The auto-placement sweep passes a batch of candidates in one go, so five
+     "passed review and fits DMT Room" arrive together — five separate messages
+     saying one thing, which is what being pounded feels like. The now-lane had a
+     collapse rule for exactly this; the log never used it, because the log was
+     designed as the complete unbatched record while the house read a different
+     channel. With everything held to one channel, the log IS what people read,
+     so it collapses too.
+
+     Nothing is lost: every notification is still its own ledger row, still on the
+     profile, still in the Activity view. Only the channel gets the short form. */
+  const byKind = new Map<string, typeof data>()
   for (const n of data) {
+    if (!byKind.has(n.kind)) byKind.set(n.kind, [])
+    byKind.get(n.kind)!.push(n)
+  }
+
+  let sent = 0
+  for (const [kind, rows] of byKind) {
     try {
-      /* The prompt goes on its own line under the sentence: the sentence says
-         what happened, the prompt asks the house for what only they know.
-         Replies to this message are read back on a later tick and filed as
-         house notes, so answering here is enough. */
-      const prompt = renderPrompt(n.kind, n.payload?.links?.[0]?.url)
-      const messageId = await sendEmbed(AUTOMATION_CHANNEL_ID,
-        oneLine(n) + (prompt ? `\n${prompt}` : ''))
-      await db.from('recruit_notifications')
-        .update({ log_at: new Date().toISOString(), discord_message_id: messageId })
-        .eq('id', n.id)
-      sent++
+      if (rows.length >= 4) {
+        const lines = rows.map((n: Record<string, any>) =>
+          `• ${(n.payload?.sentence || '').replace('{subject}', n.payload?.links?.[0]?.url
+            ? `[${n.payload?.title || n.subject_label}](${n.payload.links[0].url})`
+            : (n.payload?.title || n.subject_label))}`).join('\n')
+        const messageId = await sendEmbed(AUTOMATION_CHANNEL_ID,
+          `${icon(kind)} **${label(kind)} — ${rows.length}**\n${lines}`)
+        await db.from('recruit_notifications')
+          .update({ log_at: new Date().toISOString(), discord_message_id: messageId })
+          .in('id', rows.map((r: { id: string }) => r.id))
+        sent += rows.length
+        continue
+      }
+
+      for (const n of rows) {
+        /* The prompt goes on its own line under the sentence: the sentence says
+           what happened, the prompt asks the house for what only they know.
+           Replies to this message are read back on a later tick and filed as
+           house notes, so answering here is enough. */
+        const prompt = renderPrompt(n.kind, n.payload?.links?.[0]?.url)
+        const messageId = await sendEmbed(AUTOMATION_CHANNEL_ID,
+          oneLine(n) + (prompt ? `\n${prompt}` : ''))
+        await db.from('recruit_notifications')
+          .update({ log_at: new Date().toISOString(), discord_message_id: messageId })
+          .eq('id', n.id)
+        sent++
+      }
     } catch (err) {
-      console.warn(`[notify] log post failed for ${n.id}: ${(err as Error).message}`)
+      console.warn(`[notify] log post failed for ${kind}: ${(err as Error).message}`)
     }
   }
   return sent
@@ -1739,6 +1774,28 @@ async function drainLane(db: DB, settings: NotifySettings, audience: 'house' | '
   }
 
   const channel = audience === 'oncall' ? AUTOMATION_CHANNEL_ID : houseChannel(settings)
+
+  /* Never say the same thing twice in the same room.
+
+     The log posts every notification to #recruiting-automation, and this lane
+     posts house-wide ones to the house channel. Those were two surfaces with two
+     audiences — until notify_house_posts was turned off and the house channel
+     became #recruiting-automation as well. Then every now-lane notification
+     landed there twice: once from the log with its prompt, once from here
+     without. That is what a burst of paired notifications was.
+
+     So when this lane's destination is the channel the log already delivered to,
+     the row is stamped and not re-sent. The ledger still records that the house
+     lane handled it, and turning notify_house_posts on restores the second post
+     — to a different room, where it is a second audience rather than an echo. */
+  const alreadyDelivered = channel === AUTOMATION_CHANNEL_ID
+  if (alreadyDelivered) {
+    const ids = data.map((r: { id: string }) => r.id)
+    await db.from('recruit_notifications')
+      .update({ [stampCol]: new Date().toISOString() }).in('id', ids)
+    return 0
+  }
+
   let sent = 0
   for (const [kind, rows] of byKind) {
     try {
