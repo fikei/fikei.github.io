@@ -755,6 +755,16 @@ export function buildTourPollPayload(input: {
   return { embeds: [{ description, color: 0x1abc9c }], components }
 }
 
+// Quiet single-message edit (no audit line) — the vote handler re-renders
+// the poll after every tap, and one audit row per tap would drown the trail.
+export async function editChannelMessage(
+  channelId: string, messageId: string, payload: Record<string, unknown>,
+): Promise<void> {
+  await discordFetch(`/channels/${channelId}/messages/${messageId}`, {
+    method: 'PATCH', body: JSON.stringify(payload),
+  })
+}
+
 // Post (or refresh) the tour poll. Returns the message.
 export async function postTourPoll(input: {
   firstName: string; applicantId: string; slots: TourSlot[]

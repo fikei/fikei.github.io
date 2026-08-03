@@ -13,13 +13,13 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.31.0'
+const VERSION = '1.31.1'
 console.log(`[recruit-discord] v${VERSION} — screening claims + tour votes + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { scheduleScreening, sendIntroEmail, sharedAccessToken, sweepCalendars, HOUSE_CALENDAR_ID, SHARED_EMAIL } from '../_shared/recruit-schedule.ts'
-import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen, buildTourPollPayload } from '../_shared/discord.ts'
+import { editSchedulerSignedUp, editSchedulerFailed, dmUser, slotLabel, slotWhen, buildTourPollPayload, editChannelMessage } from '../_shared/discord.ts'
 import { tourThreshold, tourVoteCounts, maybeConfirmTour } from '../_shared/recruit-tours.ts'
 import { notifyTick, previewTick } from '../_shared/recruit-notify.ts'
 import { ensureBallots } from '../_shared/recruit-ballots.ts'
@@ -208,11 +208,15 @@ async function finishClaim(client: ReturnType<typeof db>, opts: {
 }
 
 /* Tour poll vote — "tourvote|<applicantId>|<startEpochMs>". A tap toggles
-   your vote for that slot; the message re-renders in place with fresh counts
-   (type 7 = UPDATE_MESSAGE), and the confirm check runs in the background so
-   crossing the threshold emails the applicant within seconds, not on the
-   next scan tick. Any housemate who can see the poll can vote — the channel
-   is the gate; no app sign-in required for a headcount. */
+   your vote for that slot; the poll message re-renders with fresh counts and
+   crossing the threshold emails the applicant within seconds. Any housemate
+   who can see the poll can vote — the channel is the gate; no app sign-in
+   required for a headcount.
+
+   ACK FIRST (type 6), work after. The first version did five DB round trips
+   before answering, and a cold start plus those was enough to blow Discord's
+   3-second deadline — housemates saw "this interaction failed" on votes that
+   sometimes even landed. Only the zero-IO checks run before the ACK. */
 async function handleTourVote(interaction: Record<string, any>): Promise<Response> {
   const [, applicantId, startMsRaw] = String(interaction.data?.custom_id || '').split('|')
   const slotStart = new Date(Number(startMsRaw))
@@ -222,39 +226,54 @@ async function handleTourVote(interaction: Record<string, any>): Promise<Respons
   if (!discordUserId) return json(ephemeral('Could not identify you.'))
   if (slotStart < new Date()) return json(ephemeral('That time has already passed.'))
 
-  const client = db()
-  const { data: tour } = await client.from('recruit_tours')
-    .select('*').eq('applicant_id', applicantId).eq('status', 'polled').maybeSingle()
-  if (!tour) return json(ephemeral('This poll has closed.'))
-  const slot = (tour.slots || []).find((s: any) => Date.parse(s.start) === slotStart.getTime())
-  if (!slot) return json(ephemeral('That slot is no longer on the poll.'))
-
-  // Toggle: insert wins = vote cast; unique-violation = vote withdrawn.
-  const { error: insErr } = await client.from('recruit_tour_votes').insert({
-    applicant_id: applicantId, slot_start: slotStart.toISOString(),
-    discord_user_id: discordUserId, discord_username: discordUsername,
-  })
-  if (insErr) {
-    if (insErr.code !== '23505') return json(ephemeral(`Vote failed: ${insErr.message.slice(0, 120)}`))
-    await client.from('recruit_tour_votes').delete()
-      .eq('applicant_id', applicantId).eq('slot_start', slotStart.toISOString())
-      .eq('discord_user_id', discordUserId)
-  }
-
-  const { data: applicant } = await client.from('recruit_applicants')
-    .select('first_name').eq('id', applicantId).maybeSingle()
-  const payload = buildTourPollPayload({
-    firstName: applicant?.first_name || 'An applicant', applicantId,
-    slots: tour.slots || [], offHours: Boolean(tour.off_hours),
-    threshold: await tourThreshold(client),
-    counts: await tourVoteCounts(client, applicantId),
-  })
-
-  const work = maybeConfirmTour(client, applicantId).catch((err) =>
-    console.warn(`[recruit-discord] tour confirm check failed: ${(err as Error).message}`))
+  const channelId = String(interaction.channel_id || '')
+  const messageId = String(interaction.message?.id || '')
+  const work = applyTourVote(applicantId, slotStart, discordUserId, discordUsername, channelId, messageId)
   if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) EdgeRuntime.waitUntil(work)
+  else work.catch(() => { /* logged inside */ })
+  return json(DEFERRED_UPDATE)
+}
 
-  return json({ type: 7, data: payload })
+async function applyTourVote(
+  applicantId: string, slotStart: Date,
+  discordUserId: string, discordUsername: string | null,
+  channelId: string, messageId: string,
+): Promise<void> {
+  const client = db()
+  try {
+    const { data: tour } = await client.from('recruit_tours')
+      .select('*').eq('applicant_id', applicantId).eq('status', 'polled').maybeSingle()
+    if (!tour) return // poll closed between render and tap — nothing to do
+    const slot = (tour.slots || []).find((s: any) => Date.parse(s.start) === slotStart.getTime())
+    if (!slot) return
+
+    // Toggle: insert wins = vote cast; unique-violation = vote withdrawn.
+    const { error: insErr } = await client.from('recruit_tour_votes').insert({
+      applicant_id: applicantId, slot_start: slotStart.toISOString(),
+      discord_user_id: discordUserId, discord_username: discordUsername,
+    })
+    if (insErr) {
+      if (insErr.code !== '23505') throw new Error(`vote write failed: ${insErr.message}`)
+      await client.from('recruit_tour_votes').delete()
+        .eq('applicant_id', applicantId).eq('slot_start', slotStart.toISOString())
+        .eq('discord_user_id', discordUserId)
+    }
+
+    const { data: applicant } = await client.from('recruit_applicants')
+      .select('first_name').eq('id', applicantId).maybeSingle()
+    const payload = buildTourPollPayload({
+      firstName: applicant?.first_name || 'An applicant', applicantId,
+      slots: tour.slots || [], offHours: Boolean(tour.off_hours),
+      threshold: await tourThreshold(client),
+      counts: await tourVoteCounts(client, applicantId),
+    })
+    // Edit via bot REST rather than the interaction webhook — same message,
+    // and it keeps working if the confirm below closes the poll first.
+    await editChannelMessage(channelId || tour.discord_channel_id, messageId || tour.discord_message_id, payload)
+    await maybeConfirmTour(client, applicantId)
+  } catch (err) {
+    console.error(`[recruit-discord] tour vote failed for ${applicantId}: ${(err as Error).message}`)
+  }
 }
 
 async function handleClaim(interaction: Record<string, any>): Promise<Response> {
