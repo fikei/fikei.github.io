@@ -618,6 +618,16 @@ async function detectRoomsEmptying(db: DB): Promise<Notification[]> {
 
 // Anyone still live in the funnel. Used by every detector below, so that a
 // rejected or archived applicant never generates candidate chatter.
+/* Intro calls only.
+
+   recruit_screenings holds everything the calendar sweep finds against an
+   applicant — intro calls, house visits, and house events they happen to be on.
+   Reading it unfiltered made a recurring "Agape Halloween XV Planning" meeting
+   into four separate "their intro call is booked" notifications, and would have
+   let a house dinner satisfy "they have been screened". The reminder path has
+   filtered on kind since migration 137; the detectors never did. */
+const INTRO_CALL = 'intro_call'
+
 const ACTIVE_STAGES = ['review', 'candidate']
 
 async function activeApplicants(db: DB): Promise<Map<string, { first_name: string; last_name: string; stage: string }>> {
@@ -671,7 +681,8 @@ async function detectCandidateLanding(db: DB): Promise<Notification[]> {
     db.from('recruit_listing_candidates').select('applicant_id, listing_id, created_at')
       .in('applicant_id', ids).eq('status', 'active'),
     db.from('recruit_listings').select('id, room_id, starts_on'),
-    db.from('recruit_screenings').select('applicant_id').in('applicant_id', ids),
+    db.from('recruit_screenings').select('applicant_id')
+      .in('applicant_id', ids).eq('kind', INTRO_CALL),
   ])
   const { data: rooms } = await db.from('recruit_rooms').select('id, name')
   const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
@@ -741,7 +752,8 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
      claim post. Reading recruit_screenings catches all three, which is what
      "when someone takes a call" actually means. */
   const { data: booked } = await db.from('recruit_screenings')
-    .select('id, applicant_id, housemate_name, starts_at, status, kind, created_at')
+    .select('id, applicant_id, housemate_name, housemate_user_id, starts_at, status, kind, created_at')
+    .eq('kind', INTRO_CALL)
     .gte('created_at', new Date(Date.now() - 21 * 86400000).toISOString())
   for (const sc of booked || []) {
     const who = active.get(sc.applicant_id)
@@ -833,7 +845,8 @@ async function detectScreeningMoments(db: DB): Promise<Notification[]> {
 
   // Today's calls, and calls whose notes have landed.
   const { data: screenings } = await db.from('recruit_screenings')
-    .select('id, applicant_id, housemate_name, starts_at, status, kind, created_at, recording_posted_at, share_token')
+    .select('id, applicant_id, housemate_name, housemate_user_id, starts_at, status, kind, created_at, recording_posted_at, share_token')
+    .eq('kind', INTRO_CALL)
     .gte('starts_at', new Date(Date.now() - 14 * 86400000).toISOString())
   for (const sc of screenings || []) {
     const who = active.get(sc.applicant_id)
@@ -900,7 +913,7 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
 
   const [{ data: done }, { data: votes }, { data: placements }, { data: listings }] = await Promise.all([
     db.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, housemate_user_id')
-      .in('applicant_id', ids).eq('status', 'completed'),
+      .in('applicant_id', ids).eq('status', 'completed').eq('kind', INTRO_CALL),
     db.from('recruit_decision_votes').select('applicant_id, verdict').in('applicant_id', ids),
     db.from('recruit_listing_candidates').select('applicant_id, listing_id')
       .in('applicant_id', ids).eq('status', 'active'),
@@ -998,7 +1011,7 @@ async function detectScreeningFollowup(db: DB): Promise<Notification[]> {
 
   const [{ data: screenings }, { data: emails }, { data: votes }] = await Promise.all([
     db.from('recruit_screenings').select('applicant_id, starts_at, status, housemate_name, housemate_user_id')
-      .in('applicant_id', ids).eq('status', 'completed'),
+      .in('applicant_id', ids).eq('status', 'completed').eq('kind', INTRO_CALL),
     // Anything the house has said to them since. One outbound email after the
     // call is the whole point of the nudge, so it stops as soon as one exists.
     db.from('recruit_emails').select('applicant_id, direction, sent_at')
@@ -1328,7 +1341,8 @@ async function detectGoneCold(db: DB): Promise<Notification[]> {
 
   const [{ data: emails }, { data: screened }] = await Promise.all([
     db.from('recruit_emails').select('applicant_id, direction, sent_at').in('applicant_id', ids),
-    db.from('recruit_screenings').select('applicant_id').in('applicant_id', ids),
+    db.from('recruit_screenings').select('applicant_id')
+      .in('applicant_id', ids).eq('kind', INTRO_CALL),
   ])
   const hasCall = new Set((screened || []).map((r: { applicant_id: string }) => r.applicant_id))
   const last = new Map<string, { out?: string; in?: string }>()
