@@ -7,7 +7,7 @@
  */
 (function () {
   'use strict';
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
   var ENDPOINT = SUPABASE_URL + '/rest/v1/analytics_events';
@@ -108,6 +108,14 @@
   });
 
   send(base('pageview'));
+
+  // App-supplied custom vitals (e.g. the recruiting app's boot phases).
+  // Same 'vital' row shape the passive collectors use, so they land in the
+  // existing /analytics pipeline with no schema change.
+  window.ctrlVital = function (name, value) {
+    if (typeof name !== 'string' || !isFinite(value)) return;
+    send(Object.assign(base('vital'), { meta: { name: name.slice(0, 64), value: Math.round(value * 1000) / 1000 } }));
+  };
 
   // ---- web vitals (hand-rolled: LCP, CLS, INP, TTFB) ----
   // Collected passively, sent once per page when it first goes hidden.
