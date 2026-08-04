@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.34.0'
+const VERSION = '1.34.1'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -540,6 +540,10 @@ function classifyEvent(ev: any): 'intro_call' | 'visit' | 'house_event' {
   const title = String(ev.summary || '').toLowerCase()
   if (/\b(intro call|screening|phone screen|intro chat)\b/.test(title)) return 'intro_call'
   if (/\b(visit|tour|open house|walkthrough|come by|stop by)\b/.test(title)) return 'visit'
+  // A recurring event is never a screening — nobody books an applicant
+  // biweekly forever. Without this, "Agape Halloween XV Planning" (recurring,
+  // Meet link, small) minted four phantom intro calls for one applicant.
+  if (ev.recurringEventId) return 'house_event'
   // A video link is NOT sufficient on its own — the house calendar is full
   // of social events that happen to have a Meet link, and one of them
   // ("Peloton man doing what he Peloton can") sailed straight through the
@@ -1517,8 +1521,11 @@ serve(async (req) => {
           .select('gcal_event_id').not('gcal_event_id', 'is', null)
         const seenIds = new Set((seenEvents || []).map((r) => r.gcal_event_id))
 
+        // One row per applicant per recurring series, not one per instance —
+        // four "Halloween planning" Mondays are one fact, not four.
+        const recSeen = new Set<string>()
         for (const calendarId of sweepCalendars()) {
-          const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&maxResults=250`, {
+          const resp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=250`, {
             headers: { Authorization: `Bearer ${at}` },
           })
           if (!resp.ok) {
@@ -1540,6 +1547,11 @@ serve(async (req) => {
             if (!aid || gone.has(aid)) continue
             if (seenIds.has(ev.id)) continue
             seenIds.add(ev.id)
+            if (ev.recurringEventId) {
+              const recKey = `${aid}|${ev.recurringEventId}`
+              if (recSeen.has(recKey)) continue
+              recSeen.add(recKey)
+            }
             const past = new Date(ev.end?.dateTime || ev.start.dateTime) < new Date()
             await client.from('recruit_screenings').insert({
               applicant_id: aid,
