@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0d10">
+<title>Dice Roll · ctrl.rodeo</title>
+<style>
+  :root {
+    --bg: #0d0d10;
+    --surface: #17171c;
+    --surface-2: #1f1f26;
+    --border: #2b2b34;
+    --text: #ececf1;
+    --text-dim: #8b8b98;
+    --accent: #f5c542;
+    --accent-dim: #8a6f25;
+    --red: #f87171;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  .screen { display: none; min-height: 100dvh; flex-direction: column; max-width: 480px; margin: 0 auto; padding: 16px; }
+  .screen.active { display: flex; }
+
+  /* ---------- Setup ---------- */
+  .logo { text-align: center; margin: 32px 0 8px; font-size: 40px; }
+  .logo h1 { font-size: 28px; letter-spacing: 6px; font-weight: 800; color: var(--accent); }
+  .tagline { text-align: center; color: var(--text-dim); font-size: 14px; margin-bottom: 28px; }
+  .player-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+  }
+  .player-row .num { color: var(--accent); font-weight: 700; width: 22px; }
+  .player-row .name { flex: 1; font-size: 16px; }
+  .player-row .remove { color: var(--text-dim); font-size: 20px; padding: 4px 8px; }
+  .add-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .add-row input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; color: var(--text); font-size: 16px;
+  }
+  .add-row input:focus { outline: none; border-color: var(--accent-dim); }
+  .btn {
+    display: block; width: 100%; text-align: center;
+    background: var(--accent); color: #14110a; font-weight: 700; font-size: 17px;
+    border-radius: var(--radius); padding: 16px; margin-top: auto;
+  }
+  .btn:disabled { background: var(--surface-2); color: var(--text-dim); }
+  .btn-secondary { background: var(--surface-2); color: var(--text); }
+  .btn-add {
+    background: var(--surface-2); color: var(--accent); font-weight: 700;
+    border-radius: var(--radius); padding: 14px 18px; font-size: 15px;
+  }
+  .hint { color: var(--text-dim); font-size: 13px; text-align: center; margin: 12px 0; }
+
+  /* ---------- Game header ---------- */
+  .game-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .turn-chip {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 8px 16px; font-size: 15px; font-weight: 700;
+  }
+  .turn-chip .dot { color: var(--accent); }
+  .round-chip { color: var(--text-dim); font-size: 13px; }
+  .scores-strip {
+    display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .scores-strip::-webkit-scrollbar { display: none; }
+  .score-pill {
+    flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px 12px; font-size: 12px; color: var(--text-dim);
+    text-align: center; min-width: 64px;
+  }
+  .score-pill.current { border-color: var(--accent-dim); color: var(--text); }
+  .score-pill b { display: block; font-size: 15px; color: var(--text); }
+
+  /* ---------- Dice entry ---------- */
+  .dice-area {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
+  }
+  .dice-row { display: flex; justify-content: center; gap: 10px; }
+  .die {
+    width: 54px; height: 54px; border-radius: 12px;
+    background: #f4f4f6; position: relative; border: 3px solid transparent;
+    transition: border-color .12s, background .12s;
+  }
+  .die.blank { background: var(--surface-2); border: 2px dashed var(--border); }
+  .die.next { border-color: var(--accent); }
+  .die .pip { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #1a1a1f; }
+  .entry-hint { text-align: center; color: var(--text-dim); font-size: 12px; margin: 10px 0 8px; }
+  .keypad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .key {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 0; font-size: 18px; font-weight: 700; color: var(--accent);
+  }
+  .key:active { background: #2a2a33; }
+  .keypad-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .keypad-actions button {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 0; font-size: 14px; color: var(--text-dim);
+  }
+
+  /* ---------- Scorecard ---------- */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .cat {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 15px;
+    min-height: 48px; width: 100%; text-align: left;
+  }
+  .cat:last-child { border-bottom: none; }
+  .cat .label { color: var(--text); }
+  .cat .sub { color: var(--text-dim); font-size: 11px; display: block; }
+  .cat .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cat.scored .label { color: var(--text-dim); }
+  .cat.scored .val { color: var(--text); }
+  .cat.pickable { background: var(--surface-2); }
+  .cat.pickable .val { color: var(--accent); }
+  .cat.pickable:active { background: #2a2a33; }
+  .cat.zero-pick .val { color: var(--red); }
+  .cat.summary { background: var(--bg); font-size: 13px; color: var(--text-dim); min-height: 38px; }
+  .cat.summary .val { color: var(--text); }
+  .section-title { font-size: 11px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; padding: 12px 2px 6px; }
+
+  /* ---------- End screen ---------- */
+  .podium { margin: 24px 0; }
+  .rank-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 10px;
+  }
+  .rank-row.winner { border-color: var(--accent); }
+  .rank-row .medal { font-size: 24px; width: 32px; text-align: center; }
+  .rank-row .rname { flex: 1; font-size: 17px; font-weight: 600; }
+  .rank-row .rscore { font-size: 22px; font-weight: 800; color: var(--accent); }
+  .winner-banner { text-align: center; font-size: 20px; margin-top: 20px; }
+  .winner-banner b { color: var(--accent); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(80px);
+    background: var(--surface-2); border: 1px solid var(--accent-dim); color: var(--text);
+    border-radius: 999px; padding: 10px 20px; font-size: 14px; opacity: 0;
+    transition: all .25s; pointer-events: none; white-space: nowrap; z-index: 50;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  .footer-actions { margin-top: 16px; display: flex; gap: 10px; }
+  .footer-actions .btn { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<!-- Setup -->
+<section id="screen-setup" class="screen active">
+  <div class="logo">🎲<h1>DICE ROLL</h1></div>
+  <p class="tagline">Scorekeeper for real dice · any number of players</p>
+  <div id="player-list"></div>
+  <div class="add-row">
+    <input id="name-input" type="text" placeholder="Player name" maxlength="16" autocomplete="off" enterkeyhint="done">
+    <button id="add-btn" class="btn-add">Add</button>
+  </div>
+  <p class="hint">Roll real dice at the table — this app keeps score.</p>
+  <button id="start-btn" class="btn" disabled>Start game</button>
+</section>
+
+<!-- Game -->
+<section id="screen-game" class="screen">
+  <div class="game-head">
+    <div class="turn-chip"><span class="dot">●</span> <span id="turn-name"></span></div>
+    <div class="round-chip">Round <span id="round-num"></span>/13</div>
+  </div>
+  <div id="scores-strip" class="scores-strip"></div>
+  <div class="dice-area">
+    <div id="dice-row" class="dice-row"></div>
+    <p class="entry-hint" id="entry-hint">Roll your real dice, then enter what you kept</p>
+    <div class="keypad" id="keypad">
+      <button class="key" data-v="1">1</button>
+      <button class="key" data-v="2">2</button>
+      <button class="key" data-v="3">3</button>
+      <button class="key" data-v="4">4</button>
+      <button class="key" data-v="5">5</button>
+      <button class="key" data-v="6">6</button>
+    </div>
+    <div class="keypad-actions">
+      <button id="undo-die">⌫ Undo</button>
+      <button id="clear-dice">Clear</button>
+    </div>
+  </div>
+  <div class="section-title">Upper section</div>
+  <div class="card" id="upper-card"></div>
+  <div class="section-title">Lower section</div>
+  <div class="card" id="lower-card"></div>
+  <div class="footer-actions">
+    <button id="quit-btn" class="btn btn-secondary" style="font-size:14px;padding:12px;">End game</button>
+  </div>
+  <div style="height:12px"></div>
+</section>
+
+<!-- End -->
+<section id="screen-end" class="screen">
+  <div class="logo">🏆<h1>RESULTS</h1></div>
+  <div id="podium" class="podium"></div>
+  <p class="winner-banner" id="winner-banner"></p>
+  <button id="again-btn" class="btn">Play again</button>
+  <div style="height:12px"></div>
+</section>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const VERSION = '1.0.0';
+console.log(`[diceroll] v${VERSION} - real-dice yahtzee-style scorekeeper, unlimited players`);
+
+const SAVE_KEY = 'diceroll_state_v1';
+
+const UPPER = [
+  { id: 'ones',   label: 'Ones',   sub: 'Sum of 1s', n: 1 },
+  { id: 'twos',   label: 'Twos',   sub: 'Sum of 2s', n: 2 },
+  { id: 'threes', label: 'Threes', sub: 'Sum of 3s', n: 3 },
+  { id: 'fours',  label: 'Fours',  sub: 'Sum of 4s', n: 4 },
+  { id: 'fives',  label: 'Fives',  sub: 'Sum of 5s', n: 5 },
+  { id: 'sixes',  label: 'Sixes',  sub: 'Sum of 6s', n: 6 },
+];
+const LOWER = [
+  { id: 'threeKind',  label: 'Three of a kind',  sub: 'Sum of all dice' },
+  { id: 'fourKind',   label: 'Four of a kind',   sub: 'Sum of all dice' },
+  { id: 'fullHouse',  label: 'Full house',       sub: '25 points' },
+  { id: 'smStraight', label: 'Small straight',   sub: '30 points' },
+  { id: 'lgStraight', label: 'Large straight',   sub: '40 points' },
+  { id: 'yahtzee',    label: 'Yahtzee',          sub: '50 points' },
+  { id: 'chance',     label: 'Chance',           sub: 'Sum of all dice' },
+];
+const ALL_CATS = [...UPPER, ...LOWER].map(c => c.id);
+
+const PIPS = {
+  1: [[50,50]],
+  2: [[28,28],[72,72]],
+  3: [[28,28],[50,50],[72,72]],
+  4: [[28,28],[72,28],[28,72],[72,72]],
+  5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6: [[28,28],[72,28],[28,50],[72,50],[28,72],[72,72]],
+};
+
+let state = null;
+
+function newState(names) {
+  return {
+    players: names.map(name => ({ name, scores: {}, yahtzeeBonus: 0 })),
+    current: 0,
+    round: 1,
+    dice: [],          // entered final dice for this turn (0–5 values)
+    done: false,
+  };
+}
+
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {} }
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch(e) {} }
+
+/* ---------- Scoring ---------- */
+function counts(dice) {
+  const c = [0,0,0,0,0,0,0];
+  for (const d of dice) c[d]++;
+  return c;
+}
+function sum(dice) { return dice.reduce((a,b) => a+b, 0); }
+
+function potential(catId, dice) {
+  const c = counts(dice);
+  const isYahtzee = c.some(x => x === 5);
+  switch (catId) {
+    case 'ones': case 'twos': case 'threes': case 'fours': case 'fives': case 'sixes': {
+      const n = UPPER.find(u => u.id === catId).n;
+      return c[n] * n;
+    }
+    case 'threeKind': return c.some(x => x >= 3) ? sum(dice) : 0;
+    case 'fourKind':  return c.some(x => x >= 4) ? sum(dice) : 0;
+    case 'fullHouse': {
+      if (isYahtzee && jokerActive()) return 25;
+      return (c.includes(3) && c.includes(2)) ? 25 : 0;
+    }
+    case 'smStraight': {
+      if (isYahtzee && jokerActive()) return 30;
+      return hasStraight(c, 4) ? 30 : 0;
+    }
+    case 'lgStraight': {
+      if (isYahtzee && jokerActive()) return 40;
+      return hasStraight(c, 5) ? 40 : 0;
+    }
+    case 'yahtzee': return isYahtzee ? 50 : 0;
+    case 'chance':  return sum(dice);
+  }
+  return 0;
+}
+function hasStraight(c, len) {
+  let run = 0;
+  for (let v = 1; v <= 6; v++) {
+    run = c[v] > 0 ? run + 1 : 0;
+    if (run >= len) return true;
+  }
+  return false;
+}
+// Joker rule: yahtzee rolled with the yahtzee box already filled → straights/full house score full points
+function jokerActive() {
+  return state.players[state.current].scores.yahtzee !== undefined;
+}
+function upperSum(p) { return UPPER.reduce((a,u) => a + (p.scores[u.id] || 0), 0); }
+function upperBonus(p) { return upperSum(p) >= 63 ? 35 : 0; }
+function totalScore(p) {
+  const lower = LOWER.reduce((a,l) => a + (p.scores[l.id] || 0), 0);
+  return upperSum(p) + upperBonus(p) + lower + p.yahtzeeBonus * 100;
+}
+
+/* ---------- DOM helpers ---------- */
+const $ = id => document.getElementById(id);
+function show(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('screen-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- Setup screen ---------- */
+let setupNames = [];
+function renderSetup() {
+  $('player-list').innerHTML = setupNames.map((n, i) => `
+    <div class="player-row">
+      <span class="num">${i+1}</span>
+      <span class="name">${escapeHtml(n)}</span>
+      <button class="remove" data-i="${i}" aria-label="Remove ${escapeHtml(n)}">✕</button>
+    </div>`).join('');
+  $('start-btn').disabled = setupNames.length < 1;
+  $('start-btn').textContent = setupNames.length < 1
+    ? 'Add at least 1 player'
+    : `Start game · ${setupNames.length} player${setupNames.length > 1 ? 's' : ''}`;
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function addPlayer() {
+  const input = $('name-input');
+  const name = input.value.trim();
+  if (!name) return;
+  setupNames.push(name);
+  input.value = '';
+  input.focus();
+  renderSetup();
+}
+$('add-btn').addEventListener('click', addPlayer);
+$('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+$('player-list').addEventListener('click', e => {
+  const btn = e.target.closest('.remove');
+  if (!btn) return;
+  setupNames.splice(+btn.dataset.i, 1);
+  renderSetup();
+});
+$('start-btn').addEventListener('click', () => {
+  if (setupNames.length < 1) return;
+  state = newState(setupNames);
+  save();
+  show('game');
+  renderGame();
+});
+
+/* ---------- Game screen ---------- */
+function currentPlayer() { return state.players[state.current]; }
+
+function renderGame() {
+  const p = currentPlayer();
+  $('turn-name').textContent = p.name;
+  $('round-num').textContent = state.round;
+
+  $('scores-strip').innerHTML = state.players.map((pl, i) => `
+    <div class="score-pill ${i === state.current ? 'current' : ''}">
+      ${escapeHtml(pl.name)}<b>${totalScore(pl)}</b>
+    </div>`).join('');
+
+  renderDice();
+  renderCard();
+  save();
+}
+
+function renderDice() {
+  const html = [];
+  for (let i = 0; i < 5; i++) {
+    const d = state.dice[i];
+    if (d === undefined) {
+      html.push(`<div class="die blank ${i === state.dice.length ? 'next' : ''}"></div>`);
+    } else {
+      const pips = PIPS[d].map(([x,y]) =>
+        `<span class="pip" style="left:${x}%;top:${y}%;transform:translate(-50%,-50%)"></span>`).join('');
+      html.push(`<div class="die" aria-label="Die ${i+1}: ${d}">${pips}</div>`);
+    }
+  }
+  $('dice-row').innerHTML = html.join('');
+  $('entry-hint').textContent = state.dice.length === 0
+    ? 'Roll your real dice, then enter your final 5 here'
+    : state.dice.length < 5
+      ? `${5 - state.dice.length} more…`
+      : 'Pick a category below to log the score';
+}
+
+function renderCard() {
+  const p = currentPlayer();
+  const complete = state.dice.length === 5;
+
+  $('upper-card').innerHTML = UPPER.map(cat => catRow(cat, p, complete)).join('') + `
+    <div class="cat summary"><span>Upper total (bonus at 63)</span><span class="val">${upperSum(p)}</span></div>
+    <div class="cat summary"><span>Upper bonus</span><span class="val">${upperBonus(p)}</span></div>`;
+
+  $('lower-card').innerHTML = LOWER.map(cat => catRow(cat, p, complete)).join('') + `
+    <div class="cat summary"><span>Yahtzee bonus (×100)</span><span class="val">${p.yahtzeeBonus * 100}</span></div>
+    <div class="cat summary"><span>Grand total</span><span class="val">${totalScore(p)}</span></div>`;
+}
+
+function catRow(cat, p, complete) {
+  const scored = p.scores[cat.id] !== undefined;
+  if (scored) {
+    return `<div class="cat scored">
+      <span class="label">${cat.label}</span>
+      <span class="val">${p.scores[cat.id]}</span></div>`;
+  }
+  if (!complete) {
+    return `<div class="cat">
+      <span class="label">${cat.label}<span class="sub">${cat.sub}</span></span>
+      <span class="val" style="color:var(--text-dim)">—</span></div>`;
+  }
+  const pts = potential(cat.id, state.dice);
+  return `<button class="cat pickable ${pts === 0 ? 'zero-pick' : ''}" data-cat="${cat.id}">
+    <span class="label">${cat.label}<span class="sub">${cat.sub}</span></span>
+    <span class="val">${pts}</span></button>`;
+}
+
+/* dice entry */
+$('keypad').addEventListener('click', e => {
+  const key = e.target.closest('.key');
+  if (!key || state.dice.length >= 5) return;
+  state.dice.push(+key.dataset.v);
+  if (navigator.vibrate) navigator.vibrate(15);
+  renderDice();
+  renderCard();
+  save();
+});
+$('undo-die').addEventListener('click', () => {
+  state.dice.pop();
+  renderDice();
+  renderCard();
+  save();
+});
+$('clear-dice').addEventListener('click', () => {
+  state.dice = [];
+  renderDice();
+  renderCard();
+  save();
+});
+
+/* pick score */
+document.addEventListener('click', e => {
+  const row = e.target.closest('.cat.pickable');
+  if (!row || state.dice.length !== 5) return;
+  const catId = row.dataset.cat;
+  const p = currentPlayer();
+  if (p.scores[catId] !== undefined) return;
+
+  const pts = potential(catId, state.dice);
+  const isYahtzee = counts(state.dice).some(x => x === 5);
+
+  // extra yahtzee after scoring 50 in the yahtzee box = +100 bonus
+  if (isYahtzee && p.scores.yahtzee === 50) {
+    p.yahtzeeBonus++;
+    toast('🎉 Yahtzee bonus +100!');
+  } else if (catId === 'yahtzee' && pts === 50) {
+    toast('🎲 YAHTZEE! +50');
+  }
+
+  p.scores[catId] = pts;
+  nextTurn();
+});
+
+function nextTurn() {
+  state.current++;
+  if (state.current >= state.players.length) {
+    state.current = 0;
+    state.round++;
+  }
+  state.dice = [];
+
+  const allDone = state.players.every(p => ALL_CATS.every(c => p.scores[c] !== undefined));
+  if (state.round > 13 || allDone) {
+    state.done = true;
+    endGame();
+    return;
+  }
+  renderGame();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`${currentPlayer().name}'s turn — roll!`);
+}
+
+/* quit */
+$('quit-btn').addEventListener('click', () => {
+  if (confirm('End this game and show results?')) endGame();
+});
+
+/* ---------- End screen ---------- */
+const MEDALS = ['🥇','🥈','🥉'];
+function endGame() {
+  clearSave();
+  const ranked = [...state.players].sort((a,b) => totalScore(b) - totalScore(a));
+  $('podium').innerHTML = ranked.map((p, i) => `
+    <div class="rank-row ${i === 0 ? 'winner' : ''}">
+      <span class="medal">${MEDALS[i] || (i+1)}</span>
+      <span class="rname">${escapeHtml(p.name)}</span>
+      <span class="rscore">${totalScore(p)}</span>
+    </div>`).join('');
+  const top = totalScore(ranked[0]);
+  const winners = ranked.filter(p => totalScore(p) === top);
+  $('winner-banner').innerHTML = winners.length > 1
+    ? `It's a tie at <b>${top}</b>!`
+    : `<b>${escapeHtml(winners[0].name)}</b> wins with <b>${top}</b>!`;
+  show('end');
+}
+$('again-btn').addEventListener('click', () => {
+  setupNames = state ? state.players.map(p => p.name) : [];
+  state = null;
+  renderSetup();
+  show('setup');
+});
+
+/* ---------- Resume ---------- */
+(function init() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e) {}
+  if (saved && !saved.done && saved.players && saved.players.length) {
+    if (confirm(`Resume game in progress? (Round ${saved.round}, ${saved.players.length} players)`)) {
+      state = saved;
+      show('game');
+      renderGame();
+      return;
+    }
+    clearSave();
+  }
+  renderSetup();
+})();
+</script>
+</body>
+</html>
