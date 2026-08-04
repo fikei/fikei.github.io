@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.67.0';
+const VERSION = '3.68.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -87,7 +87,7 @@ const REMOVE_OPTIONS = [
   },
   {
     id: 'not_a_fit', label: 'Not a fit',
-    hint: 'our no — queues an update email',
+    hint: 'our no — records the house decision and queues an update email',
     chip: 'not a fit', stage: 'rejected', danger: true,
   },
   // The residency decision going the other way. Kept distinct from "not a
@@ -1083,19 +1083,22 @@ function recordingLeadsHtml() {
 let removeTarget = null;   // { applicantId, listingId }
 let removePick = null;     // REMOVE_OPTIONS id
 
-function openRemoveSheet(applicantId, listingId = null) {
+function openRemoveSheet(applicantId, listingId = null, opts = {}) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
   removeTarget = { applicantId, listingId: listingId || null };
   removePick = null;
   document.getElementById('remove-title').textContent = `Remove ${fullName(a)}`;
-  document.getElementById('remove-note').value = '';
+  document.getElementById('remove-note').value = opts.note || '';
   document.getElementById('remove-until').value = defaultReturnDate();
   document.getElementById('remove-until-wrap').hidden = true;
   renderRemoveOptions();
   document.getElementById('remove-submit').disabled = true;
   document.getElementById('remove-submit').classList.remove('btn--danger');
   document.getElementById('remove-modal').hidden = false;
+  // Decide-no arrives here with "Not a fit" preselected — the verdict and
+  // its consequences (archive + update email) are one gesture, not two apps.
+  if (opts.preselect) pickRemoveOption(opts.preselect);
 }
 
 function renderRemoveOptions() {
@@ -1148,7 +1151,12 @@ async function submitRemove() {
     if (!await setExit(applicantId, opt.id, until, note)) return;
     // Their listing slots go with them — all three exits leave the board.
     await clearActivePlacements(applicantId);
-    if (opt.id === 'not_a_fit') await saveDecision(applicantId, 'pass', null, null, note);
+    if (opt.id === 'not_a_fit') {
+      await saveDecision(applicantId, 'pass', null, null, note);
+      // Not-a-fit IS the house decision going the no way — record it as one,
+      // so the decision chip, the sheet, and the archive all tell one story.
+      await writeHouseDecision(applicantId, 'no', note);
+    }
     if (a.stage !== opt.stage) await setStage(applicantId, opt.stage);
     toast(opt.id === 'not_a_fit'
       ? `${fullName(a)} → Archived — update email queued`
@@ -2960,16 +2968,23 @@ function houseDecision(applicantId) {
     String(y.updated_at || y.created_at || '').localeCompare(String(x.updated_at || x.created_at || '')))[0];
 }
 
-async function giveDecision(applicantId, verdict) {
-  const note = (document.getElementById('gd-note')?.value || '').trim();
+/* The one writer for the house decision row — Decide-yes and the Remove
+   sheet's Not-a-fit both land here, so "the decision" means one thing. */
+async function writeHouseDecision(applicantId, verdict, note) {
   const { data, error } = await sb.from('recruit_decision_votes').upsert({
     applicant_id: applicantId, voter_id: me.id, voter_name: me.name,
-    verdict, note, updated_at: new Date().toISOString(),
+    verdict, note: note || '', updated_at: new Date().toISOString(),
   }, { onConflict: 'applicant_id,voter_id' }).select().single();
-  if (error) { toast(`Decision failed: ${error.message}`); return; }
+  if (error) { toast(`Decision failed: ${error.message}`); return null; }
   decisionVotes[applicantId] = [...(decisionVotes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
+  return data;
+}
+
+async function giveDecision(applicantId, verdict) {
+  const note = (document.getElementById('gd-note')?.value || '').trim();
+  if (!await writeHouseDecision(applicantId, verdict, note)) return;
   document.getElementById('gd-modal').hidden = true;
-  toast(`Saved — ${verdict === 'yes' ? 'accept' : 'pass'} is the house decision`);
+  toast('Saved — accept is the house decision');
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (!document.getElementById('review').hidden) renderReview();
 }
@@ -6307,7 +6322,15 @@ function init() {
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
-  document.getElementById('gd-no').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'no');
+  // No is not a sentiment to file — it routes into the Remove sheet with
+  // Not a fit preselected (note carried), so the verdict and its
+  // consequences happen as one act. The decision row is written on commit.
+  document.getElementById('gd-no').onclick = () => {
+    const id = document.getElementById('gd-modal').dataset.applicant;
+    const note = (document.getElementById('gd-note')?.value || '').trim();
+    document.getElementById('gd-modal').hidden = true;
+    openRemoveSheet(id, null, { preselect: 'not_a_fit', note });
+  };
 
   document.getElementById('remove-close').onclick = hideRemoveSheet;
   document.getElementById('remove-cancel').onclick = hideRemoveSheet;
