@@ -317,3 +317,9 @@ The recording is the review artifact; hiding it made every decision one menu dee
 
 ### v3.67 — one decider for the post-call decision
 The post-screening "Would you accept them?" flow now matches the Inbox review model: **one housemate's verdict IS the house decision** — no tally, no quorum. The most recent write is canonical; anyone can overrule by deciding again (the sheet shows the standing decision, any earlier reads as history, and says plainly that saving replaces it). Row chips read `accept — Sam` / `pass — Sam` (green/gray) or `call done · needs a decision`; the ⋮ item flips to **Change decision** once one exists. Server side, `decision_open` notifications stop the moment any decision exists.
+
+### v3.68 — Decide and Remove converge on the no-path
+"Decide — no" and "Remove — not a fit" were two ways to say the same thing, one without consequences and one that didn't count as deciding. Now they are one path:
+- **Decide → "No — not a fit…"** routes into the Remove sheet with *Not a fit* preselected and the note carried over — verdict + archive + update email are one gesture (the transparency hold/Undo still applies).
+- **Remove → Not a fit**, reached directly, also **writes the house decision row** (`writeHouseDecision`, the single writer both paths share) — the decision chip, the sheet, and the archive tell one story.
+- **Decide — yes** is unchanged (house decision recorded; next step is the tour/offer). The other Remove outcomes (off this listing / save for future / opted out / trial ended) remain logistics exits, not verdicts.
