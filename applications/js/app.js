@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.65.0';
+const VERSION = '3.66.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -673,7 +673,7 @@ async function loadAll() {
     sb.from('recruit_emails').select('id, applicant_id, gmail_id, thread_id, direction, subject, snippet, from_email, to_email, sent_at').order('sent_at'),
     sb.from('recruit_votes').select('*').order('created_at'),
     sb.from('recruit_screenings').select('id, applicant_id, starts_at, ends_at, status, housemate_name, meet_link, recall_status, recall_bot_id, external_recording_url, kind, title, calendar_id').order('starts_at'),
-    sb.from('recruit_availability').select('applicant_id, windows, updated_at'),
+    sb.from('recruit_availability').select('applicant_id, windows, updated_at, source_gmail_id'),
     sb.from('recruit_listing_candidates').select('*'),
     sb.from('recruit_applicant_views').select('applicant_id'),
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
@@ -4558,6 +4558,7 @@ function renderReview() {
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
     ${stagesHtml(a)}
+    ${availabilityHtml(a)}
     ${houseEventsHtml(a)}
     <section class="review__section notes" id="notes">
       <div class="notes__head">
@@ -4840,17 +4841,38 @@ function section(title, text) {
 }
 
 /* ---------- emails panel ---------- */
+/* Bodies stored before the UTF-8 decode fix carry mojibake — UTF-8 bytes
+   read as Latin-1 ("â€™" for a curly quote). The tell is unmistakable in
+   English text, so re-decode when it's present; new rows come in clean. */
+function demojibake(s) {
+  let out = String(s || '');
+  for (let i = 0; i < 2 && /â€|Ã[-¿©®±¼½¾]|Â[ -¿]/.test(out); i++) {
+    try { out = decodeURIComponent(escape(out)); } catch { break; }
+  }
+  return out;
+}
+
+/* Reader view of a message body: fix legacy mojibake, drop the quoted
+   history (the thread renders it as its own rows), and tighten whitespace. */
+function cleanEmailBody(text) {
+  let t = demojibake(text).replace(/\r\n/g, '\n');
+  const cut = t.search(/\n\s*(On .{5,120} wrote:|-{2,}\s?(Original|Forwarded) message|From: .+\n(Sent|Date): )/i);
+  if (cut > 40) t = t.slice(0, cut);
+  t = t.split('\n').filter(line => !/^\s*>/.test(line)).join('\n');
+  return t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /* Each row expands in place to the full message body. */
 function emailRow(m) {
   const arrow = m.direction === 'out' ? '↗' : '↙';
   const who = m.direction === 'out' ? `Agape${m.sent_by_name ? ` (${esc(m.sent_by_name)})` : ''}` : esc(m.from_email.replace(/<.*>/, '').trim() || m.from_email);
-  const body = (m.body_text || '').trim();
+  const body = cleanEmailBody(m.body_text || '');
   return `<li class="email-row email-row--${m.direction}">
     <button type="button" class="email-row__head" data-email-toggle aria-expanded="false" ${body ? '' : 'disabled title="No text body stored for this message"'}>
       <span class="email-row__dir" title="${m.direction === 'out' ? 'Sent by the house' : 'Received'}">${arrow}</span>
       <span class="inbox-row__text">
-        <span class="inbox-row__title">${esc(m.subject || '(no subject)')}</span>
-        <span class="inbox-row__sub">${who} · ${new Date(m.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${m.snippet ? ` — ${esc(m.snippet.slice(0, 110))}` : ''}</span>
+        <span class="inbox-row__title">${esc(demojibake(m.subject) || '(no subject)')}</span>
+        <span class="inbox-row__sub">${who} · ${new Date(m.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${m.snippet ? ` — ${esc(demojibake(m.snippet).slice(0, 110))}` : ''}</span>
       </span>
       ${body ? '<span class="email-row__chev" aria-hidden="true">▾</span>' : ''}
     </button>
@@ -4877,9 +4899,14 @@ async function loadEmailsPanel(a) {
   // what's on screen. The old behaviour blanked the panel and blocked on
   // the network every single time the tab was opened.
   paintEmailsPanel(a, emailSyncing.has(a.id) ? 'checking' : '');
-  syncEmails(a.id).then(changed => {
-    if (changed && queue[qIndex] === a.id && reviewTab === 'emails' && host()) paintEmailsPanel(a, '');
-    else if (queue[qIndex] === a.id && reviewTab === 'emails' && host()) setEmailsNote('');
+  // ALWAYS repaint after the sync, not just when the count changed: loadAll
+  // hydrates the cache without body_text (the heavy column), so the first
+  // paint renders every row as an un-expandable disabled button. The sync
+  // returns full rows — same list, now tappable — and "nothing new synced"
+  // used to skip exactly that repaint, which is why taps did nothing on a
+  // fresh phone load.
+  syncEmails(a.id).then(() => {
+    if (queue[qIndex] === a.id && reviewTab === 'emails' && host()) paintEmailsPanel(a, '');
   }).catch(e => setEmailsNote(`couldn't reach the inbox — showing what we have (${e.message})`));
 }
 
@@ -5036,6 +5063,27 @@ function stagesHtml(a) {
     <h3 class="review__section-title">Where they are</h3>
     ${stageRow('Intro call', { state: callState, detail: callDetail, action: callAction })}
     ${stageRow('House visit', { state: visitState, detail: visitDetail, action: visitAction })}
+  </section>`;
+}
+
+/* Dedicated availability home on the profile: the parsed windows AND the
+   applicant's own words they came from. An extraction you can check against
+   its source is one you can trust — or overrule by just reading the email. */
+function availabilityHtml(a) {
+  const av = availCache[a.id];
+  if (!Array.isArray(av?.windows) || !av.windows.length) return '';
+  const wins = av.windows.map(w =>
+    `<span class="chip avail-sec__win">${new Date(w.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${esc(w.start)}–${esc(w.end)}</span>`).join('');
+  const src = (emailsCache[a.id] || []).find(m => m.gmail_id === av.source_gmail_id);
+  const quoteText = src ? (cleanEmailBody(src.body_text || '') || demojibake(src.snippet || '')) : '';
+  const srcLine = src
+    ? `from their email · ${new Date(src.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · <button type="button" class="cta-link" data-review-tab="emails">open the thread</button>`
+    : `parsed from their reply · <button type="button" class="cta-link" data-review-tab="emails">open the thread</button>`;
+  return `<section class="review__section avail-sec">
+    <h3 class="review__section-title">Availability <span class="avail-sec__tz">Pacific time</span></h3>
+    <div class="avail-sec__wins">${wins}</div>
+    ${quoteText ? `<blockquote class="avail-sec__quote">${esc(quoteText.slice(0, 280))}${quoteText.length > 280 ? '…' : ''}</blockquote>` : ''}
+    <p class="avail-sec__src">${srcLine}</p>
   </section>`;
 }
 
