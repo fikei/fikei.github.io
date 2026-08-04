@@ -948,8 +948,10 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
        trying to kill. That fact now lives in one place: the follow-up sentence
        below names the missing votes itself. */
     if (left > 14) continue
+    // One decider (2026-08-03): a single housemate's verdict IS the house
+    // decision. Once anyone has decided, nothing is open — stop nagging.
+    if ((tally.get(a.id) || 0) > 0) continue
     const step = left < 0 ? 'passed' : left <= 3 ? 'urgent' : left <= 7 ? 'soon' : 'open'
-    const n = tally.get(a.id) || 0
     out.push({
       kind: 'decision_open',
       subject_type: 'applicant',
@@ -962,7 +964,7 @@ async function detectDecisionOpen(db: DB): Promise<Notification[]> {
         title: fullName(a),
         copy: left < 0 ? 'decision_open.overdue' : 'decision_open',
         vars: { subject: fullName(a), date: fmtDay(date), days: plural(Math.abs(left), 'day') },
-        body: n ? `${plural(n, 'housemate')} weighed in so far` : 'nobody has weighed in yet',
+        body: 'nobody has decided yet — one housemate’s read settles it',
         section: 'Decisions',
         links: [{ label: ACTIONS.profile, url: applicantLink(a.id) }],
       },

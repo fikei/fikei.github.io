@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.66.1';
+const VERSION = '3.67.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -575,12 +575,16 @@ function openingsCta(a) {
     // Watch earns its inline spot back: the recording is the review artifact,
     // and burying it made every decision one menu deeper. Still no primary —
     // it sits beside the status chip, everything else stays in the ⋮.
-    const dv = decisionVotes[a.id] || [];
-    return stack(`<span class="cta-pair">${chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Decide or schedule a house tour from the ⋮ menu')}${watchBtn(sc, a.id)}</span>`);
+    const hd = houseDecision(a.id);
+    return stack(`<span class="cta-pair">${hd
+      ? chip(`${hd.verdict === 'yes' ? 'accept' : 'pass'} — ${esc(hd.voter_name || 'a housemate')}`, hd.verdict === 'yes' ? 'decision-chip--replied' : 'decision-chip--pass', `The house decision${hd.note ? ` — “${esc(hd.note)}”` : ''}. Change it from the ⋮ menu.`)
+      : chip('call done · needs a decision', 'decision-chip--vote', 'One housemate’s read settles it — decide from the ⋮ menu')}${watchBtn(sc, a.id)}</span>`);
   }
   if (phase === 'done') {
-    const dv = decisionVotes[a.id] || [];
-    return stack(chip(`call done${dv.length ? ` · ${dv.length} weighed in` : ''}`, 'decision-chip--vote', 'Decide, add a recording, or schedule a house tour from the ⋮ menu'));
+    const hd = houseDecision(a.id);
+    return stack(hd
+      ? chip(`${hd.verdict === 'yes' ? 'accept' : 'pass'} — ${esc(hd.voter_name || 'a housemate')}`, hd.verdict === 'yes' ? 'decision-chip--replied' : 'decision-chip--pass', `The house decision${hd.note ? ` — “${esc(hd.note)}”` : ''}. Change it from the ⋮ menu.`)
+      : chip('call done · needs a decision', 'decision-chip--vote', 'One housemate’s read settles it — decide from the ⋮ menu'));
   }
   if (phase === 'processing') return stack(processingChip());
   if (phase === 'live') return stack(joinBtn(sc) || processingChip());
@@ -2879,7 +2883,7 @@ function rowMenuHtml(a, listingId) {
   if (!sc.at && !sc.done && !sc.availability) items.push(item(`data-email="${a.id}" data-email-kind="availability"`, 'Schedule intro call'));
   if (!tour || tour.status === 'cancelled' || tour.status === 'confirmed') items.push(item(`data-email="${a.id}" data-email-kind="tour"`, 'Schedule house tour'));
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
-  if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, 'Decide'));
+  if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
   items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
@@ -2945,7 +2949,17 @@ async function syncDraftListings() {
   return created;
 }
 
-/* Post-screening decision sheet: yes / no + note, one row per housemate. */
+/* Post-screening decision — ONE decider (2026-08-03). A single housemate's
+   verdict is the house decision; storage keeps every row (history and RLS
+   stay untouched) and the most recent write is canonical. Anyone can
+   overrule by deciding again — same trust model as the Inbox review. */
+function houseDecision(applicantId) {
+  const dv = decisionVotes[applicantId] || [];
+  if (!dv.length) return null;
+  return dv.slice().sort((x, y) =>
+    String(y.updated_at || y.created_at || '').localeCompare(String(x.updated_at || x.created_at || '')))[0];
+}
+
 async function giveDecision(applicantId, verdict) {
   const note = (document.getElementById('gd-note')?.value || '').trim();
   const { data, error } = await sb.from('recruit_decision_votes').upsert({
@@ -2955,7 +2969,7 @@ async function giveDecision(applicantId, verdict) {
   if (error) { toast(`Decision failed: ${error.message}`); return; }
   decisionVotes[applicantId] = [...(decisionVotes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
   document.getElementById('gd-modal').hidden = true;
-  toast(`Decision saved — ${(decisionVotes[applicantId] || []).length} in`);
+  toast(`Saved — ${verdict === 'yes' ? 'accept' : 'pass'} is the house decision`);
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (!document.getElementById('review').hidden) renderReview();
 }
@@ -2964,13 +2978,15 @@ function openGiveDecision(applicantId) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
   const modal = document.getElementById('gd-modal');
-  const dv = decisionVotes[applicantId] || [];
-  const mine = dv.find(v => v.voter_id === me?.id);
+  const hd = houseDecision(applicantId);
+  const earlier = (decisionVotes[applicantId] || []).filter(v => hd && v !== hd);
   document.getElementById('gd-title').textContent = `Would you accept ${a.first}?`;
-  document.getElementById('gd-tally').innerHTML = mine || dv.length
-    ? dv.map(v => `<span class="chip-line">${esc(v.voter_name || 'Housemate')} · <b>${v.verdict}</b>${v.note ? ` — ${esc(v.note)}` : ''}</span>`).join('')
-    : '<span class="notes__empty">You\'re first — others see the tally after they decide.</span>';
-  document.getElementById('gd-note').value = mine?.note || '';
+  document.getElementById('gd-tally').innerHTML = hd
+    ? `<span class="chip-line">House decision · <b>${hd.verdict === 'yes' ? 'accept' : 'pass'}</b> — ${esc(hd.voter_name || 'a housemate')}${hd.note ? ` · “${esc(hd.note)}”` : ''}</span>` +
+      earlier.map(v => `<span class="chip-line notes__empty">earlier · ${esc(v.voter_name || 'Housemate')} said ${v.verdict}${v.note ? ` — ${esc(v.note)}` : ''}</span>`).join('') +
+      `<span class="notes__empty">Saving replaces the standing decision.</span>`
+    : '<span class="notes__empty">One housemate’s read settles it — yours becomes the house decision.</span>';
+  document.getElementById('gd-note').value = (hd && hd.voter_id === me?.id ? hd.note : '') || '';
   modal.dataset.applicant = applicantId;
   modal.hidden = false;
 }
