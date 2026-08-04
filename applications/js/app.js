@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.66.0';
+const VERSION = '3.66.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5703,6 +5703,7 @@ async function checkMembershipAndEnter() {
 }
 
 async function _checkMembershipAndEnter() {
+  const tEnter = performance.now();
   let token = null;
   try {
     const session = await sb.auth.getSession();
@@ -5731,6 +5732,15 @@ async function _checkMembershipAndEnter() {
     return;
   }
   setGate('Checking your Recruiting Society access…', null);
+  /* The data load doesn't need the access verdict — RLS enforces recruiting
+     membership on every row regardless — so it runs IN PARALLEL with the
+     access check instead of queued behind it. They used to serialize, and
+     each leg costs 1–3s; a deep link onto an applicant paid both. If the
+     gate ends up refusing entry, the fetches were RLS-empty and harmless. */
+  let tData = 0;
+  const tAccess0 = performance.now();
+  const dataP = loadAll().then(() => { tData = performance.now(); });
+  dataP.catch(() => {}); // surfaced at the await below; never unhandled here
   try {
     // No timeout here once cost a housemate a permanent spinner.
     const ctl = new AbortController();
@@ -5794,7 +5804,8 @@ async function _checkMembershipAndEnter() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
       body: JSON.stringify({ action: 'status' }),
     }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; gmailStatusFull = gmailStatus; if (view === 'settings') renderSettings(); }).catch(() => {});
-    await loadAll();
+    const tAccess = performance.now();
+    await dataP;
     // background — outreach attachment labels + rail badges need house data;
     // re-render the open view once it lands so labels don't show stale fallbacks
     loadHouse().then(async () => {
@@ -5813,7 +5824,6 @@ async function _checkMembershipAndEnter() {
     scanInbox();      // background — badge replies without opening each thread
     loadRecordingLeads(); // background — unfiled Discord recording links
     loadActivityCount();  // background — unresolved-notification badge on Activity
-    const autoFlagged = await applyAutoFlags();
     document.getElementById('gate').hidden = true;
     document.getElementById('app').hidden = false;
     renderRailUser();
@@ -5823,7 +5833,33 @@ async function _checkMembershipAndEnter() {
     if (!VIEWS[view]) view = 'openings';
     pendingOccRoom = view === 'occupancy' ? +new URLSearchParams(location.search).get('room') || null : null;
     render();
-    if (autoFlagged) toast(`${autoFlagged} applicant${autoFlagged === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
+    // The budget-floor sweep writes two rows per flagged applicant and used
+    // to gate first paint. Under-floor applications are rare and re-render
+    // is cheap — run it behind the render instead.
+    applyAutoFlags().then(n => {
+      if (!n) return;
+      toast(`${n} applicant${n === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
+      renderRailCounts();
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    }).catch(() => {});
+    /* Boot report — one console line, and each phase into the vitals
+       pipeline so slow loads show up in /analytics rather than anecdotes.
+       access+data overlap; "enter" is this function, "since nav" is the
+       user's real wait from tapping the link. */
+    {
+      const tShown = performance.now();
+      const deepLinked = Boolean(new URLSearchParams(location.search).get('a'));
+      const phases = {
+        boot_access: tAccess - tAccess0,
+        boot_data: (tData || tShown) - tAccess0,
+        boot_enter: tShown - tEnter,
+        boot_since_nav: tShown,
+      };
+      console.log(`[applications] boot: access ${phases.boot_access.toFixed(0)}ms ∥ data ${phases.boot_data.toFixed(0)}ms · enter ${phases.boot_enter.toFixed(0)}ms · since nav ${phases.boot_since_nav.toFixed(0)}ms${deepLinked ? ' · deep-link' : ''}`);
+      if (typeof window.ctrlVital === 'function') {
+        for (const [name, v] of Object.entries(phases)) window.ctrlVital(deepLinked ? `${name}.deep` : name, v);
+      }
+    }
     const deep = new URLSearchParams(location.search).get('a');
     if (deep) {
       // Exact id first; then the short name form for legacy timestamp ids
