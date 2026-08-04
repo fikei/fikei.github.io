@@ -463,13 +463,18 @@ async function maybePostTourPoll(
        this notification exists for. */
     try {
       const name = `${applicant?.first_name || 'An applicant'} ${applicant?.last_name || ''}`.trim()
-      const sig = slots.map((s) => s.start).join(',').slice(0, 120)
+      /* Keyed per person per day, not per set of times. Keying on the slots
+         themselves meant every edit to their availability was a new
+         notification — and produced a 200-character dedupe key made of ISO
+         timestamps. Somebody adjusting their times three times in an afternoon
+         is one piece of news. */
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())
       const times = fmtWindows(windows)
       await record(client, [{
         kind: 'tour_availability',
         subject_type: 'applicant', subject_id: applicantId, subject_label: name,
         lane: refresh ? 'now' : 'daily',
-        dedupe_key: `tour_availability:${applicantId}:${sig}`,
+        dedupe_key: `tour_availability:${applicantId}:${today}`,
         payload: {
           title: name,
           copy: refresh ? (times ? 'tour_availability.updated' : 'tour_availability.updated.plain') : 'tour_availability',

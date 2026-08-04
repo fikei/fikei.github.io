@@ -91,7 +91,7 @@ export const TEMPLATES: Record<string, string> = {
   'review_backlog':               '{subject} are waiting for reviews, {window} days.',
   'needs_input':                  '{asker} wants second opinon on {subject}.',
   'candidate_placed':             '{subject} passed review and fits {rooms}.',
-  'candidate_parked':             '{subject} passed review but no openings fit their move-in dates.',
+  'candidate_parked':             '{subject} passed review but no open room fits their move-in dates.',
   'gone_cold':                    '{subject} never answered the last email, sent {days} ago.',
   'candidate_promoted':           '{subject} moved into {room} on {date} as a resident.',
 
@@ -100,7 +100,7 @@ export const TEMPLATES: Record<string, string> = {
   'decision_open.overdue':        'The house still has not decided on {subject}, who wanted to move in {date}.',
 
   // --- the call
-  'screening_followup.undecided': "{subject} was interviewed {days} ago and waiting on house decision.",
+  'screening_followup.undecided': "{subject} was interviewed {days} ago and waiting on the house to decide.",
   // Naming who ran the call turns "somebody should" into "you said you would".
   'screening_followup.undecided_by': "{screener} interviewed {subject} {days} ago and the house still hasn't decided.",
   'screening_followup.silent':    '{subject} was interviewed and has heard nothing for {days}.',

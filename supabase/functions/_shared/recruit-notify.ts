@@ -705,7 +705,9 @@ async function detectCandidateLanding(db: DB): Promise<Notification[]> {
         subject_type: 'applicant',
         subject_id: a.id,
         subject_label: a.first_name,
-        lane: 'now',
+        // Good news, not urgent news: the sweep places a batch at once and
+        // nobody acts on it the minute it lands.
+        lane: 'daily',
         // Keyed on the set of rooms, so a candidate moving between listings is
         // news again while a candidate sitting still is not.
         dedupe_key: `candidate_placed:${a.id}:${[...rooms].sort().join('+')}`,
@@ -1700,9 +1702,23 @@ function oneLine(n: LineRow): string {
    members-channel passes so #recruiting-automation is never behind the
    channel the house reads. */
 async function drainLog(db: DB): Promise<number> {
+  /* Only what is urgent. Everything else waits for the digest.
+
+     The log was designed to post every notification the moment it appeared,
+     because it was the complete record and the house read a different channel.
+     With everything held to #recruiting-automation that promise turned into the
+     noise: a candidate parked with no room, a shortlist filling up, and a
+     backlog count all arrived as interrupts, each one true and none of them
+     needing anybody to move.
+
+     So the lane now governs the channel. 'now' posts immediately; 'daily' and
+     'weekly' are left unposted here and collected by the digest, which lands in
+     the same channel once a day. Nothing is dropped — the Activity view still
+     holds every notification the instant it is detected, and that is where the
+     complete-record promise lives. */
   const { data } = await db.from('recruit_notifications')
     .select('id, kind, subject_label, payload, audience, lane, muted')
-    .is('log_at', null).neq('audience', 'none')
+    .is('log_at', null).neq('audience', 'none').eq('lane', 'now')
     .order('created_at').limit(12)
   if (!data?.length) return 0
 
@@ -1877,8 +1893,14 @@ async function drainDigest(db: DB, settings: NotifySettings, lane: 'daily' | 'we
   })
   const heading = lane === 'daily' ? '🌞 **Recruiting today**' : '📅 **Recruiting this week**'
   await sendEmbed(houseChannel(settings), `${heading}\n\n${blocks.join('\n\n')}`)
+  /* Stamped as logged as well as digested: the digest IS how these reached the
+     channel, and leaving log_at null would make them look forever unposted. */
   await db.from('recruit_notifications')
-    .update({ members_at: new Date().toISOString(), digest_id: digestId })
+    .update({
+      members_at: new Date().toISOString(),
+      log_at: new Date().toISOString(),
+      digest_id: digestId,
+    })
     .in('id', data.map((r: { id: string }) => r.id))
   return data.length
 }
