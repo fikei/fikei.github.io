@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.33.0'
+const VERSION = '1.34.0'
 console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -597,6 +597,14 @@ function header(headers: Array<{ name: string; value: string }>, name: string): 
   return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
 }
 
+/* Gmail body parts are base64url-encoded UTF-8. atob() alone yields Latin-1
+   — every curly quote and emoji stored as mojibake ("â€™") — so run the
+   bytes through a real UTF-8 decode. */
+function b64ToUtf8(b64: string): string {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'))
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))
+}
+
 /* One notification per classified reply. Reads the emails the scan just
    labelled and writes them to the ledger — the same table, sentences, and lanes
    everything else uses, so a reply reads like every other notification.
@@ -986,7 +994,7 @@ serve(async (req) => {
         const walk = (part: any) => {
           if (!part) return
           if (part.mimeType === 'text/plain' && part.body?.data) {
-            try { bodyText += atob(String(part.body.data).replace(/-/g, '+').replace(/_/g, '/')) } catch { /* */ }
+            try { bodyText += b64ToUtf8(String(part.body.data)) } catch { /* */ }
           }
           for (const sub of (part.parts || [])) walk(sub)
         }
@@ -1011,7 +1019,11 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               })
             }
-            if (await autoPostEnabled(client)) await postClaim(client, applicant.id, extraction)
+            // Same routing as the scan: an open tour ask claims the windows
+            // for the poll. Without this, a manual Emails-tab sync that beat
+            // the cron marked the message processed and the poll never fired.
+            const tourOpen = await maybePostTourPoll(client, applicant.id, extraction.windows)
+            if (!tourOpen && await autoPostEnabled(client)) await postClaim(client, applicant.id, extraction)
           }
         }
       }
@@ -1397,7 +1409,7 @@ serve(async (req) => {
         const walk = (part: any) => {
           if (!part) return
           if (part.mimeType === 'text/plain' && part.body?.data) {
-            try { bodyText += atob(String(part.body.data).replace(/-/g, '+').replace(/_/g, '/')) } catch { /* */ }
+            try { bodyText += b64ToUtf8(String(part.body.data)) } catch { /* */ }
           }
           for (const sub of (part.parts || [])) walk(sub)
         }

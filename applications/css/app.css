@@ -942,6 +942,19 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .email-added__item { margin: 0; }
 .email-added__item strong { font-weight: var(--fw-medium); }
 
+/* --- v3.66: availability section on the profile ---
+   Parsed windows as chips, the applicant's own words underneath. */
+.avail-sec__tz { font-size: var(--font-size-small); font-weight: 400; color: var(--fg-subtle); margin-left: var(--space-2); }
+.avail-sec__wins { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.avail-sec__win { cursor: default; }
+.avail-sec__quote {
+  margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-4);
+  border-left: 3px solid var(--border-strong);
+  color: var(--fg-muted); font-size: var(--font-size-small); line-height: var(--lh-body);
+  font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.avail-sec__src { margin: 0; font-size: var(--font-size-small); color: var(--fg-subtle); }
+
 /* --- v2.12: review tabs + emails --- */
 .review-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
 .review-tabs__tab {
