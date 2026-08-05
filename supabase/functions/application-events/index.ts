@@ -51,8 +51,8 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.9.1';
-console.log(`[application-events] v${VERSION} - discovery pass runs/processes first in shared scan (starvation fix); 14d sent window`);
+const VERSION = '1.9.2';
+console.log(`[application-events] v${VERSION} - engaged-message informational fallthrough to opportunity extractor in shared scan`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';

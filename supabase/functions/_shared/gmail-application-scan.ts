@@ -374,6 +374,28 @@ export async function scanApplicationResponses(args: {
       else if (hits.length > 1) matchedRole = pickByTitleOverlap(hits, subject, body);
     }
 
+    const engaged = engagedThreads.has(msg.threadId);
+    // Engaged messages that come up empty in role context fall through
+    // here. The step-3 substring match is easily fooled on discovery
+    // messages — "Google Meet" boilerplate in a scheduling email matches
+    // a saved Google role, the classifier correctly calls it
+    // 'informational' for THAT role, and a genuinely new opportunity
+    // vanishes without a trace. Rejections persist to gmail_skipped, so
+    // this costs at most one extra Haiku call per engaged thread.
+    const tryEngagedCreate = async (): Promise<void> => {
+      const created = await maybeCreateRoleFromUnmatched(sql, {
+        userEmail: args.userEmail,
+        msg, messageId, sender, senderDomain, subject, body,
+        engaged: true,
+        eventSource: mode === 'backfill' ? 'gmail-backfill' : 'gmail-scan',
+      });
+      if (created) {
+        out.inserted++;
+        out.rolesCreated++;
+        labelTargets.push(msg.id);
+      }
+    };
+
     // Step 3.5 — no pipeline role matched. Two auto-create paths:
     // application receipts (the user applied outside Ladder, directly on
     // an ATS careers page), and engaged threads (an in-progress
@@ -383,7 +405,7 @@ export async function scanApplicationResponses(args: {
       const created = await maybeCreateRoleFromUnmatched(sql, {
         userEmail: args.userEmail,
         msg, messageId, sender, senderDomain, subject, body,
-        engaged: engagedThreads.has(msg.threadId),
+        engaged,
         eventSource: mode === 'backfill' ? 'gmail-backfill' : 'gmail-scan',
       });
       if (created) {
@@ -414,11 +436,18 @@ export async function scanApplicationResponses(args: {
       console.warn(`[gmail-app-scan] classify failed: ${(e as Error).message}`);
       continue;
     }
-    if (!classified) continue;
+    if (!classified) {
+      if (engaged) await tryEngagedCreate();
+      continue;
+    }
 
     // Below the persist floor → drop entirely. Don't poison the timeline
-    // with low-confidence guesses.
-    if (classified.confidence < PERSIST_CONFIDENCE_FLOOR) continue;
+    // with low-confidence guesses. Engaged messages get the opportunity
+    // extractor before we give up on them.
+    if (classified.confidence < PERSIST_CONFIDENCE_FLOOR) {
+      if (engaged) await tryEngagedCreate();
+      continue;
+    }
 
     // 'informational' events are signal-free by definition — newsletters,
     // LinkedIn job-alert digests that mention the company in passing,
@@ -426,7 +455,13 @@ export async function scanApplicationResponses(args: {
     // surfaces these because the company appears somewhere in the body,
     // but they don't represent application progress. Skip them entirely
     // rather than polluting the Activity timeline with newsletter noise.
-    if (classified.event_type === 'informational') continue;
+    // Engaged messages fall through to the opportunity extractor: an
+    // in-progress conversation that is 'informational' for the (often
+    // substring-mis)matched role may be a new opportunity elsewhere.
+    if (classified.event_type === 'informational') {
+      if (engaged) await tryEngagedCreate();
+      continue;
+    }
 
     // Decide auto-advance + needs_review per the locked policy.
     const adv = FORWARD_AUTO_ADVANCE[classified.event_type];
