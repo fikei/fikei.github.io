@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.29.0';
-console.log(`[pull-recommendations] v${VERSION} - app-scan auto-creates pipeline roles from unmatched application receipts`);
+const VERSION = '0.30.0';
+console.log(`[pull-recommendations] v${VERSION} - engaged-thread discovery creates roles from in-progress Gmail conversations; custom careers-page watch adapter`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

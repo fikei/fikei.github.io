@@ -268,6 +268,96 @@ export async function extractUnmatchedApplication(args: {
   };
 }
 
+// ── Unmatched-opportunity extraction ───────────────────────────────────
+// Third classifier, used ONLY for messages in threads the USER has
+// replied to that matched no pipeline role. Where the receipt extractor
+// asks "is this an application receipt?", this one asks "is this an
+// active job conversation — recruiter outreach the candidate engaged
+// with, a hiring-manager back-and-forth, interview scheduling — for a
+// role Ladder doesn't know about?". The scan uses it to create the
+// pipeline row for opportunities that never had a saved posting.
+
+export interface ExtractedUnmatchedOpportunity {
+  is_job_opportunity: boolean;
+  company: string;
+  title: string;
+  stage: 'applied' | 'interviewing' | 'offer';
+  summary: string;
+  confidence: number;
+}
+
+const EXTRACT_OPPORTUNITY_SYSTEM = `You look at a single Gmail message from a thread the candidate has personally replied to, and decide whether it is part of an ACTIVE job opportunity conversation for the candidate — e.g. a recruiter or hiring manager discussing a specific role with them, scheduling interviews, sharing next steps, or extending an offer.
+
+Return STRICT JSON, no prose:
+{
+  "is_job_opportunity": true | false,
+  "company": "the hiring company's name, exactly as the email presents it",
+  "title": "the role under discussion, exactly as stated ('' if never named)",
+  "stage": "applied" | "interviewing" | "offer",
+  "summary": "one short sentence (≤140 chars) — where this conversation stands",
+  "confidence": 0.0–1.0
+}
+
+Rules:
+- TRUE only for a live, two-way conversation about a specific opportunity FOR the candidate. The thread context (candidate replied) is already established; judge whether the content is about them being hired.
+- FALSE for job alerts, newsletters, cold outreach with no specifics, sales/vendor threads, networking chats with no role, the candidate hiring someone else, and personal email.
+- stage: "interviewing" when calls/interviews are being scheduled or have happened; "offer" only on explicit offer language; otherwise "applied".
+- company/title must come from the email text (sender domain may inform company). If company is not identifiable, use "" and low confidence.
+- NEVER fabricate. Empty / false > guess.
+- The body may be truncated. Trust what you see; do not extrapolate.`;
+
+export async function extractUnmatchedOpportunity(args: {
+  subject: string;
+  sender: string;
+  body: string;
+}): Promise<ExtractedUnmatchedOpportunity | null> {
+  const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
+  if (!apiKey) {
+    console.warn('[gmail-app-classifier] ANTHROPIC_API_KEY missing');
+    return null;
+  }
+
+  const trimmed = args.body.slice(0, 6000);
+  const userPrompt = [
+    `Subject: ${args.subject}`,
+    `From: ${args.sender}`,
+    `---`,
+    trimmed,
+  ].join('\n');
+
+  const r = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 300,
+      system: EXTRACT_OPPORTUNITY_SYSTEM,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const data = await r.json() as { content: Array<{ type: string; text: string }> };
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+  const parsed = extractFirstJsonObject(text) as Partial<ExtractedUnmatchedOpportunity> | null;
+  if (!parsed) {
+    console.warn(`[gmail-app-classifier] bad JSON (opportunity): ${text.slice(0, 120)}`);
+    return null;
+  }
+  const stage = parsed.stage === 'interviewing' || parsed.stage === 'offer' ? parsed.stage : 'applied';
+  return {
+    is_job_opportunity: parsed.is_job_opportunity === true,
+    company:    String(parsed.company || '').trim().slice(0, 120),
+    title:      String(parsed.title || '').trim().slice(0, 200),
+    stage,
+    summary:    String(parsed.summary || '').trim().slice(0, 180),
+    confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+  };
+}
+
 // Tolerant JSON extractor — mirrors the pattern in gmail-jobs.ts. Haiku
 // occasionally appends commentary or wraps in fences; this absorbs that.
 function extractFirstJsonObject(text: string): unknown {

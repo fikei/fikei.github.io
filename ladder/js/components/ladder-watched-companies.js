@@ -24,6 +24,7 @@ export class LadderWatchedCompanies extends LitElement {
     state:    { state: true },
     adding:   { state: true },
     newName:  { state: true },
+    newUrl:   { state: true },
     error:    { state: true },
   };
 
@@ -33,6 +34,7 @@ export class LadderWatchedCompanies extends LitElement {
     this.state = 'idle';
     this.adding = false;
     this.newName = '';
+    this.newUrl = '';
     this.error = '';
   }
 
@@ -72,14 +74,16 @@ export class LadderWatchedCompanies extends LitElement {
   async _onAdd(e) {
     e.preventDefault();
     const company = this.newName.trim();
-    if (!company || this.adding) return;
+    const url = this.newUrl.trim();
+    if ((!company && !url) || this.adding) return;
     this.adding = true;
     this.error = '';
     try {
-      await watchCompany({ company });
+      const watch = await watchCompany({ company, url: url || undefined });
       this.newName = '';
+      this.newUrl = '';
       await this._load();
-      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${company} — roles land on the next pull` } }));
+      document.dispatchEvent(new CustomEvent('job:toast', { detail: { msg: `Watching ${watch?.company || company} — roles land on the next pull` } }));
     } catch (err) {
       this.error = err.message || String(err);
     } finally {
@@ -148,7 +152,12 @@ export class LadderWatchedCompanies extends LitElement {
                    .value=${this.newName}
                    @input=${(e) => { this.newName = e.target.value; this.error = ''; }}
                    ?disabled=${this.adding}>
-            <button class="btn btn--sm" type="submit" ?disabled=${this.adding || !this.newName.trim()}>
+            <input type="url" placeholder="Careers page URL (optional)" maxlength="300"
+                   title="For companies off Greenhouse / Lever / Ashby — paste any careers page and we'll track it directly"
+                   .value=${this.newUrl}
+                   @input=${(e) => { this.newUrl = e.target.value; this.error = ''; }}
+                   ?disabled=${this.adding}>
+            <button class="btn btn--sm" type="submit" ?disabled=${this.adding || (!this.newName.trim() && !this.newUrl.trim())}>
               ${this.adding ? 'Resolving…' : '+ Watch'}
             </button>
           </form>

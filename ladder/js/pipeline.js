@@ -346,12 +346,12 @@ export async function fetchWatchedCompanies() {
 // Add a watch. Server resolves the adapter (Google/Amazon/Workday/… or an
 // ATS board probe) when not provided. Throws with the server's message on
 // a 422 so the UI can tell the user the company isn't supported yet.
-export async function watchCompany({ company, adapter, config, filterMode, titleKeywords, locations } = {}) {
+export async function watchCompany({ company, url, adapter, config, filterMode, titleKeywords, locations } = {}) {
   const headers = await authHeader();
   const res = await fetch(WATCHED_URL, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ company, adapter, config, filterMode, titleKeywords, locations }),
+    body: JSON.stringify({ company, url, adapter, config, filterMode, titleKeywords, locations }),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || `watch-company ${res.status}`);

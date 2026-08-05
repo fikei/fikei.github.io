@@ -16,8 +16,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.1.0';
-console.log(`[watched-companies] v${VERSION} - watched company list CRUD + adapter auto-resolution (google/amazon/workday/eightfold/apple/ats)`);
+const VERSION = '0.2.0';
+console.log(`[watched-companies] v${VERSION} - optional careers URL on POST: ATS derivation from board URLs + custom-page fallback adapter`);
 
 const FILTER_MODES = new Set(['all', 'role_level', 'good_fits', 'exceptional']);
 
@@ -64,6 +64,26 @@ async function probeAts(name: string): Promise<{ adapter: string; config: Record
     }));
     const hit = results.find(r => r.status === 'fulfilled');
     if (hit && hit.status === 'fulfilled') return hit.value;
+  }
+  return null;
+}
+
+// Derive an ATS adapter straight from a pasted board URL, so pasting
+// https://jobs.lever.co/acme or a boards.greenhouse.io link watches the
+// board API rather than scraping the page.
+function adapterFromUrl(rawUrl: string): { adapter: string; config: Record<string, unknown> } | null {
+  let u: URL;
+  try { u = new URL(rawUrl); } catch { return null; }
+  const host = u.hostname.toLowerCase();
+  const seg = u.pathname.split('/').filter(Boolean);
+  if (/(?:^|\.)(boards|job-boards)\.greenhouse\.io$/.test(host) && seg[0]) {
+    return { adapter: 'greenhouse', config: { slug: seg[0] } };
+  }
+  if (/(?:^|\.)jobs\.lever\.co$/.test(host) && seg[0]) {
+    return { adapter: 'lever', config: { slug: seg[0] } };
+  }
+  if (/(?:^|\.)jobs\.ashbyhq\.com$/.test(host) && seg[0]) {
+    return { adapter: 'ashby', config: { slug: seg[0] } };
   }
   return null;
 }
@@ -115,17 +135,35 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
-      const company = String(body.company || '').trim();
-      if (!company) return err('company required', 400);
+      const url = String(body.url || '').trim();
+      let company = String(body.company || '').trim();
+      // URL-only add: derive a display name from the domain ("medplum.com"
+      // → "Medplum") so the user can paste just the careers link.
+      if (!company && url) {
+        try {
+          const host = new URL(url).hostname.replace(/^www\./, '');
+          const base = host.split('.')[0];
+          company = base.charAt(0).toUpperCase() + base.slice(1);
+        } catch { /* fall through to the required check */ }
+      }
+      if (!company) return err('company or url required', 400);
+      if (url && !/^https?:\/\//i.test(url)) return err('url must be http(s)', 400);
       const norm = company.toLowerCase();
 
       let adapter = typeof body.adapter === 'string' ? body.adapter : '';
       let config  = (body.config && typeof body.config === 'object') ? body.config as Record<string, unknown> : {};
+      if (!adapter && url) {
+        // A pasted ATS board URL beats scraping; anything else becomes a
+        // custom careers-page watch (Haiku-extracted at pull time).
+        const fromUrl = adapterFromUrl(url);
+        if (fromUrl) { adapter = fromUrl.adapter; config = { ...fromUrl.config, ...config }; }
+        else { adapter = 'custom'; config = { url, ...config }; }
+      }
       if (!adapter) {
         const resolved = await resolveAdapter(sql, company);
         if (!resolved) {
           return jsonResp({ ok: false, unresolved: true,
-            error: `Couldn't find a careers backend for "${company}". Supported: major tech (Google, Amazon, Apple, Netflix, Nvidia, Salesforce, Adobe) and any company on Greenhouse / Lever / Ashby.` }, 422);
+            error: `Couldn't find a careers backend for "${company}". Paste the careers page URL to track it directly, or use a company on Greenhouse / Lever / Ashby or major tech (Google, Amazon, Apple, Netflix, Nvidia, Salesforce, Adobe).` }, 422);
         }
         adapter = resolved.adapter;
         config  = { ...resolved.config, ...config };
