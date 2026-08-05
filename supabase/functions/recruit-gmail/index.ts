@@ -16,14 +16,14 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.34.1'
-console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls`)
+const VERSION = '1.35.0'
+console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls + manual visit booking`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { sharedAccessToken as accessToken, b64url, scheduleScreening, sendIntroEmail, sweepCalendars, SHARED_EMAIL, TZ } from '../_shared/recruit-schedule.ts'
 import { upsertScreenerScheduler, editSchedulerSignedUp, notifyStuck, slotLabel, slotWhen, deriveSlots, buildMessage, postChannelEmbed, NOTES_CHANNEL_ID, ptToUTC, postTourPoll, TOUR_MAX_SLOTS, schedulingSocietyChannel } from '../_shared/discord.ts'
-import { tourThreshold, tourVoteCounts, maybeConfirmTour } from '../_shared/recruit-tours.ts'
+import { tourThreshold, tourVoteCounts, maybeConfirmTour, confirmTourManually } from '../_shared/recruit-tours.ts'
 import { record } from '../_shared/recruit-notify.ts'
 import { ACTIONS } from '../_shared/recruit-copy.ts'
 
@@ -1096,6 +1096,31 @@ serve(async (req) => {
 
       console.log(`screening ${applicantId} x ${housemateName} @ ${startsAt.toISOString()}`)
       return json({ scheduled: true, screening: result.screening })
+    }
+
+    if (action === 'schedule-visit') {
+      // Manual house-visit booking — the app-side counterpart of the tour
+      // poll. Books a real event on the house calendar (invites go out via
+      // sendUpdates=all), emails the applicant the confirmation, and closes
+      // any open Discord poll for them.
+      const applicantId = String(body.applicantId || '')
+      const startsAt = new Date(String(body.startsAt || ''))
+      if (isNaN(startsAt.getTime()) || startsAt < new Date()) return json({ error: 'Pick a future start time' }, 400)
+
+      const { data: rp } = await client.from('recruit_profiles').select('display_name, group_email').eq('user_id', userData.user.id).maybeSingle()
+      const hostName = rp?.display_name || membership.discord_username || 'an Agape housemate'
+      const hostEmail = (rp?.group_email || userData.user.email || '').toLowerCase().trim()
+
+      try {
+        const { tour } = await confirmTourManually(client, {
+          applicantId, startsAt, minutes: Number(body.minutes) || 45, hostName, hostEmail,
+        })
+        console.log(`house visit ${applicantId} set by ${hostName} @ ${startsAt.toISOString()}`)
+        return json({ scheduled: true, tour })
+      } catch (err) {
+        const msg = (err as Error).message
+        return json({ error: msg }, msg === 'Applicant has no email' ? 400 : 500)
+      }
     }
 
     if (action === 'link-recording') {

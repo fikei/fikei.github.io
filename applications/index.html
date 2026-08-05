@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.68.0">
+  <link rel="stylesheet" href="css/app.css?v=3.69.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
   <script defer src="/analytics/track.js"></script>
@@ -237,6 +237,35 @@
     </div>
   </div>
 
+  <!-- Set a time by hand: intro call or house visit at any date/time,
+       bypassing offered windows and the house poll. Booking sends the
+       calendar invites (house calendar + attendees) immediately. -->
+  <div class="email-modal" id="settime-modal" hidden>
+    <div class="email-modal__card">
+      <div class="email-modal__head">
+        <h3 class="hold-sheet__title" id="settime-title">Set a time</h3>
+        <button class="review__close email-modal__close" id="settime-close" aria-label="Close">✕</button>
+      </div>
+      <p class="email-modal__status" id="settime-status"></p>
+      <label class="listing-form__field">Date &amp; time
+        <input type="datetime-local" class="listing-status" id="settime-input">
+      </label>
+      <label class="listing-form__field">Length
+        <select class="listing-status" id="settime-minutes">
+          <option value="30">30 minutes</option>
+          <option value="45">45 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="90">1.5 hours</option>
+        </select>
+      </label>
+      <div class="decision-sheet__actions">
+        <span class="avail-foot__note" id="settime-note"></span>
+        <button class="hold-sheet__cancel" id="settime-cancel" type="button">Cancel</button>
+        <button class="btn btn--accent btn--sm" id="settime-confirm" type="button">Send invites</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Remove from a listing: one sheet, four outcomes. Scope (this listing
        only) sits apart from the three that take them out of the funnel. -->
   <div class="email-modal" id="remove-modal" hidden>
@@ -306,8 +335,8 @@
     </div>
   </div>
 
-  <script src="js/settings-schema.js?v=3.68.0"></script>
-  <script src="js/app.js?v=3.68.0"></script>
+  <script src="js/settings-schema.js?v=3.69.0"></script>
+  <script src="js/app.js?v=3.69.0"></script>
 
 </body>
 </html>
