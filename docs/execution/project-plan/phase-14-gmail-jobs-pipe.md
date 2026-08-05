@@ -195,3 +195,12 @@ The following are explicitly excluded from Phase 1. Do not add them here.
 | Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in Supabase Edge Function secrets | Pending |
 | Manually trigger first scan via `POST /gmail-scan` and confirm roles appear in recommendations widget | Pending |
 | Update `calendar-api` deployment after `_shared/google-tokens.ts` refactor: `supabase functions deploy calendar-api` | Pending |
+
+### Story 5.1 — Watch any company by careers URL (custom adapter, v2.39 / watched-companies v0.2.0)
+
+| Task | Status |
+|------|--------|
+| `watched-companies` POST accepts optional `url`: ATS board URLs (Greenhouse/Lever/Ashby) derive adapter+slug directly; anything else becomes `adapter='custom'` with `config.url` | ✓ |
+| URL-only add derives a display name from the domain (medplum.com → "Medplum") | ✓ |
+| `company-watch` gains `pullCustom`: fetch the careers page, Haiku (claude-haiku-4-5) enumerates openings from page text + link list; budgeted detail fetches populate descriptions so the grade cron can score rows | ✓ |
+| Watched-companies strip: optional "Careers page URL" input beside the company name field; 422 copy now points at the URL fallback | ✓ |

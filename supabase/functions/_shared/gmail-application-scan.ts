@@ -28,6 +28,7 @@ const LADDER_LABEL = 'Ladder';
 import {
   classifyApplicationMessage,
   extractUnmatchedApplication,
+  extractUnmatchedOpportunity,
   type ApplicationEventType,
   type ClassifiedApplicationEvent,
   ATS_PLATFORM_DOMAINS,
@@ -75,8 +76,16 @@ export interface ApplicationScanResult {
   autoResolved:  number;        // offers/rejections the scan acted on (undo-able)
   needsReview:   number;        // events flagged for user attention
   skippedNoMatch:number;        // messages where no role could be matched
-  rolesCreated:  number;        // pipeline roles auto-created from unmatched receipts
+  rolesCreated:  number;        // pipeline roles auto-created (receipts + engaged threads)
 }
+
+// Pass 3 (engaged-thread discovery) caps: threads.get calls are the
+// expensive part, and each engaged thread costs at most one Haiku call.
+const MAX_DISCOVERY_THREADS = 8;
+// Senders that never open an opportunity thread — job boards, calendar
+// robots, no-reply automation. The engaged-thread gate already implies
+// the user replied in the thread; this just skips obvious machinery.
+const DISCOVERY_NOISE_SENDER_RE = /\b(no-?reply|notifications?|newsletter|calendar-notification|mailer-daemon|do-?not-?reply)\b|@(linkedin\.com|wellfound\.com|otta\.com|builtin\.com|hnhiring\.com|substack\.com)\b/i;
 
 export async function scanApplicationResponses(args: {
   userEmail: string;
@@ -231,6 +240,56 @@ export async function scanApplicationResponses(args: {
     }
   }
 
+  // Pass 3: engaged-thread discovery. Threads the USER has replied to
+  // recently are the strongest signal for an in-progress conversation —
+  // a hiring-manager back-and-forth at a company Ladder has never seen
+  // won't surface via passes 1/2 (unknown domain, unknown company name).
+  // For each replied thread not already pinned to a role, queue its
+  // latest inbound message; the no-match branch below runs the
+  // opportunity extractor on it. Rejected messages land in gmail_skipped
+  // (reason 'not_opportunity') so we never re-classify them.
+  const engagedThreads = new Set<string>();
+  if (Date.now() < deadline) {
+    try {
+      const skippedRows = await sql<{ gmail_id: string }[]>`
+        select gmail_id from job.gmail_skipped
+         where user_email = ${args.userEmail} and reason = 'not_opportunity'`;
+      const alreadyRejected = new Set(skippedRows.map(r => r.gmail_id));
+
+      const sentThreadIds = await listThreadsByQuery(
+        args.accessToken, `in:sent newer_than:${windowDays}d -in:trash`, 50);
+      let threadBudget = MAX_DISCOVERY_THREADS;
+      for (const threadId of sentThreadIds) {
+        if (threadBudget <= 0 || Date.now() > deadline) break;
+        if (threadToRole.has(threadId)) continue;
+        threadBudget--;
+        try {
+          const r = await fetch(`${GMAIL_BASE}/threads/${threadId}?format=metadata&metadataHeaders=From`, {
+            headers: { Authorization: `Bearer ${args.accessToken}` } });
+          if (!r.ok) continue;
+          const thread = await r.json() as { messages?: GmailMessage[] };
+          // Latest inbound message = the other party's most recent word.
+          const inbound = (thread.messages || []).filter(m => {
+            const from = (getHeader(m, 'From') || '').toLowerCase();
+            return from && !from.includes(args.userEmail.toLowerCase())
+              && !DISCOVERY_NOISE_SENDER_RE.test(from);
+          });
+          const latest = inbound[inbound.length - 1];
+          if (!latest || alreadyRejected.has(latest.id)) continue;
+          engagedThreads.add(threadId);
+          idSet.add(latest.id);
+        } catch (e) {
+          console.warn(`[gmail-app-scan] thread fetch ${threadId} failed: ${(e as Error).message}`);
+        }
+      }
+      if (engagedThreads.size) {
+        console.log(`[gmail-app-scan] discovery: ${engagedThreads.size} engaged thread(s) queued`);
+      }
+    } catch (e) {
+      console.warn(`[gmail-app-scan] discovery pass failed: ${(e as Error).message}`);
+    }
+  }
+
   const ids = [...idSet];
 
   let processed = 0;
@@ -304,14 +363,16 @@ export async function scanApplicationResponses(args: {
       else if (hits.length > 1) matchedRole = pickByTitleOverlap(hits, subject, body);
     }
 
-    // Step 3.5 — no pipeline role matched. If the message looks like an
-    // application receipt (the user applied outside Ladder, directly on
-    // an ATS careers page), auto-create the pipeline role from it.
-    // Everything else is a true no-match.
+    // Step 3.5 — no pipeline role matched. Two auto-create paths:
+    // application receipts (the user applied outside Ladder, directly on
+    // an ATS careers page), and engaged threads (an in-progress
+    // conversation the user is replying to — hiring manager, recruiter —
+    // with no saved posting behind it). Everything else is a true no-match.
     if (!matchedRole) {
-      const created = await maybeCreateRoleFromReceipt(sql, {
+      const created = await maybeCreateRoleFromUnmatched(sql, {
         userEmail: args.userEmail,
         msg, messageId, sender, senderDomain, subject, body,
+        engaged: engagedThreads.has(msg.threadId),
         eventSource: mode === 'backfill' ? 'gmail-backfill' : 'gmail-scan',
       });
       if (created) {
@@ -507,12 +568,16 @@ export async function scanApplicationResponses(args: {
 // regex covers company-domain senders ("careers@acme.com").
 const RECEIPT_SUBJECT_RE = /\b(applicat|thank you for (applying|your interest)|we('|’)?( ha)?ve received|application received)/i;
 
-// Auto-create a pipeline role from an application receipt that matched
-// no existing role. Gate → Haiku extraction → blocked-company check →
-// insert role (stage 'applied') + applied_confirmation event with
-// auto_action='role_created' so it surfaces in the Updates feed.
-// Returns true when a role + event landed.
-async function maybeCreateRoleFromReceipt(
+// Auto-create a pipeline role from an unmatched message. Two paths:
+//   receipt — ATS sender / receipt subject → extractUnmatchedApplication
+//             → role at stage 'applied' + applied_confirmation event.
+//   engaged — the user has replied in this thread (pass-3 discovery) →
+//             extractUnmatchedOpportunity → role at the extracted stage
+//             + stage-mapped event. Rejections persist to gmail_skipped
+//             (reason 'not_opportunity') so the thread is never re-judged.
+// Both land with auto_action='role_created' so they surface in the
+// Updates feed. Returns true when a role + event landed.
+async function maybeCreateRoleFromUnmatched(
   sql: ReturnType<typeof db>,
   args: {
     userEmail: string;
@@ -522,37 +587,84 @@ async function maybeCreateRoleFromReceipt(
     senderDomain: string | null;
     subject: string;
     body: string;
+    engaged: boolean;
     eventSource: string;
   },
 ): Promise<boolean> {
   const atsSender = !!args.senderDomain && isAtsPlatformDomain(args.senderDomain);
-  if (!atsSender && !RECEIPT_SUBJECT_RE.test(args.subject)) return false;
+  const receiptGate = atsSender || RECEIPT_SUBJECT_RE.test(args.subject);
+  if (!receiptGate && !args.engaged) return false;
 
-  let extracted;
-  try {
-    extracted = await extractUnmatchedApplication({
-      subject: args.subject, sender: args.sender, body: args.body,
-    });
-  } catch (e) {
-    console.warn(`[gmail-app-scan] unmatched-extract failed: ${(e as Error).message}`);
-    return false;
+  let company = '';
+  let title = '';
+  let stage: 'applied' | 'interviewing' | 'offer' = 'applied';
+  let summary = '';
+  let confidence = 0;
+  let via: 'receipt' | 'opportunity' | null = null;
+
+  if (receiptGate) {
+    try {
+      const extracted = await extractUnmatchedApplication({
+        subject: args.subject, sender: args.sender, body: args.body,
+      });
+      if (extracted && extracted.is_application_receipt
+          && extracted.confidence >= AUTO_CREATE_CONFIDENCE_FLOOR) {
+        ({ company, title, summary, confidence } = extracted);
+        via = 'receipt';
+      }
+    } catch (e) {
+      console.warn(`[gmail-app-scan] unmatched-extract failed: ${(e as Error).message}`);
+    }
   }
-  if (!extracted || !extracted.is_application_receipt) return false;
-  if (extracted.confidence < AUTO_CREATE_CONFIDENCE_FLOOR) return false;
-  if (!extracted.company || isUnknownCompanyName(extracted.company)) return false;
+
+  if (!via && args.engaged) {
+    try {
+      const opp = await extractUnmatchedOpportunity({
+        subject: args.subject, sender: args.sender, body: args.body,
+      });
+      if (opp && opp.is_job_opportunity && opp.confidence >= AUTO_CREATE_CONFIDENCE_FLOOR
+          && opp.company && !isUnknownCompanyName(opp.company)) {
+        ({ company, title, stage, summary, confidence } = opp);
+        via = 'opportunity';
+      } else {
+        // Remember the verdict — engaged threads resurface every run for
+        // the whole window, and each re-judge is a Haiku call.
+        await sql`
+          insert into job.gmail_skipped (user_email, message_id, gmail_id, sender, subject, reason, details)
+          values (${args.userEmail}, ${args.messageId}, ${args.msg.id}, ${args.sender},
+                  ${args.subject}, 'not_opportunity',
+                  ${sql.json({ confidence: opp?.confidence ?? null, company: opp?.company ?? null })})
+          on conflict (user_email, message_id) do nothing`;
+        return false;
+      }
+    } catch (e) {
+      console.warn(`[gmail-app-scan] opportunity-extract failed: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
+  if (!via) return false;
+  if (!company || isUnknownCompanyName(company)) return false;
 
   // Respect the user's block list.
   const blocked = await sql<{ ok: number }[]>`
     select 1 as ok from job.blocked_companies
      where user_email = ${args.userEmail}
-       and company_norm = ${extracted.company.trim().toLowerCase()}
+       and company_norm = ${company.trim().toLowerCase()}
      limit 1`;
   if (blocked.length) return false;
 
-  const slug = buildRoleSlug(extracted.company, extracted.title || 'application');
+  const slug = buildRoleSlug(company, title || 'application');
   const receivedAt = args.msg.internalDate
     ? new Date(Number(args.msg.internalDate)).toISOString()
     : new Date().toISOString();
+
+  const eventType     = via === 'receipt' ? 'applied_confirmation'
+    : stage === 'offer' ? 'offer_received'
+    : stage === 'interviewing' ? 'screen_scheduled'
+    : 'applied_confirmation';
+  const detectedStage = via === 'receipt' ? 'applied' : stage;
+  const appliedAt     = detectedStage === 'applied' ? receivedAt : null;
 
   // Create the role. If the slug already exists (e.g. an Archived row the
   // scan's Active/Saved load didn't see), leave it untouched — the event
@@ -562,9 +674,9 @@ async function maybeCreateRoleFromReceipt(
       slug, company_slug, company_name, title, url, source, status, stage,
       applied_at, last_activity_at, status_changed_at, gmail_thread_ids
     ) values (
-      ${slug}, null, ${extracted.company}, ${extracted.title || '(unknown title)'},
-      null, 'Gmail Auto-detected', 'Active', 'applied',
-      ${receivedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
+      ${slug}, null, ${company}, ${title || '(unknown title)'},
+      null, 'Gmail Auto-detected', 'Active', ${detectedStage},
+      ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
     )
     on conflict (slug) do nothing
     returning slug`;
@@ -577,16 +689,16 @@ async function maybeCreateRoleFromReceipt(
       auto_action, prev_state
     ) values (
       ${slug}, ${args.messageId}, ${args.msg.threadId}, ${args.msg.id},
-      ${args.sender}, ${args.subject}, 'applied_confirmation', 'applied',
-      ${extracted.summary || `Application received at ${extracted.company}`},
-      ${extracted.confidence}, true, false, ${receivedAt}, ${args.eventSource},
+      ${args.sender}, ${args.subject}, ${eventType}, ${detectedStage},
+      ${summary || `${via === 'receipt' ? 'Application received' : 'In-progress conversation detected'} at ${company}`},
+      ${confidence}, true, false, ${receivedAt}, ${args.eventSource},
       'role_created', null
     )
     on conflict (gmail_message_id) do nothing
     returning id`;
   if (!inserted.length) return false;
 
-  console.log(`[gmail-app-scan] auto-created role ${slug} from receipt (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
+  console.log(`[gmail-app-scan] auto-created role ${slug} from ${via} (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
   return true;
 }
 
@@ -626,6 +738,24 @@ async function listMessagesByQuery(accessToken: string, query: string, maxIds: n
     if (!r.ok) throw new Error(`gmail messages.list ${r.status}: ${(await r.text()).slice(0, 200)}`);
     const data = await r.json() as { messages?: Array<{ id: string }>; nextPageToken?: string };
     for (const m of (data.messages || [])) ids.push(m.id);
+    if (ids.length >= maxIds || !data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+  return ids;
+}
+
+async function listThreadsByQuery(accessToken: string, query: string, maxIds: number): Promise<string[]> {
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const url = new URL(`${GMAIL_BASE}/threads`);
+    url.searchParams.set('q', query);
+    url.searchParams.set('maxResults', String(Math.min(100, maxIds - ids.length)));
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!r.ok) throw new Error(`gmail threads.list ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    const data = await r.json() as { threads?: Array<{ id: string }>; nextPageToken?: string };
+    for (const t of (data.threads || [])) ids.push(t.id);
     if (ids.length >= maxIds || !data.nextPageToken) break;
     pageToken = data.nextPageToken;
   }

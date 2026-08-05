@@ -51,8 +51,8 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.8.0';
-console.log(`[application-events] v${VERSION} - role_created Updates kind (auto-created roles from unmatched application receipts)`);
+const VERSION = '1.9.0';
+console.log(`[application-events] v${VERSION} - shared scan gains engaged-thread discovery (roles from in-progress Gmail conversations)`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';

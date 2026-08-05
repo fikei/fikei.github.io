@@ -13,6 +13,8 @@
 //                __staticRouterHydrationData (server-rendered).
 //   greenhouse / lever / ashby — public board APIs (same shape tracked-ats
 //                uses), for watched companies on a standard ATS.
+//   custom     — any careers-page URL; Haiku enumerates the openings from
+//                the page text + link list (for companies off every ATS).
 //
 // Config is empty on the user_sources row: the company list + per-company
 // adapter config live in job.watched_companies, so the watch list is a
@@ -299,6 +301,111 @@ async function pullApple(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]> 
   }).filter(Boolean) as RecommendedRoleInput[];
 }
 
+// ---------- Custom careers page (any URL, Haiku-extracted) ----------
+// For companies outside the supported ATS/major set (e.g. a static
+// /careers page like medplum.com/careers). We fetch the page, hand the
+// visible text + link list to Haiku, and let it enumerate the openings.
+// Descriptions come from a budgeted follow-up fetch of each job link so
+// the grading cron can score the rows (description > 200 chars gate).
+const CUSTOM_PAGE_TEXT_CAP  = 12_000;
+const CUSTOM_LINKS_CAP      = 120;
+const CUSTOM_EXTRACT_SYSTEM = `You are given the text content of a company careers page plus the list of links on it. Enumerate the OPEN JOB POSTINGS listed on the page.
+
+Return STRICT JSON, no prose:
+{ "jobs": [ { "title": "...", "url": "absolute link to the posting or null", "location": "as stated or null" } ] }
+
+Rules:
+- Only real, currently-listed openings on THIS page. Not nav links, blog posts, values blurbs, or "we're always hiring" boilerplate.
+- url must be chosen from the provided link list (or null when no link maps to the posting). Never invent URLs.
+- If the page lists no openings, return { "jobs": [] }.`;
+
+function extractAnchors(html: string, baseUrl: string): Array<{ href: string; text: string }> {
+  const out: Array<{ href: string; text: string }> = [];
+  const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) && out.length < CUSTOM_LINKS_CAP) {
+    const text = stripHtml(m[2]).slice(0, 120);
+    if (!text) continue;
+    try {
+      const href = new URL(m[1], baseUrl).toString();
+      if (!/^https?:/.test(href)) continue;
+      out.push({ href, text });
+    } catch { /* skip malformed hrefs */ }
+  }
+  return out;
+}
+
+async function pullCustom(w: WatchedCompanyRow): Promise<RecommendedRoleInput[]> {
+  const cfg = w.adapter_config as { url?: string };
+  if (!cfg.url) throw new Error('custom config needs url');
+  const apiKey = Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('custom adapter needs ANTHROPIC_API_KEY');
+
+  const res = await fetch(cfg.url, { headers: { 'user-agent': UA } });
+  if (!res.ok) throw new Error(`${cfg.url} → ${res.status}`);
+  const html = await res.text();
+  const pageText = stripHtml(html).slice(0, CUSTOM_PAGE_TEXT_CAP);
+  const anchors = extractAnchors(html, cfg.url);
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5',
+      max_tokens: 1500,
+      system: CUSTOM_EXTRACT_SYSTEM,
+      messages: [{ role: 'user', content: [
+        `Careers page: ${cfg.url} (company: ${w.company})`,
+        `--- LINKS ---`,
+        anchors.map(a => `${a.href} :: ${a.text}`).join('\n'),
+        `--- PAGE TEXT ---`,
+        pageText,
+      ].join('\n') }],
+    }),
+  });
+  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const data = await r.json() as { content: Array<{ type: string; text: string }> };
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+  const jsonMatch = text.replace(/```json\s*/gi, '').replace(/```/g, '').match(/\{[\s\S]*\}/);
+  const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) as { jobs?: Array<{ title?: string; url?: string | null; location?: string | null }> } : null;
+  const jobs = (parsed?.jobs || []).filter(j => j.title).slice(0, MAX_ROLES_PER_COMPANY);
+
+  const out: RecommendedRoleInput[] = [];
+  let detailBudget = MAX_DETAIL_FETCHES;
+  for (const j of jobs) {
+    const title = String(j.title).trim();
+    const jobUrl = j.url ? String(j.url) : cfg.url;
+    let description: string | undefined;
+    let salary: string | undefined;
+    if (j.url && detailBudget > 0) {
+      detailBudget--;
+      try {
+        const d = await fetch(jobUrl, { headers: { 'user-agent': UA } });
+        if (d.ok) {
+          const fullJd = stripHtml(await d.text());
+          description = capJd(fullJd);
+          salary = extractCompensation(fullJd) ?? undefined;
+        }
+      } catch { /* JD is best-effort; the row still lands and grades later */ }
+    }
+    out.push({
+      source:      'company-watch',
+      // Keyed on url+title so re-pulls dedup while distinct roles that
+      // share the page URL (no per-job link) still get separate rows.
+      sourceId:    `cw:custom:${w.id}:${slugify(`${title}:${jobUrl}`)}`,
+      sourceLabel: `${w.company} Careers`,
+      url:         jobUrl,
+      company:     w.company,
+      title,
+      location:    j.location ? String(j.location) : undefined,
+      salary,
+      description,
+      payload:     { adapter: 'custom', watchedCompanyId: w.id, careersUrl: cfg.url },
+    });
+  }
+  return out;
+}
+
 // ---------- Standard ATS boards (Greenhouse / Lever / Ashby) ----------
 // For watched companies that run a public board. Same endpoints as
 // tracked-ats but namespaced under company-watch so filter_mode applies.
@@ -355,6 +462,7 @@ const ADAPTERS: Record<string, (w: WatchedCompanyRow) => Promise<RecommendedRole
   greenhouse: pullAtsBoard,
   lever:      pullAtsBoard,
   ashby:      pullAtsBoard,
+  custom:     pullCustom,
 };
 
 // Per-company include filters — cheap substring prefilters the user can

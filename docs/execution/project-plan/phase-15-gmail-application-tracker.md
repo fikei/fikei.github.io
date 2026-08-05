@@ -221,3 +221,12 @@ Design pattern documented in `ladder/DESIGN.md` (Updates queue / Signal chips).
 | Migration 107: role_closed event type, liveness source, archived_closed auto_action; backfill legacy 'Closed' roles + last-7d closure events | ✓ |
 | application-events v1.7.0: archived_closed records in the updates feed | ✓ |
 | Client-side closure synthesis removed — dismissals now server-persisted (cross-device) | ✓ |
+
+### Story 5.7 — Engaged-thread discovery (v0.30.0, app-scan pass 3)
+
+| Task | Status |
+|------|--------|
+| Pass 3: `threads.list in:sent newer_than:7d` finds threads the user replied to; unpinned threads (≤8/run) get their latest inbound message queued for the no-match gauntlet | ✓ |
+| New `extractUnmatchedOpportunity` Haiku classifier: is this an active job conversation (recruiter/hiring-manager back-and-forth) → company, title, stage, confidence | ✓ |
+| ≥0.8 confidence + real company + not blocked → auto-create pipeline role at the extracted stage (applied/interviewing/offer) with a stage-mapped event, `auto_action='role_created'` | ✓ |
+| Rejected engaged threads persist to `gmail_skipped` (reason `not_opportunity`) so each thread costs at most one Haiku judgment | ✓ |
