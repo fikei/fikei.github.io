@@ -715,37 +715,45 @@ async function maybeCreateRoleFromUnmatched(
   // Create the role. If the slug already exists (e.g. an Archived row the
   // scan's Active/Saved load didn't see), leave it untouched — the event
   // below still attaches, and the user can resurrect from the role page.
-  const createdRows = await sql<{ slug: string }[]>`
-    insert into job.pipeline_roles (
-      slug, company_slug, company_name, title, url, source, status, stage,
-      applied_at, last_activity_at, status_changed_at, gmail_thread_ids
-    ) values (
-      ${slug}, null, ${company}, ${title || '(unknown title)'},
-      null, 'Gmail Auto-detected', 'Active', ${detectedStage},
-      ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
-    )
-    on conflict (slug) do nothing
-    returning slug`;
+  // The whole write is fenced: an insert failure here (a constraint drift
+  // like the pre-164 auto_action CHECK) must cost this message only, not
+  // abort the entire scan run.
+  try {
+    const createdRows = await sql<{ slug: string }[]>`
+      insert into job.pipeline_roles (
+        slug, company_slug, company_name, title, url, source, status, stage,
+        applied_at, last_activity_at, status_changed_at, gmail_thread_ids
+      ) values (
+        ${slug}, null, ${company}, ${title || '(unknown title)'},
+        null, 'Gmail Auto-detected', 'Active', ${detectedStage},
+        ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
+      )
+      on conflict (slug) do nothing
+      returning slug`;
 
-  const inserted = await sql<{ id: string }[]>`
-    insert into job.application_events (
-      role_slug, gmail_message_id, gmail_thread_id, gmail_api_id,
-      sender, subject, event_type, detected_stage,
-      summary, confidence, auto_applied, needs_review, received_at, source,
-      auto_action, prev_state
-    ) values (
-      ${slug}, ${args.messageId}, ${args.msg.threadId}, ${args.msg.id},
-      ${args.sender}, ${args.subject}, ${eventType}, ${detectedStage},
-      ${summary || `${via === 'receipt' ? 'Application received' : 'In-progress conversation detected'} at ${company}`},
-      ${confidence}, true, false, ${receivedAt}, ${args.eventSource},
-      'role_created', null
-    )
-    on conflict (gmail_message_id) do nothing
-    returning id`;
-  if (!inserted.length) return false;
+    const inserted = await sql<{ id: string }[]>`
+      insert into job.application_events (
+        role_slug, gmail_message_id, gmail_thread_id, gmail_api_id,
+        sender, subject, event_type, detected_stage,
+        summary, confidence, auto_applied, needs_review, received_at, source,
+        auto_action, prev_state
+      ) values (
+        ${slug}, ${args.messageId}, ${args.msg.threadId}, ${args.msg.id},
+        ${args.sender}, ${args.subject}, ${eventType}, ${detectedStage},
+        ${summary || `${via === 'receipt' ? 'Application received' : 'In-progress conversation detected'} at ${company}`},
+        ${confidence}, true, false, ${receivedAt}, ${args.eventSource},
+        'role_created', null
+      )
+      on conflict (gmail_message_id) do nothing
+      returning id`;
+    if (!inserted.length) return false;
 
-  console.log(`[gmail-app-scan] auto-created role ${slug} from ${via} (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
-  return true;
+    console.log(`[gmail-app-scan] auto-created role ${slug} from ${via} (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
+    return true;
+  } catch (e) {
+    console.warn(`[gmail-app-scan] auto-create ${slug} failed: ${(e as Error).message}`);
+    return false;
+  }
 }
 
 // Rejection → exit_reason mapping for the auto-archive. Where in the
