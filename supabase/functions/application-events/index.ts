@@ -51,7 +51,7 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.9.2';
+const VERSION = '1.9.3';
 console.log(`[application-events] v${VERSION} - engaged-message informational fallthrough to opportunity extractor in shared scan`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
