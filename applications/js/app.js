@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.68.0';
+const VERSION = '3.69.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -2890,6 +2890,10 @@ function rowMenuHtml(a, listingId) {
   // exists; a tour ask is reachable any time a cycle isn't already running.
   if (!sc.at && !sc.done && !sc.availability) items.push(item(`data-email="${a.id}" data-email-kind="availability"`, 'Schedule intro call'));
   if (!tour || tour.status === 'cancelled' || tour.status === 'confirmed') items.push(item(`data-email="${a.id}" data-email-kind="tour"`, 'Schedule house tour'));
+  // The manual override pair: set a concrete time yourself, invites go out
+  // immediately — no availability windows or house poll required.
+  if (!sc.at && !sc.done) items.push(item(`data-set-time="${a.id}|call"`, 'Set call time…'));
+  if (!tour || tour.status !== 'confirmed') items.push(item(`data-set-time="${a.id}|visit"`, 'Set visit time…'));
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
   if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
@@ -5059,7 +5063,8 @@ function stagesHtml(a) {
     // "somebody take this" — the two have completely different next actions.
     const hasTimes = (availCache[a.id]?.windows || []).length > 0;
     callDetail = hasTimes ? 'they sent times, nobody has taken it' : 'no times offered yet';
-    callAction = `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="${hasTimes ? 'schedule' : 'availability'}">${hasTimes ? 'Book it' : 'Ask for times'}</button>`;
+    callAction = `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="${hasTimes ? 'schedule' : 'availability'}">${hasTimes ? 'Book it' : 'Ask for times'}</button>
+      <button type="button" class="cta-link" data-set-time="${a.id}|call">Set a time</button>`;
   }
 
   // The house visit. Read from the calendar rather than screenings — a visit is
@@ -5080,14 +5085,17 @@ function stagesHtml(a) {
     visitDetail = `${esc(fmtSlot(tour.confirmedSlot))} · confirmed by house poll`;
   } else if (tour?.status === 'polled') {
     visitDetail = 'house poll open — confirms itself when enough housemates react';
+    visitAction = `<button type="button" class="cta-link" data-set-time="${a.id}|visit">Set a time</button>`;
   } else if (tour?.status === 'asked') {
     visitDetail = 'tour ask sent — the house poll posts when they reply with times';
+    visitAction = `<button type="button" class="cta-link" data-set-time="${a.id}|visit">Set a time</button>`;
   } else {
     // Only worth offering once they have actually been interviewed.
     visitDetail = sc.done ? 'ready to invite' : 'after the intro call';
-    visitAction = sc.done
+    visitAction = `${sc.done
       ? `<button type="button" class="cta-link" data-email="${a.id}" data-email-kind="tour">Invite them</button>`
-      : '';
+      : ''}
+      <button type="button" class="cta-link" data-set-time="${a.id}|visit">Set a time</button>`;
   }
 
   return `<section class="review__section stages">
@@ -5301,6 +5309,84 @@ async function scheduleSlot(applicantId, iso, btn, skipConfirm = false) {
     toast(`Booking failed: ${e.message}`);
     if (btn) { btn.disabled = false; }
   }
+}
+
+/* ---------- manual set-time modal ----------
+   The override path: pick any date/time for the intro call or the house
+   visit, no offered windows or house poll needed. Booking sends the real
+   invites immediately — house calendar + applicant + you — so this both
+   schedules and progresses them in one move. */
+let setTimeCtx = null;   // { applicantId, kind: 'call' | 'visit' }
+
+function openSetTimeModal(applicantId, kind) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  if (a.stage === 'rejected' || a.stage === 'archived') {
+    toast(`${fullName(a)} is archived — scheduling is off for them`);
+    return;
+  }
+  if (!(a.email || '').includes('@')) {
+    toast(`${fullName(a)} has no email on file — invites need one`);
+    return;
+  }
+  setTimeCtx = { applicantId, kind };
+  document.getElementById('settime-title').textContent = kind === 'call'
+    ? `Set the intro call with ${a.first}` : `Set the house visit for ${a.first}`;
+  document.getElementById('settime-status').textContent = '';
+  document.getElementById('settime-note').textContent = kind === 'call'
+    ? `Calendar invites (with a Meet link) go to ${a.email} and you, plus an email introduction.`
+    : `A house-calendar invite goes to ${a.email} and you, plus a confirmation email with the address.`;
+  const input = document.getElementById('settime-input');
+  // Default to the next round hour; min pins the picker to the future.
+  const next = new Date(Math.ceil((Date.now() + 60 * 60000) / 3600000) * 3600000);
+  const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  input.value = local(next);
+  input.min = local(new Date());
+  document.getElementById('settime-minutes').value = kind === 'call' ? '30' : '45';
+  document.getElementById('settime-modal').hidden = false;
+}
+
+function closeSetTimeModal() {
+  setTimeCtx = null;
+  document.getElementById('settime-modal').hidden = true;
+}
+
+async function submitSetTime(btn) {
+  if (!setTimeCtx) return;
+  const { applicantId, kind } = setTimeCtx;
+  const when = new Date(document.getElementById('settime-input').value);
+  if (isNaN(when.getTime()) || when < new Date()) {
+    document.getElementById('settime-status').textContent = 'Pick a future date and time first.';
+    return;
+  }
+  const minutes = Number(document.getElementById('settime-minutes').value) || (kind === 'call' ? 30 : 45);
+  btn.disabled = true; btn.textContent = 'Booking…';
+  try {
+    if (kind === 'call') {
+      const out = await gmailCall({ action: 'schedule', applicantId, startsAt: when.toISOString(), minutes });
+      (screeningsCache[applicantId] ||= []).unshift(out.screening);
+      screeningState[applicantId] = {
+        ...(screeningState[applicantId] || {}),
+        at: out.screening.starts_at, ends: out.screening.ends_at,
+        with: out.screening.housemate_name, link: out.screening.meet_link,
+      };
+      toast('Intro call booked — invites sent to both');
+    } else {
+      const out = await gmailCall({ action: 'schedule-visit', applicantId, startsAt: when.toISOString(), minutes });
+      tourState[applicantId] = {
+        ...(tourState[applicantId] || {}),
+        status: 'confirmed', confirmedSlot: out.tour?.confirmed_slot || when.toISOString(),
+      };
+      toast('House visit set — invites sent');
+    }
+    closeSetTimeModal();
+    renderRailCounts();
+    if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    if (!document.getElementById('review').hidden) renderReview();
+  } catch (e) {
+    document.getElementById('settime-status').textContent = `Booking failed: ${e.message}`;
+  }
+  btn.disabled = false; btn.textContent = 'Send invites';
 }
 
 /* ---------- decision sheet ----------
@@ -6149,6 +6235,12 @@ function init() {
     }
     const ar = e.target.closest('[data-avail-review]');
     if (ar) { openAvailModal(ar.dataset.availReview); return; }
+    const stx = e.target.closest('[data-set-time]');
+    if (stx) {
+      const [aid, kind] = stx.dataset.setTime.split('|');
+      openSetTimeModal(aid, kind);
+      return;
+    }
     const gd = e.target.closest('[data-give-decision]');
     if (gd) { openGiveDecision(gd.dataset.giveDecision); return; }
     const ue = e.target.closest('[data-update-edit]');
@@ -6340,6 +6432,9 @@ function init() {
   document.getElementById('claim-cancel').onclick = closeSchedulerModal;
   document.getElementById('claim-post-btn').onclick = postSchedulerFromModal;
   document.getElementById('avail-close').onclick = closeAvailModal;
+  document.getElementById('settime-close').onclick = closeSetTimeModal;
+  document.getElementById('settime-cancel').onclick = closeSetTimeModal;
+  document.getElementById('settime-confirm').onclick = (e) => submitSetTime(e.currentTarget);
   document.getElementById('avail-ask-coverage').onclick = () => {
     const id = availApplicantId;
     closeAvailModal();
