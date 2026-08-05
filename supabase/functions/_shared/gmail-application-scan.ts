@@ -179,6 +179,11 @@ export async function scanApplicationResponses(args: {
   // Build the Gmail query set. Three passes — each contributes message
   // IDs that we then dedup, fetch, and try to classify:
   //
+  //   0. Engaged-thread discovery — threads the user replied to, for
+  //      opportunities Ladder has never seen. Runs FIRST: it's cheap
+  //      (one threads.list + ≤8 threads.get) and must not be starved by
+  //      the expensive per-role name search, which can eat the whole
+  //      wall-clock budget on a large pipeline.
   //   1. Sender-domain pass — companies with a known domain in
   //      hiring_companies, plus the ATS-platform allowlist. Cheap, broad.
   //   2. Per-role name pass — for each active role, search the inbox
@@ -189,6 +194,59 @@ export async function scanApplicationResponses(args: {
   //
   // All three streams hit the same matching gauntlet below; Message-ID
   // dedup against application_events ensures we never re-classify.
+
+  // Pass 0: engaged-thread discovery. Threads the USER has replied to
+  // recently are the strongest signal for an in-progress conversation —
+  // a hiring-manager back-and-forth at a company Ladder has never seen
+  // won't surface via passes 1/2 (unknown domain, unknown company name).
+  // For each replied thread not already pinned to a role, queue its
+  // latest inbound message; the no-match branch below runs the
+  // opportunity extractor on it. Rejected messages land in gmail_skipped
+  // (reason 'not_opportunity') so we never re-classify them.
+  const engagedThreads = new Set<string>();
+  const discoveryIds: string[] = [];
+  try {
+    const skippedRows = await sql<{ gmail_id: string }[]>`
+      select gmail_id from job.gmail_skipped
+       where user_email = ${args.userEmail} and reason = 'not_opportunity'`;
+    const alreadyRejected = new Set(skippedRows.map(r => r.gmail_id));
+
+    // Wider window than the live scan's 7d: an active conversation can
+    // lull for a week+ between replies and still be very much alive.
+    const sentWindowDays = Math.max(windowDays, 14);
+    const sentThreadIds = await listThreadsByQuery(
+      args.accessToken, `in:sent newer_than:${sentWindowDays}d -in:trash`, 50);
+    // Cap counts QUEUED messages (the Haiku spend), not thread fetches —
+    // otherwise already-rejected threads eat the budget every run and can
+    // permanently starve newer conversations. Metadata fetches are cheap
+    // and bounded by the 50-thread list + the deadline.
+    for (const threadId of sentThreadIds) {
+      if (discoveryIds.length >= MAX_DISCOVERY_THREADS || Date.now() > deadline) break;
+      if (threadToRole.has(threadId)) continue;
+      try {
+        const r = await fetch(`${GMAIL_BASE}/threads/${threadId}?format=metadata&metadataHeaders=From`, {
+          headers: { Authorization: `Bearer ${args.accessToken}` } });
+        if (!r.ok) continue;
+        const thread = await r.json() as { messages?: GmailMessage[] };
+        // Latest inbound message = the other party's most recent word.
+        const inbound = (thread.messages || []).filter(m => {
+          const from = (getHeader(m, 'From') || '').toLowerCase();
+          return from && !from.includes(args.userEmail.toLowerCase())
+            && !DISCOVERY_NOISE_SENDER_RE.test(from);
+        });
+        const latest = inbound[inbound.length - 1];
+        if (!latest || alreadyRejected.has(latest.id)) continue;
+        engagedThreads.add(threadId);
+        discoveryIds.push(latest.id);
+      } catch (e) {
+        console.warn(`[gmail-app-scan] thread fetch ${threadId} failed: ${(e as Error).message}`);
+      }
+    }
+    console.log(`[gmail-app-scan] discovery: ${discoveryIds.length} engaged thread(s) queued of ${sentThreadIds.length} sent`);
+  } catch (e) {
+    console.warn(`[gmail-app-scan] discovery pass failed: ${(e as Error).message}`);
+  }
+
   const senderDomains = new Set<string>();
   for (const d of domainToRoles.keys()) senderDomains.add(d);
   for (const d of ATS_PLATFORM_DOMAINS) senderDomains.add(d);
@@ -240,57 +298,10 @@ export async function scanApplicationResponses(args: {
     }
   }
 
-  // Pass 3: engaged-thread discovery. Threads the USER has replied to
-  // recently are the strongest signal for an in-progress conversation —
-  // a hiring-manager back-and-forth at a company Ladder has never seen
-  // won't surface via passes 1/2 (unknown domain, unknown company name).
-  // For each replied thread not already pinned to a role, queue its
-  // latest inbound message; the no-match branch below runs the
-  // opportunity extractor on it. Rejected messages land in gmail_skipped
-  // (reason 'not_opportunity') so we never re-classify them.
-  const engagedThreads = new Set<string>();
-  if (Date.now() < deadline) {
-    try {
-      const skippedRows = await sql<{ gmail_id: string }[]>`
-        select gmail_id from job.gmail_skipped
-         where user_email = ${args.userEmail} and reason = 'not_opportunity'`;
-      const alreadyRejected = new Set(skippedRows.map(r => r.gmail_id));
-
-      const sentThreadIds = await listThreadsByQuery(
-        args.accessToken, `in:sent newer_than:${windowDays}d -in:trash`, 50);
-      let threadBudget = MAX_DISCOVERY_THREADS;
-      for (const threadId of sentThreadIds) {
-        if (threadBudget <= 0 || Date.now() > deadline) break;
-        if (threadToRole.has(threadId)) continue;
-        threadBudget--;
-        try {
-          const r = await fetch(`${GMAIL_BASE}/threads/${threadId}?format=metadata&metadataHeaders=From`, {
-            headers: { Authorization: `Bearer ${args.accessToken}` } });
-          if (!r.ok) continue;
-          const thread = await r.json() as { messages?: GmailMessage[] };
-          // Latest inbound message = the other party's most recent word.
-          const inbound = (thread.messages || []).filter(m => {
-            const from = (getHeader(m, 'From') || '').toLowerCase();
-            return from && !from.includes(args.userEmail.toLowerCase())
-              && !DISCOVERY_NOISE_SENDER_RE.test(from);
-          });
-          const latest = inbound[inbound.length - 1];
-          if (!latest || alreadyRejected.has(latest.id)) continue;
-          engagedThreads.add(threadId);
-          idSet.add(latest.id);
-        } catch (e) {
-          console.warn(`[gmail-app-scan] thread fetch ${threadId} failed: ${(e as Error).message}`);
-        }
-      }
-      if (engagedThreads.size) {
-        console.log(`[gmail-app-scan] discovery: ${engagedThreads.size} engaged thread(s) queued`);
-      }
-    } catch (e) {
-      console.warn(`[gmail-app-scan] discovery pass failed: ${(e as Error).message}`);
-    }
-  }
-
-  const ids = [...idSet];
+  // Discovery ids process FIRST — they're few (≤8), high-value, and the
+  // maxMessages cap would otherwise starve them behind hundreds of
+  // pass-1/2 ids.
+  const ids = [...new Set([...discoveryIds, ...idSet])];
 
   let processed = 0;
   for (const id of ids) {
