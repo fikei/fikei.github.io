@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.30.1';
-console.log(`[pull-recommendations] v${VERSION} - discovery runs first + processes first (was starved by name-search budget/message cap); 14d sent window`);
+const VERSION = '0.30.2';
+console.log(`[pull-recommendations] v${VERSION} - engaged msgs judged 'informational' for a substring-matched role fall through to the opportunity extractor`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
