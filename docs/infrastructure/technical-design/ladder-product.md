@@ -159,6 +159,23 @@ Pulls new recs from tracked ATS sources, grades ungraded recs, updates liveness 
 
 **Cron:** `pull-recommendations-15min` every 15 minutes; `grade-ungraded-10min` every 10 minutes (ungraded only).
 
+### `ats-radar-ingest` (v2.40)
+
+`POST /functions/v1/ats-radar-ingest` — uploads one `/job-radar` skill sweep (the local `fetch_boards.py` run over ~64 outdoor/soft-goods boards) into Ladder.
+
+**Auth:** `X-Cron-Secret` or service-role bearer. Called by `.claude/skills/job-radar/scripts/push_to_ladder.py` (which resolves the key via the Supabase CLI login). Scan data enters the system through Supabase only — `job-scans/` stays gitignored.
+
+**Process:**
+1. Upsert one `job.ats_radar_scans` row per company per run (idempotent on `scan_run_at + company_slug`); prune to the last 10 runs.
+2. Stamp the scan health note into the `ats-radar` `user_sources.config.lastScan` — `{ runAt, boards, verified, jobs, htmlText, unverified[] }`. The Sources row renders "N boards unverified (unreachable, not empty)" from this.
+3. Force-run `pull-recommendations` for the `ats-radar` source.
+
+**`ats-radar` source plugin** (`_shared/sources/ats-radar.ts`): reads the latest run's `ok + structured` rows and emits them as `RecommendedRoleInput` (`source_id = ats:<company_slug>:<posting-key>`, provenance in `payload`: `fetchedAt`, `careersUrl`, `atsType`, `segments`). The worker then applies its normal stack — role-universe gate (Track B `target_titles` ∪ Track A `track_a_titles`), blocked-company/title filters, dedupe vs pipeline + existing recs (URL first, then company+title), JD backfill, Haiku grading, bullets.
+
+**Liveness (prime directive):** `atsRadarLiveness` closes an active `ats-radar` rec (`closed_at`, `closure_reason='delisted'`) only when its board fetched **OK with structured results this scan** and the posting id is absent from the pull. UNVERIFIED (error) and `html-text` boards can never close recs — an unreachable board is not "no openings". Closures surface through the standard "expired postings removed" count.
+
+**Two-track grading (v2.40):** a posting whose title matches `vision.track_a_titles` is classified `track='production'` (soft goods — PLM, product developer, equipment/pack design leadership, senior sourcing/materials); everything else is `track='digital'`. `haikuRoleMatch` swaps the seniority frame, the competition calibration (career soft-goods specialists vs 200–800 tech-PM applicants), and the comp floor (`track_a_comp_floor`, default $70k, vs $200k) so a role is graded against its own track — a great PLM role is never scored as a bad PM role. `computeFit`/`compClears` take the track floor; the deterministic `track` is persisted on `recommended_roles` and `pipeline_roles`. Curated ats-radar boards suppress the public/mega-cap hard fail (VF, Amer, YETI are there by design), mirroring watched companies. Track A fields (`track_a_titles`, `track_a_comp_floor`, `track_a_notes`) are editable on /ladder/vision/ → Targets.
+
 ### `jobs-pipe`
 
 `GET /functions/v1/jobs-pipe`

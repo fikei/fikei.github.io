@@ -1,7 +1,7 @@
 // Shared fit-scoring helpers: JD fetcher + UserContext loader + Haiku
 // role-match call. Used by both pull-recommendations (cron pulls) and
 // add-role (user-saved rows) so all entry points walk the same v3 path.
-import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
+import { computeFit, trackFor, compFloorFor, type FitTrack, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { loadVisionFields } from './job-vision.ts';
 import { compClears } from './comp.ts';
 
@@ -21,6 +21,7 @@ export interface HaikuRoleMatch {
   rationale:  string;
   seniority:  string;
   scope:      string;
+  track:      FitTrack;   // which bar the posting was graded against
   fitSummary: string;
   companyDescription: string | null;
   location:   string | null;
@@ -44,6 +45,7 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
   const wanted = [
     'impact_themes', 'mission_keywords', 'mission_required', 'anti_mission_terms',
     'culture_keywords', 'interest_tags', 'target_sectors', 'score_weights', 'narrative_arc',
+    'track_a_titles', 'track_a_comp_floor', 'track_a_notes',
   ];
   const [v, skillRows, companyRows, winRows] = await Promise.all([
     loadVisionFields(sql, wanted),
@@ -75,6 +77,13 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
     // pipe extra data through.
     wins: (winRows as Array<Record<string, unknown>>).map(w => ({ headline: String(w.headline || ''), metric: (w.metric as string | null) || null })),
     weights: (v.score_weights as Partial<FitUserContext['weights']>) || undefined,
+    // Track A (production soft goods) — grade matching titles against
+    // their own bar and comp floor instead of averaging with digital PM.
+    trackA: (v.track_a_titles as string[] | null)?.length ? {
+      titles:    v.track_a_titles as string[],
+      compFloor: Number(v.track_a_comp_floor) || 70_000,
+      notes:     String(v.track_a_notes || ''),
+    } : undefined,
   };
   _fitCtxCache = { ctx, at: Date.now() };
   return ctx;
@@ -109,13 +118,26 @@ export async function fetchJdText(url: string): Promise<string> {
 export async function haikuRoleMatch(r: RoleRow, ctx: FitUserContext): Promise<HaikuRoleMatch | null> {
   const apiKey = (Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY'));
   if (!apiKey) return null;
+  // Two-track grading: a posting is measured against the bar of ITS track
+  // only — a great Product Line Manager role must never grade as a bad PM
+  // role. Track A (production soft goods) swaps the seniority frame, the
+  // competition calibration, and the comp floor.
+  const track = trackFor(r.title, ctx);
+  const floor = compFloorFor(r.title, ctx);
+  const floorText = `$${Math.round(floor / 1000)}k`;
+  const seniorityFrame = track === 'production'
+    ? `Senior/II+ Product Line Manager, Senior Product Developer, design/product-development leadership, senior sourcing/materials. Coordinator/associate/assistant is "below"; multi-team development or design org leadership is "above"; senior IC PLM/developer is "equivalent".`
+    : `Senior PM, Staff PM, Principal PM, Lead PM, Product Lead, Head of Product, Founding PM. Manager-of-managers (Director, VP) is "above"; Senior PM IC is "equivalent"; below Senior is "below".`;
+  const competitionFrame = track === 'production'
+    ? `These are production-side soft-goods roles (PLM, product development, equipment/pack design, sourcing) at outdoor and gear brands. Applicant pools are smaller than tech-PM pools but dominated by career soft-goods people with direct factory, tech-pack, and line-planning history. The candidate is a career changer: their edge is PM rigor, design training, and shipped physical-adjacent work (medical devices, design systems) — their gap is direct soft-goods development process. Score the transfer story honestly against those specialists.`
+    : `These are popular Senior/Staff/Lead PM roles at well-funded companies. Each posting receives 200–800 qualified applicants. Most are ex-Big-Tech PMs, ex-unicorn PMs, or domain experts with direct shipping history. The hiring manager is comparing this candidate against 3–8 finalists who each look credible on paper.`;
   const system = `You grade a job posting against a candidate's profile and return four structured fields.
 
 Inputs you will see:
   - Job posting (title, company, description)
   - The candidate's skills (with years of practice)
   - The candidate's interest tags (problem types they want to work on)
-  - The candidate's target seniority: Senior PM, Staff PM, Principal PM, Lead PM, Product Lead, Head of Product, Founding PM. Manager-of-managers (Director, VP) is "above"; Senior PM IC is "equivalent"; below Senior is "below".
+  - The candidate's target seniority: ${seniorityFrame}
 
 Output JSON only:
 {
@@ -142,15 +164,15 @@ Output JSON only:
       "domain":  "<one short sentence: sector overlap with their past work>",
       "stretch": "<one short sentence: is this a stretch up, sideways, or down>",
       "reach":   "<one short sentence: what would a hiring manager push on>",
-      "comp":    "<one short sentence, strictly factual: state the posted range and whether its TOP clears the candidate's $200k base floor. Top ≥ $200k = clears, full stop — do NOT speculate about buffers, negotiation room, or what the candidate 'likely expects'. If no comp is disclosed, say exactly that>"
+      "comp":    "<one short sentence, strictly factual: state the posted range and whether its TOP clears the candidate's ${floorText} base floor for this track. Top ≥ ${floorText} = clears, full stop — do NOT speculate about buffers, negotiation room, or what the candidate 'likely expects'. If no comp is disclosed, say exactly that>"
     },
-    "compAcceptable": <boolean: true if and only if the top of the disclosed comp range is ≥ the candidate's $200k base floor — a range topping at exactly $200k or above is true, no matter how small the margin. null when no comp is disclosed>,
+    "compAcceptable": <boolean: true if and only if the top of the disclosed comp range is ≥ the candidate's ${floorText} base floor for this track — a range topping at exactly ${floorText} or above is true, no matter how small the margin. null when no comp is disclosed>,
     "summary": "<2-4 sentence prose, max 100 words. From a hiring manager's lens: can this person do the job? where are they strong? where are they reaching? Be honest about competition. Speak about the candidate in third person.>"
   }
 }
 
 CRITICAL — calibrating the candidate-strength score against actual competition:
-These are popular Senior/Staff/Lead PM roles at well-funded companies. Each posting receives 200–800 qualified applicants. Most are ex-Big-Tech PMs, ex-unicorn PMs, or domain experts with direct shipping history. The hiring manager is comparing this candidate against 3–8 finalists who each look credible on paper.
+${competitionFrame}
 
 Be honest. Strong-but-not-special candidates DO NOT score in the 80s.
 
@@ -244,7 +266,10 @@ No prose outside the JSON.`;
     `\n# Candidate wins (recent, abbreviated)`,
     ...(ctx.wins || []).map(w => `- ${w.headline}${w.metric ? ` (${w.metric})` : ''}`),
     `\n# Candidate target seniority`,
-    `Senior PM, Staff PM, Principal PM, Lead PM, Product Lead, Head of Product, Founding PM. Comp floor: $200k base.`,
+    `${seniorityFrame} Comp floor for this track: ${floorText} base.`,
+    ...(track === 'production' && ctx.trackA?.notes
+      ? [`\n# Production-track grading context (grade against THIS bar, not the digital PM bar)`, ctx.trackA.notes]
+      : []),
   ].join('\n');
   try {
     const res = await fetch(ANTHROPIC_URL, {
@@ -290,24 +315,26 @@ No prose outside the JSON.`;
         reach:   clamp(b.reach,   10),
       };
       const totalScore = breakdown.skills + breakdown.scope + breakdown.outcome + breakdown.domain + breakdown.stretch + breakdown.reach;
-      const r = parsed.candidate.rationales || {};
+      const rat = parsed.candidate.rationales || {};
       const trim = (s: unknown) => String(s || '').slice(0, 600);
       candidate = {
         score: totalScore,
         breakdown,
         rationales: {
-          skills:  trim(r.skills),
-          scope:   trim(r.scope),
-          outcome: trim(r.outcome),
-          domain:  trim(r.domain),
-          stretch: trim(r.stretch),
-          reach:   trim(r.reach),
-          comp:    trim(r.comp),
+          skills:  trim(rat.skills),
+          scope:   trim(rat.scope),
+          outcome: trim(rat.outcome),
+          domain:  trim(rat.domain),
+          stretch: trim(rat.stretch),
+          reach:   trim(rat.reach),
+          comp:    trim(rat.comp),
         },
         // Deterministic first: comp is arithmetic, and the model editorializes
-        // ("clears the floor but only by $10k → false"). Fall back to the
-        // model's boolean only when no salary string exists to check.
-        compAcceptable: compClears(r.salary) ?? (typeof parsed.candidate.compAcceptable === 'boolean' ? parsed.candidate.compAcceptable : null),
+        // ("clears the floor but only by $10k → false"). Checked against the
+        // posting's salary and THIS track's floor (a previous version read a
+        // shadowed variable here, so the arithmetic path never fired). Fall
+        // back to the model's boolean only when no salary string exists.
+        compAcceptable: compClears(r.salary, floor) ?? (typeof parsed.candidate.compAcceptable === 'boolean' ? parsed.candidate.compAcceptable : null),
         summary: String(parsed.candidate.summary || '').slice(0, 1200),
       };
     }
@@ -323,7 +350,7 @@ No prose outside the JSON.`;
     return {
       score: Math.max(0, Math.min(25, Math.round(parsed.score))),
       rationale: String(parsed.rationale || '').slice(0, 400),
-      seniority, scope,
+      seniority, scope, track,
       fitSummary: String(parsed.fitSummary || '').slice(0, 1200),
       companyDescription,
       location,
@@ -350,6 +377,7 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
   location: string | null;
   description: string;
   candidate: HaikuRoleMatch['candidate'] | null;
+  compFloor: number;
 }> {
   const ctx = await loadFitContext(sql);
   let description = r.description || '';
@@ -380,5 +408,5 @@ export async function scoreOne(r: RoleRow, sql: any): Promise<{
     }
   }
   const fit = computeFit(enriched, ctx, roleScore, seniority, rationale);
-  return { fit, roleScore, rationale, seniority, scope, fitSummary, companyDescription, location, description, candidate };
+  return { fit, roleScore, rationale, seniority, scope, fitSummary, companyDescription, location, description, candidate, compFloor: compFloorFor(r.title, ctx) };
 }

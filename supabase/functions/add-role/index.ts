@@ -12,7 +12,7 @@ import { computeFit } from '../jobs-pipe/fit.ts';
 import { scoreOne } from '../_shared/job-fit-haiku.ts';
 import { compClears } from '../_shared/comp.ts';
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 // Status default: 'Saved' (post-taxonomy collapse).
 // Source-email-link: stash payload.gmailApiId as a Gmail web URL when
 // the rec came from Gmail.
@@ -566,6 +566,7 @@ serve(async (req) => {
                fit_breakdown        = ${breakdownJson}::jsonb,
                fit_rationales       = ${rationalesJson}::jsonb,
                hard_fails           = ${fitOut.fit.hardFails},
+               track                = ${fitOut.fit.track},
                description          = ${fitOut.description || null},
                role_match_score     = ${fitOut.roleScore},
                role_match_rationale = ${fitOut.rationale},
@@ -577,7 +578,7 @@ serve(async (req) => {
                candidate_breakdown  = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.breakdown) : null}::jsonb,
                candidate_rationales = ${fitOut.candidate ? JSON.stringify(fitOut.candidate.rationales) : null}::jsonb,
                candidate_summary    = ${fitOut.candidate?.summary ?? null},
-               comp_acceptable      = ${compClears(sal.range) ?? fitOut.candidate?.compAcceptable ?? null}
+               comp_acceptable      = ${compClears(sal.range, fitOut.compFloor) ?? fitOut.candidate?.compAcceptable ?? null}
          where slug = ${slug};
       `;
     } catch (e) { console.warn('[add-role] fit calc failed', e); }

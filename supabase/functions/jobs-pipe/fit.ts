@@ -50,6 +50,29 @@ export interface UserContext {
   targetSectors?:    string[];
   // Wins — Haiku-only signal; deterministic scorers don't use them.
   wins?:             Array<{ headline: string; metric?: string | null }>;
+  // Track A — production side of soft goods (vision track_a_*). A posting
+  // whose title matches any of `titles` is graded as a production role:
+  // its own comp floor and its own Haiku framing, never averaged against
+  // the digital PM bar. Absent → everything is Track B (digital).
+  trackA?: { titles: string[]; compFloor: number; notes: string };
+}
+
+export type FitTrack = 'production' | 'digital';
+
+// Which track a posting belongs to. Substring match against the Track A
+// title list — deterministic, so the classification is stable across the
+// gate, the Haiku prompt, and the comp verdict.
+export function trackFor(title: string | null | undefined, ctx?: UserContext): FitTrack {
+  const t = (title || '').toLowerCase();
+  if (!t || !ctx?.trackA?.titles?.length) return 'digital';
+  return ctx.trackA.titles.some(k => k && t.includes(k.toLowerCase().trim())) ? 'production' : 'digital';
+}
+
+// The comp floor a posting is measured against — Track A's tolerance
+// (~$70k acceptable for the right production role) or the standard floor.
+export function compFloorFor(title: string | null | undefined, ctx?: UserContext, defaultFloor = 200_000): number {
+  return trackFor(title, ctx) === 'production' && ctx?.trackA?.compFloor
+    ? ctx.trackA.compFloor : defaultFloor;
 }
 
 export interface FitWeights {
@@ -93,6 +116,7 @@ export interface FitResult {
   rationales:   FitRationales;
   hardFails:    string[];
   roleFallback: boolean; // true → role score came from regex, not Haiku
+  track:        FitTrack; // which bar this posting was measured against
 }
 
 const HARD_FAIL_CAP = 30;
@@ -399,7 +423,7 @@ function scoreStage(r: RoleRow, cap: number, watchedCompany?: boolean): { v: num
 }
 
 // ---------- Comp (cap from weights.comp, default 4) ----------
-function scoreComp(s: string, cap: number): { v: number; reason: string } {
+function scoreComp(s: string, cap: number, floor = 200_000): { v: number; reason: string } {
   if (!s) return { v: Math.round(cap * 0.5), reason: 'Compensation isn\'t disclosed — worth pinning down early.' };
   const txt = s.toLowerCase().replace(/[,$\s]/g, '');
   const nums = Array.from(txt.matchAll(/(\d+(?:\.\d+)?)(k)?/g)).map(m => {
@@ -410,8 +434,8 @@ function scoreComp(s: string, cap: number): { v: number; reason: string } {
   const top = Math.max(...nums);
   const fmt = (n: number) => `$${Math.round(n / 1000)}k`;
   if (top < 10000) return { v: Math.round(cap * 0.5), reason: 'Posted figure looks like a percentage rather than a base — confirm before reading further into it.' };
-  if (top >= 200000) return { v: cap, reason: `Top of range at ${fmt(top)} clears the floor you\'ve set.` };
-  if (top >= 170000) return { v: Math.round(cap * 0.6), reason: `Top of range at ${fmt(top)} comes in under your floor.` };
+  if (top >= floor) return { v: cap, reason: `Top of range at ${fmt(top)} clears the floor you\'ve set.` };
+  if (top >= floor * 0.85) return { v: Math.round(cap * 0.6), reason: `Top of range at ${fmt(top)} comes in under your floor.` };
   return { v: Math.round(cap * 0.2), reason: `Top of range at ${fmt(top)} is well under your floor.` };
 }
 
@@ -429,14 +453,19 @@ export interface FitOptions {
 
 export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: number | null, seniorityHint?: string | null, haikuRationale?: string | null, opts?: FitOptions): FitResult {
   const w: FitWeights = { ...DEFAULT_WEIGHTS, ...(ctx?.weights || {}) };
+  const track   = trackFor(r.title, ctx);
+  // ats-radar boards are hand-curated (registry of target companies), so
+  // like watched companies they suppress the public/mega-cap hard fail —
+  // VF, Amer, YETI are public conglomerates by design there.
+  const curated = !!opts?.watchedCompany || /\bats.radar\b|^ats boards\b/i.test(r.source || '');
   const values  = scoreValues(r, w.values, ctx);
   const culture = scoreCulture(r, w.culture, ctx);
   const role    = scoreRole(r, w.role, ctx, preComputedRole, haikuRationale);
   const domain  = scoreDomain(r, w.domain, ctx);
   const arc     = scoreArc(r, w.arc, ctx, seniorityHint);
-  const stage   = scoreStage(r, w.stage, opts?.watchedCompany);
+  const stage   = scoreStage(r, w.stage, curated);
   const geo     = scoreGeo(r, w.geo);
-  const comp    = scoreComp(r.salary, w.comp);
+  const comp    = scoreComp(r.salary, w.comp, compFloorFor(r.title, ctx));
 
   const breakdown: FitBreakdown = {
     values:  values.v,
@@ -470,5 +499,5 @@ export function computeFit(r: RoleRow, ctx?: UserContext, preComputedRole?: numb
             breakdown.arc + breakdown.stage + breakdown.comp + breakdown.geo;
   if (hardFails.length) raw = Math.min(raw, HARD_FAIL_CAP);
 
-  return { score: Math.round(raw), breakdown, rationales, hardFails, roleFallback: role.fallback };
+  return { score: Math.round(raw), breakdown, rationales, hardFails, roleFallback: role.fallback, track };
 }

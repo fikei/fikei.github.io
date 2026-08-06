@@ -40,6 +40,11 @@
 
 ## Recent Milestones
 
+### Ladder — ATS boards (job-radar) source + two-track grading
+**Shipped: 2026-08-06** — the `/job-radar` skill's local ATS sweep (~64 outdoor/soft-goods boards, first-party APIs only) now feeds Ladder as a peer of the Gmail source. `push_to_ladder.py` → `ats-radar-ingest` → `job.ats_radar_scans` staging → `ats-radar` source plugin through the normal pull-recommendations stack (gate, dedupe, Haiku grading, bullets). Liveness honors the skill's prime directive: only boards verified this scan can close recs; unverified boards surface as a Sources-row health note, never as "no openings". Track A (production soft goods — PLM / product developer / equipment design leadership / senior sourcing) added to /ladder/vision/ Targets with its own titles, framing, and ~$70k comp floor; grading measures each role against its own track instead of averaging.
+- Versions: ladder v2.40.2→v2.41.0, pull-recommendations v0.30.4→v0.31.0, recommendations v0.22.1→v0.23.0, add-role v0.7.0→v0.7.1, ats-radar-ingest v1.0.0 (new), migration 165
+- Trigger is manual for v1 (push script at the end of each `/job-radar` run); scheduling deliberately deferred — the sweep itself is local-only.
+
 ### Ladder — For You Quality Floors & Wildcards
 **Shipped: 2026-07-02** — PRs #984, #986, #989, #991, #993, #994. Candidate-score floor raised 30→50; floored view (fit ≥ 50, candidate ≥ 50, no hard fails; ungraded hidden as pending) is default with "show all" toggle. Wildcards strip (candidate≥65, fit<50) pressure-tests search criteria. Pre-save rec detail page (single rec lookup, fit/strength breakdowns, Save/Dismiss). Wellfound sender fix (domain-suffix match). Badge truthfulness + dismissed roles dedup.
 - Versions: ladder v2.13.0→v2.14.2, recommendations v0.14.0→v0.15.0-merged, pull-recommendations v0.23.1→v0.25.1

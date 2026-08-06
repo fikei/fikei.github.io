@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.22.1';
-console.log(`[recommendations] v${VERSION} - gmailStats block on GET (last scan, PT-today counts) for the Inbox scan strip`);
+const VERSION = '0.23.0';
+console.log(`[recommendations] v${VERSION} - sourceHealth carries the ats-radar lastScan note (verified/unverified board counts) for the Sources row`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -369,6 +369,7 @@ serve(async (req) => {
                  s.last_run_at   as "lastRunAt",
                  s.last_run_count as "lastRunCount",
                  s.last_error    as "lastError",
+                 s.config->'lastScan' as "lastScan",
                  case when s.type = 'gmail-jobs' and (
                         coalesce(s.last_error, '')    ilike '%reauth%' or
                         coalesce(s.last_error, '')    ilike '%not connected%' or

@@ -16,7 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
-import { computeFit, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
+import { computeFit, compFloorFor, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.30.4';
-console.log(`[pull-recommendations] v${VERSION} - engaged msgs judged 'informational' for a substring-matched role fall through to the opportunity extractor`);
+const VERSION = '0.31.0';
+console.log(`[pull-recommendations] v${VERSION} - ats-radar source (job-radar sweeps) + two-track grading (production vs digital)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -212,6 +212,7 @@ serve(async (req) => {
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               track                = ${fit.track},
                salary               = coalesce(salary, ${extractedComp}),
                role_match_score     = ${roleScore},
                role_match_rationale = ${rationale},
@@ -223,7 +224,7 @@ serve(async (req) => {
                candidate_breakdown  = coalesce(${candidate ? sql.json(candidate.breakdown) : null}, candidate_breakdown),
                candidate_rationales = coalesce(${candidate ? sql.json(candidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${candidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = ${compClears(r.salary || extractedComp) ?? candidate?.compAcceptable ?? null}
+               comp_acceptable      = ${compClears(r.salary || extractedComp, compFloorFor(r.title, ctx)) ?? candidate?.compAcceptable ?? null}
          where id = ${r.id}
       `;
       updated++;
@@ -267,6 +268,7 @@ serve(async (req) => {
                fit_breakdown        = ${sql.json(fit.breakdown)},
                fit_rationales       = ${sql.json(fit.rationales)},
                hard_fails           = ${fit.hardFails},
+               track                = ${fit.track},
                salary_range         = coalesce(salary_range, ${pipeExtractedComp}),
                role_match_score     = ${pipeRoleScore},
                role_match_rationale = ${pipeRationale},
@@ -277,7 +279,7 @@ serve(async (req) => {
                candidate_breakdown  = coalesce(${pipeCandidate ? sql.json(pipeCandidate.breakdown) : null}, candidate_breakdown),
                candidate_rationales = coalesce(${pipeCandidate ? sql.json(pipeCandidate.rationales) : null}, candidate_rationales),
                candidate_summary    = coalesce(${pipeCandidate?.summary ?? null}, candidate_summary),
-               comp_acceptable      = ${compClears(r.salary_range || pipeExtractedComp) ?? pipeCandidate?.compAcceptable ?? null}
+               comp_acceptable      = ${compClears(r.salary_range || pipeExtractedComp, compFloorFor(r.title, ctx)) ?? pipeCandidate?.compAcceptable ?? null}
          where slug = ${r.slug}`;
       pipeUpdated++;
     }
@@ -314,11 +316,14 @@ serve(async (req) => {
       // product-family default. Pre-targeted sources (gmail alerts, Jack &
       // Jill, theirstack queries) are already scoped, so they skip this.
       let pulled = pulledRaw;
-      if (src.type === 'tracked-ats') {
-        const universe = await loadRoleUniverse(sql);
+      if (src.type === 'tracked-ats' || src.type === 'ats-radar') {
+        // ats-radar pulls entire curated boards (incl. retail/warehouse),
+        // so its universe is Track B titles ∪ Track A production titles —
+        // a PLM or soft-goods developer role must survive the gate.
+        const universe = await loadRoleUniverse(sql, src.type === 'ats-radar');
         const before = pulledRaw.length;
         pulled = pulledRaw.filter(r => matchesRoleUniverse(r.title || '', universe));
-        if (pulled.length !== before) console.log(`[pull-recommendations] tracked-ats role-universe: kept ${pulled.length}/${before}`);
+        if (pulled.length !== before) console.log(`[pull-recommendations] ${src.type} role-universe: kept ${pulled.length}/${before}`);
       }
       // "Don't recommend this company" — drop blocked companies at the
       // source so they never re-accumulate (the recommendations read filter
@@ -439,6 +444,12 @@ serve(async (req) => {
       if (src.type === 'company-watch') {
         await companyWatchLiveness(sql, pulledRaw);
       }
+      // Same pattern for ats-radar, with the skill's prime directive: only
+      // boards that fetched OK this scan may close their recs. UNVERIFIED
+      // (error) and html-text boards never close anything.
+      if (src.type === 'ats-radar') {
+        await atsRadarLiveness(sql, pulledRaw);
+      }
       // Only genuinely-new rows go through inline enrich+grade. Rows that
       // were conflict-updated to backfill a missing JD are drained by the
       // grade-ungraded cron instead — inline-grading a whole tracked-ats
@@ -536,10 +547,14 @@ const DEFAULT_ROLE_UNIVERSE = [
 ];
 
 // The role universe = the user's vision.target_titles when set (scales to
-// any role they search for), else the broad product-family default.
-async function loadRoleUniverse(sql: ReturnType<typeof db>): Promise<string[]> {
+// any role they search for), else the broad product-family default. With
+// includeTrackA, the Track A production titles (vision.track_a_titles) are
+// unioned in — used by ats-radar so both tracks pass the firehose gate.
+async function loadRoleUniverse(sql: ReturnType<typeof db>, includeTrackA = false): Promise<string[]> {
   const fromVision = await loadVisionStringArray(sql, 'target_titles');
-  return (fromVision.length ? fromVision : DEFAULT_ROLE_UNIVERSE).map(s => s.toLowerCase().trim()).filter(Boolean);
+  const base = fromVision.length ? fromVision : DEFAULT_ROLE_UNIVERSE;
+  const trackA = includeTrackA ? await loadVisionStringArray(sql, 'track_a_titles') : [];
+  return [...base, ...trackA].map(s => s.toLowerCase().trim()).filter(Boolean);
 }
 
 // Inclusive substring match — a role is in-universe if its title contains
@@ -661,6 +676,7 @@ interface ScoredRow {
   fitScore:  number;
   breakdown: Record<string, number>;
   hardFails: string[];
+  track:     string;
 }
 
 function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: FitUserContext): { kept: ScoredRow[]; dropped: number } {
@@ -672,7 +688,7 @@ function scoreAndFilter(rows: RecommendedRoleInput[], minScore: number, ctx?: Fi
     // Hard-fails are kept with their flag so they show in the UI rather
     // than vanish silently.
     if (minScore > 0 && fit.score < minScore) { dropped++; continue; }
-    kept.push({ input: r, fitScore: fit.score, breakdown: fit.breakdown as unknown as Record<string, number>, hardFails: fit.hardFails });
+    kept.push({ input: r, fitScore: fit.score, breakdown: fit.breakdown as unknown as Record<string, number>, hardFails: fit.hardFails, track: fit.track });
   }
   return { kept, dropped };
 }
@@ -756,6 +772,48 @@ async function companyWatchLiveness(
   console.log(`[pull-recommendations] company-watch liveness: closed ${closedN}, seen ${seenN}`);
 }
 
+// ---------- ats-radar disappeared-since-scan liveness ----------
+// Mirror of trackedAtsLiveness with the job-radar prime directive baked in:
+// eligibility to CLOSE comes from the staging table's ok/structured rows for
+// the latest scan — not from the pulled ids — so a board with zero in-universe
+// roles still retires its stale recs, while an UNVERIFIED (error) or
+// html-text board can never close anything. source_ids are
+// `ats:<company_slug>:<key>`, so the slug is split_part(…, 2).
+async function atsRadarLiveness(
+  sql: ReturnType<typeof db>,
+  pulledRaw: RecommendedRoleInput[],
+): Promise<void> {
+  const okSlugRows = await sql<{ company_slug: string }[]>`
+    select company_slug
+      from job.ats_radar_scans
+     where scan_run_at = (select max(scan_run_at) from job.ats_radar_scans)
+       and ok
+       and kind = 'structured'`;
+  const okSlugs = okSlugRows.map(r => r.company_slug);
+  if (!okSlugs.length) return;   // no verified boards this scan → never close
+  const pulledIds = [...new Set(pulledRaw.map(r => r.sourceId).filter(Boolean))] as string[];
+  const seen = await sql`
+    update job.recommended_roles
+       set last_seen_at   = now(),
+           closed_at      = null,
+           closure_reason = null
+     where source = 'ats-radar'
+       and dismissed_at is null
+       and source_id = any(${pulledIds}::text[])`;
+  const closed = await sql`
+    update job.recommended_roles
+       set closed_at      = now(),
+           closure_reason = 'delisted'
+     where source = 'ats-radar'
+       and closed_at is null
+       and dismissed_at is null
+       and split_part(source_id, ':', 2) = any(${okSlugs}::text[])
+       and source_id <> all(${pulledIds}::text[])`;
+  const seenN   = (seen   as unknown as { count: number }).count;
+  const closedN = (closed as unknown as { count: number }).count;
+  console.log(`[pull-recommendations] ats-radar liveness: closed ${closedN}, seen ${seenN} (verified boards: ${okSlugs.length})`);
+}
+
 // ---------- Productize: enrich + Haiku-grade + rescore new inserts ----------
 // Each new row from a cron pull walks the same pipeline as the manual
 // /rescore endpoint, so cron-fed recommendations score the same as
@@ -824,6 +882,7 @@ async function enrichAndScoreNewRows(
              fit_breakdown        = ${sql.json(fit.breakdown)},
              fit_rationales       = ${sql.json(fit.rationales)},
              hard_fails           = ${fit.hardFails},
+             track                = ${fit.track},
              role_match_score     = ${roleScore},
              role_match_rationale = ${rationale},
              role_match_seniority = ${seniority},
@@ -834,7 +893,7 @@ async function enrichAndScoreNewRows(
              candidate_breakdown  = ${candidate ? sql.json(candidate.breakdown) : null},
              candidate_rationales = ${candidate ? sql.json(candidate.rationales) : null},
              candidate_summary    = ${candidate?.summary ?? null},
-             comp_acceptable      = ${compClears(salary) ?? candidate?.compAcceptable ?? null}
+             comp_acceptable      = ${compClears(salary, compFloorFor(r.title, ctx)) ?? candidate?.compAcceptable ?? null}
        where id = ${r.id}::uuid`;
   }
 }
@@ -923,6 +982,7 @@ async function insertNew(
     fit_score:      r.fitScore,
     fit_breakdown:  r.breakdown,
     hard_fails:     r.hardFails,
+    track:          r.track,
     sector:         r.input.sector ?? null,
     investors:      r.input.investors ?? [],
     payload:        r.input.payload ?? null,

@@ -32,6 +32,7 @@ const SOURCE_LABELS = {
   'gmail-jobs': 'Gmail job alerts',
   'company-watch': 'Watched companies',
   'tracked-ats': 'Tracked ATS boards',
+  'ats-radar': 'ATS boards (job-radar)',
 };
 
 // ── Deal-breakers structured editing ─────────────────────────────────────
@@ -75,8 +76,9 @@ function serializeRuleDoc(doc) {
 // Signals. Unknown fields fall into that same Advanced fold.
 const TABS = [
   { id: 'targets', label: 'Targets',
-    hint: 'What a good role looks like — titles, stage, sector, geography, comp.',
-    names: ['target_titles', 'target_stages', 'target_sectors', 'target_geographies', 'comp_floor_base', 'comp_floor_total'] },
+    hint: 'What a good role looks like — titles, stage, sector, geography, comp. The production track (soft goods) has its own titles, framing, and comp floor; roles are graded against their own track, never averaged.',
+    names: ['target_titles', 'target_stages', 'target_sectors', 'target_geographies', 'comp_floor_base', 'comp_floor_total',
+            'track_a_titles', 'track_a_notes', 'track_a_comp_floor'] },
   { id: 'signals', label: 'Signals',
     hint: 'What the recommendation grader rewards — mission, culture, interests.',
     names: ['mission_keywords', 'mission_required', 'anti_mission_terms', 'culture_keywords', 'interest_tags', 'impact_themes'] },
@@ -793,6 +795,19 @@ export class JobVision extends LitElement {
     }
   }
 
+  // Healthy-state meta for the ats-radar row: when the last sweep was
+  // pushed, what it verified, and how many boards it could NOT reach —
+  // an unreachable board is unverified, not "no openings".
+  _atsRadarMeta(s) {
+    if (s.type !== 'ats-radar' || !s.lastScan) return '';
+    const scan = s.lastScan;
+    const bits = [`Scanned ${relTime(scan.runAt)}`, `${scan.verified} boards verified`];
+    if (Number.isFinite(s.lastRunCount)) bits.push(`${s.lastRunCount} new role${s.lastRunCount === 1 ? '' : 's'} last run`);
+    const un = Array.isArray(scan.unverified) ? scan.unverified.length : 0;
+    if (un > 0) bits.push(`${un} board${un === 1 ? '' : 's'} unverified (unreachable, not empty)`);
+    return bits.join(' · ');
+  }
+
   _renderSourcesTab(tab) {
     const health = this._health;
     return html`
@@ -825,7 +840,7 @@ export class JobVision extends LitElement {
                           ${s.enabled === false ? 'Disabled'
                             : s.needsReauth ? 'Disconnected — needs re-auth'
                             : s.lastError ? s.lastError
-                            : 'Healthy'}
+                            : this._atsRadarMeta(s) || 'Healthy'}
                         </span>
                       </span>
                       ${s.type === 'gmail-jobs' && s.needsReauth ? html`
