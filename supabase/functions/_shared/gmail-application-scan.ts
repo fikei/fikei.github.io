@@ -642,6 +642,7 @@ async function maybeCreateRoleFromUnmatched(
   if (!receiptGate && !args.engaged) return false;
 
   let company = '';
+  let jobUrl: string | null = null;
   let title = '';
   let stage: 'applied' | 'interviewing' | 'offer' = 'applied';
   let summary = '';
@@ -671,6 +672,7 @@ async function maybeCreateRoleFromUnmatched(
       if (opp && opp.is_job_opportunity && opp.confidence >= AUTO_CREATE_CONFIDENCE_FLOOR
           && opp.company && !isUnknownCompanyName(opp.company)) {
         ({ company, title, stage, summary, confidence } = opp);
+        jobUrl = opp.url;
         via = 'opportunity';
       } else {
         // Remember the verdict — engaged threads resurface every run for
@@ -725,7 +727,7 @@ async function maybeCreateRoleFromUnmatched(
         applied_at, last_activity_at, status_changed_at, gmail_thread_ids
       ) values (
         ${slug}, null, ${company}, ${title || '(unknown title)'},
-        null, 'Gmail Auto-detected', 'Active', ${detectedStage},
+        ${jobUrl}, 'Gmail Auto-detected', 'Active', ${detectedStage},
         ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
       )
       on conflict (slug) do nothing
