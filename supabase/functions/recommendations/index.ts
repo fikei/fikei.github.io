@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.21.1';
-console.log(`[recommendations] v${VERSION} - Inbox gate keyed on fit_score ONLY + default sort fit_score desc; floored Inbox re-applies the role-name universe filter so removing the Strength floor doesn't leak off-universe (engineering/ops) titles from watched-company/gmail sources`);
+const VERSION = '0.22.0';
+console.log(`[recommendations] v${VERSION} - gmailStats block on GET (last scan, PT-today counts) for the Inbox scan strip`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -383,12 +383,40 @@ serve(async (req) => {
       } catch (e) {
         console.warn(`[recommendations] sourceHealth failed: ${(e as Error).message}`);
       }
+      // Gmail scan stats — powers the Inbox scan strip (last run, what
+      // landed today, manual re-run). "Today" is the user's day (PT).
+      // Never fail the page over stats bookkeeping.
+      let gmailStats: Record<string, unknown> | null = null;
+      try {
+        const [st] = await sql<Array<Record<string, unknown>>>`
+          with day as (
+            select (date_trunc('day', now() at time zone 'America/Los_Angeles')
+                    at time zone 'America/Los_Angeles') as start
+          )
+          select
+            (select g.last_scan_at from job.gmail_scan_state g where g.user_email = ${email}) as "lastScanAt",
+            (select g.last_error   from job.gmail_scan_state g where g.user_email = ${email}) as "lastError",
+            (select count(*)::int from job.recommended_roles r, day
+              where r.user_email = ${email} and r.source = 'gmail-jobs'
+                and r.created_at >= day.start)                                   as "recsToday",
+            (select count(*)::int from job.application_events e, day
+              where e.source in ('gmail-scan', 'gmail-backfill')
+                and e.created_at >= day.start)                                   as "eventsToday",
+            (select count(*)::int from job.application_events e, day
+              where e.auto_action = 'role_created'
+                and e.created_at >= day.start)                                   as "rolesCreatedToday",
+            (select count(*)::int from job.gmail_skipped k, day
+              where k.user_email = ${email} and k.skipped_at >= day.start)       as "skippedToday"`;
+        gmailStats = st ?? null;
+      } catch (e) {
+        console.warn(`[recommendations] gmailStats failed: ${(e as Error).message}`);
+      }
       return jsonResp({
         ok: true, version: VERSION, view,
         count: rows.length, total, recentlyExpired,
         offset, limit,
         hasMore: isAll && offset + rows.length < total,
-        recommendations: rows, sourceHealth,
+        recommendations: rows, sourceHealth, gmailStats,
       });
     }
 

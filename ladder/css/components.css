@@ -7235,3 +7235,29 @@ body[data-auth-state="out"] job-chat { display: none; }
 .inbox-more__btn:hover { color: var(--fg); }
 .inbox-more__chevron { font-size: 12px; line-height: 1; }
 .inbox-row--below .inbox-row__title { color: var(--fg-muted); font-weight: var(--fw-medium); }
+
+/* ---------- Gmail scan strip (/ladder/jobs/recommended/) ----------
+   One-line status row under the Updates queue: last run, today's haul,
+   error surface, and a manual "Scan now" force-run. */
+.gmail-scan {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: 760px;
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+}
+.gmail-scan strong {
+  font-weight: 600;
+}
+.gmail-scan .btn {
+  margin-left: auto;
+}
+.gmail-scan__err {
+  color: var(--error);
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

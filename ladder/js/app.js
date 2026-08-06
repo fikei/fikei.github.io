@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.39.0";
-console.log(`[ladder] v${VERSION} - watch any company by careers URL (custom adapter); Gmail engaged-thread role discovery`);
+const VERSION = "2.40.0";
+console.log(`[ladder] v${VERSION} - Gmail scan strip on Inbox: last run, found-today counts, Scan now force-run`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -39,6 +39,7 @@ if (location.pathname.startsWith('/ladder/jobs/drill')) {
 } else if (location.pathname.startsWith('/ladder/jobs/recommended')) {
   import('./components/ladder-recommendations-table.js' + V);
   import('./components/ladder-updates.js' + V);
+  import('./components/ladder-gmail-scan.js' + V);
 } else if (location.pathname.startsWith('/ladder/jobs')) {
   import('./components/ladder-pipeline.js' + V);
 }

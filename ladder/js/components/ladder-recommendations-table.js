@@ -893,6 +893,7 @@ export class JobRecommendationsTable extends LitElement {
         ${this._renderHeaderMenu()}
       </header>
       <ladder-updates></ladder-updates>
+      <ladder-gmail-scan></ladder-gmail-scan>
       ${this._renderDrainingBanner()}
       ${this._renderHealthBanner()}
       ${rows.length === 0 ? html`
