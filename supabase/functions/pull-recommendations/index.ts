@@ -24,7 +24,7 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.30.3';
+const VERSION = '0.30.4';
 console.log(`[pull-recommendations] v${VERSION} - engaged msgs judged 'informational' for a substring-matched role fall through to the opportunity extractor`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
