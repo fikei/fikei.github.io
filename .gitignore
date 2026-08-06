@@ -43,3 +43,4 @@ npm-debug.log*
 # Claude Code local state (never commit)
 .claude/worktrees/
 .claude/settings.local*.json
+job-scans/
