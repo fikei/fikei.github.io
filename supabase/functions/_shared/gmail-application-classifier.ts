@@ -282,6 +282,7 @@ export interface ExtractedUnmatchedOpportunity {
   company: string;
   title: string;
   stage: 'applied' | 'interviewing' | 'offer';
+  url: string | null;
   summary: string;
   confidence: number;
 }
@@ -294,6 +295,7 @@ Return STRICT JSON, no prose:
   "company": "the hiring company's name, exactly as the email presents it",
   "title": "the role under discussion, exactly as stated ('' if never named)",
   "stage": "applied" | "interviewing" | "offer",
+  "url": "direct link to the job posting if one appears in the email (ATS/careers link), else null",
   "summary": "one short sentence (≤140 chars) — where this conversation stands",
   "confidence": 0.0–1.0
 }
@@ -303,6 +305,7 @@ Rules:
 - FALSE for job alerts, newsletters, cold outreach with no specifics, sales/vendor threads, networking chats with no role, the candidate hiring someone else, and personal email.
 - stage: "interviewing" when calls/interviews are being scheduled or have happened; "offer" only on explicit offer language; otherwise "applied".
 - company/title must come from the email text (sender domain may inform company). If company is not identifiable, use "" and low confidence.
+- url must be copied verbatim from the email (a job-posting/ATS link, not meeting/calendar/tracking links). null when no posting link is present.
 - NEVER fabricate. Empty / false > guess.
 - The body may be truncated. Trust what you see; do not extrapolate.`;
 
@@ -348,11 +351,13 @@ export async function extractUnmatchedOpportunity(args: {
     return null;
   }
   const stage = parsed.stage === 'interviewing' || parsed.stage === 'offer' ? parsed.stage : 'applied';
+  const rawUrl = String(parsed.url || '').trim();
   return {
     is_job_opportunity: parsed.is_job_opportunity === true,
     company:    String(parsed.company || '').trim().slice(0, 120),
     title:      String(parsed.title || '').trim().slice(0, 200),
     stage,
+    url:        /^https?:\/\//i.test(rawUrl) ? rawUrl.slice(0, 500) : null,
     summary:    String(parsed.summary || '').trim().slice(0, 180),
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
   };

@@ -92,8 +92,11 @@ export function applyEaseInfo(r) {
 
 // Shared visibility filter — drops rows without a URL and Strava postings.
 // (Was duplicated in the rail and the jobs list.)
+// Exception: Active rows stay visible without a URL — Gmail auto-created
+// roles (receipts, engaged threads) land url-less, and a tracked live
+// application must never vanish from the Jobs buckets over a missing link.
 export function isVisibleRole(r) {
-  if (!r?.url) return false;
+  if (!r?.url && r?.status !== 'Active') return false;
   const company = (r.company || '').toLowerCase();
   if (company === 'strava') return false;
   if (/(^|\.)strava\.com\b/i.test(r.url)) return false;
