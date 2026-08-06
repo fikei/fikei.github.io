@@ -55,7 +55,11 @@ export class LadderGmailScan extends LitElement {
   }
 
   async _load() {
-    this.state = 'loading';
+    // Only the FIRST load gates rendering — refreshes (scan polling)
+    // must not flip state away from 'loaded' or the strip unmounts for
+    // the whole scan.
+    const first = this.state !== 'loaded';
+    if (first) this.state = 'loading';
     try {
       const d = await fetchRecommendations({ view: 'all', limit: 1 });
       this.health = (d.sourceHealth || []).find(s => s.type === 'gmail-jobs') || null;
@@ -63,7 +67,7 @@ export class LadderGmailScan extends LitElement {
       this.state = 'loaded';
     } catch (e) {
       console.warn('[gmail-scan] load failed', e);
-      this.state = 'error';
+      if (first) this.state = 'error';
     }
   }
 
