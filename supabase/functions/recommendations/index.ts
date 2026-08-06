@@ -8,7 +8,7 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.22.0';
+const VERSION = '0.22.1';
 console.log(`[recommendations] v${VERSION} - gmailStats block on GET (last scan, PT-today counts) for the Inbox scan strip`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
@@ -398,7 +398,7 @@ serve(async (req) => {
             (select g.last_error   from job.gmail_scan_state g where g.user_email = ${email}) as "lastError",
             (select count(*)::int from job.recommended_roles r, day
               where r.user_email = ${email} and r.source = 'gmail-jobs'
-                and r.created_at >= day.start)                                   as "recsToday",
+                and r.suggested_at >= day.start)                                 as "recsToday",
             (select count(*)::int from job.application_events e, day
               where e.source in ('gmail-scan', 'gmail-backfill')
                 and e.created_at >= day.start)                                   as "eventsToday",
