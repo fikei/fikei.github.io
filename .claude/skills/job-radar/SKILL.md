@@ -72,6 +72,16 @@ Save to `job-scans/scan-<YYYY-MM-DD>.md` and present in conversation. Use exactl
 
 The "Changes since last scan" diff is the recurring value: disappeared = probably filled (note if it was a target), new = act fast. Compare against the newest previous scan file in `job-scans/`.
 
+## Step 5: Push into Ladder
+
+Every sweep also feeds /ladder — verified-open roles become graded recommendations in the Inbox, and boards that disappeared close their stale recs:
+
+```bash
+python3 .claude/skills/job-radar/scripts/push_to_ladder.py
+```
+
+This uploads the raw scan to the `ats-radar-ingest` edge function (staging table `job.ats_radar_scans`) and force-runs the recommendations worker. Only `structured` (first-party verified) jobs are ingested; UNVERIFIED and `html-text` boards travel along as health metadata and can never close recs — the Sources row on /ladder/vision/?section=sources shows "N boards unverified" so an unreachable board is never mistaken for "no openings". Auth comes from the Supabase CLI login (or `LADDER_CRON_SECRET` / `SUPABASE_SERVICE_ROLE_KEY` env).
+
 ## Housekeeping
 
 - `job-scans/` is scratch output — keep it gitignored (there's an entry in `.gitignore`); reports contain no repo-relevant code.

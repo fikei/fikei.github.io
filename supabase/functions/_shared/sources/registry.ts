@@ -8,8 +8,10 @@ import { rssSource } from './rss.ts';
 import { theirstackSource } from './theirstack.ts';
 import { gmailJobsSource } from './gmail-jobs.ts';
 import { companyWatchSource } from './company-watch.ts';
+import { atsRadarSource } from './ats-radar.ts';
 
 export const SOURCES: Record<string, Source> = {
+  [atsRadarSource.type]:    atsRadarSource,
   [companyWatchSource.type]: companyWatchSource,
   [fixtureSource.type]:     fixtureSource,
   [trackedAtsSource.type]:  trackedAtsSource,

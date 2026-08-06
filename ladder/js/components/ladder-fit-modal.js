@@ -12,7 +12,7 @@ export const DIM_LABELS = {
   domain:  { label: 'Domain experience', max: 15, hint: 'Posting sector overlaps with companies you have worked at — healthtech, edtech, consumer SaaS, civic.' },
   arc:     { label: 'Career arc',        max: 10, hint: 'Stage + scope coherence: founding at seed/A, scale-up at B+, IPO/acquisition language.' },
   stage:   { label: 'Stage',             max: 4,  hint: 'Tiebreaker only. Pre-seed → C scores high; public / mega-cap hard-fails.' },
-  comp:    { label: 'Compensation',      max: 4,  hint: 'Top of range ≥ $200k = full marks. Floor signal, not a ranker.' },
+  comp:    { label: 'Compensation',      max: 4,  hint: 'Top of range clears your track\'s floor = full marks ($200k digital, ~$70k production soft goods). Floor signal, not a ranker.' },
   geo:     { label: 'Geography',         max: 2,  hint: 'Most geo filtering happens upstream — this is a small bonus.', binary: true },
 };
 
@@ -25,7 +25,7 @@ export const CANDIDATE_DIM_LABELS = {
   domain:  { label: 'Domain familiarity',  max: 15, hint: 'Worked in their sector before or domain on-ramp.' },
   stretch: { label: 'Stretch level',       max: 15, hint: 'Healthy stretch vs. comfort zone vs. risky reach.' },
   reach:   { label: 'Reach factors',       max: 10, hint: 'Specific things a hiring manager could push on — missing specialty, gaps, overqualification.' },
-  comp:    { label: 'Compensation',        max: 1,  hint: 'Posted range top clears your $200k floor. "—" means the posting doesn\'t disclose comp.', binary: true },
+  comp:    { label: 'Compensation',        max: 1,  hint: 'Posted range top clears your floor for this role\'s track ($200k digital, ~$70k production). "—" means the posting doesn\'t disclose comp.', binary: true },
 };
 
 // The 1-2 fit dimensions dragging a rec's score down, as
