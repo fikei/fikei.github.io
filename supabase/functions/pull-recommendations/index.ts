@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.31.0';
-console.log(`[pull-recommendations] v${VERSION} - ats-radar source (job-radar sweeps) + two-track grading (production vs digital)`);
+const VERSION = '0.32.0';
+console.log(`[pull-recommendations] v${VERSION} - company-watch gains workable/smartrecruiters/rippling adapters (job-radar registry watches)`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

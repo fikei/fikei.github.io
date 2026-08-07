@@ -450,6 +450,59 @@ async function pullAtsBoard(w: WatchedCompanyRow): Promise<RecommendedRoleInput[
       payload: { adapter: 'ashby', watchedCompanyId: w.id, jobId: j.id },
     }));
   }
+  if (w.adapter === 'workable') {
+    const data = await fetchJson<{ jobs?: Array<{ title?: string; city?: string; state?: string; country?: string; telecommuting?: boolean; url?: string; shortlink?: string; published_on?: string }> }>(
+      `https://apply.workable.com/api/v1/widget/accounts/${slug}?details=false`);
+    return (data.jobs || []).slice(0, MAX_ROLES_PER_COMPANY).flatMap(j => {
+      const url = j.url || j.shortlink;
+      if (!url || !j.title) return [];
+      let loc = [j.city, j.state, j.country].filter(Boolean).join(', ');
+      if (j.telecommuting) loc = loc ? `${loc} (remote)` : 'Remote';
+      return [{
+        source: 'company-watch', sourceId: `cw:workable:${cfg.slug}:${url.split('/').pop()}`,
+        sourceLabel: `${w.company} Careers`, url,
+        company: w.company, title: j.title, location: loc || undefined,
+        postedAt: j.published_on && !isNaN(Date.parse(j.published_on)) ? new Date(j.published_on).toISOString() : undefined,
+        payload: { adapter: 'workable', watchedCompanyId: w.id },
+      }];
+    });
+  }
+  if (w.adapter === 'smartrecruiters') {
+    const data = await fetchJson<{ content?: Array<{ id?: string; name?: string; releasedDate?: string; location?: { city?: string; country?: string } }> }>(
+      `https://api.smartrecruiters.com/v1/companies/${slug}/postings`);
+    return (data.content || []).slice(0, MAX_ROLES_PER_COMPANY).flatMap(j => {
+      if (!j.id || !j.name) return [];
+      return [{
+        source: 'company-watch', sourceId: `cw:sr:${cfg.slug}:${j.id}`,
+        sourceLabel: `${w.company} Careers`,
+        url: `https://jobs.smartrecruiters.com/${cfg.slug}/${j.id}`,
+        company: w.company, title: j.name,
+        location: [j.location?.city, j.location?.country].filter(Boolean).join(', ') || undefined,
+        postedAt: j.releasedDate && !isNaN(Date.parse(j.releasedDate)) ? new Date(j.releasedDate).toISOString() : undefined,
+        payload: { adapter: 'smartrecruiters', watchedCompanyId: w.id, jobId: String(j.id) },
+      }];
+    });
+  }
+  if (w.adapter === 'rippling') {
+    // deno-lint-ignore no-explicit-any
+    const data = await fetchJson<any>(`https://api.rippling.com/platform/api/ats/v1/board/${slug}/jobs`);
+    const raw: Array<Record<string, unknown>> = Array.isArray(data) ? data : (data.jobs || data.results || data.items || []);
+    return raw.slice(0, MAX_ROLES_PER_COMPANY).flatMap(j => {
+      const title = String(j.name || j.title || '');
+      const url = j.url ? String(j.url)
+        : j.uuid ? `https://ats.rippling.com/${cfg.slug}/jobs/${j.uuid}` : '';
+      if (!title || !url) return [];
+      let loc: unknown = j.workLocation ?? j.locations ?? '';
+      if (Array.isArray(loc)) loc = loc.map(x => (x && typeof x === 'object') ? ((x as Record<string, unknown>).label || (x as Record<string, unknown>).name || '') : String(x)).filter(Boolean).join(', ');
+      else if (loc && typeof loc === 'object') loc = (loc as Record<string, unknown>).label || (loc as Record<string, unknown>).name || '';
+      return [{
+        source: 'company-watch', sourceId: `cw:rippling:${cfg.slug}:${String(j.uuid || j.id || url.split('/').pop())}`,
+        sourceLabel: `${w.company} Careers`, url,
+        company: w.company, title, location: String(loc || '') || undefined,
+        payload: { adapter: 'rippling', watchedCompanyId: w.id },
+      }];
+    });
+  }
   throw new Error(`unknown ats adapter: ${w.adapter}`);
 }
 
@@ -462,6 +515,9 @@ const ADAPTERS: Record<string, (w: WatchedCompanyRow) => Promise<RecommendedRole
   greenhouse: pullAtsBoard,
   lever:      pullAtsBoard,
   ashby:      pullAtsBoard,
+  workable:        pullAtsBoard,
+  smartrecruiters: pullAtsBoard,
+  rippling:        pullAtsBoard,
   custom:     pullCustom,
 };
 
