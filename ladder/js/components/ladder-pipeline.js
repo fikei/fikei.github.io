@@ -173,6 +173,7 @@ export class JobPipeline extends LitElement {
       history.replaceState(null, '', `${location.pathname}?${qs}`);
     }
     document.dispatchEvent(new CustomEvent('job:jobs:bucket', { detail: { bucket: this.bucket } }));
+    this._syncHeader();
     this.openMenuSlug = null;
     this.livenessChecking = false;
     this.livenessResult = null;            // { checked, closed: [slug…] }
@@ -242,9 +243,25 @@ export class JobPipeline extends LitElement {
       if (b !== this.bucket) {
         this.bucket = b;
         document.dispatchEvent(new CustomEvent('job:jobs:bucket', { detail: { bucket: b } }));
+        this._syncHeader();
       }
     };
     window.addEventListener('popstate', this._onPopState);
+  }
+
+  // Keep the static page h1 (and the browser tab) in step with the nav
+  // taxonomy: Saved and In progress are separate top-level entries, so
+  // the page can't sit under a single "Jobs" heading anymore.
+  _syncHeader() {
+    const label = this.bucket === 'saved' ? 'Saved'
+      : this.bucket === 'archive' ? 'Archive'
+      : 'In progress';
+    const h1 = document.querySelector('.page-header h1');
+    if (h1) h1.textContent = label;
+    // The mobile top bar copies the h1 at inject time — keep it in step.
+    const barTitle = document.querySelector('.mobile-bar__title');
+    if (barTitle) barTitle.textContent = label;
+    document.title = `${label} — Ladder`;
   }
   disconnectedCallback() {
     document.removeEventListener('ctrl:auth:signedin', this._onAuth);

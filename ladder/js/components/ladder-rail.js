@@ -15,26 +15,32 @@ const [{ fetchPipeline, fetchRecommendations, BUCKETS, bucketFor, isVisibleRole,
 export const NAV_ICONS = {
   inbox: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
   jobs: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
+  saved: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`,
   profile: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
   plan: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
 };
 
 // Nav taxonomy: Inbox is top-level (the daily loop shouldn't hide under
-// Jobs); Jobs holds the six pipeline buckets — Saved, the four in-progress
-// stages, and Archive — as first-class sub-items (matched by `bucket`). The
-// Search plan sub-items are real sub-pages (matched by `section`). `countKey`
-// says which count to show. Keep in sync with the mobile drawer in app.js.
+// a group); Saved is top-level too (triage output, browsed daily); In
+// progress groups the four live stages + Archive as sub-items (matched by
+// `bucket` — top-level entries that share the /jobs path disambiguate via
+// `buckets`). The Search plan sub-items are real sub-pages (matched by
+// `section`). `countKey` says which count to show. Keep in sync with the
+// mobile drawer in app.js.
 const ROUTES = [
   { href: '/ladder/jobs/recommended/', label: 'Inbox', icon: 'inbox',
     match: /^\/ladder\/jobs\/recommended\/?/, countKey: 'recommended' },
+  { href: '/ladder/jobs/?bucket=saved', label: 'Saved', icon: 'saved',
+    match: /^\/ladder\/jobs(?!\/recommended)\/?/, buckets: ['saved'], countKey: 'saved' },
   {
-    href: '/ladder/jobs/',
-    label: 'Jobs',
+    href: '/ladder/jobs/?bucket=applied',
+    label: 'In progress',
     icon: 'jobs',
     match: /^\/ladder\/jobs(?!\/recommended)\/?/,
+    buckets: ['drafting', 'applied', 'interviewing', 'offer', 'archive'],
+    countKey: 'inprogress',
     sub: [
-      { href: '/ladder/jobs/?bucket=saved',        label: 'Saved',        bucket: 'saved',        countKey: 'saved' },
       { href: '/ladder/jobs/?bucket=drafting',     label: 'Drafting',     bucket: 'drafting',     countKey: 'drafting' },
       { href: '/ladder/jobs/?bucket=applied',      label: 'Applied',      bucket: 'applied',      countKey: 'applied' },
       { href: '/ladder/jobs/?bucket=interviewing', label: 'Interviewing', bucket: 'interviewing', countKey: 'interviewing' },
@@ -127,6 +133,9 @@ export class JobRail extends LitElement {
       // shared bucketFor so the rail never drifts from the list.
       const counts = Object.fromEntries(BUCKETS.map(b => [b, 0]));
       for (const r of roles) counts[bucketFor(r)]++;
+      // "In progress" chip = the four live stages (Archive is terminal,
+      // not in progress — it stays a sub-item count only).
+      counts.inprogress = counts.drafting + counts.applied + counts.interviewing + counts.offer;
       // `total` is the true count of all matching recs; `count` is only the
       // returned page size (caps at the server's page limit, e.g. 100).
       counts.recommended = recs?.total ?? recs?.count ?? (recs?.recommendations?.length ?? 0);
@@ -168,7 +177,11 @@ export class JobRail extends LitElement {
         <nav>
           <ul class="nav-list">
             ${ROUTES.map((r, i) => {
-              const active = r.match.test(this.path) && !(i > 0 && inboxActive);
+              // Entries sharing the /jobs path (Saved, In progress)
+              // disambiguate on the current ?bucket.
+              const active = r.match.test(this.path)
+                && (!r.buckets || r.buckets.includes(this.bucket))
+                && !(i > 0 && inboxActive);
               return html`
                 <li>
                   <a href=${r.href}
