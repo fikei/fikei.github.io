@@ -2,8 +2,8 @@
 // Bump VERSION on every PR that touches /ladder/js. The HTML loads this file
 // with ?v=VERSION to bypass the 10-min Pages cache, and we append the same
 // query to dynamic imports so the component graph stays consistent.
-const VERSION = "2.41.0";
-console.log(`[ladder] v${VERSION} - ATS boards (job-radar) source + two-track grading (production soft goods vs digital)`);
+const VERSION = "2.42.0";
+console.log(`[ladder] v${VERSION} - nav restructure: Saved top-level; Jobs group renamed In progress (stages + Archive)`);
 window.LADDER_VERSION = `v${VERSION}`;
 const V = `?v=${VERSION}`;
 
@@ -172,12 +172,14 @@ function injectMobileBar() {
 const DRAWER_ITEMS = [
   { href: '/ladder/jobs/recommended/', label: 'Inbox',       countKey: 'recommended', match: /^\/ladder\/jobs\/recommended\/?/,
     icon: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
-  { href: '/ladder/jobs/',             label: 'Jobs',        match: /^\/ladder\/jobs(?!\/recommended)\/?/,
+  { href: '/ladder/jobs/?bucket=saved', label: 'Saved',      match: /^\/ladder\/jobs(?!\/recommended)\/?/, buckets: ['saved'], countKey: 'saved',
+    icon: '<path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>' },
+  { href: '/ladder/jobs/?bucket=applied', label: 'In progress', match: /^\/ladder\/jobs(?!\/recommended)\/?/,
+    buckets: ['drafting', 'applied', 'interviewing', 'offer', 'archive'], countKey: 'inprogress',
     icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
-    // Six pipeline buckets as first-class sub-items (primary nav, no in-page
-    // sub-nav bar). Keep in sync with the Jobs `sub` in components/ladder-rail.js.
+    // Live stages + Archive as first-class sub-items (primary nav, no in-page
+    // sub-nav bar). Keep in sync with the In progress `sub` in components/ladder-rail.js.
     sub: [
-      { href: '/ladder/jobs/?bucket=saved',        label: 'Saved',        bucket: 'saved',        countKey: 'saved' },
       { href: '/ladder/jobs/?bucket=drafting',     label: 'Drafting',     bucket: 'drafting',     countKey: 'drafting' },
       { href: '/ladder/jobs/?bucket=applied',      label: 'Applied',      bucket: 'applied',      countKey: 'applied' },
       { href: '/ladder/jobs/?bucket=interviewing', label: 'Interviewing', bucket: 'interviewing', countKey: 'interviewing' },
@@ -207,7 +209,6 @@ function injectNavDrawer() {
       </a>
       <ul class="nav-drawer__list">
         ${DRAWER_ITEMS.map(i => {
-          const parentActive = i.match.test(here);
           // Normalize the current ?bucket= so legacy links still highlight
           // the right sub-item (leads→saved, active→drafting).
           const curBucket = (() => {
@@ -216,6 +217,9 @@ function injectNavDrawer() {
             if (b === 'active') return 'drafting';
             return b;
           })();
+          // Entries sharing the /jobs path (Saved, In progress)
+          // disambiguate on the current bucket.
+          const parentActive = i.match.test(here) && (!i.buckets || i.buckets.includes(curBucket));
           const sub = (parentActive && i.sub) ? `
             <ul class="nav-drawer__sublist">
               ${i.sub.map(s => `
