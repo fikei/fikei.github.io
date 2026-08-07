@@ -41,6 +41,7 @@ import {
   stageForEventType,
 } from './gmail-application-classifier.ts';
 import { roleSlug as buildRoleSlug } from './job-auth.ts';
+import { fetchJdText } from './job-fit-haiku.ts';
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
@@ -751,11 +752,119 @@ async function maybeCreateRoleFromUnmatched(
     if (!inserted.length) return false;
 
     console.log(`[gmail-app-scan] auto-created role ${slug} from ${via} (${args.sender})${createdRows.length ? '' : ' — slug existed, event attached only'}`);
+    // Resolve the actual posting — url (when the email had none),
+    // description, location — so the grade cron can score the role
+    // instead of it sitting bare at a floor fit. Best-effort side quest.
+    if (createdRows.length) {
+      try {
+        await resolveCreatedRole(sql, slug, company, title, jobUrl);
+      } catch (e) {
+        console.warn(`[gmail-app-scan] resolve ${slug} failed: ${(e as Error).message}`);
+      }
+    }
     return true;
   } catch (e) {
     console.warn(`[gmail-app-scan] auto-create ${slug} failed: ${(e as Error).message}`);
     return false;
   }
+}
+
+// ---------- posting resolution for auto-created roles ----------
+// With a URL from the email: fetch the JD text (Workday-aware via
+// fetchJdText). Without one: probe the public ATS boards
+// (Greenhouse/Lever/Ashby) under company-derived slugs and match the
+// title — same trio every other resolver in the pipeline uses.
+async function resolveCreatedRole(
+  sql: ReturnType<typeof db>,
+  slug: string,
+  company: string,
+  title: string,
+  jobUrl: string | null,
+): Promise<void> {
+  let url = jobUrl;
+  let description: string | null = null;
+  let location: string | null = null;
+
+  if (url) {
+    description = await fetchJdText(url).catch(() => null);
+  } else if (title) {
+    const found = await findOnAtsBoards(company, title).catch(() => null);
+    if (found) ({ url, description, location } = found);
+  }
+  if (!url && !description) return;
+  if (description && description.length < 200) description = null;
+
+  await sql`
+    update job.pipeline_roles
+       set url         = coalesce(url, ${url}),
+           description = coalesce(description, ${description}),
+           location    = coalesce(location, ${location}),
+           updated_at  = now()
+     where slug = ${slug}`;
+  console.log(`[gmail-app-scan] resolved ${slug}: url=${url ? 'yes' : 'no'} desc=${description?.length ?? 0} chars`);
+}
+
+interface BoardHit { url: string; description: string | null; location: string | null }
+
+function boardSlugCandidates(name: string): string[] {
+  const base = name.toLowerCase().trim();
+  return [...new Set([
+    base.replace(/[^a-z0-9]+/g, ''),
+    base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+  ])].filter(Boolean);
+}
+
+function titleMatches(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const na = norm(a), nb = norm(b);
+  return !!na && !!nb && (na === nb || na.includes(nb) || nb.includes(na));
+}
+
+function stripBoardHtml(html: string): string {
+  return (html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
+}
+
+async function findOnAtsBoards(company: string, title: string): Promise<BoardHit | null> {
+  for (const slug of boardSlugCandidates(company)) {
+    // Greenhouse — list, then per-job content fetch.
+    try {
+      const r = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`);
+      if (r.ok) {
+        const d = await r.json() as { jobs?: Array<{ id: number; title: string; absolute_url: string; location?: { name: string } }> };
+        const hit = (d.jobs || []).find(j => titleMatches(j.title, title));
+        if (hit) {
+          let description: string | null = null;
+          try {
+            const jr = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs/${hit.id}`);
+            if (jr.ok) description = stripBoardHtml(((await jr.json()) as { content?: string }).content || '');
+          } catch { /* listing hit is still useful */ }
+          return { url: hit.absolute_url, description, location: hit.location?.name ?? null };
+        }
+      }
+    } catch { /* next provider */ }
+    // Lever — postings include the plain description inline.
+    try {
+      const r = await fetch(`https://api.lever.co/v0/postings/${slug}?mode=json`);
+      if (r.ok) {
+        const d = await r.json() as Array<{ text: string; hostedUrl: string; descriptionPlain?: string; categories?: { location?: string } }>;
+        const hit = (Array.isArray(d) ? d : []).find(j => titleMatches(j.text, title));
+        if (hit) return { url: hit.hostedUrl, description: (hit.descriptionPlain || '').slice(0, 8000) || null, location: hit.categories?.location ?? null };
+      }
+    } catch { /* next provider */ }
+    // Ashby — board payload carries descriptionPlain.
+    try {
+      const r = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`);
+      if (r.ok) {
+        const d = await r.json() as { jobs?: Array<{ title: string; jobUrl: string; descriptionPlain?: string; locationName?: string }> };
+        const hit = (d.jobs || []).find(j => titleMatches(j.title, title));
+        if (hit) return { url: hit.jobUrl, description: (hit.descriptionPlain || '').slice(0, 8000) || null, location: hit.locationName ?? null };
+      }
+    } catch { /* next candidate */ }
+  }
+  return null;
 }
 
 // Rejection → exit_reason mapping for the auto-archive. Where in the

@@ -89,7 +89,38 @@ export async function loadFitContext(sql: any): Promise<FitUserContext> {
   return ctx;
 }
 
+// Workday postings are fully JS-rendered — a plain fetch returns an empty
+// shell. Their CXS API serves the JD as JSON: parse
+// https://<tenant>.wd<N>.myworkdayjobs.com/[<locale>/]<site>/job/[<loc>/]<Req>
+// into /wday/cxs/<tenant>/<site>/job/<Req>.
+async function fetchWorkdayJdText(url: URL): Promise<string | null> {
+  const tenant = url.hostname.split('.')[0];
+  const seg = url.pathname.split('/').filter(Boolean);
+  const jobIdx = seg.indexOf('job');
+  if (jobIdx < 1 || jobIdx === seg.length - 1) return null;
+  // Site = segment before 'job', skipping a leading locale like en-US.
+  const site = seg[jobIdx - 1];
+  const req  = seg[seg.length - 1];
+  const cxs = `https://${url.hostname}/wday/cxs/${tenant}/${site}/job/${encodeURIComponent(req)}`;
+  const r = await fetch(cxs, { headers: { accept: 'application/json' } });
+  if (!r.ok) return null;
+  const data = await r.json() as { jobPostingInfo?: { jobDescription?: string } };
+  const html = data.jobPostingInfo?.jobDescription || '';
+  if (!html) return null;
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#\d+;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000) || null;
+}
+
 export async function fetchJdText(url: string): Promise<string> {
+  try {
+    const u = new URL(url);
+    if (/\.myworkdayjobs\.com$/i.test(u.hostname)) {
+      const wd = await fetchWorkdayJdText(u).catch(() => null);
+      if (wd) return wd;
+    }
+  } catch { /* fall through to the generic path */ }
   const resp = await fetch(url, {
     redirect: 'follow',
     headers: {
