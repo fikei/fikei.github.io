@@ -14,7 +14,7 @@
    Opt out per field with data-no-picker. */
 
 (() => {
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   console.log(`[datepicker] v${VERSION} - Sassy calendar dropdown`);
 
   const SEL = 'input[type="date"]:not([data-no-picker]), input[type="datetime-local"]:not([data-no-picker])';
@@ -71,11 +71,14 @@
   input[type="datetime-local"]::-webkit-calendar-picker-indicator { display: none; }
   `;
 
+  // Styles land at load — the native calendar icons must be gone before the
+  // first field is ever seen, not after the first open.
+  const st = document.createElement('style');
+  st.textContent = STYLE;
+  (document.head || document.documentElement).appendChild(st);
+
   function ensureBuilt() {
     if (pop) return;
-    const st = document.createElement('style');
-    st.textContent = STYLE;
-    document.head.appendChild(st);
     pop = document.createElement('div');
     pop.className = 'dp';
     pop.hidden = true;
