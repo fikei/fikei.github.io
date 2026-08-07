@@ -1768,10 +1768,20 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .set-conn__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
 .set-conn__detail { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
-.set-conn__state { grid-column: 2; grid-row: 1; text-align: right; font-size: var(--font-size-caption); font-weight: var(--fw-semibold); }
+.set-conn__state {
+  grid-column: 2; grid-row: 1; justify-self: end;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--font-size-caption); font-weight: var(--fw-semibold);
+}
+/* The dot carries the color (design-system .status vocabulary); a dead
+   connection blinks so the one card needing a click reads at a glance. */
+.set-conn__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .set-conn__state.is-ok { color: var(--success); }
 .set-conn__state.is-warn { color: var(--error); }
+.set-conn__state.is-warn .set-conn__dot { animation: set-conn-blink 1s step-start infinite; }
 .set-conn__state.is-off { color: var(--fg-subtle); }
+.set-conn__action { grid-column: 2; grid-row: 2; justify-self: end; align-self: center; }
+@keyframes set-conn-blink { 50% { opacity: 0; } }
 
 .set-note { margin: var(--space-2) 0 0; color: var(--fg-subtle); font-size: var(--font-size-caption); }
 .set-note code { font-family: ui-monospace, Menlo, monospace; }
@@ -1779,6 +1789,8 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   .set-field, .set-auto, .set-conn { grid-template-columns: 1fr; }
   .set-field__control { grid-column: 1; grid-row: 3; justify-self: start; margin-top: 6px; }
   .set-auto__when, .set-auto__cadence, .set-conn__state { grid-column: 1; text-align: left; }
+  .set-conn__state { justify-self: start; }
+  .set-conn__action { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 6px; }
 }
 
 /* --- v3.49.0: stepped drawer (choose, then continue in place) ---
