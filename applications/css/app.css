@@ -1780,6 +1780,9 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .set-conn__state.is-warn { color: var(--error); }
 .set-conn__state.is-warn .set-conn__dot { animation: set-conn-blink 1s step-start infinite; }
 .set-conn__state.is-off { color: var(--fg-subtle); }
+/* A connection that merely follows a broken one dims whole (the .set-auto
+   is-off treatment) instead of raising a second red flag. */
+.set-conn.is-dim { opacity: 0.55; }
 /* The repair button replaces the state entirely — its tint (same treatment
    as review__btn--notfit) is the disconnected indicator. */
 .set-conn__action {
