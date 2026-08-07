@@ -24,8 +24,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.33.0';
-console.log(`[pull-recommendations] v${VERSION} - auto-created roles resolve their posting (email url -> JD fetch, else GH/Lever/Ashby board title match); Workday CXS-aware fetchJdText`);
+const VERSION = '0.34.0';
+console.log(`[pull-recommendations] v${VERSION} - auto-created roles with no posting synthesize a profile (email + contact + company web) so they still grade`);
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';

@@ -725,11 +725,11 @@ async function maybeCreateRoleFromUnmatched(
     const createdRows = await sql<{ slug: string }[]>`
       insert into job.pipeline_roles (
         slug, company_slug, company_name, title, url, source, status, stage,
-        applied_at, last_activity_at, status_changed_at, gmail_thread_ids
+        contact, applied_at, last_activity_at, status_changed_at, gmail_thread_ids
       ) values (
         ${slug}, null, ${company}, ${title || '(unknown title)'},
         ${jobUrl}, 'Gmail Auto-detected', 'Active', ${detectedStage},
-        ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
+        ${args.sender}, ${appliedAt}, ${receivedAt}, now(), ${[args.msg.threadId]}
       )
       on conflict (slug) do nothing
       returning slug`;
@@ -757,7 +757,10 @@ async function maybeCreateRoleFromUnmatched(
     // instead of it sitting bare at a floor fit. Best-effort side quest.
     if (createdRows.length) {
       try {
-        await resolveCreatedRole(sql, slug, company, title, jobUrl);
+        await resolveCreatedRole(sql, slug, company, title, jobUrl, {
+          sender: args.sender, senderDomain: args.senderDomain,
+          subject: args.subject, body: args.body,
+        });
       } catch (e) {
         console.warn(`[gmail-app-scan] resolve ${slug} failed: ${(e as Error).message}`);
       }
@@ -773,26 +776,48 @@ async function maybeCreateRoleFromUnmatched(
 // With a URL from the email: fetch the JD text (Workday-aware via
 // fetchJdText). Without one: probe the public ATS boards
 // (Greenhouse/Lever/Ashby) under company-derived slugs and match the
-// title — same trio every other resolver in the pipeline uses.
+// title — same trio every other resolver in the pipeline uses. When
+// neither yields a posting, SYNTHESIZE a role profile from what we do
+// have — the email itself, the sender (the connection), and the
+// company's web presence — so the role is still defined and gradeable
+// instead of sitting bare.
 async function resolveCreatedRole(
   sql: ReturnType<typeof db>,
   slug: string,
   company: string,
   title: string,
   jobUrl: string | null,
+  email: { sender: string; senderDomain: string | null; subject: string; body: string },
 ): Promise<void> {
   let url = jobUrl;
   let description: string | null = null;
   let location: string | null = null;
+  let via = 'url';
 
   if (url) {
     description = await fetchJdText(url).catch(() => null);
-  } else if (title) {
+  }
+  if (!description && title) {
     const found = await findOnAtsBoards(company, title).catch(() => null);
-    if (found) ({ url, description, location } = found);
+    if (found) {
+      url = url ?? found.url;
+      ({ description, location } = found);
+      via = 'board';
+    }
+  }
+  if (description && description.length < 200) description = null;
+
+  // Last resort: no posting anywhere → define the role from the email +
+  // company web presence. The synthesized profile is clearly labeled so
+  // the detail page never passes it off as the employer's own JD.
+  if (!description) {
+    description = await synthesizeRoleProfile(sql, company, title, email).catch(e => {
+      console.warn(`[gmail-app-scan] synthesize ${slug} failed: ${(e as Error).message}`);
+      return null;
+    });
+    via = 'synthesized';
   }
   if (!url && !description) return;
-  if (description && description.length < 200) description = null;
 
   await sql`
     update job.pipeline_roles
@@ -801,7 +826,94 @@ async function resolveCreatedRole(
            location    = coalesce(location, ${location}),
            updated_at  = now()
      where slug = ${slug}`;
-  console.log(`[gmail-app-scan] resolved ${slug}: url=${url ? 'yes' : 'no'} desc=${description?.length ?? 0} chars`);
+  console.log(`[gmail-app-scan] resolved ${slug} via ${via}: url=${url ? 'yes' : 'no'} desc=${description?.length ?? 0} chars`);
+}
+
+// Company web-presence text for the synthesis fallback. Domain comes
+// from the sender (corporate mail), the hiring_companies cache, or a
+// <company>.com guess — homepage plus /careers, stripped and capped.
+const FREE_MAIL_DOMAINS = /(^|\.)(gmail|googlemail|yahoo|outlook|hotmail|live|icloud|aol|proton|protonmail|me)\.(com|me)$/i;
+
+async function fetchCompanyWebText(sql: ReturnType<typeof db>, company: string, senderDomain: string | null): Promise<string> {
+  let domain: string | null = null;
+  if (senderDomain && !FREE_MAIL_DOMAINS.test(senderDomain)) domain = senderDomain;
+  if (!domain) {
+    try {
+      const rows = await sql<{ domain: string | null }[]>`
+        select domain from job.hiring_companies
+         where name_norm = ${company.trim().toLowerCase()} and domain is not null limit 1`;
+      domain = rows[0]?.domain ?? null;
+    } catch { /* cache miss */ }
+  }
+  if (!domain) domain = `${company.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com`;
+
+  const texts: string[] = [];
+  for (const path of ['', '/careers']) {
+    try {
+      const r = await fetch(`https://www.${domain}${path}`, {
+        redirect: 'follow',
+        headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' },
+      });
+      if (!r.ok) continue;
+      const html = await r.text();
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ').trim();
+      if (text.length > 200) texts.push(text.slice(0, 4000));
+    } catch { /* best effort */ }
+  }
+  return texts.join('\n---\n');
+}
+
+// Haiku-synthesized role profile — grounded ONLY in the email thread,
+// the sender's identity, and the company's site text. The label prefix
+// keeps provenance honest in the role detail page, and the >200-char
+// result lets the grade cron score the role.
+async function synthesizeRoleProfile(
+  sql: ReturnType<typeof db>,
+  company: string,
+  title: string,
+  email: { sender: string; senderDomain: string | null; subject: string; body: string },
+): Promise<string | null> {
+  const apiKey = Deno.env.get('LADDER_ANTHROPIC_API_KEY') || Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return null;
+
+  const webText = await fetchCompanyWebText(sql, company, email.senderDomain).catch(() => '');
+
+  const system = `You write a factual role profile for a job that has NO public posting, so a hiring pipeline can still evaluate it. Ground every sentence in the provided sources — the email conversation, the sender's identity, and the company's website text. NEVER invent requirements, compensation, or responsibilities that no source supports; where the sources are silent, say so plainly ("not yet specified").
+
+Output PLAIN TEXT (no JSON, no markdown headers), 150–350 words, structured as:
+1. One paragraph on the company (who they are, what they do — from the site text).
+2. One paragraph on the role as described in the conversation (title, scope, stage of process, who the contact is).
+3. One short paragraph listing what is known about expectations/requirements, and what remains unspecified.`;
+
+  const userPrompt = [
+    `Company: ${company}`,
+    `Role title: ${title || '(not stated)'}`,
+    `Contact: ${email.sender}`,
+    `--- EMAIL (subject: ${email.subject}) ---`,
+    email.body.slice(0, 4000),
+    webText ? `--- COMPANY WEBSITE ---\n${webText.slice(0, 5000)}` : '(no website text retrieved)',
+  ].join('\n');
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5',
+      max_tokens: 700,
+      system,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const data = await r.json() as { content: Array<{ type: string; text: string }> };
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+  if (text.length < 200) return null;
+  return `[Profile synthesized from email + company web presence — no public posting found]\n\n${text.slice(0, 6000)}`;
 }
 
 interface BoardHit { url: string; description: string | null; location: string | null }
