@@ -51,8 +51,8 @@ import { ensureAndApplyLabel } from '../_shared/gmail.ts';
 
 const LADDER_LABEL = 'Ladder';
 
-const VERSION = '1.9.4';
-console.log(`[application-events] v${VERSION} - engaged-message informational fallthrough to opportunity extractor in shared scan`);
+const VERSION = '1.10.0';
+console.log(`[application-events] v${VERSION} - shared scan resolves auto-created roles (posting url + JD + location)`);
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const USER_EMAIL_LC = 'fike101@gmail.com';
