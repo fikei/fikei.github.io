@@ -306,6 +306,39 @@ Form-like display sections for account information.
 </div>
 ```
 
+### Date Picker (`datepicker.js`)
+
+A self-contained calendar dropdown for every date field. Include the script and
+it attaches itself — no markup, no init call:
+
+```html
+<script src="/design-system/datepicker.js?v=1.0.0"></script>
+```
+
+- Targets every `input[type="date"]` and `input[type="datetime-local"]`; opt a
+  field out with `data-no-picker`.
+- **Typing stays first-class** — the input is never readonly, the calendar
+  follows what's typed, and picking a day dispatches real `input` + `change`
+  events so autosave forms hear it.
+- Desktop: popover anchored under the field (flips above when cramped).
+  Mobile (coarse pointer or ≤520px): bottom sheet + backdrop, native wheel
+  suppressed — one picker, never two.
+- Respects the input's `min`/`max`. Month + year are selects (no 40-click
+  scrubbing to a birth year). Footer: **Today**, and **Clear** unless the
+  field is `required`. Esc closes.
+- `datetime-local`: the calendar owns the date half, the typed time is left
+  alone (defaults 12:00).
+- Classes (all injected, themed by app tokens with dark fallbacks): `dp`,
+  `dp--sheet`, `dp-back`, `dp__head`, `dp__nav`, `dp__sel`, `dp__grid`,
+  `dp__dow`, `dp__day` (`is-today`, `is-selected`), `dp__foot`, `dp__quiet`.
+
+**Field-context rule that travels with it:** a date field whose meaning depends
+on another answer is **disabled until that answer exists** (never hidden —
+same rule as locked settings), with a `title` saying what wakes it. An end
+date's `min` follows its start. Examples in recruiting: "Sublet ends" sleeps
+while a listing is a resident trial; move-in "Through" sleeps until move-in
+is set; a stay's "Through" sleeps while "Ongoing" is checked.
+
 ### Progress Bar
 
 ```html
