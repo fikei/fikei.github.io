@@ -1768,8 +1768,10 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 }
 .set-conn__label { grid-column: 1; grid-row: 1; font-size: var(--font-size-small); font-weight: var(--fw-semibold); }
 .set-conn__detail { grid-column: 1; grid-row: 2; color: var(--fg-subtle); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
+/* Whatever sits in the right column — state or repair button — centers on
+   the card's full height, not the first text line. */
 .set-conn__state {
-  grid-column: 2; grid-row: 1; justify-self: end;
+  grid-column: 2; grid-row: 1 / span 2; justify-self: end; align-self: center;
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-size: var(--font-size-caption); font-weight: var(--fw-semibold);
 }
@@ -1798,7 +1800,7 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   .set-field, .set-auto, .set-conn { grid-template-columns: 1fr; }
   .set-field__control { grid-column: 1; grid-row: 3; justify-self: start; margin-top: 6px; }
   .set-auto__when, .set-auto__cadence, .set-conn__state { grid-column: 1; text-align: left; }
-  .set-conn__state { justify-self: start; }
+  .set-conn__state { justify-self: start; grid-row: auto; align-self: start; }
   .set-conn__action { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 6px; align-self: start; }
 }
 

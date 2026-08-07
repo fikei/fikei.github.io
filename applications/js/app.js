@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.70.0';
+const VERSION = '3.70.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1699,7 +1699,7 @@ function settingsConnectionsHtml() {
   // IS the indicator, never both.
   const conn = (label, ok, detail, warn, action, dim) => `<div class="set-conn${dim ? ' is-dim' : ''}">
     <span class="set-conn__label">${esc(label)}</span>
-    ${action || `<span class="set-conn__state ${ok ? 'is-ok' : (warn && !dim ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>`}
+    ${action || (dim ? '' : `<span class="set-conn__state ${ok ? 'is-ok' : (warn ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>`)}
     ${detail ? `<span class="set-conn__detail">${esc(detail)}</span>` : ''}
   </div>`;
   return conn('Shared Gmail', !!g.connected, g.connected
@@ -1708,11 +1708,11 @@ function settingsConnectionsHtml() {
       null,
       g.connected ? '' : `<button type="button" class="btn btn--sm set-conn__action" id="set-gmail-connect">${g.reconnect ? 'Reconnect' : 'Connect'}</button>`)
     // Same rule as the button card, different clothes: no second red flag.
-    // A calendar with nothing to click dims whole — the quiet card is the
-    // state — and says when it comes back.
+    // A calendar with nothing to click dims whole and drops its state text
+    // entirely — the quiet card is the state, the detail says when it wakes.
     + conn('House calendar', !!g.connected,
         g.connected ? 'Screening invites land here.' : 'Wakes back up when Gmail reconnects.',
-        g.connected ? null : 'follows Gmail', '', !g.connected)
+        null, '', !g.connected)
     + conn('Discord', true, '#recruiting-automation · #recruiting-interviews');
 }
 
