@@ -19,7 +19,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
 import { jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 console.log(`[ats-radar-ingest] v${VERSION} - job-radar sweep upload + force-run`);
 
 const PULL_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/pull-recommendations';
@@ -39,19 +39,45 @@ interface CompanyScan {
   error?:      string;
 }
 
-function authorized(req: Request): boolean {
+// The API gateway rewrites/validates the Authorization header, so the
+// service key travels in X-Ingest-Key instead (verify_jwt is off for this
+// function; this check IS the auth). Accepted credentials:
+//   - X-Cron-Secret matching CRON_SECRET
+//   - the project service key (new sb_secret_… format, exact match on env)
+//   - the legacy service_role JWT, verified against SUPABASE_JWT_SECRET
+//     with role=service_role (HS256 — same check the platform gateway does)
+async function authorized(req: Request): Promise<boolean> {
   const secret = Deno.env.get('CRON_SECRET');
   if (secret && req.headers.get('x-cron-secret') === secret) return true;
+  const key = req.headers.get('x-ingest-key')
+    || (req.headers.get('authorization') || '').replace(/^bearer\s+/i, '');
+  if (!key) return false;
   const svc = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const bearer = (req.headers.get('authorization') || '').replace(/^bearer\s+/i, '');
-  if (svc && bearer === svc) return true;
-  return false;
+  if (svc && key === svc) return true;
+  return await isServiceKey(key);
+}
+
+// A presented key (legacy service_role JWT or sb_secret) is genuine iff the
+// project's own Auth admin API accepts it — admin endpoints require
+// service-level credentials, so a 2xx is proof without needing the JWT
+// secret locally.
+async function isServiceKey(key: string): Promise<boolean> {
+  const base = Deno.env.get('SUPABASE_URL');
+  if (!base) return false;
+  try {
+    const r = await fetch(`${base}/auth/v1/admin/users?page=1&per_page=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return err('POST only', 405);
-  if (!authorized(req)) return err('forbidden', 403);
+  if (!(await authorized(req))) return err('forbidden', 403);
 
   let body: { runAt?: string; companies?: CompanyScan[] };
   try {
@@ -120,21 +146,23 @@ serve(async (req) => {
      returning id`;
   const sourceId = srcRows[0]?.id ?? null;
 
-  // Kick the worker for this one source (bypasses the schedule). Fire and
-  // wait — the caller is a local script that wants the end-to-end result.
-  let run: unknown = null;
+  // Kick the worker for this one source (bypasses the schedule). Fire and forget
+  // forget — a big scan's grade pass can outlast this function's own 150s
+  // budget, so we must not await it. The Sources row's lastRunAt/lastError
+  // show the outcome; the Inbox picks up new recs on its next fetch.
+  let kicked = false;
   if (sourceId) {
-    try {
-      const r = await fetch(PULL_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': Deno.env.get('CRON_SECRET') || '' },
-        body: JSON.stringify({ id: sourceId }),
-      });
-      run = { status: r.status, body: await r.json().catch(() => null) };
-    } catch (e) {
-      run = { error: (e as Error).message };
-    }
+    const kick = fetch(PULL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': Deno.env.get('CRON_SECRET') || '' },
+      body: JSON.stringify({ id: sourceId }),
+    }).then(r => console.log(`[ats-radar-ingest] worker kick → ${r.status}`))
+      .catch(e => console.warn(`[ats-radar-ingest] worker kick failed: ${(e as Error).message}`));
+    // Keep the kick alive past this response where the runtime supports it.
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(kick);
+    kicked = true;
   }
 
-  return jsonResp({ ok: true, version: VERSION, sourceId, ...lastScan, run });
+  return jsonResp({ ok: true, version: VERSION, sourceId, kicked, ...lastScan });
 });

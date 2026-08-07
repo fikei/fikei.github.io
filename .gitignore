@@ -44,3 +44,4 @@ npm-debug.log*
 .claude/worktrees/
 .claude/settings.local*.json
 job-scans/
+__pycache__/

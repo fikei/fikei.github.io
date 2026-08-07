@@ -18,7 +18,7 @@ interface ScanJob { title?: string; location?: string; url?: string; posted?: st
 interface ScanRow {
   company: string; company_slug: string; ats_type: string | null;
   segments: string[] | null; location: string | null; careers_url: string | null;
-  fetched_at: string | null; jobs: ScanJob[] | null;
+  fetched_at: string | null; jobs: ScanJob[] | string | null;
 }
 
 // Stable per-posting key: the ATS job id when the URL carries one (digits
@@ -44,8 +44,19 @@ export const atsRadarSource: Source = {
          and kind = 'structured'`;
     const out: RecommendedRoleInput[] = [];
     for (const r of rows) {
-      for (const j of (r.jobs || [])) {
+      // jobs may arrive as a jsonb array or as a jsonb-encoded string,
+      // depending on how the ingest serialized it — accept both.
+      let jobList: ScanJob[] = [];
+      if (Array.isArray(r.jobs)) jobList = r.jobs;
+      else if (typeof r.jobs === 'string') {
+        try { jobList = JSON.parse(r.jobs) || []; } catch { jobList = []; }
+      }
+      for (const j of jobList) {
         if (!j?.url || !j?.title) continue;
+        // Workday boards emit "Posted N Days Ago" instead of a date — only
+        // pass postedAt when it actually parses.
+        const postedMs = j.posted ? Date.parse(j.posted) : NaN;
+        const postedAt = Number.isFinite(postedMs) ? new Date(postedMs).toISOString() : undefined;
         out.push({
           source:      'ats-radar',
           sourceId:    atsRadarSourceId(r.company_slug, j.url),
@@ -54,7 +65,7 @@ export const atsRadarSource: Source = {
           company:     r.company,
           title:       j.title,
           location:    j.location || r.location || undefined,
-          postedAt:    j.posted || undefined,
+          postedAt,
           sector:      'outdoor / soft goods',
           payload: {
             fetchedAt:  r.fetched_at,
