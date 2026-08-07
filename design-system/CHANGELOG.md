@@ -4,6 +4,16 @@
 
 ---
 
+## [1.6.0] - 2026-08-06
+
+### Added
+- **Date picker (`datepicker.js` v1.0.0)** — self-attaching calendar dropdown for every `input[type=date]`/`datetime-local`. Typed entry stays first-class; popover on desktop, bottom sheet on mobile; respects `min`/`max`; opt out with `data-no-picker`.
+
+### Changed
+- **Field-context rule** — a date field whose meaning depends on another answer is disabled (not hidden) until that answer exists, with a `title` naming what wakes it; end dates chain `min` to their start.
+
+---
+
 ## [1.5.0] - 2026-07-30
 
 ### Added

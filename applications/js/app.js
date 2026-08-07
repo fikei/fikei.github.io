@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.70.1';
+const VERSION = '3.71.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -4216,7 +4216,8 @@ function listingForm(l) {
         <input type="date" name="starts_on" class="listing-status" value="${l.starts_on || ''}" required>
       </label>
       <label class="listing-form__field">Sublet ends
-        <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}">
+        <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}"
+          min="${l.starts_on || ''}" ${l.kind === 'resident' ? 'disabled title="Resident trials have no sublet end date"' : ''}>
       </label>
       <label class="listing-form__field">Rent / mo
         <input type="number" name="rent_monthly" class="listing-status" min="0" max="10000" step="5" value="${l.rent_monthly ?? ''}" placeholder="1490">
@@ -4653,7 +4654,9 @@ function moveInFactHtml(a, miNorm) {
     return `<span class="movein-set movein-set--form">
       <input type="date" class="listing-status movein-set__input" id="movein-from" value="${esc(a.moveinFrom || '')}" aria-label="Confirmed move-in">
       <span class="movein-set__sep">→</span>
-      <input type="date" class="listing-status movein-set__input" id="movein-to" value="${esc(a.moveinTo || '')}" aria-label="Through (optional)" title="Through — leave empty for open-ended">
+      <input type="date" class="listing-status movein-set__input" id="movein-to" value="${esc(a.moveinTo || '')}"
+        min="${esc(a.moveinFrom || '')}" ${a.moveinFrom ? '' : 'disabled'}
+        aria-label="Through (optional)" title="Through — leave empty for open-ended. Wakes up once move-in is set.">
       <button type="button" class="btn btn--sm btn--accent" data-movein-save>Save</button>
       ${a.moveinFrom ? `<button type="button" class="btn btn--sm" data-movein-clear>Clear</button>` : ''}
       <button type="button" class="hold-sheet__cancel movein-set__cancel" data-movein-cancel>Cancel</button>
@@ -6389,6 +6392,26 @@ function init() {
   document.addEventListener('change', e => {
     const sel = e.target.closest('[data-listing-status]');
     if (sel) updateListingStatus(sel.dataset.listingStatus, sel.value);
+    // Field-context guardrails, wherever the form came from:
+    // an end date can't precede its start…
+    if (e.target.name === 'starts_on') {
+      const ends = e.target.closest('form')?.querySelector('input[name="ends_on"]');
+      if (ends) ends.min = e.target.value || '';
+    }
+    // "Through" sleeps until a move-in exists to measure it from.
+    if (e.target.id === 'movein-from') {
+      const to = document.getElementById('movein-to');
+      if (to) { to.disabled = !e.target.value; to.min = e.target.value || ''; if (to.disabled) to.value = ''; }
+    }
+    // …and a resident trial has no sublet end — the field sleeps until the
+    // listing is a sublet again.
+    if (e.target.matches('[data-listing-form] select[name="kind"]')) {
+      const ends = e.target.closest('form').querySelector('input[name="ends_on"]');
+      if (ends) {
+        ends.disabled = e.target.value === 'resident';
+        if (ends.disabled) ends.value = '';
+      }
+    }
     const cost = e.target.closest('[data-cost-setting]');
     if (cost) {
       const key = cost.dataset.costSetting;
