@@ -759,7 +759,9 @@ Sections borrow the product's own nav vocabulary (`You · House · Funnel · Aut
                                      vocabulary; is-warn blinks). A dead connection swaps the
                                      state for its one repair verb: a tinted .set-conn__action
                                      button in the right column — the button IS the indicator,
-                                     never both, never below the card -->
+                                     never both, never below the card. A connection that only
+                                     FOLLOWS a broken one dims whole (.set-conn.is-dim, the
+                                     .set-auto is-off treatment) — no second red flag -->
 ```
 
 **Settings rules:**

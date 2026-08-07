@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.69.3';
+const VERSION = '3.70.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1697,9 +1697,9 @@ function settingsConnectionsHtml() {
   // dot carries the color, the text stays downstyled. A card that needs a
   // human action swaps the state for its one repair verb — the tinted button
   // IS the indicator, never both.
-  const conn = (label, ok, detail, warn, action) => `<div class="set-conn">
+  const conn = (label, ok, detail, warn, action, dim) => `<div class="set-conn${dim ? ' is-dim' : ''}">
     <span class="set-conn__label">${esc(label)}</span>
-    ${action || `<span class="set-conn__state ${ok ? 'is-ok' : (warn ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>`}
+    ${action || `<span class="set-conn__state ${ok ? 'is-ok' : (warn && !dim ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>`}
     ${detail ? `<span class="set-conn__detail">${esc(detail)}</span>` : ''}
   </div>`;
   return conn('Shared Gmail', !!g.connected, g.connected
@@ -1707,7 +1707,12 @@ function settingsConnectionsHtml() {
       : 'Applications and replies stop arriving until this is reconnected. You must be signed into live.at.agapesf@gmail.com in this browser.',
       null,
       g.connected ? '' : `<button type="button" class="btn btn--sm set-conn__action" id="set-gmail-connect">${g.reconnect ? 'Reconnect' : 'Connect'}</button>`)
-    + conn('House calendar', !!g.connected, 'Screening invites land here.', g.connected ? null : 'follows Gmail')
+    // Same rule as the button card, different clothes: no second red flag.
+    // A calendar with nothing to click dims whole — the quiet card is the
+    // state — and says when it comes back.
+    + conn('House calendar', !!g.connected,
+        g.connected ? 'Screening invites land here.' : 'Wakes back up when Gmail reconnects.',
+        g.connected ? null : 'follows Gmail', '', !g.connected)
     + conn('Discord', true, '#recruiting-automation · #recruiting-interviews');
 }
 
@@ -2214,9 +2219,11 @@ function counts() {
     if (a.stage === 'rejected' || a.stage === 'archived') { c.archive++; continue; }
     if (a.stage === 'review') c.inbox++;
     else if (a.stage === 'candidate') c.candidates++;
-    if (activePlacements(a.id).length) c.openings++;
     if (screeningState[a.id]) c.screening++;
   }
+  // Openings badges the rooms, not the people in them — "how many roles are
+  // open" is what the rail answers; the shortlists live inside.
+  c.openings = listings.filter(l => l.status === 'open').length;
   return c;
 }
 
@@ -2673,8 +2680,12 @@ function renderApplicants() {
   const viewList = applicants.filter(matchesView);
   const list = viewList.filter(matchesFilters);
   const filtered = list.length !== viewList.length;
-  document.getElementById('page-sub').textContent =
-    (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
+  // Openings leads with the rooms (same number the rail badges); people are
+  // the second fact. Everywhere else the count IS the people.
+  const openRoles = listings.filter(l => l.status === 'open').length;
+  document.getElementById('page-sub').textContent = view === 'openings'
+    ? `${openRoles} open role${openRoles === 1 ? '' : 's'} · ${viewList.length} applicant${viewList.length === 1 ? '' : 's'}`
+    : (filtered ? `${list.length} of ${viewList.length}` : `${viewList.length}`) +
     ` applicant${(filtered ? viewList.length : list.length) === 1 ? '' : 's'}` +
     (view === 'inbox' ? ' waiting on a review · one read decides' :
      view === 'candidates' ? ' passed review — waiting for a room' : '');
