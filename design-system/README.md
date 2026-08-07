@@ -756,9 +756,10 @@ Sections borrow the product's own nav vocabulary (`You · House · Funnel · Aut
 <div class="set-auto">…</div>   <!-- label · when it last ran · switch · hint · cadence -->
 <div class="set-conn">…</div>   <!-- label · state (is-ok / is-warn / is-off) · detail
                                      state = .set-conn__dot + downstyled text (the .status
-                                     vocabulary; is-warn blinks). A dead connection puts its
-                                     one repair verb in .set-conn__action — right column,
-                                     under the state, never below the card -->
+                                     vocabulary; is-warn blinks). A dead connection swaps the
+                                     state for its one repair verb: a tinted .set-conn__action
+                                     button in the right column — the button IS the indicator,
+                                     never both, never below the card -->
 ```
 
 **Settings rules:**

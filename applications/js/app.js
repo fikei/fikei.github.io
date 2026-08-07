@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.69.2';
+const VERSION = '3.69.3';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1695,18 +1695,18 @@ function settingsConnectionsHtml() {
   const g = gmailStatusFull || gmailStatus || { connected: false };
   // Same status vocabulary as the design system's .status indicator: a small
   // dot carries the color, the text stays downstyled. A card that needs a
-  // human action carries its button on the right edge, under the state.
+  // human action swaps the state for its one repair verb — the tinted button
+  // IS the indicator, never both.
   const conn = (label, ok, detail, warn, action) => `<div class="set-conn">
     <span class="set-conn__label">${esc(label)}</span>
-    <span class="set-conn__state ${ok ? 'is-ok' : (warn ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>
+    ${action || `<span class="set-conn__state ${ok ? 'is-ok' : (warn ? 'is-warn' : 'is-off')}"><span class="set-conn__dot" aria-hidden="true"></span>${ok ? 'connected' : esc(warn || 'not connected')}</span>`}
     ${detail ? `<span class="set-conn__detail">${esc(detail)}</span>` : ''}
-    ${action || ''}
   </div>`;
   return conn('Shared Gmail', !!g.connected, g.connected
       ? `${g.email || ''}${g.connected_by_name ? ` · connected by ${g.connected_by_name}` : ''}`
       : 'Applications and replies stop arriving until this is reconnected. You must be signed into live.at.agapesf@gmail.com in this browser.',
-      g.connected ? null : 'reconnect needed',
-      g.connected ? '' : `<button type="button" class="btn btn--sm set-conn__action" id="set-gmail-connect">Reconnect</button>`)
+      null,
+      g.connected ? '' : `<button type="button" class="btn btn--sm set-conn__action" id="set-gmail-connect">${g.reconnect ? 'Reconnect' : 'Connect'}</button>`)
     + conn('House calendar', !!g.connected, 'Screening invites land here.', g.connected ? null : 'follows Gmail')
     + conn('Discord', true, '#recruiting-automation · #recruiting-interviews');
 }
