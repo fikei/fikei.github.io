@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.71.0';
+const VERSION = '3.71.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,

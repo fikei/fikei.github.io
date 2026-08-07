@@ -82,8 +82,11 @@
   --fw-bold: 700;
   --radius-xs: 6px;
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  /* md/lg belong to non-interactive surfaces (cards, banners, modals) —
+     kept tighter than the interactive vocabulary (sm/pill), which is why
+     buttons and inputs never borrow them. */
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-pill: 999px;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 40px;
@@ -1813,7 +1816,8 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .step-choice {
   display: grid; grid-template-columns: 1fr auto; gap: 4px var(--space-3);
   width: 100%; padding: var(--space-4);
-  background: var(--bg-surface); border: 0; border-radius: var(--radius-md);
+  /* A tile is interactive — it speaks the button radius, not the card one. */
+  background: var(--bg-surface); border: 0; border-radius: var(--radius-sm);
   color: var(--fg); text-align: left;
   transition: background 80ms ease;
 }
