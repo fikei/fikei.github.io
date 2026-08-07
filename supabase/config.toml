@@ -6,6 +6,13 @@ project_id = "yfhudwakpgzswiylhfbh"
 [functions.pull-recommendations]
 verify_jwt = false
 
+# ats-radar-ingest is called by the local job-radar push script using
+# X-Cron-Secret or a service-key bearer (checked in-function). The gateway
+# only passes legacy JWTs, so platform verification must be off for the
+# new-format sb_secret key to reach the function's own auth check.
+[functions.ats-radar-ingest]
+verify_jwt = false
+
 # recruit-discord is Discord's interactions endpoint — authenticated by
 # Ed25519 request signatures, not JWTs.
 [functions.recruit-discord]

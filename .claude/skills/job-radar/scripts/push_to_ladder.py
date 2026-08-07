@@ -43,22 +43,37 @@ def find_scan_dir(arg: str | None) -> Path:
     return dirs[0]
 
 
-def resolve_auth() -> dict:
+def resolve_auth() -> list[dict]:
+    """Candidate auth headers, tried in order until one isn't rejected.
+
+    The project may hold either legacy-JWT keys or new sb_secret keys in the
+    function's SUPABASE_SERVICE_ROLE_KEY env, so both formats are tried.
+    """
     if os.environ.get("LADDER_CRON_SECRET"):
-        return {"X-Cron-Secret": os.environ["LADDER_CRON_SECRET"]}
+        return [{"X-Cron-Secret": os.environ["LADDER_CRON_SECRET"]}]
     if os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
-        return {"Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_ROLE_KEY']}"}
+        return [{"X-Ingest-Key": os.environ["SUPABASE_SERVICE_ROLE_KEY"]}]
+    candidates = []
     try:
         out = subprocess.run(
             ["supabase", "projects", "api-keys", "--project-ref", PROJECT_REF, "-o", "json"],
             capture_output=True, text=True, timeout=30, check=True,
         ).stdout
-        for row in json.loads(out):
+        rows = json.loads(out)
+        # X-Ingest-Key sidesteps the gateway's Authorization handling; the
+        # function compares it to its SUPABASE_SERVICE_ROLE_KEY env, which
+        # may be either the legacy JWT or the new sb_secret — try both.
+        for row in rows:
             if row.get("name") == "service_role":
-                return {"Authorization": f"Bearer {row['api_key']}"}
+                candidates.append({"X-Ingest-Key": row["api_key"]})
+        for row in rows:
+            if str(row.get("api_key", "")).startswith("sb_secret_"):
+                candidates.append({"X-Ingest-Key": row["api_key"]})
     except Exception as e:  # noqa: BLE001 — any failure falls through to the message below
         print(f"  (supabase CLI key lookup failed: {e})", file=sys.stderr)
-    sys.exit("no auth available — set LADDER_CRON_SECRET or SUPABASE_SERVICE_ROLE_KEY, or `supabase login`")
+    if not candidates:
+        sys.exit("no auth available — set LADDER_CRON_SECRET or SUPABASE_SERVICE_ROLE_KEY, or `supabase login`")
+    return candidates
 
 
 def main() -> None:
@@ -84,25 +99,27 @@ def main() -> None:
     payload = {"runAt": summary["run_at"], "companies": companies}
     print(f"Pushing {scan_dir} — {len(companies)} boards, run_at {summary['run_at']}")
 
-    headers = {"Content-Type": "application/json", **resolve_auth()}
-    req = urllib.request.Request(INGEST_URL, json.dumps(payload).encode(), headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            result = json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        sys.exit(f"ingest failed: HTTP {e.code} — {e.read().decode()[:500]}")
+    body = json.dumps(payload).encode()
+    result = None
+    last_err = "no auth candidates"
+    for auth in resolve_auth():
+        headers = {"Content-Type": "application/json", **auth}
+        req = urllib.request.Request(INGEST_URL, body, headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                result = json.loads(resp.read())
+            break
+        except urllib.error.HTTPError as e:
+            last_err = f"HTTP {e.code} — {e.read().decode()[:300]}"
+            if e.code not in (401, 403):
+                break  # a non-auth failure won't be fixed by another key
+    if result is None:
+        sys.exit(f"ingest failed: {last_err}")
 
-    print(json.dumps({k: v for k, v in result.items() if k != "run"}, indent=2))
-    run = result.get("run") or {}
-    src = None
-    for s in ((run.get("body") or {}).get("sources") or []):
-        if s.get("type") == "ats-radar":
-            src = s
-    if src:
-        print(f"Worker: pulled {src.get('pulled')} in-universe roles, inserted {src.get('inserted')} new recs"
-              + (f", error: {src['error']}" if src.get("error") else ""))
-    else:
-        print(f"Worker kick status: {run.get('status')}")
+    print(json.dumps(result, indent=2))
+    if result.get("kicked"):
+        print("Worker kicked — grading runs in the background; new recs land in the Inbox "
+              "and the Sources row shows lastRunAt/lastError in a minute or two.")
 
 
 if __name__ == "__main__":
