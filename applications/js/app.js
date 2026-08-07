@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.69.0';
+const VERSION = '3.69.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1702,9 +1702,10 @@ function settingsConnectionsHtml() {
       ? `${g.email || ''}${g.connected_by_name ? ` · connected by ${g.connected_by_name}` : ''}`
       : 'Applications and replies stop arriving until this is reconnected.',
       g.connected ? null : 'reconnect needed')
+    + (g.connected ? '' : `<button type="button" class="btn btn--sm" id="set-gmail-connect">Reconnect Gmail</button>
+      <p class="set-note">You must be signed into live.at.agapesf@gmail.com in this browser.</p>`)
     + conn('House calendar', !!g.connected, 'Screening invites land here.', g.connected ? null : 'follows Gmail')
-    + conn('Discord', true, '#recruiting-automation · #recruiting-interviews')
-    + `<p class="set-note">Reconnecting Gmail happens from the account itself — the token is server-side and never reaches this page.</p>`;
+    + conn('Discord', true, '#recruiting-automation · #recruiting-interviews');
 }
 
 function settingsDataHtml() {
@@ -1759,6 +1760,7 @@ function renderSettings() {
     });
   });
   host.querySelector('#set-export')?.addEventListener('click', exportCsv);
+  host.querySelector('#set-gmail-connect')?.addEventListener('click', connectSharedGmail);
 }
 
 function flashSetting(el) {

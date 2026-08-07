@@ -16,8 +16,8 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.35.0'
-console.log(`[recruit-gmail] v${VERSION} — shared-account applicant email pipe + claim posts + reply intents + tour polls + manual visit booking`)
+const VERSION = '1.35.1'
+console.log(`[recruit-gmail] v${VERSION} — status probes the refresh token so a dead grant surfaces as reconnect-needed`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -880,7 +880,14 @@ serve(async (req) => {
     if (action === 'status') {
       const { data: acct } = await client.from('recruit_gmail_account')
         .select('email, connected_by_name, connected_at').eq('id', 1).maybeSingle()
-      return json(acct ? { connected: true, ...acct } : { connected: false })
+      if (!acct) return json({ connected: false })
+      // A stored row isn't a live connection — Google can expire or revoke the
+      // refresh token server-side (invalid_grant). Probe it so the app shows
+      // "reconnect needed" instead of a false ✓ while every send/scan fails.
+      try { await accessToken(client) } catch (e) {
+        return json({ connected: false, reconnect: true, ...acct, error: String((e as Error)?.message || e).slice(0, 180) })
+      }
+      return json({ connected: true, ...acct })
     }
 
     if (action === 'send-update') {
