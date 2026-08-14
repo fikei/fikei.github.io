@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.71.1';
+const VERSION = '3.72.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5650,7 +5650,13 @@ async function handleGmailCallback() {
   try {
     const out = await gmailCall({ action: 'connect', code });
     gmailStatus = { connected: true, email: out.email, connected_by_name: me?.name };
-      toast(`Shared Gmail connected: ${out.email}`);
+    // Reconnecting usually means the hourly sheet pull has been failing —
+    // the server runs a catch-up pull inside connect, so fold its result in.
+    const pulled = out.ingest?.inserted || 0;
+    toast(pulled
+      ? `Shared Gmail connected: ${out.email} — ${pulled} new applicant${pulled === 1 ? '' : 's'} pulled from the sheet`
+      : `Shared Gmail connected: ${out.email}`);
+    if (pulled) { await loadAll(); render(); }
   } catch (e) { toast(`Gmail connect failed: ${e.message}`); }
 }
 
