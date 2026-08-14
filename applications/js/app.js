@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.73.0';
+const VERSION = '3.73.1';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1459,7 +1459,7 @@ async function castVote(applicantId) {
   if (error) { toast(`Review failed: ${error.message}`); return; }
   votes[applicantId] = [...(votes[applicantId] || []).filter(v => v.voter_id !== me.id), data];
   logEvent('event_verdict', applicantId, fullName(a),
-    `${me.name || 'A housemate'} reviewed {} as ${VERDICTS[pendingVerdict]?.toLowerCase() || pendingVerdict}.`, note);
+    `${me.name || 'A housemate'} reviewed {} as ${VERDICTS[pendingVerdict]?.label.toLowerCase() || pendingVerdict}.`, note);
   // The review IS the answer to both of those asks.
   ackFor('applicant', applicantId, ['review_stalled', 'needs_input', 'application_new']);
   // "Not a fit" is a recruiter decision too, so Archive and the update tray
