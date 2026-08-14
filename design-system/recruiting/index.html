@@ -622,6 +622,8 @@ table.vx th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08
         <li>The comment is required on all three, client-side and by a CHECK constraint. A verdict with no why isn't a review.</li>
         <li>Three tints, three meanings: the error tint for not a fit, lime for move forward, a neutral overlay for needs input. Only the selected chip fills in.</li>
         <li>No scores, no averages, no blindness — there's no tally left to anchor against.</li>
+        <li>A forward verdict swaps this bar for the candidate bar in place — the swap announces itself (v3.73.0): the new bar flashes lime once (<code>.review__foot.is-promoted</code>), leads with a "Now a candidate" tag (<code>.foot-promoted</code>, reuses <code>.verdict-tag.is-forward</code>), and a banner at the top of the profile carries the outcome with an Undo. Toast fires too, for the auto-advance case.</li>
+        <li>People can also enter the funnel by hand — "Add person" in the Applicants and Candidates headers opens a modal (email-modal shell, <code>.add-form__row</code> two-up fields) that inserts via the <code>recruit_add_applicant</code> RPC: referrals and walk-ins that never touched the form, starting in Inbox or straight to Candidates.</li>
       </ul>
     </div>
   </section>
