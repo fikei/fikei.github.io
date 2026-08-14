@@ -1962,3 +1962,21 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
   .stage-row__detail { grid-column: 1 / -1; white-space: normal; }
   .stage-row__action { grid-column: 1 / -1; }
 }
+
+/* ---------- applicant → candidate transition (v3.73.0) ----------
+   The vote bar is replaced by the candidate bar the moment a forward verdict
+   lands. The swap announces itself: the bar flashes green once and leads with
+   a "Now a candidate" tag, so the new actions read as a promotion, not a
+   glitch. */
+.review__foot.is-promoted { animation: foot-promoted 1.6s ease-out 1; }
+@keyframes foot-promoted {
+  0% { background: rgba(159, 232, 112, 0.28); }
+  100% { background: var(--bg-elevated); }
+}
+.foot-promoted { align-self: center; padding: 2px 8px; white-space: nowrap; }
+
+/* ---------- add-a-person modal (v3.73.0) ----------
+   Reuses the email-modal shell and listing-form fields; only the two-up rows
+   are new. */
+.add-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 560px) { .add-form__row { grid-template-columns: 1fr; } }

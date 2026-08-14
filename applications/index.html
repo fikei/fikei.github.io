@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.72.0">
+  <link rel="stylesheet" href="css/app.css?v=3.73.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
   <script defer src="/analytics/track.js"></script>
@@ -287,6 +287,61 @@
     </div>
   </div>
 
+  <!-- Add someone by hand — referrals and walk-ins that never touched the
+       application form. Inserts via the recruit_add_applicant RPC. -->
+  <div class="email-modal" id="add-modal" hidden>
+    <div class="email-modal__card">
+      <div class="email-modal__head">
+        <h3 class="hold-sheet__title">Add a person</h3>
+        <button class="review__close email-modal__close" id="add-close" aria-label="Close">✕</button>
+      </div>
+      <p class="email-modal__status" id="add-status"></p>
+      <div class="add-form__row">
+        <label class="listing-form__field">First name
+          <input type="text" class="listing-status" id="add-first" maxlength="80" autocomplete="off">
+        </label>
+        <label class="listing-form__field">Last name
+          <input type="text" class="listing-status" id="add-last" maxlength="80" autocomplete="off">
+        </label>
+      </div>
+      <label class="listing-form__field">Email
+        <input type="email" class="listing-status" id="add-email" maxlength="200" autocomplete="off">
+      </label>
+      <div class="add-form__row">
+        <label class="listing-form__field">Track
+          <select class="listing-status" id="add-track">
+            <option value="Long-term (full-time)">Full-time</option>
+            <option value="Short-term (sublet)">Sublet</option>
+          </select>
+        </label>
+        <label class="listing-form__field">Start them in
+          <select class="listing-status" id="add-stage">
+            <option value="review">Applicants — needs a review</option>
+            <option value="candidate">Candidates — already vouched for</option>
+          </select>
+        </label>
+      </div>
+      <div class="add-form__row">
+        <label class="listing-form__field">Move-in
+          <input type="text" class="listing-status" id="add-movein" maxlength="120" placeholder="e.g. September 2026, flexible">
+        </label>
+        <label class="listing-form__field">Budget
+          <input type="text" class="listing-status" id="add-budget" maxlength="120" placeholder="e.g. $1,800/mo">
+        </label>
+      </div>
+      <label class="listing-form__field">How they reached us
+        <input type="text" class="listing-status" id="add-source" maxlength="200" placeholder="e.g. referred by Sam, met at a house dinner">
+      </label>
+      <label class="listing-form__field">About them (optional)
+        <textarea class="notes__input" id="add-about" rows="3" maxlength="4000" placeholder="Anything the house should know going in."></textarea>
+      </label>
+      <div class="decision-sheet__actions">
+        <button class="hold-sheet__cancel" id="add-cancel" type="button">Cancel</button>
+        <button class="btn btn--accent btn--sm" id="add-submit" type="button">Add them</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Post-screening decision: would you accept them? -->
   <div class="email-modal" id="gd-modal" hidden>
     <div class="email-modal__card">
@@ -337,7 +392,7 @@
 
   <script src="js/settings-schema.js?v=3.69.0"></script>
   <script src="../design-system/datepicker.js?v=1.0.1"></script>
-  <script src="js/app.js?v=3.72.0"></script>
+  <script src="js/app.js?v=3.73.0"></script>
 
 </body>
 </html>

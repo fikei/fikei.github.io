@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.72.0';
+const VERSION = '3.73.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1499,7 +1499,14 @@ async function castVote(applicantId) {
   if (a.stage === 'candidate' && before !== 'candidate') {
     if (!houseLoaded) await loadHouse();
     const added = await syncAutoPlacements();
-    toast(`${fullName(a)} moved forward → Candidates${added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : ''}`);
+    const placed = added ? ` · placed in ${added} listing${added === 1 ? '' : 's'}` : '';
+    toast(`${fullName(a)} moved forward → Candidates${placed}`);
+    // The profile changes shape underneath you — same person, different
+    // questions. Say so where the eye already is (the bar it replaces) and
+    // keep the way back within reach.
+    showReviewBanner(`<span><b>${esc(fullName(a))}</b> is now a candidate${placed}</span>
+      <button type="button" class="cta-link" data-reopen="${a.id}">Undo</button>`);
+    justPromoted = a.id;
   } else toast('Saved — flagged for another housemate to read');
   renderRailCounts();
   renderReview();
@@ -1575,7 +1582,12 @@ async function render() {
   document.getElementById('page-title').textContent = def.title;
   document.getElementById('mobile-title').textContent = def.title;
   const headAction = document.getElementById('page-head-action');
-  if (headAction) headAction.innerHTML = view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>` : '';
+  if (headAction) headAction.innerHTML =
+    view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>`
+    // Referrals and walk-ins that never touched the application form.
+    : view === 'inbox' || view === 'candidates'
+      ? `<button class="btn btn--sm" data-add-person="${view === 'candidates' ? 'candidate' : 'review'}">Add person</button>`
+    : '';
   document.querySelectorAll('[data-view-link]').forEach(el =>
     el.classList.toggle('is-current', el.dataset.viewLink === view
       && (el.classList.contains('rail-nav__row') || el.classList.contains('rail-foot__settings'))));
@@ -1831,6 +1843,7 @@ const ACTIVITY_KINDS = {
   event_verdict:          { icon: '🔖', label: 'Review written' },
   event_passed:           { icon: '🚪', label: 'Passed on' },
   event_stage:            { icon: '🔀', label: 'Stage changed' },
+  event_added:            { icon: '➕', label: 'Added by hand' },
   event_email:            { icon: '📤', label: 'Email sent' },
   event_placement:        { icon: '📌', label: 'Shortlist changed' },
   event_move_in:          { icon: '🧳', label: 'Move-in confirmed' },
@@ -4461,6 +4474,7 @@ function closeReview() {
    through Archive for the person. */
 let bannerTimer = null;
 let keepBannerOnce = false;   // set when the banner explains the step we're taking
+let justPromoted = null;      // applicant whose foot bar should announce the promotion
 function showReviewBanner(html) {
   const el = document.getElementById('review-banner');
   if (!el) return;
@@ -4746,6 +4760,12 @@ function renderReviewFoot(a) {
   const keepNote = noteDraft.id === a.id ? noteDraft.text : null;
   const liveBox = document.getElementById('vote-send-update');
   if (liveBox) sendUpdateWith = liveBox.checked;
+  // Fresh off a forward verdict: the candidate bar that replaces the vote bar
+  // names the change before offering its new actions, so the swap reads as a
+  // promotion rather than a glitch.
+  const promoted = justPromoted === a.id && a.stage === 'candidate';
+  justPromoted = null;
+  foot.classList.toggle('is-promoted', promoted);
   if (a.stage === 'review') {
     const mine = myVote(a.id);
     const sel = pendingVerdict || mine?.verdict || null;
@@ -4793,6 +4813,7 @@ function renderReviewFoot(a) {
       // controls stay available behind it.
       const trial = trialStayFor(a.id);
       foot.innerHTML = `
+        ${promoted ? `<span class="verdict-tag is-forward foot-promoted">Now a candidate</span>` : ''}
         ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
         <span class="foot-cta">${trial
           ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Welcome in</button>`
@@ -4837,6 +4858,62 @@ async function reopenApplicant(id) {
     renderRailCounts();
     if (!document.getElementById('review').hidden) renderReview(); else render();
   }
+}
+
+/* ---------- manual add ----------
+   Referrals, friends of the house, people met at dinners — anyone who never
+   touched the application form. recruit_applicants is client-read-only, so
+   the insert goes through the recruit_add_applicant RPC (migration 166),
+   which also owns id minting and the duplicate-email guard. */
+function openAddPerson(stage) {
+  ['add-first', 'add-last', 'add-email', 'add-movein', 'add-budget', 'add-source', 'add-about']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('add-stage').value = stage === 'candidate' ? 'candidate' : 'review';
+  document.getElementById('add-status').textContent = '';
+  document.getElementById('add-modal').hidden = false;
+  document.getElementById('add-first').focus();
+}
+
+function closeAddPerson() { document.getElementById('add-modal').hidden = true; }
+
+async function submitAddPerson(btn) {
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  const first = val('add-first'), last = val('add-last'), email = val('add-email');
+  const status = document.getElementById('add-status');
+  if (!first) { status.textContent = 'A first name is required.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { status.textContent = 'A real email is required — it\'s how the funnel reaches them.'; return; }
+  const stage = val('add-stage') === 'candidate' ? 'candidate' : 'review';
+  btn.disabled = true;
+  status.textContent = 'Adding…';
+  const { data: id, error } = await sb.rpc('recruit_add_applicant', {
+    p_first: first, p_email: email, p_last: last, p_stage: stage,
+    p_residency: val('add-track'), p_move_in: val('add-movein'),
+    p_budget: val('add-budget'), p_source: val('add-source'), p_about: val('add-about'),
+  });
+  btn.disabled = false;
+  if (error) { status.textContent = `Couldn't add them: ${error.message}`; return; }
+  const a = {
+    id, ts_iso: new Date().toISOString(), first, last, pronouns: '',
+    email, social: '', about: val('add-about'), why: '', gifts: '',
+    source: val('add-source'), residency: val('add-track'),
+    movein: val('add-movein'), budget: val('add-budget'), avatarUrl: null,
+    stage, moveinFrom: null, moveinTo: null, moveinSetBy: null,
+    updateSentAt: null, updateSkippedAt: null,
+    exitReason: null, exitUntil: null, exitNote: '', exitBy: null,
+  };
+  applicants.unshift(a);
+  logEvent('event_added', id, fullName(a),
+    `${me.name || 'A housemate'} added {} by hand, straight to ${stage === 'candidate' ? 'Candidates' : 'Applicants'}.`,
+    val('add-source') || null);
+  if (stage === 'candidate') {
+    if (!houseLoaded) await loadHouse();
+    await syncAutoPlacements();
+  }
+  closeAddPerson();
+  renderRailCounts();
+  render();
+  toast(`${fullName(a)} added to ${stage === 'candidate' ? 'Candidates' : 'Applicants'}`);
+  openReview(id);
 }
 
 function renderNotes(applicantId) {
@@ -6387,6 +6464,11 @@ function init() {
     if (editL) { openListingModal(editL.dataset.editListing); return; }
     const newL = e.target.closest('[data-new-listing]');
     if (newL) { openListingModal('new'); return; }
+    const addP = e.target.closest('[data-add-person]');
+    if (addP) { openAddPerson(addP.dataset.addPerson); return; }
+    if (e.target.closest('#add-close') || e.target.closest('#add-cancel')) { closeAddPerson(); return; }
+    const addGo = e.target.closest('#add-submit');
+    if (addGo) { submitAddPerson(addGo); return; }
     const cancelL = e.target.closest('[data-cancel-listing]');
     if (cancelL) { closeListingModal(); return; }
     const delL = e.target.closest('[data-delete-listing]');
