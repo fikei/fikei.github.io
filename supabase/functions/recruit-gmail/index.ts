@@ -16,8 +16,8 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.35.1'
-console.log(`[recruit-gmail] v${VERSION} — status probes the refresh token so a dead grant surfaces as reconnect-needed`)
+const VERSION = '1.36.0'
+console.log(`[recruit-gmail] v${VERSION} — connect triggers an application-sheet pull so reconnecting catches up new applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -874,7 +874,27 @@ serve(async (req) => {
         connected_at: new Date().toISOString(),
       })
       if (error) return json({ error: error.message }, 500)
-      return json({ connected: true, email: SHARED_EMAIL })
+      /* The account usually gets reconnected because something was failing —
+         often the hourly sheet pull. Catch the Inbox up right now rather than
+         waiting for the next cron tick. Same-project call, authed with the
+         ingest secret both functions already share; a pull failure never
+         fails the connect. */
+      let ingest: Record<string, unknown> | null = null
+      const ingestSecret = Deno.env.get('RECRUIT_INGEST_SECRET')
+      if (ingestSecret) {
+        try {
+          const resp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/recruit-ingest/pull`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-ingest-secret': ingestSecret },
+            body: '{}',
+          })
+          ingest = await resp.json().catch(() => null)
+          if (!resp.ok) console.warn(`[recruit-gmail] post-connect sheet pull failed: ${JSON.stringify(ingest).slice(0, 200)}`)
+        } catch (e) {
+          console.warn(`[recruit-gmail] post-connect sheet pull failed: ${(e as Error).message}`)
+        }
+      }
+      return json({ connected: true, email: SHARED_EMAIL, ingest })
     }
 
     if (action === 'status') {
