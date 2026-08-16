@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.73.1';
+const VERSION = '3.74.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -5950,6 +5950,21 @@ async function _checkMembershipAndEnter() {
         : 'The browser dropped the sign-in. Try again, or open ctrl.rodeo in a normal browser window.');
     return;
   }
+
+  const user = window.CtrlAuth.getUser();
+
+  /* boot-opt: cached gate verdict. Telemetry (5 days, n=37 boot_access +
+     boot_access.deep) showed boot_access.deep p75 1647ms vs boot_data.deep
+     p75 1298ms — the Discord membership round trip, not loadAll, is the
+     slower boot leg. A fresh verdict for the same signed-in user lets us
+     enter without awaiting it; the real check still runs and revokes entry
+     if it comes back refused. A refused or failed check is never cached. */
+  const GATE_CACHE_KEY = 'agape:gate';
+  const GATE_CACHE_MS = 6 * 60 * 60 * 1000;
+  let gateCache = null;
+  try { gateCache = JSON.parse(localStorage.getItem(GATE_CACHE_KEY) || 'null'); } catch { /* corrupt cache — ignore */ }
+  const gateHit = !!(gateCache && user && gateCache.userId === user.id && (Date.now() - gateCache.at) < GATE_CACHE_MS);
+
   setGate('Checking your Recruiting Society access…', null);
   /* The data load doesn't need the access verdict — RLS enforces recruiting
      membership on every row regardless — so it runs IN PARALLEL with the
@@ -5960,7 +5975,8 @@ async function _checkMembershipAndEnter() {
   const tAccess0 = performance.now();
   const dataP = loadAll().then(() => { tData = performance.now(); });
   dataP.catch(() => {}); // surfaced at the await below; never unhandled here
-  try {
+
+  const verify = async () => {
     // No timeout here once cost a housemate a permanent spinner.
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 20000);
@@ -5977,33 +5993,36 @@ async function _checkMembershipAndEnter() {
     // A 500 used to fall through to "no Discord linked", sending people off to
     // re-link an account that was never the problem. Say what actually broke.
     if (!resp.ok) {
-      stall('The access check failed.',
-        `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
-      return;
+      const err = new Error(`${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+      err.serverError = true;
+      throw err;
     }
+    return status;
+  };
+
+  const showDenied = (status) => {
     if (!status.linked) {
       setGate('Your account has no Discord linked.', 'Link Discord',
         'Link the Discord account that’s in the Agape server, then try again.');
       document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
       return;
     }
-    if (!status.isRecruitingMember) {
-      setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
-        'Re-check access',
-        'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
-      document.getElementById('gate-btn').onclick = async () => {
-        setGate('Re-checking…', null);
-        await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ action: 'verify' }),
-        });
-        checkMembershipAndEnter();
-      };
-      return;
-    }
+    setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+      'Re-check access',
+      'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+    document.getElementById('gate-btn').onclick = async () => {
+      setGate('Re-checking…', null);
+      await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'verify' }),
+      });
+      checkMembershipAndEnter();
+    };
+  };
+
+  const enter = async (status) => {
     // in — identify self, load data, render
-    const user = window.CtrlAuth.getUser();
     me = { id: user.id, name: status.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
     // Admin = can see #recruiting-automation. The function derives it from
     // Discord and writes recruit_admins, which is what RLS actually consults —
@@ -6097,10 +6116,58 @@ async function _checkMembershipAndEnter() {
     }
     const linkEv = new URLSearchParams(location.search).get('link');
     if (linkEv) openLinkRecording(linkEv);
+  };
+
+  if (gateHit) {
+    // Enter now on the cached verdict; the real check still runs below and
+    // can revoke entry if it comes back refused.
+    try {
+      await enter({ discordUsername: gateCache.username, isRecruitingAdmin: gateCache.isAdmin });
+    } catch (e) {
+      stall('Something went wrong entering the app.', e.message || '');
+      console.error(e);
+      return;
+    }
+    verify().then(status => {
+      if (!status.linked || !status.isRecruitingMember) {
+        localStorage.removeItem(GATE_CACHE_KEY);
+        document.getElementById('app').hidden = true;
+        document.getElementById('gate').hidden = false;
+        _entering = false;
+        showDenied(status);
+        return;
+      }
+      isAdmin = status.isRecruitingAdmin === true;
+      if (status.discordUsername) me.name = status.discordUsername;
+      localStorage.setItem(GATE_CACHE_KEY, JSON.stringify({
+        userId: user.id, username: status.discordUsername || null, isAdmin, at: Date.now(),
+      }));
+      renderRailUser();
+    }).catch(() => { /* transient background revalidation failure — never boots a live session on it */ });
+    return;
+  }
+
+  try {
+    const status = await verify();
+    if (!status.linked || !status.isRecruitingMember) {
+      showDenied(status);
+      return;
+    }
+    // A refused or failed check must never be cached — only a real, current
+    // "in" verdict earns the fast path on the next boot.
+    localStorage.setItem(GATE_CACHE_KEY, JSON.stringify({
+      userId: user.id, username: status.discordUsername || null,
+      isAdmin: status.isRecruitingAdmin === true, at: Date.now(),
+    }));
+    await enter(status);
   } catch (e) {
-    const aborted = e.name === 'AbortError';
-    stall(aborted ? 'The access check timed out.' : 'Something went wrong checking access.',
-      aborted ? 'Discord took too long to answer. Try again — this is usually transient.' : (e.message || ''));
+    if (e.serverError) {
+      stall('The access check failed.', e.message);
+    } else {
+      const aborted = e.name === 'AbortError';
+      stall(aborted ? 'The access check timed out.' : 'Something went wrong checking access.',
+        aborted ? 'Discord took too long to answer. Try again — this is usually transient.' : (e.message || ''));
+    }
     console.error(e);
   }
 }
