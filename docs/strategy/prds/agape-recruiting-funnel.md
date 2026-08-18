@@ -113,6 +113,24 @@ Not built: a Discord announcement on promotion. It needs an authenticated
 route on `recruit-discord`, and the checklist already gives the house the
 signal. Worth revisiting if promotions start getting missed.
 
+### v3.74.0 (2026-08-17): applicant phone number
+
+Email is how the funnel writes to people; texting is how tours actually get
+scheduled. `recruit_applicants.phone` (migration 167) fills three ways: the
+sheet ingest maps a phone/mobile/cell column when the form asks
+(`recruit-ingest` v1.6.0), the manual-add modal takes an optional number, and
+recruiters can type one in on the profile — a Phone fact next to Budget with
+the same quiet ✎ as move-in, saved through the new `recruit_update_profile`
+RPC (the table stays client-read-only). Shown as an `sms:` link.
+
+**Fields considered and deferred**, so they're one migration away: location /
+current city (often inferable from the move-in answer), occupation (lives in
+the About free text; structure only pays off for list scanning), emergency
+contact (recruiter-entered, matters at trial/resident stage). Deliberately
+excluded: age/DOB and gender — fair-housing risk, and pronouns already cover
+presentation. `recruit_update_profile` is the intended home for any of these
+that get promoted: one parameter per editable field.
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 

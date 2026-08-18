@@ -20,7 +20,7 @@
 // slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
 // stable uuid from the DB default (migration 159).
 
-const VERSION = '1.5.0'
+const VERSION = '1.6.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -79,6 +79,7 @@ const FIELD_PATTERNS: Array<[string, RegExp]> = [
   ['last_name', /^(last name|last|surname)/i],
   ['full_name', /^(full name|your name|name)$/i],
   ['email', /e-?mail/i],
+  ['phone', /\b(phone|mobile|cell|contact number)\b/i],
   ['pronouns', /pronoun/i],
   ['social', /(social|instagram|links?|handle)/i],
   ['residency', /(residency|full.?time|short.?term|length of stay|type of stay)/i],
@@ -349,7 +350,7 @@ serve(async (req) => {
         // consumed by rows that actually insert.
         submitted_at: submittedAt.toISOString(),
         first_name: m.first_name, last_name: m.last_name || '',
-        pronouns: m.pronouns || '', email: m.email, social: m.social || '',
+        pronouns: m.pronouns || '', email: m.email, phone: m.phone || '', social: m.social || '',
         about: m.about || '', why_agape: m.why_agape || '', gifts: m.gifts || '',
         heard_from: m.heard_from || '', residency: m.residency || '',
         move_in: m.move_in || '', budget: m.budget || '',

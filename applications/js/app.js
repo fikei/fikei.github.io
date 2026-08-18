@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.73.1';
+const VERSION = '3.74.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -763,7 +763,7 @@ async function loadAll() {
   applicants = (aRes.data || []).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
-    email: r.email, social: r.social, about: r.about, why: r.why_agape,
+    email: r.email, phone: r.phone || '', social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
     movein: r.move_in, budget: r.budget, avatarUrl: r.avatar_url,
     stage: r.stage || 'review',
@@ -1847,6 +1847,7 @@ const ACTIVITY_KINDS = {
   event_email:            { icon: '📤', label: 'Email sent' },
   event_placement:        { icon: '📌', label: 'Shortlist changed' },
   event_move_in:          { icon: '🧳', label: 'Move-in confirmed' },
+  event_phone:            { icon: '📱', label: 'Phone added' },
   event_comment:          { icon: '💬', label: 'Note added' },
   event_screening:        { icon: '👥', label: 'Call arranged' },
 };
@@ -4445,6 +4446,7 @@ function openReview(id) {
   reviewTab = 'profile';
   pendingVerdict = null;
   moveinEditing = false;
+  phoneEditing = false;
   if (!viewedIds.has(id)) {
     viewedIds.add(id);
     sb.from('recruit_applicant_views')
@@ -4497,6 +4499,7 @@ function step(delta) {
   sendUpdateWith = updateEmailDefault();
   noteDraft = { id: queue[next], text: '' };
   moveinEditing = false;
+  phoneEditing = false;
   if (!keepBannerOnce) hideReviewBanner();
   keepBannerOnce = false;
   hideHoldSheet();
@@ -4605,6 +4608,7 @@ function renderReview() {
           <div class="review__facts">
             <div class="review__fact"><span class="review__fact-label">Move-in</span>${moveInFactHtml(a, miNorm)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
+            <div class="review__fact"><span class="review__fact-label">Phone</span>${phoneFactHtml(a)}</div>
             ${a.source ? `<div class="review__fact"><span class="review__fact-label">Via</span><span class="review__fact-value review__fact-value--quiet">${esc(a.source)}</span></div>` : ''}
             <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
@@ -4706,6 +4710,47 @@ async function saveMoveIn(id, clear = false) {
   await syncAutoPlacements(); // dates changed — placements reshuffle to match
   toast(from ? `Move-in confirmed: ${confirmedMoveIn(a)} — placements updated` : 'Confirmed date cleared — back to their stated answer');
   renderRailCounts();
+  renderReview();
+}
+
+/* ---------- phone field ----------
+   The form doesn't reliably ask for a number, so the profile is where one
+   lands — typed in by whoever got it (usually over email, before a tour).
+   Same quiet ✎ as the move-in fact; recruit_applicants is client-read-only,
+   so the save goes through the recruit_update_profile RPC. */
+let phoneEditing = false;
+
+function phoneFactHtml(a) {
+  if (phoneEditing) {
+    return `<span class="movein-set movein-set--form">
+      <input type="tel" class="listing-status movein-set__input" id="phone-input" value="${esc(a.phone || '')}"
+        maxlength="40" placeholder="e.g. (415) 555-0123" aria-label="Phone number">
+      <button type="button" class="btn btn--sm btn--accent" data-phone-save>Save</button>
+      <button type="button" class="hold-sheet__cancel movein-set__cancel" data-phone-cancel>Cancel</button>
+    </span>`;
+  }
+  const sms = (a.phone || '').replace(/[^+\d]/g, '');
+  const shown = a.phone
+    ? `<a href="sms:${esc(sms)}" title="Text them">${esc(a.phone)}</a>`
+    : '—';
+  return `<span class="review__fact-value">${shown}
+    <button type="button" class="fact-edit" data-phone-edit title="${a.phone ? 'Edit their number' : 'Add their number'}" aria-label="Edit phone number">✎</button>
+  </span>`;
+}
+
+async function savePhone(id) {
+  const a = applicants.find(x => x.id === id);
+  if (!a) return;
+  const phone = (document.getElementById('phone-input')?.value || '').trim();
+  const { error } = await sb.rpc('recruit_update_profile', { p_applicant: id, p_phone: phone });
+  if (error) { toast(`Save failed: ${error.message}`); return; }
+  const had = Boolean(a.phone);
+  a.phone = phone;
+  phoneEditing = false;
+  if (phone && !had) {
+    logEvent('event_phone', id, fullName(a), `${me.name || 'A housemate'} added {}'s phone number.`);
+  }
+  toast(phone ? 'Phone saved' : 'Phone cleared');
   renderReview();
 }
 
@@ -4866,7 +4911,7 @@ async function reopenApplicant(id) {
    the insert goes through the recruit_add_applicant RPC (migration 166),
    which also owns id minting and the duplicate-email guard. */
 function openAddPerson(stage) {
-  ['add-first', 'add-last', 'add-email', 'add-movein', 'add-budget', 'add-source', 'add-about']
+  ['add-first', 'add-last', 'add-email', 'add-phone', 'add-movein', 'add-budget', 'add-source', 'add-about']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('add-stage').value = stage === 'candidate' ? 'candidate' : 'review';
   document.getElementById('add-status').textContent = '';
@@ -4889,12 +4934,13 @@ async function submitAddPerson(btn) {
     p_first: first, p_email: email, p_last: last, p_stage: stage,
     p_residency: val('add-track'), p_move_in: val('add-movein'),
     p_budget: val('add-budget'), p_source: val('add-source'), p_about: val('add-about'),
+    p_phone: val('add-phone'),
   });
   btn.disabled = false;
   if (error) { status.textContent = `Couldn't add them: ${error.message}`; return; }
   const a = {
     id, ts_iso: new Date().toISOString(), first, last, pronouns: '',
-    email, social: '', about: val('add-about'), why: '', gifts: '',
+    email, phone: val('add-phone'), social: '', about: val('add-about'), why: '', gifts: '',
     source: val('add-source'), residency: val('add-track'),
     movein: val('add-movein'), budget: val('add-budget'), avatarUrl: null,
     stage, moveinFrom: null, moveinTo: null, moveinSetBy: null,
@@ -6404,6 +6450,12 @@ function init() {
     if (miClear) { saveMoveIn(queue[qIndex], true); return; }
     const miCancel = e.target.closest('[data-movein-cancel]');
     if (miCancel) { moveinEditing = false; renderReview(); return; }
+    const phEdit = e.target.closest('[data-phone-edit]');
+    if (phEdit) { phoneEditing = true; renderReview(); document.getElementById('phone-input')?.focus(); return; }
+    const phSave = e.target.closest('[data-phone-save]');
+    if (phSave) { savePhone(queue[qIndex]); return; }
+    const phCancel = e.target.closest('[data-phone-cancel]');
+    if (phCancel) { phoneEditing = false; renderReview(); return; }
     const rmPl = e.target.closest('[data-remove-placement]');
     if (rmPl) {
       const [aid, lid] = rmPl.dataset.removePlacement.split('|');
