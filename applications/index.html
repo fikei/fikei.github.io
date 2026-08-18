@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/auth/ctrl-auth.css">
-  <link rel="stylesheet" href="css/app.css?v=3.73.1">
+  <link rel="stylesheet" href="css/app.css?v=3.74.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/auth/ctrl-auth.js"></script>
   <script defer src="/analytics/track.js"></script>
@@ -304,9 +304,14 @@
           <input type="text" class="listing-status" id="add-last" maxlength="80" autocomplete="off">
         </label>
       </div>
-      <label class="listing-form__field">Email
-        <input type="email" class="listing-status" id="add-email" maxlength="200" autocomplete="off">
-      </label>
+      <div class="add-form__row">
+        <label class="listing-form__field">Email
+          <input type="email" class="listing-status" id="add-email" maxlength="200" autocomplete="off">
+        </label>
+        <label class="listing-form__field">Phone (optional)
+          <input type="tel" class="listing-status" id="add-phone" maxlength="40" autocomplete="off" placeholder="e.g. (415) 555-0123">
+        </label>
+      </div>
       <div class="add-form__row">
         <label class="listing-form__field">Track
           <select class="listing-status" id="add-track">
@@ -392,7 +397,7 @@
 
   <script src="js/settings-schema.js?v=3.69.0"></script>
   <script src="../design-system/datepicker.js?v=1.0.1"></script>
-  <script src="js/app.js?v=3.73.1"></script>
+  <script src="js/app.js?v=3.74.0"></script>
 
 </body>
 </html>
