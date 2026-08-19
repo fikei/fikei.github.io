@@ -180,6 +180,21 @@ menu's **Set their move-in…** (renamed from "Book them in…"), a thin sheet
 over the same `bookApplicant()` core. If the booking half fails the decision
 still stands and the error shows in place.
 
+Two more rules from the same feedback round:
+
+- **Set their move-in… is available at any stage, like Remove** — in the
+  Openings ⋮ menu unconditionally, and in the review overlay footer for
+  review-stage and candidate-stage people (saved-for-future included; booking
+  brings them back). Booking IS accepting: `bookApplicant()` records the yes
+  decision on the way through, so the chip always agrees with the calendar.
+- **Every email composer has Send later** — saves the edited draft
+  server-side (`recruit_email_drafts`, migration 169; one per applicant,
+  latest write wins) so anyone can pick it up; reopening the composer loads
+  the saved draft instead of redrafting, Regenerate gets a fresh one, and a
+  successful send clears it. Deliberately app-side, not a Gmail draft — the
+  shared connection's scopes are readonly + send, and `gmail.compose` would
+  force re-consenting the shared account.
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 

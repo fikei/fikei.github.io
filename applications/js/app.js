@@ -675,7 +675,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes, tRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes, tRes, edRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at, source').order('created_at'),
@@ -692,8 +692,11 @@ async function loadAll() {
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
     sb.from('recruit_decision_votes').select('*'),
     sb.from('recruit_tours').select('applicant_id, status, asked_at, confirmed_slot, off_hours'),
+    sb.from('recruit_email_drafts').select('*'),
   ]);
   placements = pRes.data || [];
+  emailDrafts = {};
+  for (const d of (edRes?.data || [])) emailDrafts[d.applicant_id] = d;
   viewedIds = new Set((vwRes.data || []).map(v => v.applicant_id));
   claimPosts = {};
   for (const c of (cpRes.data || [])) claimPosts[c.applicant_id] = { status: c.status, postedAt: c.posted_at };
@@ -1237,6 +1240,7 @@ let emailApplicantId = null;
 
 let emailMode = 'outreach';   // 'outreach' | 'update' (rejection queue)
 let emailKind = null;         // typed draft override, e.g. 'tour'
+let emailDrafts = {};         // applicant_id -> recruit_email_drafts row ("Send later")
 
 async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
@@ -1259,6 +1263,18 @@ async function openEmailModal(applicantId, kind) {
   document.getElementById('email-body').value = '';
   const addedHost = document.getElementById('email-added');
   if (addedHost) { addedHost.hidden = true; addedHost.innerHTML = ''; }
+  // A saved draft beats a fresh AI one — someone already put words in.
+  // Regenerate is the way to a fresh draft from here.
+  const saved = emailDrafts[applicantId];
+  if (saved && saved.mode === 'outreach') {
+    emailKind = saved.kind || emailKind;
+    document.getElementById('email-subject').value = saved.subject || '';
+    document.getElementById('email-body').value = saved.body || '';
+    document.getElementById('email-status').textContent =
+      `Saved draft — ${saved.saved_by_name || 'a housemate'} · ${relTime(saved.updated_at)}. Edit and send, or Regenerate for a fresh one.`;
+    document.getElementById('email-modal').hidden = false;
+    return;
+  }
   document.getElementById('email-status').textContent = kind === 'tour'
     ? 'Drafting the availability ask — Tue–Thu 5–7pm is stated as the preference, with no reasoning exposed…'
     : kind === 'accepted'
@@ -1266,6 +1282,30 @@ async function openEmailModal(applicantId, kind) {
       : 'Drafting from their application, the listing, and any flags…';
   document.getElementById('email-modal').hidden = false;
   await generateEmail(applicantId);
+}
+
+/* "Send later" — the draft outlives the modal, server-side, one per
+   applicant, for whoever picks it up next. Reopening the composer loads it. */
+async function saveEmailDraft() {
+  if (!emailApplicantId) return;
+  const row = {
+    applicant_id: emailApplicantId, mode: emailMode, kind: emailKind || null,
+    subject: document.getElementById('email-subject').value.slice(0, 300),
+    body: document.getElementById('email-body').value.slice(0, 10000),
+    saved_by: me.id, saved_by_name: me.name, updated_at: new Date().toISOString(),
+  };
+  const { error } = await sb.from('recruit_email_drafts').upsert(row);
+  if (error) { toast(`Draft save failed: ${error.message}`); return; }
+  emailDrafts[emailApplicantId] = row;
+  toast('Draft saved — it loads next time anyone opens their email');
+  closeEmailModal();
+}
+
+async function clearEmailDraft(applicantId) {
+  if (!emailDrafts[applicantId]) return;
+  delete emailDrafts[applicantId];
+  const { error } = await sb.from('recruit_email_drafts').delete().eq('applicant_id', applicantId);
+  if (error) console.warn('draft clear failed', error.message);
 }
 
 /* Rejection-queue editor: drafts via draft_update, sends via send-update
@@ -1309,6 +1349,15 @@ async function openUpdateEmail(applicantId) {
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   document.getElementById('email-send').textContent = 'Send update';
+  const saved = emailDrafts[applicantId];
+  if (saved && saved.mode === 'update') {
+    document.getElementById('email-subject').value = saved.subject || '';
+    document.getElementById('email-body').value = saved.body || '';
+    document.getElementById('email-status').textContent =
+      `Saved draft — ${saved.saved_by_name || 'a housemate'} · ${relTime(saved.updated_at)}. Edit and send, or Regenerate for a fresh one.`;
+    document.getElementById('email-modal').hidden = false;
+    return;
+  }
   document.getElementById('email-status').textContent = 'Writing a draft you can edit — sending is optional.';
   document.getElementById('email-modal').hidden = false;
   try {
@@ -2951,8 +3000,9 @@ function rowMenuHtml(a, listingId) {
   if (!tour || tour.status !== 'confirmed') items.push(item(`data-set-time="${a.id}|visit"`, 'Set visit time…'));
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
   if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
-  // A decided yes with no room booked is unfinished business — the menu says so.
-  if (houseDecision(a.id)?.verdict === 'yes' && !liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Set their move-in…'));
+  // Available at any stage, like Remove — booking someone IS accepting them,
+  // and the flow records the yes on the way through.
+  if (!liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Set their move-in…'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
   items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
@@ -3219,6 +3269,11 @@ async function bookApplicant(applicantId, listingId, start, end, errEl) {
     p_decision_on: l.kind === 'resident' && end ? trialDecisionDefault(end) : null,
   });
   if (error) { err.textContent = error.message; return false; }
+  // Booking IS accepting — record the yes so the decision chip agrees with
+  // the calendar, whatever stage they were booked from.
+  if (houseDecision(applicantId)?.verdict !== 'yes') {
+    await writeHouseDecision(applicantId, 'yes', 'Accepted by booking them a room');
+  }
   const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
   const kindWord = l.kind === 'resident' ? 'trial' : 'sublet';
   logEvent('event_move_in', applicantId, fullName(a),
@@ -5047,7 +5102,8 @@ function renderReviewFoot(a) {
           <input type="checkbox" id="vote-send-update" ${sendUpdateWith ? 'checked' : ''}> Send them an update
         </label>` : ''}
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
-      </div>`;
+      </div>
+      ${liveStayFor(a.id) ? '' : `<span class="foot-links"><button type="button" class="cta-link" data-book-in="${a.id}" title="Skips the funnel — books a room and records the accept in one step">Set their move-in…</button></span>`}`;
     footFor = a.id;
   } else if (a.stage === 'candidate') {
     const pills = activePlacements(a.id).map(p => {
@@ -5063,6 +5119,7 @@ function renderReviewFoot(a) {
         <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
         <span class="foot-links">
           <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back</button>
+          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     } else {
@@ -5078,6 +5135,7 @@ function renderReviewFoot(a) {
           : openingsCta(a)}</span>
         <span class="foot-links">
           ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
+          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     }
@@ -6836,6 +6894,7 @@ function init() {
     if (id) openSchedulerPreview(id);
   };
   document.getElementById('email-close').onclick = closeEmailModal;
+  document.getElementById('email-later').onclick = saveEmailDraft;
   // Regenerate has to respect which editor you're in. In the rejection queue
   // it must redraft the update — routing it to the outreach drafter produced a
   // warm invite, complete with a booking link, one click away from being sent
@@ -6878,6 +6937,7 @@ function init() {
         const a = applicants.find(x => x.id === sentFor);
         if (a && queue[qIndex] === sentFor && reviewTab === 'emails') paintEmailsPanel(a, '');
       }).catch(() => {});
+      clearEmailDraft(sentFor); // sent — the saved draft has done its job
       closeEmailModal();
     } catch (e) { toast(`Send failed: ${e.message}`); }
     btn.disabled = false; btn.textContent = emailMode === 'update' ? 'Send update' : 'Send via Agape Gmail';
