@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.74.0';
+const VERSION = '3.75.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -109,6 +109,15 @@ function trialStayFor(applicantId) {
   if (!applicantId || !houseLoaded) return null;
   const today = new Date().toISOString().slice(0, 10);
   return stays.find(s => s.kind === 'candidate' && s.applicant_id === applicantId
+    && (!s.ends_on || s.ends_on >= today)) || null;
+}
+/* Any live or upcoming stay of theirs — trial, sublet, or residency. This is
+   what "booked" means everywhere: on the calendar, out of the placement
+   sweep, and the Book-them-in door closed behind them. */
+function liveStayFor(applicantId) {
+  if (!applicantId || !houseLoaded) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return stays.find(s => s.applicant_id === applicantId && s.kind !== 'shared'
     && (!s.ends_on || s.ends_on >= today)) || null;
 }
 // Default return date for Save for future: three months out, month start.
@@ -894,7 +903,9 @@ async function syncAutoPlacements() {
   const fresh = [];
   // A saved-for-future candidate keeps the stage but is off the board until
   // their date lands, so they're excluded here as well as in matchesView.
-  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason)) {
+  // Booked people (a live trial or sublet) are off the board too — the room
+  // question is answered; the calendar owns them now.
+  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason && !liveStayFor(x.id))) {
     // One listing each. Someone already placed is left alone — the sweep
     // must never yank a person out from under whoever is working them.
     if (activePlacements(a.id).length) continue;
@@ -907,7 +918,7 @@ async function syncAutoPlacements() {
     if (p.source !== 'auto' || p.status !== 'active') return false;
     const a = applicants.find(x => x.id === p.applicant_id);
     const l = listings.find(x => x.id === p.listing_id);
-    return !a || !l || a.stage !== 'candidate' || a.exitReason || !qualifiesFor(a, l);
+    return !a || !l || a.stage !== 'candidate' || a.exitReason || !qualifiesFor(a, l) || !!liveStayFor(a.id);
   });
   if (stale.length) {
     const { error } = await sb.from('recruit_listing_candidates').delete().in('id', stale.map(r => r.id));
@@ -1242,14 +1253,17 @@ async function openEmailModal(applicantId, kind) {
   emailMode = 'outreach';
   emailKind = kind || null;
   document.getElementById('email-send').textContent = 'Send via Agape Gmail';
-  document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour` : `Email ${fullName(a)}`;
+  document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour`
+    : kind === 'accepted' ? `Tell ${a.first} they're in` : `Email ${fullName(a)}`;
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   const addedHost = document.getElementById('email-added');
   if (addedHost) { addedHost.hidden = true; addedHost.innerHTML = ''; }
   document.getElementById('email-status').textContent = kind === 'tour'
     ? 'Drafting the availability ask — Tue–Thu 5–7pm is stated as the preference, with no reasoning exposed…'
-    : 'Drafting from their application, the listing, and any flags…';
+    : kind === 'accepted'
+      ? 'Drafting the acceptance — room, dates, and next steps from their booking. Sending is optional…'
+      : 'Drafting from their application, the listing, and any flags…';
   document.getElementById('email-modal').hidden = false;
   await generateEmail(applicantId);
 }
@@ -1336,7 +1350,7 @@ async function generateEmail(applicantId) {
     if (emailApplicantId !== applicantId) return; // closed / switched meanwhile
     document.getElementById('email-subject').value = out.subject || '';
     document.getElementById('email-body').value = out.body || '';
-    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask', tour: 'House tour ask', visit: 'House tour ask' };
+    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask', tour: 'House tour ask', visit: 'House tour ask', accepted: 'Acceptance email' };
     document.getElementById('email-status').textContent =
       `${typeLabels[out.emailType] || 'Outreach'}${out.reason ? ` — ${out.reason}` : ''}. Edit freely, then send.`;
     // What the drafter folded in beyond the scheduling ask, and why — so the
@@ -2674,6 +2688,17 @@ function placementChip(a) {
   }).join('');
 }
 
+/* Booked people carry the answer on the row: which room, which kind of stay,
+   from when. The trial's next step (Welcome in) lives in the calendar drawer. */
+function bookedChip(a) {
+  const s = liveStayFor(a.id);
+  if (!s) return '';
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  const kind = s.kind === 'candidate' ? 'trial' : s.kind;
+  return `<span class="decision-chip decision-chip--replied" title="${esc(`On the occupancy calendar — ${kind} in ${room?.name || 'a room'} from ${fmtDay(s.starts_on)}${s.ends_on ? ` through ${fmtDay(s.ends_on)}` : ''}${s.kind === 'candidate' ? '. Welcome them in from the calendar when the trial works out.' : ''}`)}">${
+    esc(`booked · ${room?.name || 'Room'} ${kind}`)}</span>`;
+}
+
 function rowBadge(a) {
   if (view === 'inbox') return voteChip(a);
   // Archive carries two facts: which kind of no, and whether they've been
@@ -2683,8 +2708,8 @@ function rowBadge(a) {
     const owed = a.stage === 'rejected' || a.updateSentAt;
     return exitChip(a) + (owed || !a.exitReason ? stageChip(a) : '');
   }
-  if (view === 'screening') return screeningChip(a);
-  if (view === 'candidates') return exitChip(a) || placementChip(a);
+  if (view === 'screening') return bookedChip(a) || screeningChip(a);
+  if (view === 'candidates') return exitChip(a) || bookedChip(a) || placementChip(a);
   return decisionChip(a.id);
 }
 
@@ -2926,6 +2951,8 @@ function rowMenuHtml(a, listingId) {
   if (!tour || tour.status !== 'confirmed') items.push(item(`data-set-time="${a.id}|visit"`, 'Set visit time…'));
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
   if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
+  // A decided yes with no room booked is unfinished business — the menu says so.
+  if (houseDecision(a.id)?.verdict === 'yes' && !liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Book them in…'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
   items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
@@ -3021,6 +3048,9 @@ async function giveDecision(applicantId, verdict) {
   toast('Saved — accept is the house decision');
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (!document.getElementById('review').hidden) renderReview();
+  // A yes isn't finished until they're on the calendar. Roll straight into
+  // booking the room — closable, and reachable later from the row's ⋮ menu.
+  if (verdict === 'yes' && !liveStayFor(applicantId)) openBookIn(applicantId);
 }
 
 function openGiveDecision(applicantId) {
@@ -3038,6 +3068,120 @@ function openGiveDecision(applicantId) {
   document.getElementById('gd-note').value = (hd && hd.voter_id === me?.id ? hd.note : '') || '';
   modal.dataset.applicant = applicantId;
   modal.hidden = false;
+}
+
+/* --- book them in ---
+   The step a yes used to leave dangling. One sheet, one RPC
+   (recruit_accept_applicant, migration 168): a linked stay on the calendar
+   (trial for resident-track listings, sublet otherwise), the listing marked
+   filled, their placements tombstoned. Opens right after a yes decision and
+   stays reachable from the ⋮ menu until they're booked. */
+async function openBookIn(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  if (!houseLoaded) await loadHouse();
+  if (liveStayFor(applicantId)) { toast(`${a.first} is already on the calendar`); return; }
+  const open = listings.filter(l => l.status === 'open');
+  if (!open.length) {
+    toast('No open listings — create one from Occupancy, then book them in from the ⋮ menu');
+    return;
+  }
+  const modal = document.getElementById('bi-modal');
+  modal.dataset.applicant = applicantId;
+  document.getElementById('bi-title').textContent = `Book ${a.first} in`;
+  const preferred = activePlacements(applicantId)[0]?.listing_id;
+  renderBookIn(open.some(l => l.id === preferred) ? preferred : open[0].id);
+  modal.hidden = false;
+}
+
+function bookInDefaults(l) {
+  const today = new Date().toISOString().slice(0, 10);
+  const start = l.starts_on > today ? l.starts_on : today;
+  const end = l.kind === 'resident'
+    ? addMonthsIso2(start, setting('trial_length_months'))
+    : (l.ends_on || '');
+  return { start, end };
+}
+
+function renderBookIn(listingId) {
+  const open = listings.filter(l => l.status === 'open');
+  const l = open.find(x => x.id === listingId) || open[0];
+  if (!l) return;
+  const { start, end } = bookInDefaults(l);
+  const label = x => {
+    const room = rooms.find(r => r.id === x.room_id) || allRooms.find(r => r.id === x.room_id);
+    return `${room?.name || 'Room'} — ${x.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(x.starts_on)}`;
+  };
+  const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+  document.getElementById('bi-body').innerHTML = `
+    <label class="listing-form__field">Listing
+      <select class="listing-status" id="bi-listing">
+        ${open.map(x => `<option value="${x.id}" ${x.id === l.id ? 'selected' : ''}>${esc(label(x))}</option>`).join('')}
+      </select>
+    </label>
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">From
+        <input type="date" class="listing-status" id="bi-start" value="${start}" required>
+      </label>
+      <label class="listing-form__field">Through
+        <input type="date" class="listing-status" id="bi-end" value="${end}" ${l.kind === 'resident' ? '' : 'required'}>
+      </label>
+    </div>
+    <p class="occ-drawer__note">${l.kind === 'resident'
+      ? `Puts their trial in ${esc(room?.name || 'the room')} on the occupancy calendar with its check-in and decision milestones, marks the listing filled, and takes them out of other openings. Welcome them in from the calendar when the trial works out — one person's call, same as this one.`
+      : `Puts their sublet in ${esc(room?.name || 'the room')} on the occupancy calendar, marks the listing filled, and takes them out of other openings.`}</p>
+    <p class="listing-form__error" id="bi-error"></p>
+    <div class="decision-sheet__actions">
+      <button class="hold-sheet__cancel" id="bi-later" type="button" title="They stay a decided-yes candidate — book them any time from the ⋮ menu">Not yet</button>
+      <button class="btn btn--accent btn--sm" id="bi-submit" type="button">Book the room</button>
+    </div>`;
+  document.getElementById('bi-listing').onchange = e => renderBookIn(e.target.value);
+  document.getElementById('bi-later').onclick = () => { document.getElementById('bi-modal').hidden = true; };
+  document.getElementById('bi-submit').onclick = () => submitBookIn();
+}
+
+async function submitBookIn() {
+  const modal = document.getElementById('bi-modal');
+  const applicantId = modal.dataset.applicant;
+  const a = applicants.find(x => x.id === applicantId);
+  const l = listings.find(x => x.id === document.getElementById('bi-listing')?.value);
+  const err = document.getElementById('bi-error');
+  const start = document.getElementById('bi-start')?.value;
+  const end = document.getElementById('bi-end')?.value || null;
+  if (!a || !l) return;
+  if (!start) { err.textContent = 'Pick the day they move in.'; return; }
+  if (end && end < start) { err.textContent = '"Through" must be at or after "From".'; return; }
+  if (l.kind !== 'resident' && !end) { err.textContent = 'A sublet needs an end date.'; return; }
+  const btn = document.getElementById('bi-submit');
+  btn.disabled = true;
+  const { error } = await sb.rpc('recruit_accept_applicant', {
+    p_applicant: applicantId,
+    p_listing: l.id,
+    p_starts_on: start,
+    p_ends_on: end,
+    p_checkin_on: l.kind === 'resident' ? trialCheckinDefault(start) : null,
+    p_decision_on: l.kind === 'resident' && end ? trialDecisionDefault(end) : null,
+  });
+  if (error) { err.textContent = error.message; btn.disabled = false; return; }
+  modal.hidden = true;
+  const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+  const kindWord = l.kind === 'resident' ? 'trial' : 'sublet';
+  logEvent('event_move_in', applicantId, fullName(a),
+    `${me.name || 'A housemate'} booked {} into ${room?.name || 'a room'} — ${kindWord} from ${fmtDay(start)}.`);
+  // Everything that was chasing a room for them is answered.
+  ackFor('applicant', applicantId, ['candidate_parked', 'candidate_placed', 'screening_followup',
+    'decision_open', 'gone_cold']);
+  ackFor('listing', l.id, ['listing_draft', 'listing_draft_stale', 'listing_no_qualifiers',
+    'opening_at_risk', 'opening_overdue', 'listing_has_candidates']);
+  // The RPC touched stays, the listing, placements, and possibly the stage.
+  await Promise.all([loadHouse(), loadAll()]);
+  toast(`${a.first} booked into ${room?.name || 'the room'} — ${kindWord} from ${fmtDay(start)} · listing marked filled`);
+  renderRailCounts();
+  if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+  if (view === 'occupancy') renderOccupancy();
+  if (!document.getElementById('review').hidden) renderReview();
+  // Telling them is the other half of accepting them.
+  openEmailModal(applicantId, 'accepted');
 }
 
 /* Drag applicants inside a listing group to reorder, or across groups to
@@ -6391,6 +6535,8 @@ function init() {
     }
     const gd = e.target.closest('[data-give-decision]');
     if (gd) { openGiveDecision(gd.dataset.giveDecision); return; }
+    const bi = e.target.closest('[data-book-in]');
+    if (bi) { openBookIn(bi.dataset.bookIn); return; }
     const ue = e.target.closest('[data-update-edit]');
     if (ue) { openUpdateEmail(ue.dataset.updateEdit); return; }
     const us = e.target.closest('[data-update-skip]');
@@ -6592,6 +6738,7 @@ function init() {
 
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
+  document.getElementById('bi-close').onclick = () => { document.getElementById('bi-modal').hidden = true; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
   // No is not a sentiment to file — it routes into the Remove sheet with
   // Not a fit preselected (note carried), so the verdict and its
