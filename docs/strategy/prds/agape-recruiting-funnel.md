@@ -167,6 +167,19 @@ trial to residency. Sublets never promote — their stay just runs out its dates
 at which point the person becomes placeable again (or gets a real exit from
 the Remove sheet).
 
+### v3.76.0 (2026-08-19): accept & book is one click
+
+The two-modal accept ("yes" sheet, then a booking sheet) was clunky in
+practice. The room half now lives **inside** the accept modal: when they're
+unbooked and a listing is open, the modal shows the listing (their placement,
+switchable only when more than one is open) and prefilled from/through dates,
+and the primary button reads **Yes — accept & book the room** — one click
+writes the decision and runs `recruit_accept_applicant`. A quiet **Accept
+without booking** link keeps decide-now-book-later; that later path is the ⋮
+menu's **Set their move-in…** (renamed from "Book them in…"), a thin sheet
+over the same `bookApplicant()` core. If the booking half fails the decision
+still stands and the error shows in place.
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 

@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.75.0';
+const VERSION = '3.76.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -2952,7 +2952,7 @@ function rowMenuHtml(a, listingId) {
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
   if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
   // A decided yes with no room booked is unfinished business — the menu says so.
-  if (houseDecision(a.id)?.verdict === 'yes' && !liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Book them in…'));
+  if (houseDecision(a.id)?.verdict === 'yes' && !liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Set their move-in…'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
   items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
@@ -3041,16 +3041,28 @@ async function writeHouseDecision(applicantId, verdict, note) {
   return data;
 }
 
-async function giveDecision(applicantId, verdict) {
+async function giveDecision(applicantId, verdict, skipBooking = false) {
   const note = (document.getElementById('gd-note')?.value || '').trim();
   if (!await writeHouseDecision(applicantId, verdict, note)) return;
+  // Accepting and booking are one gesture when a room is on the table — the
+  // modal already showed which room and which dates a yes commits to. If the
+  // booking half fails, the decision is saved and the error shows in place.
+  const sel = document.getElementById('gd-book-listing');
+  if (verdict === 'yes' && !skipBooking && sel) {
+    const ok = await bookApplicant(applicantId, sel.value,
+      document.getElementById('gd-book-start')?.value,
+      document.getElementById('gd-book-end')?.value || null,
+      document.getElementById('gd-book-error'));
+    if (!ok) return;
+    document.getElementById('gd-modal').hidden = true;
+    return;
+  }
   document.getElementById('gd-modal').hidden = true;
-  toast('Saved — accept is the house decision');
+  toast(verdict === 'yes' && !liveStayFor(applicantId)
+    ? 'Saved — accept is the house decision. Set their move-in from the ⋮ menu when ready.'
+    : 'Saved — accept is the house decision');
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (!document.getElementById('review').hidden) renderReview();
-  // A yes isn't finished until they're on the calendar. Roll straight into
-  // booking the room — closable, and reachable later from the row's ⋮ menu.
-  if (verdict === 'yes' && !liveStayFor(applicantId)) openBookIn(applicantId);
 }
 
 function openGiveDecision(applicantId) {
@@ -3066,16 +3078,63 @@ function openGiveDecision(applicantId) {
       `<span class="notes__empty">Saving replaces the standing decision.</span>`
     : '<span class="notes__empty">One housemate’s read settles it — yours becomes the house decision.</span>';
   document.getElementById('gd-note').value = (hd && hd.voter_id === me?.id ? hd.note : '') || '';
+  renderGdBooking(applicantId);
   modal.dataset.applicant = applicantId;
   modal.hidden = false;
 }
 
-/* --- book them in ---
-   The step a yes used to leave dangling. One sheet, one RPC
-   (recruit_accept_applicant, migration 168): a linked stay on the calendar
-   (trial for resident-track listings, sublet otherwise), the listing marked
-   filled, their placements tombstoned. Opens right after a yes decision and
-   stays reachable from the ⋮ menu until they're booked. */
+/* The room half of the accept modal. When they're unbooked and a listing is
+   open, a yes accepts AND books — the room and dates sit right under the
+   decision so one click commits to exactly what's on screen. A quiet link
+   keeps "decide now, book later" possible; booking then lives in the ⋮ menu. */
+function renderGdBooking(applicantId, listingId) {
+  const host = document.getElementById('gd-book');
+  const yesBtn = document.getElementById('gd-yes');
+  if (!host || !yesBtn) return;
+  host.innerHTML = '';
+  yesBtn.textContent = 'Yes — accept';
+  const open = listings.filter(l => l.status === 'open');
+  if (liveStayFor(applicantId) || !open.length) return;
+  const preferred = listingId || activePlacements(applicantId)[0]?.listing_id;
+  const l = open.find(x => x.id === preferred) || open[0];
+  const { start, end } = bookInDefaults(l);
+  const label = x => {
+    const room = rooms.find(r => r.id === x.room_id) || allRooms.find(r => r.id === x.room_id);
+    return `${room?.name || 'Room'} — ${x.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(x.starts_on)}`;
+  };
+  host.innerHTML = `
+    <div class="occ-drawer__section">A yes gives them the room</div>
+    ${open.length > 1 ? `<label class="listing-form__field">Listing
+      <select class="listing-status" id="gd-book-listing">
+        ${open.map(x => `<option value="${x.id}" ${x.id === l.id ? 'selected' : ''}>${esc(label(x))}</option>`).join('')}
+      </select>
+    </label>` : `<p class="occ-drawer__note">${esc(label(l))}</p>
+      <select id="gd-book-listing" hidden><option value="${l.id}" selected></option></select>`}
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">From
+        <input type="date" class="listing-status" id="gd-book-start" value="${start}" required>
+      </label>
+      <label class="listing-form__field">Through
+        <input type="date" class="listing-status" id="gd-book-end" value="${end}" ${l.kind === 'resident' ? '' : 'required'}>
+      </label>
+    </div>
+    <p class="occ-drawer__note">${l.kind === 'resident'
+      ? 'Their trial lands on the occupancy calendar with its milestones, the listing is marked filled, and they leave other openings.'
+      : 'Their sublet lands on the occupancy calendar, the listing is marked filled, and they leave other openings.'}</p>
+    <p class="listing-form__error" id="gd-book-error"></p>
+    <p class="notes__empty">Not ready to commit the room? <button type="button" class="cta-link" id="gd-decide-only">Accept without booking</button></p>`;
+  yesBtn.textContent = 'Yes — accept & book the room';
+  const sel = host.querySelector('#gd-book-listing');
+  if (sel && open.length > 1) sel.onchange = e => renderGdBooking(applicantId, e.target.value);
+  host.querySelector('#gd-decide-only').onclick = () =>
+    giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes', true);
+}
+
+/* --- set their move-in (the late-booking path) ---
+   The accept modal books in the same click as the yes; this sheet exists for
+   the yes that skipped booking ("Accept without booking"). Same core —
+   bookApplicant → recruit_accept_applicant — reachable from the ⋮ menu until
+   they're on the calendar. */
 async function openBookIn(applicantId) {
   const a = applicants.find(x => x.id === applicantId);
   if (!a) return;
@@ -3083,12 +3142,12 @@ async function openBookIn(applicantId) {
   if (liveStayFor(applicantId)) { toast(`${a.first} is already on the calendar`); return; }
   const open = listings.filter(l => l.status === 'open');
   if (!open.length) {
-    toast('No open listings — create one from Occupancy, then book them in from the ⋮ menu');
+    toast('No open listings — create one from Occupancy, then set their move-in from the ⋮ menu');
     return;
   }
   const modal = document.getElementById('bi-modal');
   modal.dataset.applicant = applicantId;
-  document.getElementById('bi-title').textContent = `Book ${a.first} in`;
+  document.getElementById('bi-title').textContent = `Move ${a.first} in`;
   const preferred = activePlacements(applicantId)[0]?.listing_id;
   renderBookIn(open.some(l => l.id === preferred) ? preferred : open[0].id);
   modal.hidden = false;
@@ -3132,42 +3191,38 @@ function renderBookIn(listingId) {
       : `Puts their sublet in ${esc(room?.name || 'the room')} on the occupancy calendar, marks the listing filled, and takes them out of other openings.`}</p>
     <p class="listing-form__error" id="bi-error"></p>
     <div class="decision-sheet__actions">
-      <button class="hold-sheet__cancel" id="bi-later" type="button" title="They stay a decided-yes candidate — book them any time from the ⋮ menu">Not yet</button>
-      <button class="btn btn--accent btn--sm" id="bi-submit" type="button">Book the room</button>
+      <button class="hold-sheet__cancel" id="bi-later" type="button" title="They stay a decided-yes candidate — set their move-in any time from the ⋮ menu">Not yet</button>
+      <button class="btn btn--accent btn--sm" id="bi-submit" type="button">Confirm move-in</button>
     </div>`;
   document.getElementById('bi-listing').onchange = e => renderBookIn(e.target.value);
   document.getElementById('bi-later').onclick = () => { document.getElementById('bi-modal').hidden = true; };
   document.getElementById('bi-submit').onclick = () => submitBookIn();
 }
 
-async function submitBookIn() {
-  const modal = document.getElementById('bi-modal');
-  const applicantId = modal.dataset.applicant;
+/* The booking itself — shared by the accept modal's one-click yes and the
+   ⋮ menu's later "Set their move-in". Validates, runs the RPC, reloads, and
+   opens the acceptance email. Returns false with the error shown in errEl. */
+async function bookApplicant(applicantId, listingId, start, end, errEl) {
   const a = applicants.find(x => x.id === applicantId);
-  const l = listings.find(x => x.id === document.getElementById('bi-listing')?.value);
-  const err = document.getElementById('bi-error');
-  const start = document.getElementById('bi-start')?.value;
-  const end = document.getElementById('bi-end')?.value || null;
-  if (!a || !l) return;
-  if (!start) { err.textContent = 'Pick the day they move in.'; return; }
-  if (end && end < start) { err.textContent = '"Through" must be at or after "From".'; return; }
-  if (l.kind !== 'resident' && !end) { err.textContent = 'A sublet needs an end date.'; return; }
-  const btn = document.getElementById('bi-submit');
-  btn.disabled = true;
+  const l = listings.find(x => x.id === listingId);
+  const err = errEl || { textContent: '' };
+  if (!a || !l) { err.textContent = 'That listing is gone — reopen the sheet.'; return false; }
+  if (!start) { err.textContent = 'Pick the day they move in.'; return false; }
+  if (end && end < start) { err.textContent = '"Through" must be at or after "From".'; return false; }
+  if (l.kind !== 'resident' && !end) { err.textContent = 'A sublet needs an end date.'; return false; }
   const { error } = await sb.rpc('recruit_accept_applicant', {
     p_applicant: applicantId,
     p_listing: l.id,
     p_starts_on: start,
-    p_ends_on: end,
+    p_ends_on: end || null,
     p_checkin_on: l.kind === 'resident' ? trialCheckinDefault(start) : null,
     p_decision_on: l.kind === 'resident' && end ? trialDecisionDefault(end) : null,
   });
-  if (error) { err.textContent = error.message; btn.disabled = false; return; }
-  modal.hidden = true;
+  if (error) { err.textContent = error.message; return false; }
   const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
   const kindWord = l.kind === 'resident' ? 'trial' : 'sublet';
   logEvent('event_move_in', applicantId, fullName(a),
-    `${me.name || 'A housemate'} booked {} into ${room?.name || 'a room'} — ${kindWord} from ${fmtDay(start)}.`);
+    `${me.name || 'A housemate'} gave {} ${room?.name || 'a room'} — ${kindWord} from ${fmtDay(start)}.`);
   // Everything that was chasing a room for them is answered.
   ackFor('applicant', applicantId, ['candidate_parked', 'candidate_placed', 'screening_followup',
     'decision_open', 'gone_cold']);
@@ -3175,13 +3230,27 @@ async function submitBookIn() {
     'opening_at_risk', 'opening_overdue', 'listing_has_candidates']);
   // The RPC touched stays, the listing, placements, and possibly the stage.
   await Promise.all([loadHouse(), loadAll()]);
-  toast(`${a.first} booked into ${room?.name || 'the room'} — ${kindWord} from ${fmtDay(start)} · listing marked filled`);
+  toast(`${a.first} has ${room?.name || 'the room'} — ${kindWord} from ${fmtDay(start)} · listing marked filled`);
   renderRailCounts();
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (view === 'occupancy') renderOccupancy();
   if (!document.getElementById('review').hidden) renderReview();
   // Telling them is the other half of accepting them.
   openEmailModal(applicantId, 'accepted');
+  return true;
+}
+
+async function submitBookIn() {
+  const modal = document.getElementById('bi-modal');
+  const btn = document.getElementById('bi-submit');
+  btn.disabled = true;
+  const ok = await bookApplicant(modal.dataset.applicant,
+    document.getElementById('bi-listing')?.value,
+    document.getElementById('bi-start')?.value,
+    document.getElementById('bi-end')?.value || null,
+    document.getElementById('bi-error'));
+  if (!ok) { btn.disabled = false; return; }
+  modal.hidden = true;
 }
 
 /* Drag applicants inside a listing group to reorder, or across groups to
