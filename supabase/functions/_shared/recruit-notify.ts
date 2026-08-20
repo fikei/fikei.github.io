@@ -1131,6 +1131,80 @@ async function detectPromotions(db: DB): Promise<Notification[]> {
 }
 
 
+/* C5 — move-in morning. The welcome email promised a day-of email with WiFi,
+   door, and arrival details; this is the nudge that keeps the promise. It also
+   pre-fills the draft (recruit_email_drafts) from Settings → Move-in, so the
+   composer opens ready and a human just hits send. Never auto-sends. */
+async function detectMoveInDay(db: DB): Promise<Notification[]> {
+  const today = ptToday()
+  const { data: stays } = await db.from('recruit_stays')
+    .select('id, applicant_id, occupant, room_id, kind, starts_on, movein')
+    .in('kind', ['candidate', 'sublet', 'resident'])
+    .eq('starts_on', today)
+    .is('dayof_email_sent_at', null)
+    .not('applicant_id', 'is', null)
+  if (!stays?.length) return []
+  const { data: rooms } = await db.from('recruit_rooms').select('id, name')
+  const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
+
+  const { data: setRows } = await db.from('recruit_settings').select('key, value')
+    .in('key', ['wifi_name', 'wifi_password', 'door_note', 'arrival_note', 'house_address'])
+  const sv = new Map((setRows || []).map((r: { key: string; value: unknown }) => [r.key, String(r.value ?? '')]))
+
+  const out: Notification[] = []
+  for (const s of stays) {
+    const first = String(s.occupant || '').split(' ')[0] || 'there'
+    // Prefill the day-of draft — but never clobber one a human already saved.
+    const { data: existing } = await db.from('recruit_email_drafts')
+      .select('applicant_id').eq('applicant_id', s.applicant_id).maybeSingle()
+    if (!existing) {
+      const lines = [
+        `Hey ${first},`,
+        '',
+        `Today's the day — welcome home. Everything you need on arrival:`,
+        '',
+        `Address: ${sv.get('house_address') || '(set house address in Settings)'}`,
+        sv.get('arrival_note') ? `Arrival: ${sv.get('arrival_note')}` : null,
+        sv.get('door_note') ? `Getting in: ${sv.get('door_note')}` : null,
+        sv.get('wifi_name') ? `WiFi: ${sv.get('wifi_name')}${sv.get('wifi_password') ? ` · password ${sv.get('wifi_password')}` : ''}` : null,
+        '',
+        `Questions on the way over? Reply here or ping us on Discord.`,
+        '',
+        `See you soon,`,
+        `The Agape crew`,
+      ].filter((l) => l !== null)
+      await db.from('recruit_email_drafts').upsert({
+        applicant_id: s.applicant_id, mode: 'outreach', kind: 'movein_day',
+        subject: 'Move-in day — everything you need',
+        body: lines.join('\n'),
+        saved_by_name: 'Move-in automation',
+        updated_at: new Date().toISOString(),
+      })
+    }
+    out.push({
+      kind: 'movein_day',
+      subject_type: 'applicant' as const,
+      subject_id: String(s.applicant_id),
+      subject_label: String(s.occupant || 'A new housemate'),
+      lane: 'now' as const,
+      dedupe_key: `movein_day:${s.id}:${s.starts_on}`,
+      payload: {
+        title: String(s.occupant || 'A new housemate'),
+        copy: 'movein_day',
+        vars: {
+          subject: String(s.occupant || 'A new housemate'),
+          room: String(roomName.get(s.room_id as number) || 'their room'),
+        },
+        body: 'their day-of email is drafted — open their profile and send it',
+        section: 'Move-in day',
+        links: [{ label: ACTIONS.write, url: applicantLink(String(s.applicant_id)) }],
+      },
+    })
+  }
+  return out
+}
+
+
 /* ---------------------------------------------------------------------------
    Openings, in detail.
 
@@ -1619,6 +1693,7 @@ function detectors(db: DB): Array<[string, () => Promise<Notification[]>]> {
     ['decision_open', () => detectDecisionOpen(db)],
     ['screening_followup', () => detectScreeningFollowup(db)],
     ['candidate_promoted', () => detectPromotions(db)],
+    ['movein_day', () => detectMoveInDay(db)],
     // Openings, in detail.
     ['listing_draft', () => detectDraftListings(db)],
     ['listing_has_candidates', () => detectFirstCandidate(db)],

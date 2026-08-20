@@ -195,6 +195,16 @@ Two more rules from the same feedback round:
   shared connection's scopes are readonly + send, and `gmail.compose` would
   force re-consenting the shared account.
 
+### v3.77.0 (2026-08-20): move-in onboarding
+
+Acceptance now runs to the front door: a **Confirm move-in details** sheet after
+booking (money, buddy, links — all editable), a generated housemate agreement attached
+to a fixed-template **welcome email** (finance folks cc'd), an in-app **buddy
+rotation**, a **day-of email** drafted + nudged on move-in morning, and a Move-in
+panel on every booked stay. Also: one Discord message per new application — the rich
+ledger card now posts at ingest time (recruit-ingest v1.7.0). Full spec:
+[agape-move-in-onboarding.md](./agape-move-in-onboarding.md).
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 
