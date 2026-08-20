@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -27,7 +27,10 @@ const QUESTIONS = [
   {
     id: 'residency', type: 'radio', fields: ['residency'], required: true,
     label: 'What kind of stay are you looking for?',
-    options: ['Full-time resident', 'Short-term (sublet)'],
+    options: [
+      { label: 'Full-time resident', desc: "A long-term home — you're joining the house proper, usually a year or more." },
+      { label: 'Short-term (sublet)', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
+    ],
   },
   {
     id: 'move_in', type: 'date', fields: ['move_in'], required: true,
@@ -262,10 +265,15 @@ function inputHtml(q) {
   if (q.type === 'textarea') return `<textarea class="input textarea" id="f-${q.fields[0]}" maxlength="4000">${v(q.fields[0])}</textarea>`;
   if (q.type === 'radio') {
     const cur = state.answers[q.fields[0]] || '';
-    return q.options.map((opt, i) => `
-      <button type="button" class="apply-choice ${opt === cur ? 'selected' : ''}" data-value="${esc(opt)}">
-        <span class="apply-choice__key">${i + 1}</span>${esc(opt)}
-      </button>`).join('');
+    return q.options.map((opt, i) => {
+      const label = typeof opt === 'string' ? opt : opt.label;
+      const desc = typeof opt === 'string' ? '' : (opt.desc || '');
+      return `
+      <button type="button" class="apply-choice ${label === cur ? 'selected' : ''}" data-value="${esc(label)}">
+        <span class="apply-choice__key">${i + 1}</span>
+        <span class="apply-choice__body">${esc(label)}${desc ? `<span class="apply-choice__desc">${esc(desc)}</span>` : ''}</span>
+      </button>`;
+    }).join('');
   }
   if (q.type === 'date') {
     const cur = state.answers[q.fields[0]] || '';
@@ -323,6 +331,12 @@ function renderQuestion(q) {
 
   const submit = async () => {
     if (q.type === 'interstitial') return advance();
+    if (q.type === 'radio') {
+      // Selection already saved on click — Enter/Next just moves on, which
+      // is what makes a prefilled re-apply walk fast to step through.
+      if (q.required && !(state.answers[q.fields[0]] || '').trim()) return showErr('Pick one to continue.');
+      return advance();
+    }
     const fields = collect(q);
     if (q.required && Object.values(fields).every((x) => !x)) return showErr('This one’s required.');
     Object.assign(state.answers, fields);
@@ -349,8 +363,9 @@ function renderQuestion(q) {
       };
     });
     document.addEventListener('keydown', function pick(e) {
-      const i = parseInt(e.key, 10) - 1;
       if (state.screen !== 'q:' + q.id) return document.removeEventListener('keydown', pick);
+      if (e.key === 'Enter') { e.preventDefault(); return submit(); }
+      const i = parseInt(e.key, 10) - 1;
       if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
     });
   } else {
@@ -432,7 +447,10 @@ function renderLocked() {
     state.app = data;
     for (const q of QUESTIONS) for (const f of (q.fields || [])) state.answers[f] = data[f] || '';
     track('reapplied');
-    go('review'); // prefilled — they refresh what changed and resubmit
+    // Walk the whole form again, prefilled — stay type, move-in, and budget
+    // came back cleared (they age fastest), so those must be answered fresh.
+    state.fromReview = false;
+    go('q:' + QUESTIONS[0].id);
   };
   document.getElementById('signout').onclick = async () => { await sb.auth.signOut(); state.answers = {}; state.app = null; go('welcome'); };
 }

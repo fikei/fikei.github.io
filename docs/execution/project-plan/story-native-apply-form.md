@@ -19,7 +19,7 @@ Email became the auth step; first/last name share one screen; residency and budg
 
 ## Re-apply path (v1.1.0, migration 171)
 
-A rejected/archived applicant sees "Apply again" on the locked view (with the house's "check back around {month}" hint when `exit_reason='future'`). `recruit_apply_reapply` reopens the SAME row: prior outcome is snapshotted into a System comment, votes/decision/exit fields clear (a stale veto would instantly re-reject), the row becomes a hidden draft, and resubmitting stamps a fresh `submitted_at` so it sorts as new in the Inbox. Comments from the earlier round stay visible to reviewers.
+A rejected/archived applicant sees "Apply again" on the locked view (with the house's "check back around {month}" hint when `exit_reason='future'`). `recruit_apply_reapply` reopens the SAME row: prior outcome (including old stay type / move-in / budget) is snapshotted into a System comment, votes/decision/exit fields clear (a stale veto would instantly re-reject), and the time-sensitive answers — stay type, move-in, budget — reset (migration 172) so they must be answered fresh. The applicant then walks the full form again, prefilled where answers keep (v1.2.0: Enter auto-advances, radio options carry stay-type context blurbs), ending in the full review screen; resubmitting stamps a fresh `submitted_at` so it sorts as new in the Inbox. Comments from the earlier round stay visible to reviewers.
 
 ## Soft launch → cutover checklist
 
