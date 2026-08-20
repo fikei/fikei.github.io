@@ -2743,7 +2743,7 @@ button.link-subtle {
 .pipeline-table .col-fit      { width: 64px; white-space: nowrap; }
 .pipeline-table .col-strength { width: 78px; white-space: nowrap; }
 .pipeline-table .col-source   { width: 1%; min-width: 116px; white-space: nowrap; }
-.pipeline-table .col-added    { width: 88px;  white-space: nowrap; color: var(--text-muted); }
+.pipeline-table .col-added    { width: 88px;  white-space: nowrap; color: var(--fg-muted); font-size: var(--font-size-small); }
 
 /* Location nested under Role (company line) on every list view. Muted,
    single-line, with a small pin. Multiple locations collapse to "+N". */
@@ -3768,6 +3768,9 @@ button.link-subtle {
   .pipeline-table tr:has(.col-status) .col-sector { display: none; }
   /* col-signal has no grid-area assigned — let auto-flow ignore it. */
   .pipeline-table .col-signal { display: none; }
+  /* Added date is secondary — hidden on phones (it has no grid-area in the
+     card layout); the full date lives on the role detail page. */
+  .pipeline-table .col-added { display: none; }
   .pipeline-table .col-menu {
     grid-area: menu;
     width: auto;
@@ -4200,6 +4203,26 @@ button.link-subtle {
   color: var(--success);
   border-color: var(--success);
   background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+/* "Added" date-range filter in the pipeline meta bar (Saved bucket). A bare
+   select styled like the small btn pills it sits beside. */
+.added-filter select {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.added-filter.is-active select {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* Filled "Ready to submit" state — bank covers every required field. */
