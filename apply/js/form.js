@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -25,11 +25,12 @@ const QUESTIONS = [
     placeholder: 'she/her, they/them, …',
   },
   {
-    id: 'residency', type: 'radio', fields: ['residency'], required: true,
+    id: 'residency', type: 'multi', fields: ['residency'], required: true,
     label: 'What kind of stay are you looking for?',
+    hint: 'Pick one — or both, if you could see either working.',
     options: [
-      { label: 'Full-time resident', desc: "A long-term home — you're joining the house proper, usually a year or more." },
-      { label: 'Short-term (sublet)', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
+      { label: 'Full-time resident', desc: "A long-term home — you're joining the house proper, usually a year or more.", noteHint: 'anything about this? e.g. earliest you could commit (optional)' },
+      { label: 'Short-term (sublet)', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.', noteHint: 'anything about this? e.g. how long a sublet works for you (optional)' },
     ],
   },
   {
@@ -72,7 +73,29 @@ const QUESTIONS = [
     label: 'Where else can we find you?',
     hint: 'Both optional. A number helps when it comes time to schedule a tour.',
   },
+  {
+    id: 'anything_else', type: 'textarea', fields: ['anything_else'], required: false,
+    label: 'Anything else we should know?',
+    hint: "Totally optional — timing quirks, pets, questions for us, anything that didn't fit above.",
+  },
 ];
+
+/* Multi-choice values live in one TEXT column as a readable string:
+   "Full-time resident — from October | Short-term (sublet) — 3 months max".
+   Parses back leniently, so old single-value answers load fine. */
+function parseMulti(q, raw) {
+  const map = {};
+  for (const part of String(raw || '').split('|')) {
+    const p = part.trim();
+    if (!p) continue;
+    const opt = q.options.find((o) => p.startsWith(o.label));
+    if (!opt) continue;
+    map[opt.label] = p.slice(opt.label.length).replace(/^\s*—\s*/, '').trim();
+  }
+  return map;
+}
+const composeMulti = (map) =>
+  Object.entries(map).map(([label, note]) => (note ? `${label} — ${note}` : label)).join(' | ');
 
 /* ---------- state ---------- */
 const state = {
@@ -150,6 +173,7 @@ function progressFor(screen) {
 
 function go(screen) {
   state.screen = screen;
+  state._multiFor = null; // multi-choice screens re-parse their answer on entry
   $fill.style.width = progressFor(screen) + '%';
   $screen.classList.add('fade-out');
   setTimeout(() => {
@@ -275,6 +299,20 @@ function inputHtml(q) {
       </button>`;
     }).join('');
   }
+  if (q.type === 'multi') {
+    const sel = state._multi || {};
+    return q.options.map((opt, i) => {
+      const on = Object.prototype.hasOwnProperty.call(sel, opt.label);
+      return `
+      <div class="apply-field">
+        <button type="button" class="apply-choice ${on ? 'selected' : ''}" data-value="${esc(opt.label)}">
+          <span class="apply-choice__key">${on ? '✓' : i + 1}</span>
+          <span class="apply-choice__body">${esc(opt.label)}${opt.desc ? `<span class="apply-choice__desc">${esc(opt.desc)}</span>` : ''}</span>
+        </button>
+        ${on ? `<input class="input apply-choice__note" data-note="${esc(opt.label)}" placeholder="${esc(opt.noteHint || 'anything about this? (optional)')}" value="${esc(sel[opt.label] || '')}">` : ''}
+      </div>`;
+    }).join('');
+  }
   if (q.type === 'date') {
     const cur = state.answers[q.fields[0]] || '';
     const m = cur.match(/\d{4}-\d{2}-\d{2}/);
@@ -303,6 +341,13 @@ function collect(q) {
 
 function renderQuestion(q) {
   const idx = questionIndex(q.id);
+  // One document-level key handler at a time — toggle re-renders on multi
+  // screens would otherwise stack listeners and double-fire Enter.
+  if (state._keyHandler) { document.removeEventListener('keydown', state._keyHandler); state._keyHandler = null; }
+  if (q.type === 'multi' && state._multiFor !== q.id) {
+    state._multi = parseMulti(q, state.answers[q.fields[0]] || '');
+    state._multiFor = q.id;
+  }
   const n = QUESTIONS.filter((x) => x.type !== 'interstitial').indexOf(q) + 1;
   const total = QUESTIONS.filter((x) => x.type !== 'interstitial').length;
 
@@ -329,12 +374,24 @@ function renderQuestion(q) {
     }
   };
 
+  const syncMultiNotes = () => {
+    $screen.querySelectorAll('[data-note]').forEach((el) => { state._multi[el.dataset.note] = el.value.trim(); });
+  };
+
   const submit = async () => {
     if (q.type === 'interstitial') return advance();
     if (q.type === 'radio') {
       // Selection already saved on click — Enter/Next just moves on, which
       // is what makes a prefilled re-apply walk fast to step through.
       if (q.required && !(state.answers[q.fields[0]] || '').trim()) return showErr('Pick one to continue.');
+      return advance();
+    }
+    if (q.type === 'multi') {
+      syncMultiNotes();
+      const composed = composeMulti(state._multi);
+      if (q.required && !composed) return showErr('Pick at least one to continue.');
+      state.answers[q.fields[0]] = composed;
+      saveFields({ [q.fields[0]]: composed });
       return advance();
     }
     const fields = collect(q);
@@ -362,12 +419,32 @@ function renderQuestion(q) {
         setTimeout(advance, 200);
       };
     });
-    document.addEventListener('keydown', function pick(e) {
-      if (state.screen !== 'q:' + q.id) return document.removeEventListener('keydown', pick);
+    state._keyHandler = (e) => {
+      if (state.screen !== 'q:' + q.id) return;
       if (e.key === 'Enter') { e.preventDefault(); return submit(); }
       const i = parseInt(e.key, 10) - 1;
       if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
+    };
+    document.addEventListener('keydown', state._keyHandler);
+  } else if (q.type === 'multi') {
+    $screen.querySelectorAll('.apply-choice').forEach((el) => {
+      el.onclick = () => {
+        syncMultiNotes();
+        const label = el.dataset.value;
+        if (Object.prototype.hasOwnProperty.call(state._multi, label)) delete state._multi[label];
+        else state._multi[label] = '';
+        renderQuestion(q); // re-render so the context input follows the selection
+      };
     });
+    state._keyHandler = (e) => {
+      if (state.screen !== 'q:' + q.id) return;
+      const typing = e.target && e.target.matches && e.target.matches('input, textarea');
+      if (e.key === 'Enter') { e.preventDefault(); return submit(); }
+      if (typing) return; // digits belong to the note being typed
+      const i = parseInt(e.key, 10) - 1;
+      if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
+    };
+    document.addEventListener('keydown', state._keyHandler);
   } else {
     bindEnter(submit);
     const first = $screen.querySelector('input, textarea');

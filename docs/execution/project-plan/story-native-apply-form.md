@@ -21,6 +21,10 @@ Email became the auth step; first/last name share one screen; residency and budg
 
 A rejected/archived applicant sees "Apply again" on the locked view (with the house's "check back around {month}" hint when `exit_reason='future'`). `recruit_apply_reapply` reopens the SAME row: prior outcome (including old stay type / move-in / budget) is snapshotted into a System comment, votes/decision/exit fields clear (a stale veto would instantly re-reject), and the time-sensitive answers — stay type, move-in, budget — reset (migration 172) so they must be answered fresh. The applicant then walks the full form again, prefilled where answers keep (v1.2.0: Enter auto-advances, radio options carry stay-type context blurbs), ending in the full review screen; resubmitting stamps a fresh `submitted_at` so it sorts as new in the Inbox. Comments from the earlier round stay visible to reviewers.
 
+## v1.3.0 — both-tracks stay type + closing catch-all
+
+Stay type is multi-select: full-time, sublet, or both, each with an optional inline context note ("earliest you could commit", "how long a sublet works"). Stored readable in the existing `residency` TEXT column (`Full-time resident — note | Short-term (sublet) — note`); the triage app (v3.78.0) shows an `Either` track chip, matches both-track applicants to both listing kinds, and passes them through both track filters. New final question "Anything else we should know?" → `anything_else` column (migration 173), shown as its own profile section; ingest v1.7.1 maps it from sheet headers too.
+
 ## Soft launch → cutover checklist
 
 - [ ] Test cohort completes /apply end-to-end (watch `apply_step` vitals in /analytics for drop-off)
