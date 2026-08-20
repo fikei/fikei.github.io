@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.11.0'
+const VERSION = '1.12.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -198,7 +198,7 @@ function classifyOutreach(emails: any[], screening: any): { type: string; reason
 
 // Draft a tailored outreach email for an applicant + their listing.
 // deno-lint-ignore no-explicit-any
-async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string, ctx?: { type: string; emails: any[]; screening: any }): Promise<{ subject: string; body: string; added?: Array<{ what: string; why: string }> }> {
+async function draftEmail(applicant: any, listing: any, room: any, flags: any[], senderName: string, ctx?: { type: string; emails: any[]; screening: any; booked?: string | null }): Promise<{ subject: string; body: string; added?: Array<{ what: string; why: string }> }> {
   const trim = (t: string, n = 600) => (t || '').replace(/\s+/g, ' ').slice(0, n)
   const pricing = listing ? [
     listing.rent_monthly != null ? `$${listing.rent_monthly} rent (covers utilities and cleaners for common spaces)` : null,
@@ -221,6 +221,7 @@ async function draftEmail(applicant: any, listing: any, room: any, flags: any[],
       reply: `They wrote back last — respond directly and concretely to what they said (use the listing details below for pricing/dates if asked). If no call is booked yet, close with the call CTA — ${cta}. Under 140 words.`,
       post_call: `Their Intro Call with ${ctx.screening?.housemate_name || 'a housemate'} just happened. Thank them warmly, one specific human touch, and say the house will be in touch about next steps soon. Do NOT promise an outcome or timeline beyond "soon". Under 80 words.`,
       reschedule: `Their scheduled call fell through. Own it lightly (no blame either way) and reopen scheduling — ${cta}. Under 90 words.`,
+      accepted: `THE HOUSE SAID YES — we are accepting ${applicant.first_name}. ${ctx.booked || 'Their room is booked.'} Tell them warmly and plainly that we'd love to have them, confirm those specifics (the room, the dates, and what kind of stay it is — for a resident trial, say it's the trial period that leads to full residency, with a mutual check-in at the end), and give the next steps: confirm the move-in date works for them, and we'll follow up with move-in logistics (keys, what to bring, meeting the house). Genuine warmth, no corporate tone, and no conditions beyond what's stated here. Under 150 words.`,
       tour: `We want to invite them to VISIT THE HOUSE in person: a casual hang and a house tour where they'll meet more housemates. Warm and concrete. The ONE ask: send a few times in the next two weeks that work for them, and state plainly that Tuesday–Thursday evenings between 5 and 7pm work best on our end. State ONLY that general constraint — never explain WHY those hours work, and never mention family dinner or any other house ritual. Do NOT promise an outcome — a visit is the next step, not an offer. Under 120 words before any added items (see below).`,
     }
     briefs.visit = briefs.tour
@@ -336,9 +337,23 @@ serve(async (req) => {
       ])
       const cls = classifyOutreach(emails || [], screening)
       const type = typeof body.emailType === 'string' && body.emailType ? String(body.emailType) : cls.type
+      // The acceptance email is grounded in the actual booking, not the stale
+      // decision listing — the stay is what the accept flow just created.
+      let booked: string | null = null
+      if (type === 'accepted') {
+        const { data: stay } = await client.from('recruit_stays')
+          .select('room_id, kind, starts_on, ends_on')
+          .eq('applicant_id', applicant.id).neq('kind', 'shared')
+          .or(`ends_on.is.null,ends_on.gte.${new Date().toISOString().slice(0, 10)}`)
+          .order('starts_on', { ascending: false }).limit(1).maybeSingle()
+        if (stay) {
+          const r = (rooms || []).find((x) => x.id === stay.room_id)
+          booked = `Their booking: ${r?.name || 'a room'} — ${stay.kind === 'candidate' ? 'resident trial' : 'sublet'} from ${stay.starts_on}${stay.ends_on ? ` through ${stay.ends_on}` : ''}.`
+        }
+      }
       const draft = await draftEmail(applicant, listing, room, sug?.flags || [], prof?.discord_username || 'a housemate',
-        { type, emails: emails || [], screening })
-      return new Response(JSON.stringify({ ...draft, emailType: type, reason: cls.reason }), { headers: jsonHeaders })
+        { type, emails: emails || [], screening, booked })
+      return new Response(JSON.stringify({ ...draft, emailType: type, reason: type === 'accepted' ? '' : cls.reason }), { headers: jsonHeaders })
     }
 
     if (body.action === 'draft_update' && body.applicantId) {
