@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
