@@ -106,6 +106,27 @@ body {
   margin-top: 6px;
   font-size: var(--text-md) !important;
 }
+
+/* Per-track structured timing (date + flexible + context) under a selected choice */
+.apply-track {
+  border-left: 1px solid var(--border-subtle);
+  margin: 8px 0 4px 10px;
+  padding-left: 14px;
+}
+.apply-track .input[type="date"] { font-size: var(--text-md); }
+.apply-track__flexwrap { display: flex; align-items: flex-end; padding-bottom: 10px; }
+.apply-track__flex { display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; }
+
+/* Keycap hints (matches the triage review overlay's key affordances) */
+.apply-nav__enter kbd {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  border: 1px solid var(--border-subtle);
+  border-bottom-width: 2px;
+  padding: 1px 5px;
+  margin: 0 1px;
+}
 .apply-choice.selected .apply-choice__key { color: var(--fg); border-color: var(--fg); }
 
 /* Nav row under each question */

@@ -25,6 +25,10 @@ A rejected/archived applicant sees "Apply again" on the locked view (with the ho
 
 Stay type is multi-select: full-time, sublet, or both, each with an optional inline context note ("earliest you could commit", "how long a sublet works"). Stored readable in the existing `residency` TEXT column (`Full-time resident — note | Short-term (sublet) — note`); the triage app (v3.78.0) shows an `Either` track chip, matches both-track applicants to both listing kinds, and passes them through both track filters. New final question "Anything else we should know?" → `anything_else` column (migration 173), shown as its own profile section; ingest v1.7.1 maps it from sheet headers too.
 
+## v1.4.0 — structured tracks + keyboard nav
+
+The stay question absorbs move-in: each selected track (full-time / sublet) carries its own structured timing — soonest move-in date, "my timing is flexible" toggle, optional context — stored per-track in `move_in` ("Full-time: 2026-11-15 (flexible — note) | Sublet: …"; single-track keeps the legacy plain format). Full-time context calls out the three-month resident trial. Keyboard scheme on every question: Enter next (Cmd/Ctrl+Enter in textareas), ←/→ move when not typing, Esc jumps to the overview; keycap hints shown in the nav. Triage v3.79.0 parses ISO dates in `normalizeMoveIn`.
+
 ## Soft launch → cutover checklist
 
 - [ ] Test cohort completes /apply end-to-end (watch `apply_step` vitals in /analytics for drop-off)
