@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.36.0'
+const VERSION = '1.37.1'
 console.log(`[recruit-gmail] v${VERSION} — connect triggers an application-sheet pull so reconnecting catches up new applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -960,18 +960,53 @@ serve(async (req) => {
       const text = String(body.body || '').slice(0, 10000)
       if (!subject || !text) return json({ error: 'Subject and body required' }, 400)
 
+      // Optional cc (the welcome email copies the finance folks) and
+      // attachments (the agreement PDF rides along). Attachments flip the
+      // MIME to multipart/mixed; a plain send stays exactly what it was.
+      const cc = (Array.isArray(body.cc) ? body.cc : [])
+        .map((e: unknown) => String(e || '').trim()).filter((e: string) => e.includes('@')).slice(0, 5)
+      const attachments = (Array.isArray(body.attachments) ? body.attachments : [])
+        .filter((a: Record<string, unknown>) => a && typeof a.dataBase64 === 'string' && a.dataBase64)
+        .slice(0, 3)
+        .map((a: Record<string, unknown>) => ({
+          filename: String(a.filename || 'attachment.pdf').replace(/[\r\n"]/g, '').slice(0, 120),
+          mimeType: String(a.mimeType || 'application/pdf').replace(/[\r\n]/g, ''),
+          dataBase64: String(a.dataBase64),
+        }))
+
       const at = await accessToken(client)
       // RFC 2047 encode the subject for safety with unicode
       const encSubject = `=?UTF-8?B?${b64url(subject).replace(/-/g, '+').replace(/_/g, '/')}?=`
-      const raw = [
+      const headers = [
         `From: Agape <${SHARED_EMAIL}>`,
         `To: ${applicant.email}`,
+        ...(cc.length ? [`Cc: ${cc.join(', ')}`] : []),
         `Subject: ${encSubject}`,
         'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        '',
-        text,
-      ].join('\r\n')
+      ]
+      let raw: string
+      if (attachments.length) {
+        const boundary = `agape_${crypto.randomUUID().replace(/-/g, '')}`
+        const parts = [
+          `--${boundary}`,
+          'Content-Type: text/plain; charset=UTF-8',
+          '',
+          text,
+          ...attachments.flatMap((a: { filename: string; mimeType: string; dataBase64: string }) => [
+            `--${boundary}`,
+            `Content-Type: ${a.mimeType}; name="${a.filename}"`,
+            'Content-Transfer-Encoding: base64',
+            `Content-Disposition: attachment; filename="${a.filename}"`,
+            '',
+            // Gmail accepts long base64 lines, but fold to 76 chars for safety.
+            a.dataBase64.replace(/.{76}/g, '$&\r\n'),
+          ]),
+          `--${boundary}--`,
+        ]
+        raw = [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, '', ...parts].join('\r\n')
+      } else {
+        raw = [...headers, 'Content-Type: text/plain; charset=UTF-8', '', text].join('\r\n')
+      }
       const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
         method: 'POST',
         headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
@@ -1004,6 +1039,112 @@ serve(async (req) => {
       }
       console.log(`sent → ${applicant.email} (${sent.id})`)
       return json({ sent: true, gmailId: sent.id })
+    }
+
+    if (action === 'generate-agreement') {
+      /* The housemate agreement, generated from a Drive template Doc into the
+         agreements folder, merge fields replaced, exported as PDF for the
+         welcome email. The stay's agreement_url is the record — regenerating
+         re-exports the SAME doc rather than littering the folder with copies.
+         Docs batchUpdate and Drive export both run on the drive scope the
+         shared account already granted; no reconsent. */
+      const stayId = String(body.stayId || '')
+      const { data: stay } = await client.from('recruit_stays')
+        .select('id, occupant, kind, starts_on, ends_on, movein, agreement_url')
+        .eq('id', stayId).maybeSingle()
+      if (!stay) return json({ error: 'No such stay' }, 404)
+      const mv = (stay.movein || {}) as Record<string, unknown>
+      const gset = async (key: string, fallback = '') => {
+        const { data } = await client.from('recruit_settings').select('value').eq('key', key).maybeSingle()
+        const v = data?.value
+        return v == null || v === '' ? fallback : String(v)
+      }
+      const templateId = String(body.templateId || await gset('agreement_template_doc_id'))
+      const folderId = String(body.folderId || await gset('agreement_folder_id'))
+      if (!templateId || !folderId) {
+        return json({ error: 'Set the agreement template Doc ID and folder ID in Settings → Move-in first' }, 400)
+      }
+
+      const at = await accessToken(client)
+      const DRIVE = 'https://www.googleapis.com/drive/v3'
+      const driveJson = async (url: string, init?: RequestInit) => {
+        const resp = await fetch(url, {
+          ...(init || {}),
+          headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
+        })
+        const out = await resp.json().catch(() => ({}))
+        if (!resp.ok) throw new Error(`Drive ${resp.status}: ${JSON.stringify(out).slice(0, 200)}`)
+        return out
+      }
+      const fmtLong = (iso: string) => iso
+        ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ })
+        : ''
+      const money = (v: unknown) => v == null || v === '' ? '' : `$${Number(v).toLocaleString('en-US')}`
+
+      /* A merged doc can't be re-merged — the {{tokens}} are gone. So a
+         SIGNED agreement is reused as-is (it's the record), and anything
+         unsigned gets a fresh copy with the current numbers, the old copy
+         trashed so the folder never holds two versions of one person. */
+      const prevDocId = (stay.agreement_url || '').match(/\/d\/([\w-]+)/)?.[1] || null
+      let docId = prevDocId
+      const isNew = !prevDocId || !stay.agreement_signed_at
+      if (isNew) {
+        const name = `${stay.occupant || 'Housemate'} - Agape Housemate Agreement`
+        const copy = await driveJson(`${DRIVE}/files/${templateId}/copy?supportsAllDrives=true`, {
+          method: 'POST', body: JSON.stringify({ name, parents: [folderId] }),
+        })
+        docId = copy.id
+        if (!docId) throw new Error('Drive returned no file id for the agreement copy')
+        if (prevDocId && prevDocId !== docId) {
+          await driveJson(`${DRIVE}/files/${prevDocId}?supportsAllDrives=true`, {
+            method: 'PATCH', body: JSON.stringify({ trashed: true }),
+          }).catch((e) => console.warn(`old agreement not trashed: ${(e as Error).message}`))
+        }
+      }
+
+      if (isNew) {
+        const fields: Record<string, string> = {
+          housemate_name: stay.occupant || '',
+          move_in: fmtLong(stay.starts_on),
+          move_out: fmtLong(stay.ends_on || ''),
+          rent: money(mv.rent), dues: money(mv.dues), food: money(mv.food),
+          total: money(mv.total), deposit: money(mv.deposit),
+          master_tenant: await gset('master_tenant_name'),
+          master_rent: money(await gset('master_rent_monthly', '19500')),
+          today: fmtLong(new Date().toISOString().slice(0, 10)),
+        }
+        const requests = Object.entries(fields).map(([k, v]) => ({
+          replaceAllText: { containsText: { text: `{{${k}}}`, matchCase: false }, replaceText: v || '—' },
+        }))
+        const docsResp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests }),
+        })
+        if (!docsResp.ok) {
+          const errText = await docsResp.text()
+          throw new Error(`Docs merge failed (${docsResp.status}): ${errText.slice(0, 200)}`)
+        }
+      }
+
+      const pdfResp = await fetch(`${DRIVE}/files/${docId}/export?mimeType=application/pdf`, {
+        headers: { Authorization: `Bearer ${at}` },
+      })
+      if (!pdfResp.ok) throw new Error(`PDF export failed (${pdfResp.status})`)
+      const bytes = new Uint8Array(await pdfResp.arrayBuffer())
+      let bin = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      }
+      const pdfBase64 = btoa(bin)
+
+      const docUrl = `https://docs.google.com/document/d/${docId}/edit`
+      await client.from('recruit_stays').update({ agreement_url: docUrl, updated_at: new Date().toISOString() }).eq('id', stay.id)
+      console.log(`agreement ${isNew ? 'generated' : 're-exported'} for stay ${stay.id} (${docId})`)
+      return json({
+        docUrl, pdfBase64,
+        filename: `${(stay.occupant || 'Housemate').replace(/[^\w -]/g, '')} - Agape Housemate Agreement.pdf`,
+      })
     }
 
     if (action === 'sync') {

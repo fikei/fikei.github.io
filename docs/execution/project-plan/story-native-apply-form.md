@@ -1,0 +1,45 @@
+# Story: Native application form (/apply)
+
+**Status:** built — in soft launch
+**Replaces:** Google Form → Google Sheet → `recruit-ingest` as the primary application path
+
+## What shipped
+
+- **ctrl.rodeo/apply** — Typeform-style application: one question per screen, Sassy dark theme, progress line, keyboard-first (Enter advances, number keys pick radio options).
+- **Applicant login** — email OTP (`signInWithOtp` + inline `verifyOtp`, no redirect). Auth is question one, so every later answer autosaves server-side; applicants return any time to finish or edit.
+- **Edit-until-decision** — applications stay editable while `stage = 'review'`; the `recruit_apply_save` RPC enforces the lock server-side. Locked view shows status.
+- **Row claiming** — a sheet-era applicant signing in with the same (verified) email adopts their existing row rather than creating a twin.
+- **Schema** (migration 170): `recruit_applicants` + `user_id`, `is_submitted`, `updated_at`, `source (sheet|native|manual)`; RPCs `recruit_apply_load/save/submit` (SECURITY DEFINER — applicants only ever see form columns, never internal notes).
+- **Triage app v3.77.0** — hides native drafts, shows a `native` badge and "updated Xh ago" on edited applications. No pipeline changes.
+- **Ingest v1.7.0** — stamps `source: 'sheet'`; email dedupe protects native rows from being twinned or shadowed.
+
+## Revised field set (vs. the Google Form)
+
+Email became the auth step; first/last name share one screen; residency and budget became structured choices; move-in became a date ("soonest you could move in" + flexible toggle, copy notes that people who can move when a spot opens are prioritized); an interstitial before the three essays says a real person reads every application. Phone + social share one optional closing screen. Values store as label strings in the existing TEXT columns, so triage and ingest needed no mapping changes.
+
+## Re-apply path (v1.1.0, migration 171)
+
+A rejected/archived applicant sees "Apply again" on the locked view (with the house's "check back around {month}" hint when `exit_reason='future'`). `recruit_apply_reapply` reopens the SAME row: prior outcome (including old stay type / move-in / budget) is snapshotted into a System comment, votes/decision/exit fields clear (a stale veto would instantly re-reject), and the time-sensitive answers — stay type, move-in, budget — reset (migration 172) so they must be answered fresh. The applicant then walks the full form again, prefilled where answers keep (v1.2.0: Enter auto-advances, radio options carry stay-type context blurbs), ending in the full review screen; resubmitting stamps a fresh `submitted_at` so it sorts as new in the Inbox. Comments from the earlier round stay visible to reviewers.
+
+## v1.3.0 — both-tracks stay type + closing catch-all
+
+Stay type is multi-select: full-time, sublet, or both, each with an optional inline context note ("earliest you could commit", "how long a sublet works"). Stored readable in the existing `residency` TEXT column (`Full-time resident — note | Short-term (sublet) — note`); the triage app (v3.78.0) shows an `Either` track chip, matches both-track applicants to both listing kinds, and passes them through both track filters. New final question "Anything else we should know?" → `anything_else` column (migration 173), shown as its own profile section; ingest v1.7.1 maps it from sheet headers too.
+
+## v1.4.0 — structured tracks + keyboard nav
+
+The stay question absorbs move-in: each selected track (full-time / sublet) carries its own structured timing — soonest move-in date, "my timing is flexible" toggle, optional context — stored per-track in `move_in` ("Full-time: 2026-11-15 (flexible — note) | Sublet: …"; single-track keeps the legacy plain format). Full-time context calls out the three-month resident trial. Keyboard scheme on every question: Enter next (Cmd/Ctrl+Enter in textareas), ←/→ move when not typing, Esc jumps to the overview; keycap hints shown in the nav. Triage v3.79.0 parses ISO dates in `normalizeMoveIn`.
+
+## Soft launch → cutover checklist
+
+- [ ] Test cohort completes /apply end-to-end (watch `apply_step` vitals in /analytics for drop-off)
+- [ ] Native submissions triaged alongside sheet rows for 2–4 weeks
+- [ ] Flip the public application link to ctrl.rodeo/apply
+- [ ] Close the Google Form with a redirect message
+- [ ] Sheet ingest cron stays as fallback for manual sheet additions (decommission decision later)
+
+## References
+
+- Migration: `supabase/migrations/170_recruit_native_apply.sql`
+- Form: `apply/index.html`, `apply/js/form.js`, `apply/css/form.css`
+- Dual-path ingest: `docs/infrastructure/recruiting-sheet-ingest.md` § Dual ingestion
+- Wizard CSS classes: `design-system/README.md` § Apply wizard
