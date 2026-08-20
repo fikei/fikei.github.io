@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.76.0';
+const VERSION = '3.77.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -772,8 +772,11 @@ async function loadAll() {
     sendUpdateWith = updateEmailDefault();
   });
   if (aRes.error) throw aRes.error;
-  applicants = (aRes.data || []).map(r => ({
+  // Native drafts (someone mid-way through /apply) are not applications yet
+  // — they enter the funnel when the applicant hits Submit.
+  applicants = (aRes.data || []).filter(r => r.is_submitted !== false).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
+    updatedAt: r.updated_at || null, origin: r.source || 'sheet',
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, phone: r.phone || '', social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
@@ -4871,14 +4874,14 @@ function renderReview() {
           <p class="review__meta"><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></p>
           <div class="review__badges">
             <span class="review__badge review__badge--track">${trackLabel(a)}</span>
-
+            ${a.origin === 'native' ? '<span class="review__badge" title="Applied through ctrl.rodeo/apply — they can edit their answers until a decision">native</span>' : ''}
           </div>
           <div class="review__facts">
             <div class="review__fact"><span class="review__fact-label">Move-in</span>${moveInFactHtml(a, miNorm)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Phone</span>${phoneFactHtml(a)}</div>
             ${a.source ? `<div class="review__fact"><span class="review__fact-label">Via</span><span class="review__fact-value review__fact-value--quiet">${esc(a.source)}</span></div>` : ''}
-            <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+            <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}${a.updatedAt && (new Date(a.updatedAt) - new Date(a.ts_iso)) > 3600e3 ? ` <span class="review__fact-value--quiet" title="They edited their application on /apply">· updated ${relTime(a.updatedAt)}</span>` : ''}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
           </div>
         </div>

@@ -40,6 +40,10 @@
 
 ## Recent Milestones
 
+### Recruiting — native application form (/apply) with applicant login
+**Shipped: 2026-08-20** — the Agape application moves off Google Forms onto ctrl.rodeo/apply: Typeform-style one-question-per-screen flow on the Sassy design system, email-OTP login as question one so every answer autosaves server-side, and applications stay editable until the house decides. Sheet-era applicants signing in with the same email claim their existing row. Soft launch: unlisted URL, sheet ingest still live as fallback. Details: [story-native-apply-form.md](./story-native-apply-form.md)
+- Versions: apply v1.0.0 (new), applications v3.76.0→v3.77.0, recruit-ingest v1.6.0→v1.7.0, migration 170
+
 ### Ladder — ATS boards (job-radar) source + two-track grading
 **Shipped: 2026-08-06** — the `/job-radar` skill's local ATS sweep (~64 outdoor/soft-goods boards, first-party APIs only) now feeds Ladder as a peer of the Gmail source. `push_to_ladder.py` → `ats-radar-ingest` → `job.ats_radar_scans` staging → `ats-radar` source plugin through the normal pull-recommendations stack (gate, dedupe, Haiku grading, bullets). Liveness honors the skill's prime directive: only boards verified this scan can close recs; unverified boards surface as a Sources-row health note, never as "no openings". Track A (production soft goods — PLM / product developer / equipment design leadership / senior sourcing) added to /ladder/vision/ Targets with its own titles, framing, and ~$70k comp floor; grading measures each role against its own track instead of averaging.
 - Versions: ladder v2.40.2→v2.41.0, pull-recommendations v0.30.4→v0.31.0, recommendations v0.22.1→v0.23.0, add-role v0.7.0→v0.7.1, ats-radar-ingest v1.0.0 (new), migration 165
