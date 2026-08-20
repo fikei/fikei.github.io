@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.80.0';
+const VERSION = '3.81.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -2760,7 +2760,7 @@ function placementChip(a) {
 }
 
 /* Booked people carry the answer on the row: which room, which kind of stay,
-   from when. The trial's next step (Welcome in) lives in the calendar drawer. */
+   from when. The trial's next step (Change to resident) lives in the calendar drawer. */
 function bookedChip(a) {
   const s = liveStayFor(a.id);
   if (!s) return '';
@@ -3962,39 +3962,122 @@ function voteCloseOn(iso) {
    none. The form below still edits the trial itself; this is the door out. */
 let promoting = null;   // stay id currently showing the confirm strip
 
-function promoteBlockHtml(s) {
-  if (!s.id || s.kind !== 'candidate') return '';
-  const trialEnd = s.ends_on;
-  const start = trialEnd ? isoAddDays(trialEnd, 1) : new Date().toISOString().slice(0, 10);
-  if (promoting !== s.id) {
-    return `<div class="occ-drawer__promote">
-      <button type="button" class="drawer-cta__alt" data-promote-open="${s.id}">
-        <span>Welcome in</span>
-        <span class="drawer-cta__exit-hint">Ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}.</span>
-      </button>
-    </div>`;
+/* The bottom action area of a stay drawer — every transition a stay can make,
+   in one place: trial → resident ("Change to resident"), sublet → trial
+   ("Add resident trial"), and the pre-move-in undo ("Step back"). The stay
+   form above only edits the stay; these are the doors out of it. */
+function stayTransitionsHtml(s) {
+  if (!s.id || s.kind === 'shared') return '';
+  const today = new Date().toISOString().slice(0, 10);
+  const parts = [];
+
+  if (s.kind === 'candidate') {
+    const trialEnd = s.ends_on;
+    const start = trialEnd ? isoAddDays(trialEnd, 1) : today;
+    if (promoting === s.id) {
+      return `<form class="occ-drawer__promote occ-drawer__promote--open" data-promote-form="${s.id}">
+        <div class="occ-drawer__section">Make ${esc(s.occupant || 'them')} a resident</div>
+        <div class="occ-drawer__dates">
+          <label class="listing-form__field">Room
+            <select name="room_id" class="listing-status">
+              ${rooms.map(r => `<option value="${r.id}" ${r.id === s.room_id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="listing-form__field">Resident from
+            <input type="date" name="starts_on" class="listing-status" value="${start}" required>
+          </label>
+        </div>
+        <p class="occ-drawer__note">The trial closes the day before, so the timeline has no gap. An onboarding checklist gets created for the house to work through.</p>
+        <p class="listing-form__error" data-promote-error></p>
+        <div class="drawer-cta">
+          <div class="drawer-cta__row">
+            <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
+            <button type="submit" class="btn btn--accent drawer-cta__commit">Change to resident</button>
+          </div>
+        </div>
+      </form>`;
+    }
+    parts.push(`<button type="button" class="drawer-cta__alt" data-promote-open="${s.id}">
+      <span>Change to resident</span>
+      <span class="drawer-cta__exit-hint">ends the trial and starts an open-ended residency${trialEnd ? ` on ${fmtShort(start)}` : ''}</span>
+    </button>`);
   }
-  return `<form class="occ-drawer__promote occ-drawer__promote--open" data-promote-form="${s.id}">
-    <div class="occ-drawer__section">Welcome ${esc(s.occupant || 'them')} in</div>
-    <div class="occ-drawer__dates">
-      <label class="listing-form__field">Room
-        <select name="room_id" class="listing-status">
-          ${rooms.map(r => `<option value="${r.id}" ${r.id === s.room_id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
-        </select>
-      </label>
-      <label class="listing-form__field">Resident from
-        <input type="date" name="starts_on" class="listing-status" value="${start}" required>
-      </label>
-    </div>
-    <p class="occ-drawer__note">The trial closes the day before, so the timeline has no gap. An onboarding checklist gets created for the house to work through.</p>
-    <p class="listing-form__error" data-promote-error></p>
-    <div class="drawer-cta">
-      <div class="drawer-cta__row">
-        <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
-        <button type="submit" class="btn btn--accent drawer-cta__commit">Welcome in</button>
-      </div>
-    </div>
-  </form>`;
+
+  if (s.kind === 'sublet') {
+    const start = s.ends_on ? isoAddDays(s.ends_on, 1) : today;
+    if (promoting === s.id) {
+      return `<form class="occ-drawer__promote occ-drawer__promote--open" data-s2t-form="${s.id}">
+        <div class="occ-drawer__section">Start ${esc(s.occupant || 'their')} resident trial</div>
+        <div class="occ-drawer__dates">
+          <label class="listing-form__field">Room
+            <select name="room_id" class="listing-status">
+              ${rooms.map(r => `<option value="${r.id}" ${r.id === s.room_id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="listing-form__field">Trial from
+            <input type="date" name="starts_on" class="listing-status" value="${start}" required>
+          </label>
+        </div>
+        <label class="listing-form__field">Through
+          <input type="date" name="ends_on" class="listing-status" value="${addMonthsIso2(start, setting('trial_length_months'))}" required>
+        </label>
+        <p class="occ-drawer__note">The sublet closes the day before, so the timeline has no gap. Check-in and decision milestones are prefilled from the trial settings.</p>
+        <p class="listing-form__error" data-s2t-error></p>
+        <div class="drawer-cta">
+          <div class="drawer-cta__row">
+            <button type="button" class="drawer-cta__quiet" data-promote-cancel>Cancel</button>
+            <button type="submit" class="btn btn--accent drawer-cta__commit">Add resident trial</button>
+          </div>
+        </div>
+      </form>`;
+    }
+    parts.push(`<button type="button" class="drawer-cta__alt" data-s2t-open="${s.id}">
+      <span>Add resident trial</span>
+      <span class="drawer-cta__exit-hint">they're staying to try for residency — the trial starts when the sublet ends</span>
+    </button>`);
+  }
+
+  // The pre-move-in undo, for anyone the accept flow booked.
+  const exits = [];
+  if (s.applicant_id && s.kind !== 'resident' && s.starts_on > today) {
+    exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-unbook="${s.id}">
+      <span class="drawer-cta__exit-label">Step back — reopen the listing</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&#8617;</span>
+      <span class="drawer-cta__exit-hint">removes this booking, reopens the room's listing, and puts them back on it as a candidate — everyone else returns too, unless a recruiter removed them</span>
+    </button>`);
+  }
+
+  if (!parts.length && !exits.length) return '';
+  return `<div class="drawer-cta occ-drawer__promote">
+    ${parts.join('')}
+    ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
+  </div>`;
+}
+
+async function submitSubletToTrial(form) {
+  const stayId = form.dataset.s2tForm;
+  const err = form.querySelector('[data-s2t-error]');
+  const fd = new FormData(form);
+  const s = stays.find(x => x.id === stayId);
+  const startsOn = fd.get('starts_on');
+  const endsOn = fd.get('ends_on');
+  if (!startsOn) { err.textContent = 'Pick the day the trial starts.'; return; }
+  if (endsOn && endsOn < startsOn) { err.textContent = '"Through" must be at or after "From".'; return; }
+  const { error } = await sb.rpc('recruit_sublet_to_trial', {
+    p_stay_id: stayId,
+    p_room_id: +fd.get('room_id'),
+    p_starts_on: startsOn,
+    p_ends_on: endsOn || null,
+    p_checkin_on: trialCheckinDefault(startsOn),
+    p_decision_on: endsOn ? trialDecisionDefault(endsOn) : null,
+  });
+  if (error) { err.textContent = error.message; return; }
+  promoting = null;
+  occDrawer = null;
+  await Promise.all([loadHouse(), loadAll()]);
+  toast(`${s?.occupant || 'They'} are on a resident trial from ${fmtDay(startsOn)}`);
+  renderRailCounts();
+  renderOccupancy();
 }
 
 /* --- onboarding checklist ---
@@ -4044,6 +4127,29 @@ function moveinPanelHtml(s) {
       <span class="drawer-cta__exit-hint">confirm money, buddy, and links — then ${s.welcome_email_sent_at ? 're-draft' : 'draft'} the welcome email</span>
     </button>
   </div>`;
+}
+
+/* The accept flow's undo, pre-move-in only. One RPC (migration 175): stay
+   deleted, listing reopened, the person back on the shortlist. The sweep
+   right after brings back everyone else who still qualifies — tombstones
+   (real recruiter removals) keep holding. Decision and stage stand. */
+async function unbookStay(stayId) {
+  const s = stays.find(x => x.id === stayId);
+  if (!s) return;
+  const a = applicants.find(x => x.id === s.applicant_id);
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  if (!confirm(`Step ${s.occupant || 'them'} back from ${room?.name || 'the room'}?\n\nThe booking comes off the calendar, the listing reopens, and they go back onto it as a candidate. Their accept decision stays on record.`)) return;
+  const { error } = await sb.rpc('recruit_unbook_stay', { p_stay_id: stayId });
+  if (error) { toast(`Couldn't step back: ${error.message}`); return; }
+  occDrawer = null;
+  await Promise.all([loadHouse(), loadAll()]);
+  const readded = await syncAutoPlacements();
+  toast(`${s.occupant || 'They'} stepped back — listing reopened${readded ? ` · ${readded} candidate${readded === 1 ? '' : 's'} re-placed` : ''}`);
+  if (a) logEvent('event_stage', a.id, fullName(a),
+    `${me.name || 'A housemate'} stepped {} back from ${room?.name || 'a room'} before move-in — the listing is open again.`);
+  renderRailCounts();
+  renderOccupancy();
+  if (VIEWS[view]?.kind === 'applicants') renderApplicants();
 }
 
 async function toggleAgreementSigned(stayId, signed) {
@@ -4304,7 +4410,9 @@ function renderOccDrawer() {
     const room = rooms.find(r => r.id === s.room_id);
     title = s.occupant || KIND_LABELS[s.kind];
     sub = `${room?.name || 'Room'} · ${KIND_LABELS[s.kind]} · ${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
-    body = promoteBlockHtml(s) + stayFormHtml(s, s.room_id) + moveinPanelHtml(s) + onboardingHtml(s);
+    // Read top to bottom: edit the stay, its move-in state, the checklist,
+    // then the ways OUT of it — transitions live in the bottom action area.
+    body = stayFormHtml(s, s.room_id) + moveinPanelHtml(s) + onboardingHtml(s) + stayTransitionsHtml(s);
   } else if (occDrawer.type === 'gap') {
     const room = rooms.find(r => r.id === occDrawer.roomId);
     title = `${room?.name || 'Room'} — open`;
@@ -4376,8 +4484,19 @@ function renderOccDrawer() {
     e.preventDefault();
     submitPromote(e.target);
   });
+  hostWrap.querySelector('[data-s2t-open]')?.addEventListener('click', e => {
+    promoting = e.currentTarget.dataset.s2tOpen;
+    renderOccDrawer();
+  });
+  hostWrap.querySelector('[data-s2t-form]')?.addEventListener('submit', e => {
+    e.preventDefault();
+    submitSubletToTrial(e.target);
+  });
   hostWrap.querySelector('[data-movein-open]')?.addEventListener('click', e => {
     openMoveinConfirm(e.currentTarget.dataset.moveinOpen);
+  });
+  hostWrap.querySelector('[data-unbook]')?.addEventListener('click', e => {
+    unbookStay(e.currentTarget.dataset.unbook);
   });
   hostWrap.querySelector('[data-agreement-signed]')?.addEventListener('change', e => {
     toggleAgreementSigned(e.target.dataset.agreementSigned, e.target.checked);
@@ -5438,7 +5557,7 @@ function renderReviewFoot(a) {
         ${promoted ? `<span class="verdict-tag is-forward foot-promoted">Now a candidate</span>` : ''}
         ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
         <span class="foot-cta">${trial
-          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Welcome in</button>`
+          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Change to resident</button>`
           : openingsCta(a)}</span>
         <span class="foot-links">
           ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
