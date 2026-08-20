@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.37.0'
+const VERSION = '1.37.1'
 console.log(`[recruit-gmail] v${VERSION} — connect triggers an application-sheet pull so reconnecting catches up new applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -1081,16 +1081,25 @@ serve(async (req) => {
         : ''
       const money = (v: unknown) => v == null || v === '' ? '' : `$${Number(v).toLocaleString('en-US')}`
 
-      // Reuse the existing doc when there is one; otherwise copy the template.
-      let docId = (stay.agreement_url || '').match(/\/d\/([\w-]+)/)?.[1] || null
-      const isNew = !docId
-      if (!docId) {
+      /* A merged doc can't be re-merged — the {{tokens}} are gone. So a
+         SIGNED agreement is reused as-is (it's the record), and anything
+         unsigned gets a fresh copy with the current numbers, the old copy
+         trashed so the folder never holds two versions of one person. */
+      const prevDocId = (stay.agreement_url || '').match(/\/d\/([\w-]+)/)?.[1] || null
+      let docId = prevDocId
+      const isNew = !prevDocId || !stay.agreement_signed_at
+      if (isNew) {
         const name = `${stay.occupant || 'Housemate'} - Agape Housemate Agreement`
         const copy = await driveJson(`${DRIVE}/files/${templateId}/copy?supportsAllDrives=true`, {
           method: 'POST', body: JSON.stringify({ name, parents: [folderId] }),
         })
         docId = copy.id
         if (!docId) throw new Error('Drive returned no file id for the agreement copy')
+        if (prevDocId && prevDocId !== docId) {
+          await driveJson(`${DRIVE}/files/${prevDocId}?supportsAllDrives=true`, {
+            method: 'PATCH', body: JSON.stringify({ trashed: true }),
+          }).catch((e) => console.warn(`old agreement not trashed: ${(e as Error).message}`))
+        }
       }
 
       if (isNew) {
