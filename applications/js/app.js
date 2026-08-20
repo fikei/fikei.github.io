@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.79.0';
+const VERSION = '3.80.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -785,7 +785,7 @@ async function loadAll() {
   applicants = (aRes.data || []).filter(r => r.is_submitted !== false).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
     updatedAt: r.updated_at || null, origin: r.source || 'sheet',
-    anythingElse: r.anything_else || '',
+    anythingElse: r.anything_else || '', community: r.community || '',
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, phone: r.phone || '', social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
@@ -5200,6 +5200,7 @@ function renderReview() {
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
+    ${section('Community', a.community)}
     ${section('Anything else', a.anythingElse)}
     ${stagesHtml(a)}
     ${availabilityHtml(a)}
