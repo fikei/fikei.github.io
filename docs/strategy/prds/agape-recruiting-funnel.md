@@ -131,6 +131,70 @@ excluded: age/DOB and gender — fair-housing risk, and pronouns already cover
 presentation. `recruit_update_profile` is the intended home for any of these
 that get promoted: one parameter per editable field.
 
+### v3.75.0 (2026-08-19): the accept flow — decision to booked room in one step
+
+"Yes — accept" used to write a decision row and stop. Filling the room was
+three disconnected manual steps in Occupancy: a free-text stay form that never
+set `applicant_id` (the exact drift migration 141 was written to stop), a
+separate "mark filled" on the listing, and remembering to do both —
+`listing_filled_no_stay` existed purely to nag about the halves coming apart.
+
+**`recruit_accept_applicant`** (migration 168) is the bridge, one transaction:
+
+- a `recruit_stays` row **linked to the application** — trial (`candidate`)
+  for resident-track listings with check-in/decision milestones prefilled from
+  the trial settings, `sublet` otherwise;
+- the listing marked `filled`;
+- their placements tombstoned (so the sweep never re-adds them);
+- stage/exit normalized (a saved-for-future person who gets booked stops
+  reading as parked). Guards: listing must be open, no double-booking someone
+  who already has a live stay.
+
+**UX.** Saving a yes in "Would you accept them?" rolls straight into **Book
+them in**: listing (defaulting to their placement), from/through dates
+(trial length from `trial_length_months`), one consequence line. Closable —
+"Not yet" leaves them a decided-yes candidate, and the row's ⋮ menu carries
+**Book them in…** until they're on the calendar. After booking, the email
+modal opens with a new `accepted` draft type (`recruit-match` v1.12.0),
+grounded in the actual stay (room, kind, dates), sending optional as always.
+Booked people show a `booked · Room trial/sublet` chip in Candidates and
+Screening, leave the auto-placement sweep, and the chasing notifications
+(parked/placed/follow-up/decide) are acked. Single-decider throughout — the
+accept, the booking, and the eventual Welcome-in are each one person's call.
+
+**Welcome in** (`recruit_promote_stay`) is unchanged: still the only door from
+trial to residency. Sublets never promote — their stay just runs out its dates,
+at which point the person becomes placeable again (or gets a real exit from
+the Remove sheet).
+
+### v3.76.0 (2026-08-19): accept & book is one click
+
+The two-modal accept ("yes" sheet, then a booking sheet) was clunky in
+practice. The room half now lives **inside** the accept modal: when they're
+unbooked and a listing is open, the modal shows the listing (their placement,
+switchable only when more than one is open) and prefilled from/through dates,
+and the primary button reads **Yes — accept & book the room** — one click
+writes the decision and runs `recruit_accept_applicant`. A quiet **Accept
+without booking** link keeps decide-now-book-later; that later path is the ⋮
+menu's **Set their move-in…** (renamed from "Book them in…"), a thin sheet
+over the same `bookApplicant()` core. If the booking half fails the decision
+still stands and the error shows in place.
+
+Two more rules from the same feedback round:
+
+- **Set their move-in… is available at any stage, like Remove** — in the
+  Openings ⋮ menu unconditionally, and in the review overlay footer for
+  review-stage and candidate-stage people (saved-for-future included; booking
+  brings them back). Booking IS accepting: `bookApplicant()` records the yes
+  decision on the way through, so the chip always agrees with the calendar.
+- **Every email composer has Send later** — saves the edited draft
+  server-side (`recruit_email_drafts`, migration 169; one per applicant,
+  latest write wins) so anyone can pick it up; reopening the composer loads
+  the saved draft instead of redrafting, Regenerate gets a fresh one, and a
+  successful send clears it. Deliberately app-side, not a Gmail draft — the
+  shared connection's scopes are readonly + send, and `gmail.compose` would
+  force re-consenting the shared account.
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 

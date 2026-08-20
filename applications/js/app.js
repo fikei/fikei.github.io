@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.75.0';
+const VERSION = '3.77.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -109,6 +109,15 @@ function trialStayFor(applicantId) {
   if (!applicantId || !houseLoaded) return null;
   const today = new Date().toISOString().slice(0, 10);
   return stays.find(s => s.kind === 'candidate' && s.applicant_id === applicantId
+    && (!s.ends_on || s.ends_on >= today)) || null;
+}
+/* Any live or upcoming stay of theirs — trial, sublet, or residency. This is
+   what "booked" means everywhere: on the calendar, out of the placement
+   sweep, and the Book-them-in door closed behind them. */
+function liveStayFor(applicantId) {
+  if (!applicantId || !houseLoaded) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return stays.find(s => s.applicant_id === applicantId && s.kind !== 'shared'
     && (!s.ends_on || s.ends_on >= today)) || null;
 }
 // Default return date for Save for future: three months out, month start.
@@ -666,7 +675,7 @@ async function resolveAvatars() {
 
 /* ---------- data ---------- */
 async function loadAll() {
-  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes, tRes] = await Promise.all([
+  const [aRes, dRes, cRes, eRes, vRes, scRes, avRes, pRes, vwRes, cpRes, dvRes, tRes, edRes] = await Promise.all([
     sb.from('recruit_applicants').select('*').order('submitted_at', { ascending: false }),
     sb.from('recruit_decisions').select('*'),
     sb.from('recruit_comments').select('applicant_id, author_name, body, created_at, source').order('created_at'),
@@ -683,8 +692,11 @@ async function loadAll() {
     sb.from('recruit_claim_posts').select('applicant_id, status, posted_at'),
     sb.from('recruit_decision_votes').select('*'),
     sb.from('recruit_tours').select('applicant_id, status, asked_at, confirmed_slot, off_hours'),
+    sb.from('recruit_email_drafts').select('*'),
   ]);
   placements = pRes.data || [];
+  emailDrafts = {};
+  for (const d of (edRes?.data || [])) emailDrafts[d.applicant_id] = d;
   viewedIds = new Set((vwRes.data || []).map(v => v.applicant_id));
   claimPosts = {};
   for (const c of (cpRes.data || [])) claimPosts[c.applicant_id] = { status: c.status, postedAt: c.posted_at };
@@ -894,7 +906,9 @@ async function syncAutoPlacements() {
   const fresh = [];
   // A saved-for-future candidate keeps the stage but is off the board until
   // their date lands, so they're excluded here as well as in matchesView.
-  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason)) {
+  // Booked people (a live trial or sublet) are off the board too — the room
+  // question is answered; the calendar owns them now.
+  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason && !liveStayFor(x.id))) {
     // One listing each. Someone already placed is left alone — the sweep
     // must never yank a person out from under whoever is working them.
     if (activePlacements(a.id).length) continue;
@@ -907,7 +921,7 @@ async function syncAutoPlacements() {
     if (p.source !== 'auto' || p.status !== 'active') return false;
     const a = applicants.find(x => x.id === p.applicant_id);
     const l = listings.find(x => x.id === p.listing_id);
-    return !a || !l || a.stage !== 'candidate' || a.exitReason || !qualifiesFor(a, l);
+    return !a || !l || a.stage !== 'candidate' || a.exitReason || !qualifiesFor(a, l) || !!liveStayFor(a.id);
   });
   if (stale.length) {
     const { error } = await sb.from('recruit_listing_candidates').delete().in('id', stale.map(r => r.id));
@@ -1226,6 +1240,7 @@ let emailApplicantId = null;
 
 let emailMode = 'outreach';   // 'outreach' | 'update' (rejection queue)
 let emailKind = null;         // typed draft override, e.g. 'tour'
+let emailDrafts = {};         // applicant_id -> recruit_email_drafts row ("Send later")
 
 async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
@@ -1242,16 +1257,55 @@ async function openEmailModal(applicantId, kind) {
   emailMode = 'outreach';
   emailKind = kind || null;
   document.getElementById('email-send').textContent = 'Send via Agape Gmail';
-  document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour` : `Email ${fullName(a)}`;
+  document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour`
+    : kind === 'accepted' ? `Tell ${a.first} they're in` : `Email ${fullName(a)}`;
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   const addedHost = document.getElementById('email-added');
   if (addedHost) { addedHost.hidden = true; addedHost.innerHTML = ''; }
+  // A saved draft beats a fresh AI one — someone already put words in.
+  // Regenerate is the way to a fresh draft from here.
+  const saved = emailDrafts[applicantId];
+  if (saved && saved.mode === 'outreach') {
+    emailKind = saved.kind || emailKind;
+    document.getElementById('email-subject').value = saved.subject || '';
+    document.getElementById('email-body').value = saved.body || '';
+    document.getElementById('email-status').textContent =
+      `Saved draft — ${saved.saved_by_name || 'a housemate'} · ${relTime(saved.updated_at)}. Edit and send, or Regenerate for a fresh one.`;
+    document.getElementById('email-modal').hidden = false;
+    return;
+  }
   document.getElementById('email-status').textContent = kind === 'tour'
     ? 'Drafting the availability ask — Tue–Thu 5–7pm is stated as the preference, with no reasoning exposed…'
-    : 'Drafting from their application, the listing, and any flags…';
+    : kind === 'accepted'
+      ? 'Drafting the acceptance — room, dates, and next steps from their booking. Sending is optional…'
+      : 'Drafting from their application, the listing, and any flags…';
   document.getElementById('email-modal').hidden = false;
   await generateEmail(applicantId);
+}
+
+/* "Send later" — the draft outlives the modal, server-side, one per
+   applicant, for whoever picks it up next. Reopening the composer loads it. */
+async function saveEmailDraft() {
+  if (!emailApplicantId) return;
+  const row = {
+    applicant_id: emailApplicantId, mode: emailMode, kind: emailKind || null,
+    subject: document.getElementById('email-subject').value.slice(0, 300),
+    body: document.getElementById('email-body').value.slice(0, 10000),
+    saved_by: me.id, saved_by_name: me.name, updated_at: new Date().toISOString(),
+  };
+  const { error } = await sb.from('recruit_email_drafts').upsert(row);
+  if (error) { toast(`Draft save failed: ${error.message}`); return; }
+  emailDrafts[emailApplicantId] = row;
+  toast('Draft saved — it loads next time anyone opens their email');
+  closeEmailModal();
+}
+
+async function clearEmailDraft(applicantId) {
+  if (!emailDrafts[applicantId]) return;
+  delete emailDrafts[applicantId];
+  const { error } = await sb.from('recruit_email_drafts').delete().eq('applicant_id', applicantId);
+  if (error) console.warn('draft clear failed', error.message);
 }
 
 /* Rejection-queue editor: drafts via draft_update, sends via send-update
@@ -1295,6 +1349,15 @@ async function openUpdateEmail(applicantId) {
   document.getElementById('email-subject').value = '';
   document.getElementById('email-body').value = '';
   document.getElementById('email-send').textContent = 'Send update';
+  const saved = emailDrafts[applicantId];
+  if (saved && saved.mode === 'update') {
+    document.getElementById('email-subject').value = saved.subject || '';
+    document.getElementById('email-body').value = saved.body || '';
+    document.getElementById('email-status').textContent =
+      `Saved draft — ${saved.saved_by_name || 'a housemate'} · ${relTime(saved.updated_at)}. Edit and send, or Regenerate for a fresh one.`;
+    document.getElementById('email-modal').hidden = false;
+    return;
+  }
   document.getElementById('email-status').textContent = 'Writing a draft you can edit — sending is optional.';
   document.getElementById('email-modal').hidden = false;
   try {
@@ -1336,7 +1399,7 @@ async function generateEmail(applicantId) {
     if (emailApplicantId !== applicantId) return; // closed / switched meanwhile
     document.getElementById('email-subject').value = out.subject || '';
     document.getElementById('email-body').value = out.body || '';
-    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask', tour: 'House tour ask', visit: 'House tour ask' };
+    const typeLabels = { first_response: 'First response', follow_up: 'Follow-up nudge', reply: 'Reply to their last email', post_call: 'Post-call thank-you', reschedule: 'Reschedule ask', tour: 'House tour ask', visit: 'House tour ask', accepted: 'Acceptance email' };
     document.getElementById('email-status').textContent =
       `${typeLabels[out.emailType] || 'Outreach'}${out.reason ? ` — ${out.reason}` : ''}. Edit freely, then send.`;
     // What the drafter folded in beyond the scheduling ask, and why — so the
@@ -2674,6 +2737,17 @@ function placementChip(a) {
   }).join('');
 }
 
+/* Booked people carry the answer on the row: which room, which kind of stay,
+   from when. The trial's next step (Welcome in) lives in the calendar drawer. */
+function bookedChip(a) {
+  const s = liveStayFor(a.id);
+  if (!s) return '';
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  const kind = s.kind === 'candidate' ? 'trial' : s.kind;
+  return `<span class="decision-chip decision-chip--replied" title="${esc(`On the occupancy calendar — ${kind} in ${room?.name || 'a room'} from ${fmtDay(s.starts_on)}${s.ends_on ? ` through ${fmtDay(s.ends_on)}` : ''}${s.kind === 'candidate' ? '. Welcome them in from the calendar when the trial works out.' : ''}`)}">${
+    esc(`booked · ${room?.name || 'Room'} ${kind}`)}</span>`;
+}
+
 function rowBadge(a) {
   if (view === 'inbox') return voteChip(a);
   // Archive carries two facts: which kind of no, and whether they've been
@@ -2683,8 +2757,8 @@ function rowBadge(a) {
     const owed = a.stage === 'rejected' || a.updateSentAt;
     return exitChip(a) + (owed || !a.exitReason ? stageChip(a) : '');
   }
-  if (view === 'screening') return screeningChip(a);
-  if (view === 'candidates') return exitChip(a) || placementChip(a);
+  if (view === 'screening') return bookedChip(a) || screeningChip(a);
+  if (view === 'candidates') return exitChip(a) || bookedChip(a) || placementChip(a);
   return decisionChip(a.id);
 }
 
@@ -2926,6 +3000,9 @@ function rowMenuHtml(a, listingId) {
   if (!tour || tour.status !== 'confirmed') items.push(item(`data-set-time="${a.id}|visit"`, 'Set visit time…'));
   if (sc.watch) items.push(item(`data-play-mini="${a.id}"`, 'Watch recording'));
   if (sc.watch || sc.done) items.push(item(`data-give-decision="${a.id}"`, houseDecision(a.id) ? 'Change decision' : 'Decide'));
+  // Available at any stage, like Remove — booking someone IS accepting them,
+  // and the flow records the yes on the way through.
+  if (!liveStayFor(a.id)) items.push(item(`data-book-in="${a.id}"`, 'Set their move-in…'));
   items.push(item(`data-review="${a.id}"`, 'Open profile'));
   items.push(item(`data-add-recording="${a.id}"`, 'Add recording'));
   return `<span class="listing-menu-wrap">
@@ -3014,11 +3091,26 @@ async function writeHouseDecision(applicantId, verdict, note) {
   return data;
 }
 
-async function giveDecision(applicantId, verdict) {
+async function giveDecision(applicantId, verdict, skipBooking = false) {
   const note = (document.getElementById('gd-note')?.value || '').trim();
   if (!await writeHouseDecision(applicantId, verdict, note)) return;
+  // Accepting and booking are one gesture when a room is on the table — the
+  // modal already showed which room and which dates a yes commits to. If the
+  // booking half fails, the decision is saved and the error shows in place.
+  const sel = document.getElementById('gd-book-listing');
+  if (verdict === 'yes' && !skipBooking && sel) {
+    const ok = await bookApplicant(applicantId, sel.value,
+      document.getElementById('gd-book-start')?.value,
+      document.getElementById('gd-book-end')?.value || null,
+      document.getElementById('gd-book-error'));
+    if (!ok) return;
+    document.getElementById('gd-modal').hidden = true;
+    return;
+  }
   document.getElementById('gd-modal').hidden = true;
-  toast('Saved — accept is the house decision');
+  toast(verdict === 'yes' && !liveStayFor(applicantId)
+    ? 'Saved — accept is the house decision. Set their move-in from the ⋮ menu when ready.'
+    : 'Saved — accept is the house decision');
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (!document.getElementById('review').hidden) renderReview();
 }
@@ -3036,8 +3128,184 @@ function openGiveDecision(applicantId) {
       `<span class="notes__empty">Saving replaces the standing decision.</span>`
     : '<span class="notes__empty">One housemate’s read settles it — yours becomes the house decision.</span>';
   document.getElementById('gd-note').value = (hd && hd.voter_id === me?.id ? hd.note : '') || '';
+  renderGdBooking(applicantId);
   modal.dataset.applicant = applicantId;
   modal.hidden = false;
+}
+
+/* The room half of the accept modal. When they're unbooked and a listing is
+   open, a yes accepts AND books — the room and dates sit right under the
+   decision so one click commits to exactly what's on screen. A quiet link
+   keeps "decide now, book later" possible; booking then lives in the ⋮ menu. */
+function renderGdBooking(applicantId, listingId) {
+  const host = document.getElementById('gd-book');
+  const yesBtn = document.getElementById('gd-yes');
+  if (!host || !yesBtn) return;
+  host.innerHTML = '';
+  yesBtn.textContent = 'Yes — accept';
+  const open = listings.filter(l => l.status === 'open');
+  if (liveStayFor(applicantId) || !open.length) return;
+  const preferred = listingId || activePlacements(applicantId)[0]?.listing_id;
+  const l = open.find(x => x.id === preferred) || open[0];
+  const { start, end } = bookInDefaults(l);
+  const label = x => {
+    const room = rooms.find(r => r.id === x.room_id) || allRooms.find(r => r.id === x.room_id);
+    return `${room?.name || 'Room'} — ${x.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(x.starts_on)}`;
+  };
+  host.innerHTML = `
+    <div class="occ-drawer__section">A yes gives them the room</div>
+    ${open.length > 1 ? `<label class="listing-form__field">Listing
+      <select class="listing-status" id="gd-book-listing">
+        ${open.map(x => `<option value="${x.id}" ${x.id === l.id ? 'selected' : ''}>${esc(label(x))}</option>`).join('')}
+      </select>
+    </label>` : `<p class="occ-drawer__note">${esc(label(l))}</p>
+      <select id="gd-book-listing" hidden><option value="${l.id}" selected></option></select>`}
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">From
+        <input type="date" class="listing-status" id="gd-book-start" value="${start}" required>
+      </label>
+      <label class="listing-form__field">Through
+        <input type="date" class="listing-status" id="gd-book-end" value="${end}" ${l.kind === 'resident' ? '' : 'required'}>
+      </label>
+    </div>
+    <p class="occ-drawer__note">${l.kind === 'resident'
+      ? 'Their trial lands on the occupancy calendar with its milestones, the listing is marked filled, and they leave other openings.'
+      : 'Their sublet lands on the occupancy calendar, the listing is marked filled, and they leave other openings.'}</p>
+    <p class="listing-form__error" id="gd-book-error"></p>
+    <p class="notes__empty">Not ready to commit the room? <button type="button" class="cta-link" id="gd-decide-only">Accept without booking</button></p>`;
+  yesBtn.textContent = 'Yes — accept & book the room';
+  const sel = host.querySelector('#gd-book-listing');
+  if (sel && open.length > 1) sel.onchange = e => renderGdBooking(applicantId, e.target.value);
+  host.querySelector('#gd-decide-only').onclick = () =>
+    giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes', true);
+}
+
+/* --- set their move-in (the late-booking path) ---
+   The accept modal books in the same click as the yes; this sheet exists for
+   the yes that skipped booking ("Accept without booking"). Same core —
+   bookApplicant → recruit_accept_applicant — reachable from the ⋮ menu until
+   they're on the calendar. */
+async function openBookIn(applicantId) {
+  const a = applicants.find(x => x.id === applicantId);
+  if (!a) return;
+  if (!houseLoaded) await loadHouse();
+  if (liveStayFor(applicantId)) { toast(`${a.first} is already on the calendar`); return; }
+  const open = listings.filter(l => l.status === 'open');
+  if (!open.length) {
+    toast('No open listings — create one from Occupancy, then set their move-in from the ⋮ menu');
+    return;
+  }
+  const modal = document.getElementById('bi-modal');
+  modal.dataset.applicant = applicantId;
+  document.getElementById('bi-title').textContent = `Move ${a.first} in`;
+  const preferred = activePlacements(applicantId)[0]?.listing_id;
+  renderBookIn(open.some(l => l.id === preferred) ? preferred : open[0].id);
+  modal.hidden = false;
+}
+
+function bookInDefaults(l) {
+  const today = new Date().toISOString().slice(0, 10);
+  const start = l.starts_on > today ? l.starts_on : today;
+  const end = l.kind === 'resident'
+    ? addMonthsIso2(start, setting('trial_length_months'))
+    : (l.ends_on || '');
+  return { start, end };
+}
+
+function renderBookIn(listingId) {
+  const open = listings.filter(l => l.status === 'open');
+  const l = open.find(x => x.id === listingId) || open[0];
+  if (!l) return;
+  const { start, end } = bookInDefaults(l);
+  const label = x => {
+    const room = rooms.find(r => r.id === x.room_id) || allRooms.find(r => r.id === x.room_id);
+    return `${room?.name || 'Room'} — ${x.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(x.starts_on)}`;
+  };
+  const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+  document.getElementById('bi-body').innerHTML = `
+    <label class="listing-form__field">Listing
+      <select class="listing-status" id="bi-listing">
+        ${open.map(x => `<option value="${x.id}" ${x.id === l.id ? 'selected' : ''}>${esc(label(x))}</option>`).join('')}
+      </select>
+    </label>
+    <div class="occ-drawer__dates">
+      <label class="listing-form__field">From
+        <input type="date" class="listing-status" id="bi-start" value="${start}" required>
+      </label>
+      <label class="listing-form__field">Through
+        <input type="date" class="listing-status" id="bi-end" value="${end}" ${l.kind === 'resident' ? '' : 'required'}>
+      </label>
+    </div>
+    <p class="occ-drawer__note">${l.kind === 'resident'
+      ? `Puts their trial in ${esc(room?.name || 'the room')} on the occupancy calendar with its check-in and decision milestones, marks the listing filled, and takes them out of other openings. Welcome them in from the calendar when the trial works out — one person's call, same as this one.`
+      : `Puts their sublet in ${esc(room?.name || 'the room')} on the occupancy calendar, marks the listing filled, and takes them out of other openings.`}</p>
+    <p class="listing-form__error" id="bi-error"></p>
+    <div class="decision-sheet__actions">
+      <button class="hold-sheet__cancel" id="bi-later" type="button" title="They stay a decided-yes candidate — set their move-in any time from the ⋮ menu">Not yet</button>
+      <button class="btn btn--accent btn--sm" id="bi-submit" type="button">Confirm move-in</button>
+    </div>`;
+  document.getElementById('bi-listing').onchange = e => renderBookIn(e.target.value);
+  document.getElementById('bi-later').onclick = () => { document.getElementById('bi-modal').hidden = true; };
+  document.getElementById('bi-submit').onclick = () => submitBookIn();
+}
+
+/* The booking itself — shared by the accept modal's one-click yes and the
+   ⋮ menu's later "Set their move-in". Validates, runs the RPC, reloads, and
+   opens the acceptance email. Returns false with the error shown in errEl. */
+async function bookApplicant(applicantId, listingId, start, end, errEl) {
+  const a = applicants.find(x => x.id === applicantId);
+  const l = listings.find(x => x.id === listingId);
+  const err = errEl || { textContent: '' };
+  if (!a || !l) { err.textContent = 'That listing is gone — reopen the sheet.'; return false; }
+  if (!start) { err.textContent = 'Pick the day they move in.'; return false; }
+  if (end && end < start) { err.textContent = '"Through" must be at or after "From".'; return false; }
+  if (l.kind !== 'resident' && !end) { err.textContent = 'A sublet needs an end date.'; return false; }
+  const { error } = await sb.rpc('recruit_accept_applicant', {
+    p_applicant: applicantId,
+    p_listing: l.id,
+    p_starts_on: start,
+    p_ends_on: end || null,
+    p_checkin_on: l.kind === 'resident' ? trialCheckinDefault(start) : null,
+    p_decision_on: l.kind === 'resident' && end ? trialDecisionDefault(end) : null,
+  });
+  if (error) { err.textContent = error.message; return false; }
+  // Booking IS accepting — record the yes so the decision chip agrees with
+  // the calendar, whatever stage they were booked from.
+  if (houseDecision(applicantId)?.verdict !== 'yes') {
+    await writeHouseDecision(applicantId, 'yes', 'Accepted by booking them a room');
+  }
+  const room = rooms.find(r => r.id === l.room_id) || allRooms.find(r => r.id === l.room_id);
+  const kindWord = l.kind === 'resident' ? 'trial' : 'sublet';
+  logEvent('event_move_in', applicantId, fullName(a),
+    `${me.name || 'A housemate'} gave {} ${room?.name || 'a room'} — ${kindWord} from ${fmtDay(start)}.`);
+  // Everything that was chasing a room for them is answered.
+  ackFor('applicant', applicantId, ['candidate_parked', 'candidate_placed', 'screening_followup',
+    'decision_open', 'gone_cold']);
+  ackFor('listing', l.id, ['listing_draft', 'listing_draft_stale', 'listing_no_qualifiers',
+    'opening_at_risk', 'opening_overdue', 'listing_has_candidates']);
+  // The RPC touched stays, the listing, placements, and possibly the stage.
+  await Promise.all([loadHouse(), loadAll()]);
+  toast(`${a.first} has ${room?.name || 'the room'} — ${kindWord} from ${fmtDay(start)} · listing marked filled`);
+  renderRailCounts();
+  if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+  if (view === 'occupancy') renderOccupancy();
+  if (!document.getElementById('review').hidden) renderReview();
+  // Telling them is the other half of accepting them.
+  openEmailModal(applicantId, 'accepted');
+  return true;
+}
+
+async function submitBookIn() {
+  const modal = document.getElementById('bi-modal');
+  const btn = document.getElementById('bi-submit');
+  btn.disabled = true;
+  const ok = await bookApplicant(modal.dataset.applicant,
+    document.getElementById('bi-listing')?.value,
+    document.getElementById('bi-start')?.value,
+    document.getElementById('bi-end')?.value || null,
+    document.getElementById('bi-error'));
+  if (!ok) { btn.disabled = false; return; }
+  modal.hidden = true;
 }
 
 /* Drag applicants inside a listing group to reorder, or across groups to
@@ -4834,7 +5102,8 @@ function renderReviewFoot(a) {
           <input type="checkbox" id="vote-send-update" ${sendUpdateWith ? 'checked' : ''}> Send them an update
         </label>` : ''}
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
-      </div>`;
+      </div>
+      ${liveStayFor(a.id) ? '' : `<span class="foot-links"><button type="button" class="cta-link" data-book-in="${a.id}" title="Skips the funnel — books a room and records the accept in one step">Set their move-in…</button></span>`}`;
     footFor = a.id;
   } else if (a.stage === 'candidate') {
     const pills = activePlacements(a.id).map(p => {
@@ -4850,6 +5119,7 @@ function renderReviewFoot(a) {
         <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
         <span class="foot-links">
           <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back</button>
+          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     } else {
@@ -4865,6 +5135,7 @@ function renderReviewFoot(a) {
           : openingsCta(a)}</span>
         <span class="foot-links">
           ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
+          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     }
@@ -6506,6 +6777,8 @@ function init() {
     }
     const gd = e.target.closest('[data-give-decision]');
     if (gd) { openGiveDecision(gd.dataset.giveDecision); return; }
+    const bi = e.target.closest('[data-book-in]');
+    if (bi) { openBookIn(bi.dataset.bookIn); return; }
     const ue = e.target.closest('[data-update-edit]');
     if (ue) { openUpdateEmail(ue.dataset.updateEdit); return; }
     const us = e.target.closest('[data-update-skip]');
@@ -6707,6 +6980,7 @@ function init() {
 
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
+  document.getElementById('bi-close').onclick = () => { document.getElementById('bi-modal').hidden = true; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
   // No is not a sentiment to file — it routes into the Remove sheet with
   // Not a fit preselected (note carried), so the verdict and its
@@ -6735,6 +7009,7 @@ function init() {
     if (id) openSchedulerPreview(id);
   };
   document.getElementById('email-close').onclick = closeEmailModal;
+  document.getElementById('email-later').onclick = saveEmailDraft;
   // Regenerate has to respect which editor you're in. In the rejection queue
   // it must redraft the update — routing it to the outreach drafter produced a
   // warm invite, complete with a booking link, one click away from being sent
@@ -6777,6 +7052,7 @@ function init() {
         const a = applicants.find(x => x.id === sentFor);
         if (a && queue[qIndex] === sentFor && reviewTab === 'emails') paintEmailsPanel(a, '');
       }).catch(() => {});
+      clearEmailDraft(sentFor); // sent — the saved draft has done its job
       closeEmailModal();
     } catch (e) { toast(`Send failed: ${e.message}`); }
     btn.disabled = false; btn.textContent = emailMode === 'update' ? 'Send update' : 'Send via Agape Gmail';
