@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -210,7 +210,13 @@ function renderEmail() {
     state.email = email;
     const btn = document.getElementById('next');
     btn.disabled = true; btn.textContent = 'Sending…';
-    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    // emailRedirectTo matters: the project's auth email is a magic LINK
+    // (no {{ .Token }} code yet) — clicking it must land back on /apply/,
+    // where supabase-js picks the session out of the URL and boot() resumes.
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + '/apply/' },
+    });
     if (error) { btn.disabled = false; btn.textContent = 'Send code'; return showErr(error.message); }
     go('code');
   };
@@ -222,7 +228,8 @@ function renderEmail() {
 function renderCode() {
   $screen.innerHTML = `
     <div class="apply-q__count">check your inbox</div>
-    <h1 class="apply-q__title">Enter the code we sent to<br>${esc(state.email)}</h1>
+    <h1 class="apply-q__title">Check your email —<br>${esc(state.email)}</h1>
+    <p class="apply-q__hint">Tap the sign-in link in the email and you'll land right back here. Got a six-digit code instead? Enter it below.</p>
     <div class="apply-q"><input class="input apply-otp" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······"></div>
     ${nav('<button class="btn btn--filled" id="next">Verify</button><button class="apply-back" id="back">use a different email</button>')}`;
   const submit = async () => {
