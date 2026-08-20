@@ -96,6 +96,12 @@ body {
   padding: 1px 7px;
   flex-shrink: 0;
 }
+.apply-choice__body { display: flex; flex-direction: column; gap: 3px; }
+.apply-choice__desc {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  line-height: var(--leading-normal);
+}
 .apply-choice.selected .apply-choice__key { color: var(--fg); border-color: var(--fg); }
 
 /* Nav row under each question */
