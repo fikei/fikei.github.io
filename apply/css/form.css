@@ -102,6 +102,10 @@ body {
   color: var(--fg-muted);
   line-height: var(--leading-normal);
 }
+.apply-choice__note {
+  margin-top: 6px;
+  font-size: var(--text-md) !important;
+}
 .apply-choice.selected .apply-choice__key { color: var(--fg); border-color: var(--fg); }
 
 /* Nav row under each question */

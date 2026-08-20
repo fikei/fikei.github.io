@@ -20,7 +20,7 @@
 // slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
 // stable uuid from the DB default (migration 159).
 
-const VERSION = '1.7.0'
+const VERSION = '1.7.1'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -90,6 +90,7 @@ const FIELD_PATTERNS: Array<[string, RegExp]> = [
   ['gifts', /(gift|offer|contribute|share with the house)/i],
   ['about', /(about you|tell us about|introduce)/i],
   ['heard_from', /(how did you hear|hear about|referred|find us)/i],
+  ['anything_else', /(anything else|should know|other notes)/i],
 ]
 
 function mapRow(row: Record<string, unknown>): Record<string, string> {
@@ -354,6 +355,7 @@ serve(async (req) => {
         pronouns: m.pronouns || '', email: m.email, phone: m.phone || '', social: m.social || '',
         about: m.about || '', why_agape: m.why_agape || '', gifts: m.gifts || '',
         heard_from: m.heard_from || '', residency: m.residency || '',
+        anything_else: m.anything_else || '',
         move_in: m.move_in || '', budget: m.budget || '',
         // Explicit rather than the column default: rows minted by /apply carry
         // 'native', and the two paths must stay tellable-apart forever.

@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.77.0';
+const VERSION = '3.78.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -239,8 +239,11 @@ let qIndex = 0;
 const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = a => ((a.first[0] || '') + (a.last[0] || '')).toUpperCase();
 const fullName = a => `${a.first} ${a.last}`.trim();
-const isSublet = a => /short/i.test(a.residency);
-const trackLabel = a => isSublet(a) ? 'Sublet' : 'Full-time';
+// The native form lets applicants pick BOTH tracks (with per-track notes),
+// stored as "Full-time resident — note | Short-term (sublet) — note".
+const isSublet = a => /short|sublet/i.test(a.residency);
+const wantsBoth = a => /full.?time/i.test(a.residency) && isSublet(a);
+const trackLabel = a => wantsBoth(a) ? 'Either' : isSublet(a) ? 'Sublet' : 'Full-time';
 const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const monthKey = iso => iso.slice(0, 7);
 const monthLabel = iso => new Date(iso + (iso.length === 7 ? '-01T12:00' : '')).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -278,7 +281,7 @@ function displayMoveIn(a) {
    the default track, so it stays neutral (blends with the background);
    Sublet keeps its tint as the exception worth noticing. */
 const trackBadge = a =>
-  `<span class="listing-kind listing-kind--${isSublet(a) ? 'sublet' : 'fulltime'} listing-kind--xs">${trackLabel(a)}</span>`;
+  `<span class="listing-kind listing-kind--${wantsBoth(a) ? 'fulltime' : isSublet(a) ? 'sublet' : 'fulltime'} listing-kind--xs">${trackLabel(a)}</span>`;
 
 /* Row subline (text after the track badge): pronouns · move-in dates.
    Budget lives on the review page. */
@@ -777,6 +780,7 @@ async function loadAll() {
   applicants = (aRes.data || []).filter(r => r.is_submitted !== false).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
     updatedAt: r.updated_at || null, origin: r.source || 'sheet',
+    anythingElse: r.anything_else || '',
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, phone: r.phone || '', social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
@@ -847,7 +851,8 @@ const monthShift = (ym, n) => {
 
 function qualifiesFor(a, l) {
   if (l.status !== 'open') return false;
-  if (isSublet(a) !== (l.kind === 'sublet')) return false;
+  // 'Either' applicants qualify for both listing kinds.
+  if (l.kind === 'sublet' ? !isSublet(a) : (isSublet(a) && !wantsBoth(a))) return false;
   const bm = budgetMax(a.budget);
   if (bm !== null && l.rent_monthly != null && bm < l.rent_monthly) return false;
   // Dates have to line up. A recruiter-confirmed window is exact — no
@@ -2096,7 +2101,7 @@ async function loadProfileActivity(a) {
   const who = n => n || 'a housemate';
 
   // Applied — always the first thing that happened.
-  add(a.ts_iso, 'application_new', `Applied for ${isSublet(a) ? 'a sublet' : 'a full-time room'}.`);
+  add(a.ts_iso, 'application_new', `Applied for ${wantsBoth(a) ? 'a room — open to full-time or a sublet' : isSublet(a) ? 'a sublet' : 'a full-time room'}.`);
 
   // Reviews, with the rationale — this is what "passed on" actually means.
   for (const v of votesRes.data || []) {
@@ -2274,7 +2279,7 @@ function budgetBucket(a) {
 }
 
 function matchesFilters(a) {
-  if (filters.track === 'fulltime' && isSublet(a)) return false;
+  if (filters.track === 'fulltime' && isSublet(a) && !wantsBoth(a)) return false;
   if (filters.track === 'sublet' && !isSublet(a)) return false;
   if (filters.month !== 'any' && moveInBucket(a) !== filters.month) return false;
   if (filters.budget !== 'any' && budgetBucket(a) !== filters.budget) return false;
@@ -5190,6 +5195,7 @@ function renderReview() {
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
+    ${section('Anything else', a.anythingElse)}
     ${stagesHtml(a)}
     ${availabilityHtml(a)}
     ${houseEventsHtml(a)}
