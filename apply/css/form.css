@@ -60,7 +60,15 @@ body {
   font-size: var(--text-lg);
   padding: 12px 14px;
 }
-.apply-q .input.textarea { min-height: 180px; resize: vertical; line-height: var(--leading-normal); }
+/* Long-form answers stay at the system's body scale — the oversized type is
+   for one-line answers only. */
+.apply-q .input.textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: var(--leading-normal);
+  font-size: var(--text-md);
+  padding: var(--space-3);
+}
 
 .apply-row { display: flex; gap: 12px; }
 .apply-row > div { flex: 1; }
