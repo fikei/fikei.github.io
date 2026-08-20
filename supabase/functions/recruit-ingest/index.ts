@@ -20,12 +20,13 @@
 // slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
 // stable uuid from the DB default (migration 159).
 
-const VERSION = '1.6.0'
+const VERSION = '1.7.1'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { postChannelEmbed, AUTOMATION_CHANNEL_ID } from '../_shared/discord.ts'
+import { notifyTick } from '../_shared/recruit-notify.ts'
 import { sharedAccessToken } from '../_shared/recruit-schedule.ts'
 
 // The application spreadsheet + tab, overridable so a new form or season
@@ -89,6 +90,7 @@ const FIELD_PATTERNS: Array<[string, RegExp]> = [
   ['gifts', /(gift|offer|contribute|share with the house)/i],
   ['about', /(about you|tell us about|introduce)/i],
   ['heard_from', /(how did you hear|hear about|referred|find us)/i],
+  ['anything_else', /(anything else|should know|other notes)/i],
 ]
 
 function mapRow(row: Record<string, unknown>): Record<string, string> {
@@ -353,7 +355,11 @@ serve(async (req) => {
         pronouns: m.pronouns || '', email: m.email, phone: m.phone || '', social: m.social || '',
         about: m.about || '', why_agape: m.why_agape || '', gifts: m.gifts || '',
         heard_from: m.heard_from || '', residency: m.residency || '',
+        anything_else: m.anything_else || '',
         move_in: m.move_in || '', budget: m.budget || '',
+        // Explicit rather than the column default: rows minted by /apply carry
+        // 'native', and the two paths must stay tellable-apart forever.
+        source: 'sheet',
       })
     }
 
@@ -370,11 +376,14 @@ serve(async (req) => {
       if (!byEmail.has(key)) byEmail.set(key, r)
       else skipped.push(`re-application in the same batch: ${r.email}`)
     }
-    const { data: existing } = await client.from('recruit_applicants').select('id, email')
-    const knownEmails = new Set((existing || []).map((e) => String(e.email || '').toLowerCase()))
+    // Email dedupe also shields /apply: a native applicant who ALSO fills the
+    // old Google Form must never have their edited row shadowed or twinned.
+    const { data: existing } = await client.from('recruit_applicants').select('id, email, source')
+    const sourceByEmail = new Map((existing || []).map((e) => [String(e.email || '').toLowerCase(), String(e.source || 'sheet')]))
     const fresh: Array<Record<string, string>> = []
     for (const r of byEmail.values()) {
-      if (knownEmails.has(r.email.toLowerCase())) { skipped.push(`already an applicant: ${r.email}`); continue }
+      const known = sourceByEmail.get(r.email.toLowerCase())
+      if (known) { skipped.push(`already an applicant (${known}): ${r.email}`); continue }
       fresh.push(r)
     }
     // Ids only for rows that will actually insert — normalized name slugs,
@@ -400,16 +409,20 @@ serve(async (req) => {
 
     const created = data || []
     if (created.length) {
-      // Ingest is an automation too — it belongs in the audit channel. The
-      // #recruiting-society ping about these applicants follows from the
-      // recruit-gmail scan, which owns ping dedup.
+      // One Discord message per application, not two. The bare "N new
+      // applications" digest is gone; instead we stamp discord_ping_at here
+      // (the gmail scan used to own this, ~20 min later) and run the notify
+      // tick synchronously, so the ledger's rich card — the one people reply
+      // to — posts at ingest time. The 15-min cron stays as the backstop if
+      // anything here fails.
       try {
-        const names = created.map((c) => `${c.first_name} ${c.last_name || ''}`.trim()).join(', ')
-        await postChannelEmbed(AUTOMATION_CHANNEL_ID,
-          `📥 **${created.length} new application${created.length === 1 ? '' : 's'}**\n${names.slice(0, 800)}`,
-          0x6a6c6a, `${created.length} new application${created.length === 1 ? '' : 's'}`)
+        await client.from('recruit_applicants')
+          .update({ discord_ping_at: new Date().toISOString() })
+          .in('id', created.map((c) => c.id))
+        const tick = await notifyTick(client)
+        console.log(`[recruit-ingest] notify tick: ${JSON.stringify(tick).slice(0, 200)}`)
       } catch (err) {
-        console.warn(`[recruit-ingest] audit post failed: ${(err as Error).message}`)
+        console.warn(`[recruit-ingest] notify tick failed (cron will catch up): ${(err as Error).message}`)
       }
     }
     console.log(`[recruit-ingest] ${created.length} created, ${byEmail.size - fresh.length} already present, ${skipped.length} skipped`)

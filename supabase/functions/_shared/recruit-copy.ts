@@ -59,6 +59,7 @@ export const KINDS: Record<string, { icon: string; label: string }> = {
   candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
   decision_open:          { icon: '📊', label: 'Decision open' },
   candidate_promoted:     { icon: '🎉', label: 'Welcomed in' },
+  movein_day:             { icon: '🧳', label: 'Move-in day' },
   gone_cold:              { icon: '💤', label: 'Gone quiet' },
 
   // Openings.
@@ -94,6 +95,7 @@ export const TEMPLATES: Record<string, string> = {
   'candidate_parked':             '{subject} passed review but no open room fits their move-in dates.',
   'gone_cold':                    '{subject} never answered the last email, sent {days} ago.',
   'candidate_promoted':           '{subject} moved into {room} on {date} as a resident.',
+  'movein_day':                   '{subject} moves into {room} today.',
 
   // The house reaches ONE decision; housemates weigh in on it. Never a tally.
   'decision_open':                'The house needs to decide on {subject} before {date}, {days} away.',
