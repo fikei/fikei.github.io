@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -97,9 +97,10 @@ function parseTracks(q, residencyRaw, moveinRaw) {
     const keys = Object.keys(map);
     const label = opt ? opt.label : (keys.length === 1 ? keys[0] : null);
     if (!label || !map[label]) continue;
-    const m = p.match(/\d{4}-\d{2}-\d{2}/);
+    const dates = p.match(/\d{4}-\d{2}-\d{2}/g) || [];
     map[label] = {
-      date: m ? m[0] : '',
+      date: dates[0] || '',
+      dateEnd: dates[1] || '', // "soonest → latest"; absent when flexible
       flex: /flexible/i.test(p),
       note: (p.match(/—\s*([^)|]+)\)?\s*$/) || [])[1]?.trim() || '',
     };
@@ -114,6 +115,8 @@ function composeTracks(q, map) {
     if (!t) continue;
     labels.push(opt.label);
     let when = t.date || '';
+    // The latest-date bound only means something when timing is firm.
+    if (!t.flex && t.dateEnd) when += (when ? ' → ' : '…') + t.dateEnd;
     if (t.flex) when += when ? ' (flexible' + (t.note ? ' — ' + t.note : '') + ')' : 'Flexible' + (t.note ? ' — ' + t.note : '');
     else if (t.note) when += (when ? ' — ' : '') + t.note;
     timing.push(`${opt.short}: ${when || '—'}`);
@@ -347,10 +350,13 @@ function inputHtml(q) {
               <label class="apply-field-label">soonest you could move in</label>
               <input class="input" type="date" data-t-date="${esc(opt.label)}" value="${esc(t.date)}" min="${today}">
             </div>
-            <div class="apply-track__flexwrap">
-              <label class="apply-field-label apply-track__flex"><input type="checkbox" data-t-flex="${esc(opt.label)}" ${t.flex ? 'checked' : ''}> my timing is flexible</label>
-            </div>
+            ${t.flex ? '' : `
+            <div>
+              <label class="apply-field-label">latest you could move in</label>
+              <input class="input" type="date" data-t-late="${esc(opt.label)}" value="${esc(t.dateEnd || '')}" min="${esc(t.date || today)}">
+            </div>`}
           </div>
+          <label class="apply-field-label apply-track__flex"><input type="checkbox" data-t-flex="${esc(opt.label)}" ${t.flex ? 'checked' : ''}> my timing is flexible</label>
           <input class="input apply-choice__note" data-t-note="${esc(opt.label)}" placeholder="context on timing? e.g. after my lease ends (optional)" value="${esc(t.note)}">
         </div>` : ''}
       </div>`;
@@ -419,6 +425,7 @@ function renderQuestion(q) {
 
   const syncMulti = () => {
     $screen.querySelectorAll('[data-t-date]').forEach((el) => { if (state._multi[el.dataset.tDate]) state._multi[el.dataset.tDate].date = el.value; });
+    $screen.querySelectorAll('[data-t-late]').forEach((el) => { if (state._multi[el.dataset.tLate]) state._multi[el.dataset.tLate].dateEnd = el.value; });
     $screen.querySelectorAll('[data-t-flex]').forEach((el) => { if (state._multi[el.dataset.tFlex]) state._multi[el.dataset.tFlex].flex = el.checked; });
     $screen.querySelectorAll('[data-t-note]').forEach((el) => { if (state._multi[el.dataset.tNote]) state._multi[el.dataset.tNote].note = el.value.trim(); });
   };
@@ -490,9 +497,14 @@ function renderQuestion(q) {
         syncMulti();
         const label = el.dataset.value;
         if (state._multi[label]) delete state._multi[label];
-        else state._multi[label] = { date: '', flex: false, note: '' };
+        else state._multi[label] = { date: '', dateEnd: '', flex: false, note: '' };
         renderQuestion(q); // re-render so the timing fields follow the selection
       };
+    });
+    // Flexible hides the latest-date bound — a firm deadline and "flexible"
+    // contradict each other. Re-render so the field follows the toggle.
+    $screen.querySelectorAll('[data-t-flex]').forEach((el) => {
+      el.onchange = () => { syncMulti(); renderQuestion(q); };
     });
   } else {
     const first = $screen.querySelector('input, textarea');
