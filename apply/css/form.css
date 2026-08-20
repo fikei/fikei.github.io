@@ -1,0 +1,165 @@
+/* /apply — one question per screen, on Sassy tokens.
+   New reusable classes documented in design-system/README.md § Apply wizard. */
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Thin progress line pinned to the top of the viewport */
+.apply-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--border-subtle); z-index: 10;
+}
+.apply-progress__fill {
+  height: 100%; width: 0%;
+  background: var(--fg);
+  transition: width 0.3s ease;
+}
+
+/* Centered single-question stage */
+.apply-shell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px 96px;
+}
+.apply-screen { width: 100%; max-width: 560px; }
+.apply-screen.fade-out { opacity: 0; transform: translateY(-8px); }
+.apply-screen.fade-in { opacity: 1; transform: translateY(0); }
+.apply-screen { transition: opacity 0.15s ease, transform 0.15s ease; }
+
+.apply-q__count {
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  margin-bottom: 12px;
+}
+.apply-q__title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  margin: 0 0 12px;
+}
+.apply-q__hint {
+  color: var(--fg-muted);
+  margin: 0 0 28px;
+  max-width: 48ch;
+}
+
+.apply-q .input {
+  width: 100%;
+  font-size: var(--text-lg);
+  padding: 12px 14px;
+}
+.apply-q .input.textarea { min-height: 180px; resize: vertical; line-height: var(--leading-normal); }
+
+.apply-row { display: flex; gap: 12px; }
+.apply-row > div { flex: 1; }
+.apply-field-label {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  margin: 0 0 6px;
+}
+.apply-field + .apply-field { margin-top: 16px; }
+
+/* Choice cards (radio-as-buttons) */
+.apply-choice {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: border-color var(--duration-fast, 0.1s) ease;
+}
+.apply-choice:hover { border-color: var(--fg-muted); }
+.apply-choice.selected { border-color: var(--fg); background: var(--bg-elevated); }
+.apply-choice__key {
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 7px;
+  flex-shrink: 0;
+}
+.apply-choice.selected .apply-choice__key { color: var(--fg); border-color: var(--fg); }
+
+/* Nav row under each question */
+.apply-nav { display: flex; align-items: center; gap: 12px; margin-top: 28px; }
+.apply-nav__enter { font-size: var(--text-sm); color: var(--fg-subtle); }
+.apply-back {
+  background: none; border: none; cursor: pointer;
+  color: var(--fg-subtle); font-family: inherit; font-size: var(--text-sm);
+  padding: 6px 0;
+}
+.apply-back:hover { color: var(--fg); }
+
+.apply-error {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin-top: 10px;
+  min-height: 18px;
+}
+
+/* One-time-code boxes */
+.apply-otp { letter-spacing: 0.6em; text-align: center; font-size: var(--text-xl) !important; }
+
+/* Essay interstitial + welcome */
+.apply-intro__mark {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  margin-bottom: 20px;
+}
+
+/* Review screen */
+.apply-review { border-top: 1px solid var(--border-subtle); }
+.apply-review__row {
+  display: flex; gap: 16px; align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+.apply-review__row:hover .apply-review__label { color: var(--fg); }
+.apply-review__label { width: 130px; flex-shrink: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+.apply-review__value { flex: 1; white-space: pre-wrap; word-break: break-word; }
+.apply-review__value.empty { color: var(--fg-subtle); }
+.apply-review__edit { font-size: var(--text-sm); color: var(--fg-subtle); }
+
+/* Status banner (submitted / locked) */
+.apply-banner {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+.apply-banner strong { color: var(--fg); font-weight: 500; }
+
+.apply-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+.apply-foot__save { transition: opacity 0.3s ease; }
+
+@media (max-width: 640px) {
+  .apply-q__title { font-size: var(--text-xl); }
+  .apply-shell { align-items: flex-start; padding-top: 80px; }
+  .apply-row { flex-direction: column; }
+}

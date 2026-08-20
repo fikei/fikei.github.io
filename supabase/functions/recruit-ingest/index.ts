@@ -20,7 +20,7 @@
 // slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
 // stable uuid from the DB default (migration 159).
 
-const VERSION = '1.6.0'
+const VERSION = '1.7.0'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -354,6 +354,9 @@ serve(async (req) => {
         about: m.about || '', why_agape: m.why_agape || '', gifts: m.gifts || '',
         heard_from: m.heard_from || '', residency: m.residency || '',
         move_in: m.move_in || '', budget: m.budget || '',
+        // Explicit rather than the column default: rows minted by /apply carry
+        // 'native', and the two paths must stay tellable-apart forever.
+        source: 'sheet',
       })
     }
 
@@ -370,11 +373,14 @@ serve(async (req) => {
       if (!byEmail.has(key)) byEmail.set(key, r)
       else skipped.push(`re-application in the same batch: ${r.email}`)
     }
-    const { data: existing } = await client.from('recruit_applicants').select('id, email')
-    const knownEmails = new Set((existing || []).map((e) => String(e.email || '').toLowerCase()))
+    // Email dedupe also shields /apply: a native applicant who ALSO fills the
+    // old Google Form must never have their edited row shadowed or twinned.
+    const { data: existing } = await client.from('recruit_applicants').select('id, email, source')
+    const sourceByEmail = new Map((existing || []).map((e) => [String(e.email || '').toLowerCase(), String(e.source || 'sheet')]))
     const fresh: Array<Record<string, string>> = []
     for (const r of byEmail.values()) {
-      if (knownEmails.has(r.email.toLowerCase())) { skipped.push(`already an applicant: ${r.email}`); continue }
+      const known = sourceByEmail.get(r.email.toLowerCase())
+      if (known) { skipped.push(`already an applicant (${known}): ${r.email}`); continue }
       fresh.push(r)
     }
     // Ids only for rows that will actually insert — normalized name slugs,
