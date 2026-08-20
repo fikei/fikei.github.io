@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -93,6 +93,7 @@ const track = (screen) => {
     const i = SCREEN_ORDER.indexOf(screen);
     if (i >= 0) window.ctrlVital?.('apply_step', i);
     if (screen === 'submitted') window.ctrlVital?.('apply_submitted', 1);
+    if (screen === 'reapplied') window.ctrlVital?.('apply_reapplied', 1);
   } catch { /* analytics is best-effort */ }
 };
 
@@ -408,14 +409,31 @@ function renderDone() {
 
 function renderLocked() {
   const stage = state.app?.stage || '';
+  const canReapply = Boolean(state.app?.can_reapply);
+  const returnAfter = state.app?.return_after
+    ? new Date(state.app.return_after + 'T12:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : null;
   const msg = stage === 'candidate'
     ? 'Good news — your application has moved forward. Keep an eye on your email; a housemate will be in touch about next steps.'
-    : 'Your application has been reviewed and is no longer open for edits. Thanks for the time you put into it.';
+    : returnAfter
+      ? `This round didn't line up, but the house suggested checking back around ${returnAfter}. Things change — rooms open, timing shifts. You're welcome to apply again.`
+      : 'Your application has been reviewed and this round is closed. Thanks for the time you put into it — and the door isn’t locked: you can apply again whenever things feel different.';
   $screen.innerHTML = `
     <div class="apply-banner"><strong>Application ${stage === 'candidate' ? 'moved forward' : 'closed'}.</strong></div>
     <h1 class="apply-q__title">${stage === 'candidate' ? 'You’re in review for a spot.' : 'This application is closed.'}</h1>
     <p class="apply-q__hint">${msg}</p>
-    <button class="btn btn--ghost" id="signout">sign out</button>`;
+    ${nav((canReapply ? '<button class="btn btn--filled" id="reapply">Apply again</button>' : '') +
+          '<button class="btn btn--ghost" id="signout">sign out</button>')}`;
+  const re = document.getElementById('reapply');
+  if (re) re.onclick = async () => {
+    re.disabled = true; re.textContent = 'Reopening…';
+    const { data, error } = await sb.rpc('recruit_apply_reapply');
+    if (error) { re.disabled = false; re.textContent = 'Apply again'; return showErr(error.message.replace(/^.*?: /, '')); }
+    state.app = data;
+    for (const q of QUESTIONS) for (const f of (q.fields || [])) state.answers[f] = data[f] || '';
+    track('reapplied');
+    go('review'); // prefilled — they refresh what changed and resubmit
+  };
   document.getElementById('signout').onclick = async () => { await sb.auth.signOut(); state.answers = {}; state.app = null; go('welcome'); };
 }
 

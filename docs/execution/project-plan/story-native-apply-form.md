@@ -17,6 +17,10 @@
 
 Email became the auth step; first/last name share one screen; residency and budget became structured choices; move-in became a date ("soonest you could move in" + flexible toggle, copy notes that people who can move when a spot opens are prioritized); an interstitial before the three essays says a real person reads every application. Phone + social share one optional closing screen. Values store as label strings in the existing TEXT columns, so triage and ingest needed no mapping changes.
 
+## Re-apply path (v1.1.0, migration 171)
+
+A rejected/archived applicant sees "Apply again" on the locked view (with the house's "check back around {month}" hint when `exit_reason='future'`). `recruit_apply_reapply` reopens the SAME row: prior outcome is snapshotted into a System comment, votes/decision/exit fields clear (a stale veto would instantly re-reject), the row becomes a hidden draft, and resubmitting stamps a fresh `submitted_at` so it sorts as new in the Inbox. Comments from the earlier round stay visible to reviewers.
+
 ## Soft launch → cutover checklist
 
 - [ ] Test cohort completes /apply end-to-end (watch `apply_step` vitals in /analytics for drop-off)
