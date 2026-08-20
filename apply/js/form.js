@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -25,18 +25,13 @@ const QUESTIONS = [
     placeholder: 'she/her, they/them, …',
   },
   {
-    id: 'residency', type: 'multi', fields: ['residency'], required: true,
+    id: 'residency', type: 'multi', fields: ['residency', 'move_in'], required: true,
     label: 'What kind of stay are you looking for?',
-    hint: 'Pick one — or both, if you could see either working.',
+    hint: 'Pick one — or both, if you could see either working. Rooms open up when they open up, so folks who can hop in when a spot frees up tend to move to the front.',
     options: [
-      { label: 'Full-time resident', desc: "A long-term home — you're joining the house proper, usually a year or more.", noteHint: 'anything about this? e.g. earliest you could commit (optional)' },
-      { label: 'Short-term (sublet)', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.', noteHint: 'anything about this? e.g. how long a sublet works for you (optional)' },
+      { label: 'Full-time resident', short: 'Full-time', desc: 'A long-term home. Full-time starts with a three-month resident trial — live with us, see how it fits — then you join the house proper.' },
+      { label: 'Short-term (sublet)', short: 'Sublet', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
     ],
-  },
-  {
-    id: 'move_in', type: 'date', fields: ['move_in'], required: true,
-    label: "What's the soonest you could move in?",
-    hint: 'Rooms open up when they open up — no waitlist math here. Folks who can hop in when a spot frees up tend to move to the front.',
   },
   {
     id: 'budget', type: 'radio', fields: ['budget'], required: true,
@@ -80,22 +75,56 @@ const QUESTIONS = [
   },
 ];
 
-/* Multi-choice values live in one TEXT column as a readable string:
-   "Full-time resident — from October | Short-term (sublet) — 3 months max".
-   Parses back leniently, so old single-value answers load fine. */
-function parseMulti(q, raw) {
-  const map = {};
-  for (const part of String(raw || '').split('|')) {
+/* Track answers live in the two existing TEXT columns, human-readable:
+     residency: "Full-time resident | Short-term (sublet)"
+     move_in:   "Full-time: 2026-11-15 (flexible — after my lease) | Sublet: 2026-09-01"
+   Each selected track carries structured timing: a move-in date, a flexible
+   toggle, and optional context. Parses back leniently — legacy single-value
+   answers ("Full-time resident" / "2026-10-01 (flexible)") load fine. */
+function parseTracks(q, residencyRaw, moveinRaw) {
+  const map = {}; // label → { date, flex, note }
+  const resParts = String(residencyRaw || '').split('|').map((s) => s.trim()).filter(Boolean);
+  for (const opt of q.options) {
+    if (resParts.some((r) => r.startsWith(opt.label) || r.startsWith(opt.short))) {
+      map[opt.label] = { date: '', flex: false, note: '' };
+    }
+  }
+  for (const part of String(moveinRaw || '').split('|')) {
     const p = part.trim();
     if (!p) continue;
-    const opt = q.options.find((o) => p.startsWith(o.label));
-    if (!opt) continue;
-    map[opt.label] = p.slice(opt.label.length).replace(/^\s*—\s*/, '').trim();
+    const opt = q.options.find((o) => p.startsWith(o.short + ':') || p.startsWith(o.label));
+    // Legacy value with no track prefix belongs to the only selected track.
+    const keys = Object.keys(map);
+    const label = opt ? opt.label : (keys.length === 1 ? keys[0] : null);
+    if (!label || !map[label]) continue;
+    const m = p.match(/\d{4}-\d{2}-\d{2}/);
+    map[label] = {
+      date: m ? m[0] : '',
+      flex: /flexible/i.test(p),
+      note: (p.match(/—\s*([^)|]+)\)?\s*$/) || [])[1]?.trim() || '',
+    };
   }
   return map;
 }
-const composeMulti = (map) =>
-  Object.entries(map).map(([label, note]) => (note ? `${label} — ${note}` : label)).join(' | ');
+function composeTracks(q, map) {
+  const labels = [];
+  const timing = [];
+  for (const opt of q.options) {
+    const t = map[opt.label];
+    if (!t) continue;
+    labels.push(opt.label);
+    let when = t.date || '';
+    if (t.flex) when += when ? ' (flexible' + (t.note ? ' — ' + t.note : '') + ')' : 'Flexible' + (t.note ? ' — ' + t.note : '');
+    else if (t.note) when += (when ? ' — ' : '') + t.note;
+    timing.push(`${opt.short}: ${when || '—'}`);
+  }
+  return {
+    residency: labels.join(' | '),
+    move_in: labels.length === 1
+      ? timing[0].replace(/^[^:]+:\s*/, '') // single track keeps the legacy plain format
+      : timing.join(' | '),
+  };
+}
 
 /* ---------- state ---------- */
 const state = {
@@ -203,8 +232,9 @@ function render() {
   if (s.startsWith('q:')) return renderQuestion(QUESTIONS[questionIndex(s.slice(2))]);
 }
 
-function nav(html = '') {
-  return `<div class="apply-nav">${html}<span class="apply-nav__enter">press enter ↵</span></div>
+const QKEYS = '<kbd>↵</kbd> next · <kbd>←</kbd><kbd>→</kbd> move · <kbd>esc</kbd> overview';
+function nav(html = '', keys = '<kbd>↵</kbd> enter') {
+  return `<div class="apply-nav">${html}<span class="apply-nav__enter">${keys}</span></div>
           <div class="apply-error" id="err"></div>`;
 }
 
@@ -301,15 +331,28 @@ function inputHtml(q) {
   }
   if (q.type === 'multi') {
     const sel = state._multi || {};
+    const today = new Date().toISOString().slice(0, 10);
     return q.options.map((opt, i) => {
-      const on = Object.prototype.hasOwnProperty.call(sel, opt.label);
+      const t = sel[opt.label];
       return `
       <div class="apply-field">
-        <button type="button" class="apply-choice ${on ? 'selected' : ''}" data-value="${esc(opt.label)}">
-          <span class="apply-choice__key">${on ? '✓' : i + 1}</span>
+        <button type="button" class="apply-choice ${t ? 'selected' : ''}" data-value="${esc(opt.label)}">
+          <span class="apply-choice__key">${t ? '✓' : i + 1}</span>
           <span class="apply-choice__body">${esc(opt.label)}${opt.desc ? `<span class="apply-choice__desc">${esc(opt.desc)}</span>` : ''}</span>
         </button>
-        ${on ? `<input class="input apply-choice__note" data-note="${esc(opt.label)}" placeholder="${esc(opt.noteHint || 'anything about this? (optional)')}" value="${esc(sel[opt.label] || '')}">` : ''}
+        ${t ? `
+        <div class="apply-track">
+          <div class="apply-row">
+            <div>
+              <label class="apply-field-label">soonest you could move in</label>
+              <input class="input" type="date" data-t-date="${esc(opt.label)}" value="${esc(t.date)}" min="${today}">
+            </div>
+            <div class="apply-track__flexwrap">
+              <label class="apply-field-label apply-track__flex"><input type="checkbox" data-t-flex="${esc(opt.label)}" ${t.flex ? 'checked' : ''}> my timing is flexible</label>
+            </div>
+          </div>
+          <input class="input apply-choice__note" data-t-note="${esc(opt.label)}" placeholder="context on timing? e.g. after my lease ends (optional)" value="${esc(t.note)}">
+        </div>` : ''}
       </div>`;
     }).join('');
   }
@@ -345,7 +388,7 @@ function renderQuestion(q) {
   // screens would otherwise stack listeners and double-fire Enter.
   if (state._keyHandler) { document.removeEventListener('keydown', state._keyHandler); state._keyHandler = null; }
   if (q.type === 'multi' && state._multiFor !== q.id) {
-    state._multi = parseMulti(q, state.answers[q.fields[0]] || '');
+    state._multi = parseTracks(q, state.answers.residency || '', state.answers.move_in || '');
     state._multiFor = q.id;
   }
   const n = QUESTIONS.filter((x) => x.type !== 'interstitial').indexOf(q) + 1;
@@ -355,7 +398,7 @@ function renderQuestion(q) {
     $screen.innerHTML = `
       <h1 class="apply-q__title">${esc(q.label)}</h1>
       <p class="apply-q__hint">${esc(q.hint)}</p>
-      ${nav('<button class="btn btn--filled" id="next">I’m ready</button><button class="apply-back" id="back">back</button>')}`;
+      ${nav('<button class="btn btn--filled" id="next">I’m ready</button><button class="apply-back" id="back">back</button>', QKEYS)}`;
   } else {
     $screen.innerHTML = `
       <div class="apply-q__count">${n} / ${total}${q.required ? '' : ' · optional'}</div>
@@ -363,7 +406,7 @@ function renderQuestion(q) {
       ${q.hint ? `<p class="apply-q__hint">${esc(q.hint)}</p>` : ''}
       <div class="apply-q">${inputHtml(q)}</div>
       ${nav(`<button class="btn btn--filled" id="next">${state.fromReview ? 'Save' : 'Next'}</button>` +
-            (idx > 0 || state.fromReview ? '<button class="apply-back" id="back">back</button>' : ''))}`;
+            (idx > 0 || state.fromReview ? '<button class="apply-back" id="back">back</button>' : ''), QKEYS)}`;
   }
 
   const advance = () => {
@@ -374,8 +417,10 @@ function renderQuestion(q) {
     }
   };
 
-  const syncMultiNotes = () => {
-    $screen.querySelectorAll('[data-note]').forEach((el) => { state._multi[el.dataset.note] = el.value.trim(); });
+  const syncMulti = () => {
+    $screen.querySelectorAll('[data-t-date]').forEach((el) => { if (state._multi[el.dataset.tDate]) state._multi[el.dataset.tDate].date = el.value; });
+    $screen.querySelectorAll('[data-t-flex]').forEach((el) => { if (state._multi[el.dataset.tFlex]) state._multi[el.dataset.tFlex].flex = el.checked; });
+    $screen.querySelectorAll('[data-t-note]').forEach((el) => { if (state._multi[el.dataset.tNote]) state._multi[el.dataset.tNote].note = el.value.trim(); });
   };
 
   const submit = async () => {
@@ -387,11 +432,11 @@ function renderQuestion(q) {
       return advance();
     }
     if (q.type === 'multi') {
-      syncMultiNotes();
-      const composed = composeMulti(state._multi);
-      if (q.required && !composed) return showErr('Pick at least one to continue.');
-      state.answers[q.fields[0]] = composed;
-      saveFields({ [q.fields[0]]: composed });
+      syncMulti();
+      if (q.required && !Object.keys(state._multi).length) return showErr('Pick at least one to continue.');
+      const composed = composeTracks(q, state._multi);
+      Object.assign(state.answers, composed);
+      saveFields(composed);
       return advance();
     }
     const fields = collect(q);
@@ -401,13 +446,33 @@ function renderQuestion(q) {
     advance();
   };
 
-  document.getElementById('next').onclick = submit;
-  const back = document.getElementById('back');
-  if (back) back.onclick = () => {
+  const goBack = () => {
     if (state.fromReview) { state.fromReview = false; return go('review'); }
     const pq = QUESTIONS[idx - 1];
     go(pq ? 'q:' + pq.id : 'code');
   };
+
+  // Esc bails to the overview, keeping whatever is typed so far.
+  const exitToOverview = () => {
+    if (q.type === 'multi') {
+      syncMulti();
+      if (Object.keys(state._multi).length) {
+        const composed = composeTracks(q, state._multi);
+        Object.assign(state.answers, composed);
+        saveFields(composed);
+      }
+    } else if (q.type !== 'interstitial' && q.type !== 'radio') {
+      const fields = collect(q);
+      Object.assign(state.answers, fields);
+      if (Object.values(fields).some(Boolean)) saveFields(fields);
+    }
+    state.fromReview = false;
+    go('review');
+  };
+
+  document.getElementById('next').onclick = submit;
+  const back = document.getElementById('back');
+  if (back) back.onclick = goBack;
 
   if (q.type === 'radio') {
     $screen.querySelectorAll('.apply-choice').forEach((el) => {
@@ -419,41 +484,42 @@ function renderQuestion(q) {
         setTimeout(advance, 200);
       };
     });
-    state._keyHandler = (e) => {
-      if (state.screen !== 'q:' + q.id) return;
-      if (e.key === 'Enter') { e.preventDefault(); return submit(); }
-      const i = parseInt(e.key, 10) - 1;
-      if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
-    };
-    document.addEventListener('keydown', state._keyHandler);
   } else if (q.type === 'multi') {
     $screen.querySelectorAll('.apply-choice').forEach((el) => {
       el.onclick = () => {
-        syncMultiNotes();
+        syncMulti();
         const label = el.dataset.value;
-        if (Object.prototype.hasOwnProperty.call(state._multi, label)) delete state._multi[label];
-        else state._multi[label] = '';
-        renderQuestion(q); // re-render so the context input follows the selection
+        if (state._multi[label]) delete state._multi[label];
+        else state._multi[label] = { date: '', flex: false, note: '' };
+        renderQuestion(q); // re-render so the timing fields follow the selection
       };
     });
-    state._keyHandler = (e) => {
-      if (state.screen !== 'q:' + q.id) return;
-      const typing = e.target && e.target.matches && e.target.matches('input, textarea');
-      if (e.key === 'Enter') { e.preventDefault(); return submit(); }
-      if (typing) return; // digits belong to the note being typed
-      const i = parseInt(e.key, 10) - 1;
-      if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
-    };
-    document.addEventListener('keydown', state._keyHandler);
   } else {
-    bindEnter(submit);
     const first = $screen.querySelector('input, textarea');
     if (first) first.focus();
-    // Cmd/Ctrl+Enter submits a textarea (plain Enter is a newline there).
-    $screen.querySelectorAll('textarea').forEach((el) => {
-      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit(); } });
-    });
   }
+
+  // One keyboard scheme for every question screen: Enter advances (plain
+  // Enter stays a newline inside a textarea — Cmd/Ctrl+Enter sends those),
+  // arrows move between questions when not typing, Esc jumps to the overview.
+  state._keyHandler = (e) => {
+    if (state.screen !== 'q:' + q.id) return;
+    const t = e.target;
+    const typing = Boolean(t && t.matches && t.matches('input, textarea'));
+    const inTextarea = Boolean(t && t.matches && t.matches('textarea'));
+    if (e.key === 'Escape') { e.preventDefault(); return exitToOverview(); }
+    if (e.key === 'Enter') {
+      if (inTextarea && !(e.metaKey || e.ctrlKey)) return;
+      e.preventDefault(); return submit();
+    }
+    if (e.key === 'ArrowRight' && !typing) { e.preventDefault(); return submit(); }
+    if (e.key === 'ArrowLeft' && !typing) { e.preventDefault(); return goBack(); }
+    if ((q.type === 'radio' || q.type === 'multi') && !typing) {
+      const i = parseInt(e.key, 10) - 1;
+      if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
+    }
+  };
+  document.addEventListener('keydown', state._keyHandler);
 }
 
 function renderReview() {

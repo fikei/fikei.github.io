@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.78.0';
+const VERSION = '3.79.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -302,6 +302,11 @@ function normalizeMoveIn(a) {
   if (!raw || /^n\/?a$/i.test(raw)) return '';
   const flexible = /flexib|anytime|any time|whenever|open to|open for/i.test(raw);
   if (/asap|as soon as/i.test(raw)) return 'ASAP' + (flexible ? ' · flexible' : '');
+
+  // Native /apply values are ISO ("2026-11-15 (flexible)"), possibly per-track
+  // ("Full-time: 2026-11-15 (flexible) | Sublet: —") — the first date wins.
+  const iso = raw.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) return `${MONTH_ABBR[+iso[2] - 1]} ${+iso[3]}, ${iso[1]}` + (flexible ? ' · flexible' : '');
 
   const found = [];
   // Abbreviations tolerate suffixes ("Sept", "Aug.") — match on the 3-letter stem.
