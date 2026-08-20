@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.77.0';
+const VERSION = '3.80.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -239,8 +239,11 @@ let qIndex = 0;
 const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = a => ((a.first[0] || '') + (a.last[0] || '')).toUpperCase();
 const fullName = a => `${a.first} ${a.last}`.trim();
-const isSublet = a => /short/i.test(a.residency);
-const trackLabel = a => isSublet(a) ? 'Sublet' : 'Full-time';
+// The native form lets applicants pick BOTH tracks (with per-track notes),
+// stored as "Full-time resident — note | Short-term (sublet) — note".
+const isSublet = a => /short|sublet/i.test(a.residency);
+const wantsBoth = a => /full.?time/i.test(a.residency) && isSublet(a);
+const trackLabel = a => wantsBoth(a) ? 'Either' : isSublet(a) ? 'Sublet' : 'Full-time';
 const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const monthKey = iso => iso.slice(0, 7);
 const monthLabel = iso => new Date(iso + (iso.length === 7 ? '-01T12:00' : '')).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -278,7 +281,7 @@ function displayMoveIn(a) {
    the default track, so it stays neutral (blends with the background);
    Sublet keeps its tint as the exception worth noticing. */
 const trackBadge = a =>
-  `<span class="listing-kind listing-kind--${isSublet(a) ? 'sublet' : 'fulltime'} listing-kind--xs">${trackLabel(a)}</span>`;
+  `<span class="listing-kind listing-kind--${wantsBoth(a) ? 'fulltime' : isSublet(a) ? 'sublet' : 'fulltime'} listing-kind--xs">${trackLabel(a)}</span>`;
 
 /* Row subline (text after the track badge): pronouns · move-in dates.
    Budget lives on the review page. */
@@ -299,6 +302,11 @@ function normalizeMoveIn(a) {
   if (!raw || /^n\/?a$/i.test(raw)) return '';
   const flexible = /flexib|anytime|any time|whenever|open to|open for/i.test(raw);
   if (/asap|as soon as/i.test(raw)) return 'ASAP' + (flexible ? ' · flexible' : '');
+
+  // Native /apply values are ISO ("2026-11-15 (flexible)"), possibly per-track
+  // ("Full-time: 2026-11-15 (flexible) | Sublet: —") — the first date wins.
+  const iso = raw.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) return `${MONTH_ABBR[+iso[2] - 1]} ${+iso[3]}, ${iso[1]}` + (flexible ? ' · flexible' : '');
 
   const found = [];
   // Abbreviations tolerate suffixes ("Sept", "Aug.") — match on the 3-letter stem.
@@ -772,8 +780,12 @@ async function loadAll() {
     sendUpdateWith = updateEmailDefault();
   });
   if (aRes.error) throw aRes.error;
-  applicants = (aRes.data || []).map(r => ({
+  // Native drafts (someone mid-way through /apply) are not applications yet
+  // — they enter the funnel when the applicant hits Submit.
+  applicants = (aRes.data || []).filter(r => r.is_submitted !== false).map(r => ({
     id: r.id, ts_iso: r.submitted_at,
+    updatedAt: r.updated_at || null, origin: r.source || 'sheet',
+    anythingElse: r.anything_else || '',
     first: r.first_name, last: r.last_name, pronouns: r.pronouns,
     email: r.email, phone: r.phone || '', social: r.social, about: r.about, why: r.why_agape,
     gifts: r.gifts, source: r.heard_from, residency: r.residency,
@@ -844,7 +856,8 @@ const monthShift = (ym, n) => {
 
 function qualifiesFor(a, l) {
   if (l.status !== 'open') return false;
-  if (isSublet(a) !== (l.kind === 'sublet')) return false;
+  // 'Either' applicants qualify for both listing kinds.
+  if (l.kind === 'sublet' ? !isSublet(a) : (isSublet(a) && !wantsBoth(a))) return false;
   const bm = budgetMax(a.budget);
   if (bm !== null && l.rent_monthly != null && bm < l.rent_monthly) return false;
   // Dates have to line up. A recruiter-confirmed window is exact — no
@@ -1241,6 +1254,7 @@ let emailApplicantId = null;
 let emailMode = 'outreach';   // 'outreach' | 'update' (rejection queue)
 let emailKind = null;         // typed draft override, e.g. 'tour'
 let emailDrafts = {};         // applicant_id -> recruit_email_drafts row ("Send later")
+let emailExtras = null;       // { cc, attachments, stampStayId, stamp } riding the next send
 
 async function openEmailModal(applicantId, kind) {
   const a = applicants.find(x => x.id === applicantId);
@@ -1256,6 +1270,7 @@ async function openEmailModal(applicantId, kind) {
   emailApplicantId = applicantId;
   emailMode = 'outreach';
   emailKind = kind || null;
+  emailExtras = null;
   document.getElementById('email-send').textContent = 'Send via Agape Gmail';
   document.getElementById('email-title').textContent = kind === 'tour' ? `Invite ${a.first} for a house tour`
     : kind === 'accepted' ? `Tell ${a.first} they're in` : `Email ${fullName(a)}`;
@@ -1268,6 +1283,11 @@ async function openEmailModal(applicantId, kind) {
   const saved = emailDrafts[applicantId];
   if (saved && saved.mode === 'outreach') {
     emailKind = saved.kind || emailKind;
+    // The day-of draft carries its send stamp, so a sent one stops nagging.
+    if (saved.kind === 'movein_day') {
+      const st = liveStayFor(applicantId);
+      if (st) emailExtras = { stampStayId: st.id, stamp: 'dayof' };
+    }
     document.getElementById('email-subject').value = saved.subject || '';
     document.getElementById('email-body').value = saved.body || '';
     document.getElementById('email-status').textContent =
@@ -1419,6 +1439,7 @@ async function generateEmail(applicantId) {
 
 function closeEmailModal() {
   emailApplicantId = null;
+  emailExtras = null;
   document.getElementById('email-modal').hidden = true;
 }
 
@@ -1892,6 +1913,7 @@ const ACTIVITY_KINDS = {
   candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
   decision_open:          { icon: '📊', label: 'Decision open' },
   candidate_promoted:     { icon: '🎉', label: 'Welcomed in' },
+  movein_day:             { icon: '🧳', label: 'Move-in day' },
   gone_cold:              { icon: '💤', label: 'Gone quiet' },
   listing_draft:          { icon: '📄', label: 'Draft opening' },
   listing_draft_stale:    { icon: '🐌', label: 'Draft going stale' },
@@ -2084,7 +2106,7 @@ async function loadProfileActivity(a) {
   const who = n => n || 'a housemate';
 
   // Applied — always the first thing that happened.
-  add(a.ts_iso, 'application_new', `Applied for ${isSublet(a) ? 'a sublet' : 'a full-time room'}.`);
+  add(a.ts_iso, 'application_new', `Applied for ${wantsBoth(a) ? 'a room — open to full-time or a sublet' : isSublet(a) ? 'a sublet' : 'a full-time room'}.`);
 
   // Reviews, with the rationale — this is what "passed on" actually means.
   for (const v of votesRes.data || []) {
@@ -2262,7 +2284,7 @@ function budgetBucket(a) {
 }
 
 function matchesFilters(a) {
-  if (filters.track === 'fulltime' && isSublet(a)) return false;
+  if (filters.track === 'fulltime' && isSublet(a) && !wantsBoth(a)) return false;
   if (filters.track === 'sublet' && !isSublet(a)) return false;
   if (filters.month !== 'any' && moveInBucket(a) !== filters.month) return false;
   if (filters.budget !== 'any' && budgetBucket(a) !== filters.budget) return false;
@@ -3260,7 +3282,7 @@ async function bookApplicant(applicantId, listingId, start, end, errEl) {
   if (!start) { err.textContent = 'Pick the day they move in.'; return false; }
   if (end && end < start) { err.textContent = '"Through" must be at or after "From".'; return false; }
   if (l.kind !== 'resident' && !end) { err.textContent = 'A sublet needs an end date.'; return false; }
-  const { error } = await sb.rpc('recruit_accept_applicant', {
+  const { data: newStayId, error } = await sb.rpc('recruit_accept_applicant', {
     p_applicant: applicantId,
     p_listing: l.id,
     p_starts_on: start,
@@ -3290,8 +3312,9 @@ async function bookApplicant(applicantId, listingId, start, end, errEl) {
   if (VIEWS[view]?.kind === 'applicants') renderApplicants();
   if (view === 'occupancy') renderOccupancy();
   if (!document.getElementById('review').hidden) renderReview();
-  // Telling them is the other half of accepting them.
-  openEmailModal(applicantId, 'accepted');
+  // Telling them is the other half of accepting them — but first, confirm
+  // every fact the email and agreement will state.
+  openMoveinConfirm(newStayId);
   return true;
 }
 
@@ -3306,6 +3329,244 @@ async function submitBookIn() {
     document.getElementById('bi-error'));
   if (!ok) { btn.disabled = false; return; }
   modal.hidden = true;
+}
+
+/* --- confirm move-in details → welcome email ---
+   Booking answers who and where; this sheet confirms everything the welcome
+   email and the agreement will STATE — money, buddy, links, arrival — each
+   field editable, then one click drafts the (still editable) email with the
+   agreement PDF attached and the finance folks cc'd. Reachable again from the
+   stay drawer as long as the stay is live. */
+let moveinFor = null;   // stay id open in the confirm sheet
+
+/* The rent this stay was offered at: the room's most recent listing wins,
+   the room's own number is the fallback. */
+function rentForStay(s) {
+  const ls = listings.filter(l => l.room_id === s.room_id && l.rent_monthly != null)
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+  if (ls.length) return ls[0].rent_monthly;
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  return room?.rent_monthly ?? '';
+}
+
+// Current residents, for the buddy pick.
+function residentRoster() {
+  const today = new Date().toISOString().slice(0, 10);
+  return [...new Set(stays
+    .filter(s => s.kind === 'resident' && (!s.ends_on || s.ends_on >= today) && s.occupant)
+    .map(s => s.occupant.trim()))];
+}
+
+/* Next up = the resident who has gone longest without being someone's buddy.
+   Derived from buddy_name history on stays — no rotation table to maintain. */
+function suggestedBuddy() {
+  const roster = residentRoster();
+  if (!roster.length) return null;
+  const lastBuddied = new Map();
+  for (const s of stays) {
+    if (!s.buddy_name) continue;
+    const when = s.starts_on || '';
+    if (when > (lastBuddied.get(s.buddy_name) || '')) lastBuddied.set(s.buddy_name, when);
+  }
+  return roster.slice().sort((a, b) =>
+    (lastBuddied.get(a) || '').localeCompare(lastBuddied.get(b) || ''))[0];
+}
+
+function openMoveinConfirm(stayId) {
+  const s = stays.find(x => x.id === stayId);
+  if (!s) { toast('Stay not found — open it from the occupancy calendar'); return; }
+  moveinFor = stayId;
+  const first = (s.occupant || '').split(' ')[0] || 'them';
+  document.getElementById('mi-title').textContent = `Confirm move-in details — ${first}`;
+  renderMoveinConfirm();
+  document.getElementById('mi-modal').hidden = false;
+}
+
+function renderMoveinConfirm() {
+  const s = stays.find(x => x.id === moveinFor);
+  if (!s) return;
+  const mv = s.movein || {};
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  const isTrial = s.kind === 'candidate';
+  const roster = residentRoster();
+  const next = suggestedBuddy();
+  const buddy = s.buddy_name || next || '';
+  const val = (k, fallback) => mv[k] ?? fallback;
+  const field = (id, label, value, attrs = '') =>
+    `<label class="listing-form__field">${label}
+      <input class="listing-status" id="${id}" value="${esc(String(value ?? ''))}" ${attrs}>
+    </label>`;
+  document.getElementById('mi-body').innerHTML = `
+    <p class="occ-drawer__note">${esc(room?.name || 'Room')}${room?.floor ? ` (${esc(String(room.floor))})` : ''} ·
+      ${isTrial ? `resident trial from ${fmtDay(s.starts_on)}${s.ends_on ? ` — decision by ${fmtDay(s.ends_on)}` : ''}` : `sublet ${fmtDay(s.starts_on)} – ${s.ends_on ? fmtDay(s.ends_on) : 'TBD'}`}.
+      Dates are edited on the stay itself; everything below feeds the email and the agreement.</p>
+    <div class="occ-drawer__section">Money</div>
+    <div class="occ-drawer__dates">
+      ${field('mi-rent', 'Lease rent /mo', val('rent', rentForStay(s)), 'type="number" min="0" step="5"')}
+      ${field('mi-dues', 'House dues /mo', val('dues', setting('dues_monthly')), 'type="number" min="0" step="5"')}
+      ${field('mi-food', 'Groceries /mo', val('food', setting('food_monthly')), 'type="number" min="0" step="5"')}
+      ${field('mi-deposit', 'Deposit', val('deposit', setting('deposit_amount')), 'type="number" min="0" step="50"')}
+    </div>
+    <p class="occ-drawer__note" id="mi-total"></p>
+    <div class="occ-drawer__section">Buddy</div>
+    <label class="listing-form__field">Their buddy
+      <select class="listing-status" id="mi-buddy">
+        <option value="">No buddy yet</option>
+        ${roster.map(n => `<option value="${esc(n)}" ${n === buddy ? 'selected' : ''}>${esc(n)}${n === next ? ' (next up)' : ''}</option>`).join('')}
+      </select>
+    </label>
+    <div class="occ-drawer__section">Links & people</div>
+    ${field('mi-fin1-email', `Cc — ${esc(setting('finance_contact_1_name') || 'finance 1')}`, setting('finance_contact_1_email'), 'type="email" placeholder="finance email"')}
+    ${field('mi-fin2-email', `Cc — ${esc(setting('finance_contact_2_name') || 'finance 2')}`, setting('finance_contact_2_email'), 'type="email" placeholder="finance email (optional)"')}
+    ${field('mi-discord', 'Discord invite', setting('discord_invite_url'), 'placeholder="https://discord.gg/…"')}
+    ${field('mi-notion', 'Notion guide', setting('notion_guide_url'), 'placeholder="https://notion.so/…"')}
+    ${field('mi-hosts', 'Onboarding chat hosts', setting('onboarding_hosts'), '')}
+    ${field('mi-address', 'Address', setting('house_address'), '')}
+    ${field('mi-arrival', 'Arrival note', setting('arrival_note'), 'placeholder="Reach out to … when you arrive"')}
+    <p class="occ-drawer__note">Link and people edits save back to Settings → Move-in — they're house facts, not per-person ones.</p>
+    <p class="listing-form__error" id="mi-error"></p>
+    <div class="decision-sheet__actions">
+      <button class="hold-sheet__cancel" id="mi-later" type="button" title="Everything stays as it is — reopen from the stay on the occupancy calendar">Not yet</button>
+      <button class="btn btn--accent btn--sm" id="mi-submit" type="button">Confirm &amp; draft the email</button>
+    </div>`;
+  const totalLine = () => {
+    const n = id => Number(document.getElementById(id)?.value) || 0;
+    document.getElementById('mi-total').textContent =
+      `Monthly total: $${(n('mi-rent') + n('mi-dues') + n('mi-food')).toLocaleString('en-US')} · deposit $${n('mi-deposit').toLocaleString('en-US')} held throughout`;
+  };
+  ['mi-rent', 'mi-dues', 'mi-food', 'mi-deposit'].forEach(id =>
+    document.getElementById(id).addEventListener('input', totalLine));
+  totalLine();
+  document.getElementById('mi-later').onclick = () => { document.getElementById('mi-modal').hidden = true; moveinFor = null; };
+  document.getElementById('mi-submit').onclick = () => submitMoveinConfirm();
+}
+
+async function submitMoveinConfirm() {
+  const s = stays.find(x => x.id === moveinFor);
+  if (!s) return;
+  const a = applicants.find(x => x.id === s.applicant_id);
+  const err = document.getElementById('mi-error');
+  const num = id => { const v = document.getElementById(id)?.value; return v === '' ? null : Number(v); };
+  const str = id => (document.getElementById(id)?.value || '').trim();
+  const payload = {
+    rent: num('mi-rent'), dues: num('mi-dues'), food: num('mi-food'), deposit: num('mi-deposit'),
+    total: (num('mi-rent') || 0) + (num('mi-dues') || 0) + (num('mi-food') || 0),
+    finance_cc: [str('mi-fin1-email'), str('mi-fin2-email')].filter(e => e.includes('@')),
+    discord_invite: str('mi-discord'), notion_guide: str('mi-notion'),
+    hosts: str('mi-hosts'), address: str('mi-address'), arrival: str('mi-arrival'),
+    confirmed_by: me?.name || null, confirmed_at: new Date().toISOString(),
+  };
+  if (payload.rent == null) { err.textContent = 'Rent is the one number the email cannot guess.'; return; }
+  const btn = document.getElementById('mi-submit');
+  btn.disabled = true;
+  const buddy = str('mi-buddy') || document.getElementById('mi-buddy')?.value || '';
+
+  // House facts flow back to settings so the next confirm starts current.
+  const backToSettings = [
+    ['finance_contact_1_email', str('mi-fin1-email')], ['finance_contact_2_email', str('mi-fin2-email')],
+    ['discord_invite_url', payload.discord_invite], ['notion_guide_url', payload.notion_guide],
+    ['onboarding_hosts', payload.hosts], ['house_address', payload.address], ['arrival_note', payload.arrival],
+  ];
+  for (const [key, v] of backToSettings) {
+    if (v !== String(setting(key) ?? '')) await setSetting(key, v);
+  }
+
+  const { error } = await sb.from('recruit_stays')
+    .update({ movein: payload, buddy_name: buddy || null, updated_at: new Date().toISOString() })
+    .eq('id', s.id);
+  if (error) { err.textContent = error.message; btn.disabled = false; return; }
+  Object.assign(s, { movein: payload, buddy_name: buddy || null });
+
+  // The agreement rides the email as a PDF. A generation failure downgrades
+  // to sending without the attachment, never to blocking the email.
+  let attachment = null;
+  btn.textContent = 'Generating the agreement…';
+  try {
+    const out = await gmailCall({ action: 'generate-agreement', stayId: s.id });
+    s.agreement_url = out.docUrl;
+    attachment = { filename: out.filename, mimeType: 'application/pdf', dataBase64: out.pdfBase64 };
+  } catch (e) {
+    toast(`Agreement not attached — ${e.message}`);
+  }
+  document.getElementById('mi-modal').hidden = true;
+  moveinFor = null;
+  openWelcomeEmail(a, s, payload, attachment);
+  if (view === 'occupancy') renderOccupancy();
+}
+
+/* The welcome email — a fixed template, so the numbers are exactly what was
+   just confirmed. Fully editable in the composer before sending. */
+function buildWelcomeEmail(a, s, p) {
+  const room = rooms.find(r => r.id === s.room_id) || allRooms.find(r => r.id === s.room_id);
+  const isTrial = s.kind === 'candidate';
+  const first = a?.first || (s.occupant || '').split(' ')[0] || 'there';
+  const money = v => v == null ? '$—' : `$${Number(v).toLocaleString('en-US')}`;
+  const long = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
+  const month = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('en-US', { month: 'long' }) : '';
+  const fin = [setting('finance_contact_1_name'), p.finance_cc?.length > 1 ? setting('finance_contact_2_name') : null]
+    .filter(Boolean).join(' & ') || 'our finance folks';
+  const trialLine = isTrial
+    ? ` with the standard ${setting('trial_length_months')}-month trial period. We'll do feedback check-ins after your first and second months, then either extend a long-term offer or confirm a move-out date.`
+    : ` through ${long(s.ends_on)}.`;
+  const sections = [];
+  sections.push(`Set up rent — watch for an apartments.com invite
+Your monthly total is ${money(p.total)}: ${money(p.rent)} rent + ${money(p.dues)} house dues + ${money(p.food)} communal groceries. A ${money(p.deposit)} deposit is held throughout your time at Agape.
+- ${fin} (cc'd) will send an invite from apartments.com to ${a?.email || 'your email'} — accept it and set up your payment method there.
+- Your first payment covers ${month(s.starts_on)} and is due by ${long(s.starts_on)}.
+- If the invite hasn't landed within a couple of days, check spam, then ping ${fin} on Discord.`);
+  sections.push(`Sign your agreement
+Attached is your housemate agreement — give it a read, sign, and send it back before move-in day by replying to this email with the signed copy. It covers the basics and makes sure we're on the same page around dates, rent, and end-of-term details.`);
+  sections.push(`Join Discord & Notion
+These two are where the house actually runs.
+- Discord: ${p.discord_invite || '(invite link)'} — announcements, events, and day-to-day logistics. Introduce yourself in #all-agape once you're in.
+- Notion: invite sent separately — the house wiki: chore rotations, house guides, shared docs. A good place to start: ${p.notion_guide || '(guide link)'}`);
+  sections.push(`Book your onboarding chat
+Before moving in, reach out to ${p.hosts || 'the house'} on Discord to book your onboarding chat. It happens in your first day or two in the house and takes about an hour — they'll walk you through how the house runs (dinner and cooking shifts, monthly check-ins and house meetings), your areas of responsibility, and anything the tour didn't cover.`);
+  if (s.buddy_name) {
+    sections.push(`Your buddy
+You're paired with ${s.buddy_name}. Your buddy is a current resident who's your first stop for questions — they'll set up your food bins and shoe storage and be a friendly point of contact throughout your time here. They'll say hi on Discord in the next few days; if you haven't heard from them, reply here and I'll make the intro.`);
+  }
+  sections.push(`Move-in day plan
+- Date: ${long(s.starts_on)}
+- Address: ${p.address || '(set the address in Settings)'}
+${p.arrival ? `- Arrival: ${p.arrival}\n` : ''}We'll send a day-of email with WiFi, door, and everything else you need on arrival.`);
+  const body = `Hey ${first},
+
+Welcome to Agape — we are so, so excited for you to be joining us.
+
+Quick confirmation before anything else: you'll be in the ${room?.name || 'your'} room${room?.floor ? ` (${room.floor})` : ''} as a ${isTrial ? 'full-time resident candidate' : 'subletter'}, starting on or after ${long(s.starts_on)}${trialLine} If any of that doesn't match what you expected, reply now and we'll sort it out.
+
+Here's what to knock out before move-in day so you can just settle in when you arrive.
+
+${sections.map((sec, i) => `${i + 1}. ${sec}`).join('\n\n')}
+
+Questions before then? Reply here or ping me on Discord.
+
+See you soon,
+${me?.name || 'Ian'} & the Agape crew`;
+  return { subject: 'Welcome to Agape — your move-in details', body };
+}
+
+function openWelcomeEmail(a, s, p, attachment) {
+  if (!a) { toast('No application linked to this stay — email them by hand'); return; }
+  const draft = buildWelcomeEmail(a, s, p);
+  emailApplicantId = a.id;
+  emailMode = 'outreach';
+  emailKind = 'welcome';
+  emailExtras = {
+    cc: p.finance_cc || [],
+    attachments: attachment ? [attachment] : [],
+    stampStayId: s.id, stamp: 'welcome',
+  };
+  document.getElementById('email-send').textContent = 'Send via Agape Gmail';
+  document.getElementById('email-title').textContent = `Welcome ${a.first} to Agape`;
+  document.getElementById('email-subject').value = draft.subject;
+  document.getElementById('email-body').value = draft.body;
+  const addedHost = document.getElementById('email-added');
+  if (addedHost) { addedHost.hidden = true; addedHost.innerHTML = ''; }
+  document.getElementById('email-status').textContent =
+    `${attachment ? `Agreement attached (${attachment.filename})` : 'No agreement attached'}${emailExtras.cc.length ? ` · cc ${emailExtras.cc.join(', ')}` : ''} · every line is editable.`;
+  document.getElementById('email-modal').hidden = false;
 }
 
 /* Drag applicants inside a listing group to reorder, or across groups to
@@ -3758,6 +4019,44 @@ function onboardingHtml(s) {
   </div>`;
 }
 
+/* --- move-in panel (stay drawer) ---
+   The acceptance flow's state, visible where the stay lives: buddy, the
+   agreement, and the two emails. "Move-in details…" reopens the confirm
+   sheet at any point before (or after) the welcome email goes out. */
+function moveinPanelHtml(s) {
+  if (!s.id || !s.applicant_id || s.kind === 'shared') return '';
+  const row = (label, value) => `<div class="occ-drawer__fact"><dt>${label}</dt><dd>${value}</dd></div>`;
+  const agreement = s.agreement_signed_at
+    ? `signed ${fmtDay(s.agreement_signed_at.slice(0, 10))}`
+    : s.agreement_url
+      ? `<a href="${esc(s.agreement_url)}" target="_blank" rel="noopener">generated</a> — <label class="chip-line"><input type="checkbox" data-agreement-signed="${s.id}"> mark signed</label>`
+      : 'not generated yet';
+  return `<div class="occ-drawer__onboard">
+    <div class="occ-drawer__section">Move-in</div>
+    <dl class="occ-drawer__facts">
+      ${row('Buddy', esc(s.buddy_name || '—'))}
+      ${row('Agreement', agreement)}
+      ${row('Welcome email', s.welcome_email_sent_at ? `sent ${fmtDay(s.welcome_email_sent_at.slice(0, 10))}` : 'not sent')}
+      ${row('Day-of email', s.dayof_email_sent_at ? `sent ${fmtDay(s.dayof_email_sent_at.slice(0, 10))}` : 'drafts itself on move-in morning')}
+    </dl>
+    <button type="button" class="drawer-cta__alt" data-movein-open="${s.id}">
+      <span>Move-in details…</span>
+      <span class="drawer-cta__exit-hint">confirm money, buddy, and links — then ${s.welcome_email_sent_at ? 're-draft' : 'draft'} the welcome email</span>
+    </button>
+  </div>`;
+}
+
+async function toggleAgreementSigned(stayId, signed) {
+  const s = stays.find(x => x.id === stayId);
+  if (!s) return;
+  const when = signed ? new Date().toISOString() : null;
+  const { error } = await sb.from('recruit_stays')
+    .update({ agreement_signed_at: when, updated_at: new Date().toISOString() }).eq('id', stayId);
+  if (error) { toast(`Could not save: ${error.message}`); return; }
+  s.agreement_signed_at = when;
+  renderOccDrawer();
+}
+
 async function toggleOnboarding(id, done) {
   const row = onboarding.find(o => o.id === id);
   if (!row) return;
@@ -4005,7 +4304,7 @@ function renderOccDrawer() {
     const room = rooms.find(r => r.id === s.room_id);
     title = s.occupant || KIND_LABELS[s.kind];
     sub = `${room?.name || 'Room'} · ${KIND_LABELS[s.kind]} · ${fmtShort(s.starts_on)} – ${s.ends_on ? fmtShort(s.ends_on) : 'ongoing'}`;
-    body = promoteBlockHtml(s) + stayFormHtml(s, s.room_id) + onboardingHtml(s);
+    body = promoteBlockHtml(s) + stayFormHtml(s, s.room_id) + moveinPanelHtml(s) + onboardingHtml(s);
   } else if (occDrawer.type === 'gap') {
     const room = rooms.find(r => r.id === occDrawer.roomId);
     title = `${room?.name || 'Room'} — open`;
@@ -4076,6 +4375,12 @@ function renderOccDrawer() {
   hostWrap.querySelector('[data-promote-form]')?.addEventListener('submit', e => {
     e.preventDefault();
     submitPromote(e.target);
+  });
+  hostWrap.querySelector('[data-movein-open]')?.addEventListener('click', e => {
+    openMoveinConfirm(e.currentTarget.dataset.moveinOpen);
+  });
+  hostWrap.querySelector('[data-agreement-signed]')?.addEventListener('change', e => {
+    toggleAgreementSigned(e.target.dataset.agreementSigned, e.target.checked);
   });
   hostWrap.querySelectorAll('[data-onboard]').forEach(box => {
     box.addEventListener('change', () => toggleOnboarding(box.dataset.onboard, box.checked));
@@ -4871,14 +5176,14 @@ function renderReview() {
           <p class="review__meta"><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></p>
           <div class="review__badges">
             <span class="review__badge review__badge--track">${trackLabel(a)}</span>
-
+            ${a.origin === 'native' ? '<span class="review__badge" title="Applied through ctrl.rodeo/apply — they can edit their answers until a decision">native</span>' : ''}
           </div>
           <div class="review__facts">
             <div class="review__fact"><span class="review__fact-label">Move-in</span>${moveInFactHtml(a, miNorm)}</div>
             <div class="review__fact"><span class="review__fact-label">Budget</span><span class="review__fact-value">${esc(buNorm || a.budget || '—')} ${infoDot(a.budget, buNorm)}</span></div>
             <div class="review__fact"><span class="review__fact-label">Phone</span>${phoneFactHtml(a)}</div>
             ${a.source ? `<div class="review__fact"><span class="review__fact-label">Via</span><span class="review__fact-value review__fact-value--quiet">${esc(a.source)}</span></div>` : ''}
-            <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
+            <div class="review__fact"><span class="review__fact-label">Applied</span><span class="review__fact-value">${new Date(a.ts_iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}${a.updatedAt && (new Date(a.updatedAt) - new Date(a.ts_iso)) > 3600e3 ? ` <span class="review__fact-value--quiet" title="They edited their application on /apply">· updated ${relTime(a.updatedAt)}</span>` : ''}</span></div>
             ${linksHtml ? `<div class="review__fact"><span class="review__fact-label">Links</span>${linksHtml}</div>` : ''}
           </div>
         </div>
@@ -4895,6 +5200,7 @@ function renderReview() {
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
+    ${section('Anything else', a.anythingElse)}
     ${stagesHtml(a)}
     ${availabilityHtml(a)}
     ${houseEventsHtml(a)}
@@ -6934,6 +7240,7 @@ function init() {
   document.getElementById('menu-signout').onclick = () => window.CtrlAuth.signOut();
   document.getElementById('gd-close').onclick = () => { document.getElementById('gd-modal').hidden = true; };
   document.getElementById('bi-close').onclick = () => { document.getElementById('bi-modal').hidden = true; };
+  document.getElementById('mi-close').onclick = () => { document.getElementById('mi-modal').hidden = true; moveinFor = null; };
   document.getElementById('gd-yes').onclick = () => giveDecision(document.getElementById('gd-modal').dataset.applicant, 'yes');
   // No is not a sentiment to file — it routes into the Remove sheet with
   // Not a fit preselected (note carried), so the verdict and its
@@ -6985,7 +7292,20 @@ function init() {
         // A tour ask opens the tour cycle server-side: the next availability
         // reply becomes a house poll instead of a screener claim.
         ...(emailKind === 'tour' || emailKind === 'visit' ? { kind: 'tour' } : {}),
+        // The welcome email copies the finance folks and carries the agreement.
+        ...(emailExtras?.cc?.length ? { cc: emailExtras.cc } : {}),
+        ...(emailExtras?.attachments?.length ? { attachments: emailExtras.attachments } : {}),
       });
+      // Welcome / day-of sends stamp the stay so nudges and panels move on.
+      if (emailExtras?.stampStayId) {
+        const col = emailExtras.stamp === 'dayof' ? 'dayof_email_sent_at' : 'welcome_email_sent_at';
+        const when = new Date().toISOString();
+        sb.from('recruit_stays').update({ [col]: when }).eq('id', emailExtras.stampStayId)
+          .then(({ error: e2 }) => { if (e2) console.warn('send stamp failed', e2.message); });
+        const st = stays.find(x => x.id === emailExtras.stampStayId);
+        if (st) st[col] = when;
+        if (emailExtras.stamp === 'dayof') ackFor('applicant', sentFor, ['movein_day']);
+      }
       if ((emailKind === 'tour' || emailKind === 'visit') && emailMode !== 'update') {
         tourState[sentFor] = { status: 'asked', askedAt: new Date().toISOString() };
         if (VIEWS[view]?.kind === 'applicants') renderApplicants();

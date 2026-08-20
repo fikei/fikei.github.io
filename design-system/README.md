@@ -892,6 +892,20 @@ Grid-based widget framework for AI-powered recommendations. Uses `w-*` prefix cl
 
 **Feature flag:** Widgets hidden by default. Enable via `window.enableWidgetDS()` in console. Toggle in dev menu (Ctrl+Shift+D).
 
+## Apply wizard (`/apply/css/form.css`)
+
+One-question-per-screen form classes, built on the tokens. Page-scoped today;
+promote into `components.css` if a second wizard appears.
+
+- `.apply-progress` / `.apply-progress__fill` — 3px progress line fixed to the viewport top
+- `.apply-shell` / `.apply-screen` — centered single-question stage; `.fade-out` drives the 150ms step transition
+- `.apply-q__count`, `.apply-q__title`, `.apply-q__hint` — question header stack (count · display-font title · muted hint)
+- `.apply-choice` (+ `.selected`, `.apply-choice__key`) — radio options as full-width cards with a keyboard-number chip
+- `.apply-otp` — one-time-code input (letter-spaced, centered)
+- `.apply-review` / `.apply-review__row|__label|__value|__edit` — answer summary list, each row a jump-to-edit
+- `.apply-banner` — status banner (submitted / locked)
+- `.apply-nav`, `.apply-back`, `.apply-error`, `.apply-foot` — step navigation, quiet back link, inline error, save-state footer
+
 ## Light Mode
 
 Add `.light` class to `<html>` to enable light mode:

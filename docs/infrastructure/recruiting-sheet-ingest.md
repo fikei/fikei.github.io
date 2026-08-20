@@ -98,3 +98,24 @@ curl -s -X POST https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recruit-in
 ```
 
 `dryRun` shows exactly what would be written, including the derived id, and touches nothing.
+
+## Dual ingestion: sheet vs. the native /apply form
+
+Since migration 170 the funnel has two ways in, and `recruit_applicants.source`
+says which one a row used:
+
+- **`native`** — ctrl.rodeo/apply (the home-built form). The applicant signs in
+  with an email OTP; their row carries `user_id` and they can edit it through
+  the `recruit_apply_*` RPCs until the stage leaves `review`. Rows with
+  `is_submitted = false` are in-progress drafts and are hidden from the triage
+  app.
+- **`sheet`** — this Google Sheet pipeline (kept as a fallback for manual
+  additions). Ingest v1.7.0 stamps `source: 'sheet'` explicitly.
+- **`manual`** — reserved for recruiter-added rows.
+
+Collisions resolve by email, native wins: ingest already skips any email that
+exists in `recruit_applicants`, so a person who applied natively and then also
+fills the old Google Form is skipped (logged as `already an applicant
+(native): …`) rather than twinned or overwritten. The reverse direction — a
+sheet-era applicant signing in on /apply with the same email — claims their
+existing row (`user_id` gets set) instead of creating a second one.
