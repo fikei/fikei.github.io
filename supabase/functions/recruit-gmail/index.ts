@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.37.2'
+const VERSION = '1.38.0'
 console.log(`[recruit-gmail] v${VERSION} — connect triggers an application-sheet pull so reconnecting catches up new applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -910,49 +910,11 @@ serve(async (req) => {
       return json({ connected: true, ...acct })
     }
 
-    if (action === 'send-update') {
-      // Rejection-queue send: same pipe as 'send', plus stamps
-      // update_email_sent_at and closes the stage to 'archived'.
-      const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
-      if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
-      const subject = String(body.subject || '').slice(0, 300)
-      const text = String(body.body || '').slice(0, 10000)
-      if (!subject || !text) return json({ error: 'Subject and body required' }, 400)
-      const at = await accessToken(client)
-      const encSubject = `=?UTF-8?B?${b64url(subject).replace(/-/g, '+').replace(/_/g, '/')}?=`
-      const raw = [
-        `From: Agape <${SHARED_EMAIL}>`,
-        `To: ${applicant.email}`,
-        `Subject: ${encSubject}`,
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        '',
-        text,
-      ].join('\r\n')
-      const resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raw: b64url(raw) }),
-      })
-      const sent = await resp.json()
-      if (!resp.ok) return json({ error: `Send failed: ${JSON.stringify(sent).slice(0, 180)}` }, 500)
-      await client.from('recruit_emails').upsert({
-        applicant_id: applicant.id, gmail_id: sent.id, thread_id: sent.threadId,
-        direction: 'out', subject, snippet: text.slice(0, 180), body_text: text,
-        from_email: SHARED_EMAIL, to_email: applicant.email,
-        sent_by_name: 'update queue', sent_at: new Date().toISOString(),
-      }, { onConflict: 'gmail_id' })
-      await client.from('recruit_applicants')
-        .update({ update_email_sent_at: new Date().toISOString(), stage: 'archived' })
-        .eq('id', applicant.id)
-      return json({ sent: true })
-    }
-
     if (action === 'send') {
       const { data: applicant } = await client.from('recruit_applicants').select('*').eq('id', String(body.applicantId || '')).maybeSingle()
       if (!applicant?.email?.includes('@')) return json({ error: 'Applicant has no email' }, 400)
-      // Outreach can never reach someone who has been archived. 'send-update'
-      // is the only channel left for them, and it carries no invitation.
+      // Outreach can never reach someone who has been archived. Applicant
+      // updates go out in bulk, later — never from this composer.
       if (applicant.stage === 'rejected' || applicant.stage === 'archived') {
         return json({ error: 'They are archived — only their update email can be sent' }, 409)
       }
