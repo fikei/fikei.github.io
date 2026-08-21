@@ -18,7 +18,7 @@
  *
  * Classic script, not a module: it runs before app.js and hands over globals.
  */
-const SETTINGS_VERSION = '1.3.0';
+const SETTINGS_VERSION = '1.4.0';
 console.log(`[settings-schema] v${SETTINGS_VERSION}`);
 
 /* Every knob, exposed or not. `section: null` means "routed through setting()
@@ -72,11 +72,8 @@ const SETTING_DEFS = {
     label: 'Trial decision lands before the end by', unit: 'months', min: 0, max: 6, step: 1,
     hint: 'Enough runway to say yes, or for them to find somewhere else.',
   },
-  update_email_default: {
-    scope: 'house', type: 'bool', section: 'funnel', default: true,
-    label: 'Offer an update email by default',
-    hint: 'When someone is marked not a fit — you can still change it per person.',
-  },
+  /* update_email_default retired 2026-08-21: the per-decision "Send them an
+     update" offer is gone — rejections queue for bulk sends instead. */
 
   /* --- Move-in ----------------------------------------------------------- *
    * Everything the welcome email, the agreement, and the day-of email merge

@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.82.0';
+const VERSION = '3.83.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -87,7 +87,7 @@ const REMOVE_OPTIONS = [
   },
   {
     id: 'not_a_fit', label: 'Not a fit',
-    hint: 'our no — records the house decision and queues an update email',
+    hint: 'our no — records the house decision; their update goes out with the next bulk send',
     chip: 'not a fit', stage: 'rejected', danger: true,
   },
   // The residency decision going the other way. Kept distinct from "not a
@@ -155,10 +155,6 @@ let decisionVotes = {};       // applicant_id -> recruit_decision_votes rows
 let screeningState = {};      // applicant_id -> { at?, with?, availability? }
 let houseEvents = {};         // applicant_id -> non-intro_call calendar rows
 let pendingVerdict = null;    // 'not_fit' | 'needs_input' | 'forward' while the review bar is open
-/* How the update-email box starts on a Not-a-fit decision. A house preference
-   rather than a hard default: some houses always write, some rarely do. */
-const updateEmailDefault = () => settings.update_email_default !== false;
-let sendUpdateWith = true;    // "Send them an update" rides with a Not-a-fit decision
 let noteDraft = { id: null, text: '' };  // review comment in progress, scoped to its applicant
 let footFor = null;           // which applicant the review bar in the DOM belongs to
 let commentCounts = {};       // applicant_id -> n
@@ -777,7 +773,6 @@ async function loadAll() {
       settings[row.key] = row.value;
       settingsMeta[row.key] = { by: row.updated_by_name, at: row.updated_at };
     }
-    sendUpdateWith = updateEmailDefault();
   });
   if (aRes.error) throw aRes.error;
   // Native drafts (someone mid-way through /apply) are not applications yet
@@ -1553,31 +1548,24 @@ async function castVote(applicantId) {
   const before = a.stage;
   if (fresh) a.stage = fresh.stage;
   const verdict = pendingVerdict;
-  const wantsUpdate = document.getElementById('vote-send-update')?.checked ?? sendUpdateWith;
   pendingVerdict = null;
   noteDraft = { id: null, text: '' };
   if (verdict === 'not_fit') {
-    // The email decision was made on the decision step, so honour it here
-    // rather than asking again.
-    if (!wantsUpdate) {
-      const { error: skipErr } = await sb.rpc('recruit_skip_update', { p_applicant: applicantId });
-      if (skipErr) toast(`Archived, but the email couldn't be marked skipped: ${skipErr.message}`);
-      else { a.updateSkippedAt = new Date().toISOString(); a.stage = 'archived'; }
-    }
+    // No per-decision email offer: rejected rows sit in the Archive's update
+    // queue and go out in bulk. Deciding and writing are separate moments.
     renderRailCounts();
     // Auto-advance: their profile has nothing left to do on it. The banner
     // carries the outcome onto the next applicant.
-    const summary = `${fullName(a)} archived — ${wantsUpdate ? 'update email queued' : 'no email sent'}`;
+    const summary = `${fullName(a)} archived — update rides the next bulk send`;
     // Last in the queue means step() closes the overlay, taking the banner with
     // it, so say it in a toast instead.
     if (qIndex >= queue.length - 1) toast(summary);
     else {
-      showReviewBanner(`<span><b>${esc(fullName(a))}</b> archived — ${wantsUpdate ? 'update email queued' : 'no email sent'}</span>
+      showReviewBanner(`<span><b>${esc(fullName(a))}</b> archived — update rides the next bulk send</span>
         <button type="button" class="cta-link" data-reopen="${a.id}">Undo</button>`);
       keepBannerOnce = true;
     }
     step(1);
-    if (wantsUpdate) openUpdateEmail(applicantId);
     return;
   }
   if (a.stage === 'candidate' && before !== 'candidate') {
@@ -3968,7 +3956,7 @@ let promoting = null;   // stay id currently showing the confirm strip
    ("Add resident trial"), and the pre-move-in undo ("Step back"). The stay
    form above only edits the stay; these are the doors out of it. */
 function stayTransitionsHtml(s) {
-  if (!s.id || s.kind === 'shared') return '';
+  if (!s.id) return '';   // a new stay has nothing to transition out of
   const today = new Date().toISOString().slice(0, 10);
   const parts = [];
 
@@ -4038,8 +4026,17 @@ function stayTransitionsHtml(s) {
     </button>`);
   }
 
-  // The pre-move-in undo, for anyone the accept flow booked.
+  // The ways out, least → most final: mark leaving (residents), the
+  // pre-move-in step-back (booked people), and delete — always last, always
+  // the only plain-destructive one.
   const exits = [];
+  if (s.kind === 'resident') {
+    exits.push(`<button type="button" class="drawer-cta__exit" data-stay-leaving="${s.room_id}" data-stay-leaving-date="${s.ends_on || ''}">
+      <span class="drawer-cta__exit-label">Mark leaving</span>
+      <span class="drawer-cta__exit-icon" aria-hidden="true">&rarr;</span>
+      <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
+    </button>`);
+  }
   if (s.applicant_id && s.kind !== 'resident' && s.starts_on > today) {
     exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-unbook="${s.id}">
       <span class="drawer-cta__exit-label">Step back — reopen the listing</span>
@@ -4047,6 +4044,11 @@ function stayTransitionsHtml(s) {
       <span class="drawer-cta__exit-hint">removes this booking, reopens the room's listing, and puts them back on it as a candidate — everyone else returns too, unless a recruiter removed them</span>
     </button>`);
   }
+  exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-stay-delete="${s.id}">
+    <span class="drawer-cta__exit-label">Remove stay</span>
+    <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
+    <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
+  </button>`);
 
   if (!parts.length && !exits.length) return '';
   return `<div class="drawer-cta occ-drawer__promote">
@@ -4121,7 +4123,7 @@ function moveinPanelHtml(s) {
       ${row('Buddy', esc(s.buddy_name || '—'))}
       ${row('Agreement', agreement)}
       ${row('Welcome email', s.welcome_email_sent_at ? `sent ${fmtDay(s.welcome_email_sent_at.slice(0, 10))}` : 'not sent')}
-      ${row('Day-of email', s.dayof_email_sent_at ? `sent ${fmtDay(s.dayof_email_sent_at.slice(0, 10))}` : 'drafts itself on move-in morning')}
+      ${row('Day-of email', s.dayof_email_sent_at ? `sent ${fmtDay(s.dayof_email_sent_at.slice(0, 10))}` : 'drafts on move-in morning')}
     </dl>
     <button type="button" class="drawer-cta__alt" data-movein-open="${s.id}">
       <span>Move-in details…</span>
@@ -4204,23 +4206,9 @@ async function submitPromote(form) {
 
 function stayFormHtml(s, roomId) {
   const isNew = !s.id;
-  // Tier 3 of the sidebar CTA pattern: the ways out. Each carries a hint so a
-  // red label is never the only thing telling you what it does.
-  const exits = [];
-  if (!isNew && s.kind === 'resident') {
-    exits.push(`<button type="button" class="drawer-cta__exit" data-stay-leaving="${roomId}" data-stay-leaving-date="${s.ends_on || ''}">
-      <span class="drawer-cta__exit-label">Mark leaving</span>
-      <span class="drawer-cta__exit-icon" aria-hidden="true">&rarr;</span>
-      <span class="drawer-cta__exit-hint">sets a move-out date and lists the room</span>
-    </button>`);
-  }
-  if (!isNew) {
-    exits.push(`<button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-stay-delete="${s.id}">
-      <span class="drawer-cta__exit-label">Remove stay</span>
-      <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
-      <span class="drawer-cta__exit-hint">deletes it from the timeline</span>
-    </button>`);
-  }
+  // The ways out of a stay live in the drawer's bottom action area
+  // (stayTransitionsHtml), not inside the edit form — the form edits, the
+  // bottom area transitions.
   return `<form class="occ-drawer__form" data-stay-form="${s.id || 'new'}" data-stay-room="${roomId}">
     <label class="listing-form__field">Who
       <input type="text" name="occupant" class="listing-status" value="${esc(s.occupant || '')}" placeholder="Name" autofocus>
@@ -4247,7 +4235,6 @@ function stayFormHtml(s, roomId) {
         <button type="button" class="drawer-cta__quiet" data-drawer-close>Cancel</button>
         <button type="submit" class="btn btn--accent drawer-cta__commit">Add stay</button>
       </div>` : `<p class="drawer-cta__flag" data-save-flag></p>`}
-      ${exits.length ? `<div class="drawer-cta__exits">${exits.join('')}</div>` : ''}
     </div>
   </form>`;
 }
@@ -5189,7 +5176,6 @@ function step(delta) {
   if (next < 0 || next >= queue.length) { if (delta > 0) closeReview(); return; }
   qIndex = next;
   pendingVerdict = null;
-  sendUpdateWith = updateEmailDefault();
   noteDraft = { id: queue[next], text: '' };
   moveinEditing = false;
   phoneEditing = false;
@@ -5498,8 +5484,6 @@ function renderReviewFoot(a) {
   const liveNote = document.getElementById('vote-note');
   if (liveNote && footFor === a.id) noteDraft = { id: a.id, text: liveNote.value };
   const keepNote = noteDraft.id === a.id ? noteDraft.text : null;
-  const liveBox = document.getElementById('vote-send-update');
-  if (liveBox) sendUpdateWith = liveBox.checked;
   // Fresh off a forward verdict: the candidate bar that replaces the vote bar
   // names the change before offering its new actions, so the swap reads as a
   // promotion rather than a glitch.
@@ -5525,9 +5509,6 @@ function renderReviewFoot(a) {
         <input type="text" class="listing-status vote-bar__note" id="vote-note" maxlength="500"
           placeholder="Your comment (required)"
           value="${esc(keepNote ?? mine?.note ?? '')}">
-        ${sel === 'not_fit' ? `<label class="vote-bar__email" title="Unchecked, they're archived with nothing sent">
-          <input type="checkbox" id="vote-send-update" ${sendUpdateWith ? 'checked' : ''}> Send them an update
-        </label>` : ''}
         <button type="button" class="btn btn--accent vote-bar__cast" data-cast-vote ${sel ? '' : 'disabled'}>${confirmLabel}</button>
       </div>
       ${liveStayFor(a.id) ? '' : `<span class="foot-links"><button type="button" class="cta-link" data-book-in="${a.id}" title="Skips the funnel — books a room and records the accept in one step">Set their move-in…</button></span>`}`;
