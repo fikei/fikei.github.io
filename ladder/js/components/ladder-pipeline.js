@@ -59,9 +59,35 @@ const COLUMNS = [
   { id: 'signal', label: '',       sortKey: null },
   { id: 'connections', label: 'Network', sortKey: 'connections', type: 'num', defaultDir: 'desc' },
   { id: 'sector', label: 'Sector', sortKey: 'sector',  type: 'text' },
+  { id: 'added',  label: 'Added',  sortKey: 'first_seen', type: 'num', defaultDir: 'desc' },
   { id: 'status', label: 'Status', sortKey: 'status',  type: 'text' },
   { id: 'menu',   label: '',       sortKey: null },
 ];
+
+// "Added" date-range filter options (Saved bucket). id doubles as the
+// ?added= URL value; match(days) tests a role's age in days against the range.
+const ADDED_RANGES = [
+  { id: '1d',   label: 'Last 24 hours',     match: (d) => d <= 1 },
+  { id: '7d',   label: 'Last 7 days',       match: (d) => d <= 7 },
+  { id: '30d',  label: 'Last 30 days',      match: (d) => d <= 30 },
+  { id: '30d+', label: 'Older than 30 days', match: (d) => d > 30 },
+];
+
+// Epoch ms for a role's "added" date, or null when absent/unparseable.
+// first_seen is when the role entered the pipeline (paste, rec save, import).
+function addedAt(r) {
+  const t = Date.parse(r.first_seen || '');
+  return isNaN(t) ? null : t;
+}
+
+// Compact cell date: "Jul 9" this year, "Jul 9 '25" otherwise.
+function fmtAdded(t) {
+  if (t == null) return '—';
+  const d = new Date(t);
+  const md = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return d.getFullYear() === new Date().getFullYear()
+    ? md : `${md} '${String(d.getFullYear()).slice(-2)}`;
+}
 
 // Manual ordering — user can drag rows within a bucket. Order persists in
 // localStorage as a per-bucket array of slugs (one key per bucket). Any column
@@ -127,6 +153,8 @@ export class JobPipeline extends LitElement {
     hoverEase:       { state: true },
     // "⚡ Easy apply" quick filter (Saved + Drafting). Mirrored in ?ease=easy.
     easeFilter:      { state: true },
+    // "Added" date-range filter (Saved only). Mirrored in ?added=<range>.
+    addedFilter:     { state: true },
     // Easy Apply setup banner (Saved page, periodic cadence).
     easeBannerHidden: { state: true },
   };
@@ -161,6 +189,7 @@ export class JobPipeline extends LitElement {
     if (b === 'active' && STAGE_IDS.includes(stageQ)) resolved = stageQ;
     this.bucket = resolved || 'saved';
     this.easeFilter = params.get('ease') === 'easy';
+    this.addedFilter = ADDED_RANGES.some(x => x.id === params.get('added')) ? params.get('added') : '';
     // Default to fit-score (desc) on every bucket, including Saved. A saved
     // manual drag order is still one click away via "Use my order".
     this.sortKey = 'score';
@@ -425,7 +454,8 @@ export class JobPipeline extends LitElement {
     const key = this.sortKey;
     const dir = this.sortDir === 'desc' ? -1 : 1;
     const arr = this.roles.filter(r => isVisibleRole(r) && bucketFilter(r, this.bucket)
-      && (!this.easeFilter || r.applyEase === 'easy'));
+      && (!this.easeFilter || r.applyEase === 'easy')
+      && this._addedMatch(r));
     if (key === 'manual') {
       const order = this._manualOrders[this.bucket] || [];
       const idx = new Map(order.map((slug, i) => [slug, i]));
@@ -442,7 +472,9 @@ export class JobPipeline extends LitElement {
       });
       return arr;
     }
-    const valFor = (r) => key === 'connections' ? this._connScore(r) : r[key];
+    const valFor = (r) => key === 'connections' ? this._connScore(r)
+      : key === 'first_seen' ? addedAt(r)
+      : r[key];
     arr.sort((a, b) => {
       const av = valFor(a);
       const bv = valFor(b);
@@ -515,11 +547,18 @@ export class JobPipeline extends LitElement {
   // "Move to <bucket>" — the single flat action behind every menu option.
   // Saved / a stage / Archive all live at the same level; a stage promotes the
   // row to Active with that stage (the server mirrors the auto-promote rule),
-  // Saved clears the stage, Archive opens the exit-reason modal.
+  // Saved clears the stage. Archiving an in-progress role opens the
+  // exit-reason modal (the outcome tunes recommendations); archiving straight
+  // from Saved skips it — never applied, so there's no outcome to record.
   async _moveToBucket(r, bucket) {
     this.openMenuSlug = null;
     if (bucket === bucketFor(r)) return;                       // already there
-    if (bucket === 'archive') return this._openArchiveModal(r);
+    if (bucket === 'archive') {
+      if (bucketFor(r) === 'saved') {
+        return this._applyPatch(r, { status: 'Archive', stage: null, exit_reason: null, exit_context: null });
+      }
+      return this._openArchiveModal(r);
+    }
     if (bucket === 'saved')   return this._applyPatch(r, { status: 'Saved', stage: null, exit_reason: null });
     // A stage bucket → Active + that stage.
     return this._applyPatch(r, { status: 'Active', stage: bucket, exit_reason: null });
@@ -785,6 +824,7 @@ export class JobPipeline extends LitElement {
     return COLUMNS
       .filter(c => !(c.id === 'status' && this._isSaved))
       .filter(c => !(c.id === 'connections' && !this._isSaved))
+      .filter(c => !(c.id === 'added' && !this._isSaved))
       .map(c => (c.id === 'status' && this._isStageBucket) ? { ...c, label: 'Stage', sortKey: 'stage' } : c);
   }
 
@@ -863,6 +903,8 @@ export class JobPipeline extends LitElement {
         <td class="col col-signal" data-label="">${this._renderSignalCell(r)}</td>
         ${this._isSaved ? html`<td class="col col-connections" data-label="Network">${this._renderConnectionsCell(r)}</td>` : nothing}
         <td class="col col-sector" data-label="Sector">${this._renderSectorCell(r)}</td>
+        ${this._isSaved ? html`<td class="col col-added" data-label="Added"
+            title=${r.first_seen ? new Date(r.first_seen).toLocaleDateString() : ''}>${fmtAdded(addedAt(r))}</td>` : nothing}
         ${showStatus ? html`<td class="col col-status status-cell" data-label="Status">${this._renderStatusCell(r)}</td>` : nothing}
         <td class="col col-menu">${this._renderMenuCell(r)}</td>
       </tr>
@@ -923,6 +965,23 @@ export class JobPipeline extends LitElement {
         ${group(essays.length === 1 ? 'Essay question' : 'Essay questions', essays)}
         ${group(shorts.length === 1 ? 'Short answer' : 'Short answers', shorts)}
       </div>`;
+  }
+
+  // "Added" range filter — Saved only (the column only renders there).
+  _addedMatch(r) {
+    if (!this.addedFilter || !this._isSaved) return true;
+    const range = ADDED_RANGES.find(x => x.id === this.addedFilter);
+    if (!range) return true;
+    const t = addedAt(r);
+    if (t == null) return false;
+    return range.match((Date.now() - t) / 86400000);
+  }
+
+  _setAddedFilter(v) {
+    this.addedFilter = ADDED_RANGES.some(x => x.id === v) ? v : '';
+    const qs = new URLSearchParams(location.search);
+    if (this.addedFilter) qs.set('added', this.addedFilter); else qs.delete('added');
+    history.replaceState(null, '', `${location.pathname}?${qs}`);
   }
 
   _toggleEaseFilter() {
@@ -1244,7 +1303,7 @@ export class JobPipeline extends LitElement {
         <strong>${rows.length}</strong> ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'},
         ${this.sortKey === 'manual'
           ? html`in your custom order. <span class="muted">Drag rows to rearrange.</span>`
-          : html`sorted by ${this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.`}
+          : html`sorted by ${this.sortKey === 'first_seen' ? 'date added' : this.sortKey} ${this.sortDir === 'asc' ? '↑' : '↓'}.`}
         ${(this._isSaved || this.bucket === 'drafting')
           && (this.easeFilter || this.roles.some(r => isVisibleRole(r) && bucketFilter(r, this.bucket) && r.applyEase === 'easy')) ? html`
           <button class="btn btn--sm ease-filter-pill ${this.easeFilter ? 'is-active' : ''}"
@@ -1253,6 +1312,14 @@ export class JobPipeline extends LitElement {
             <span class="ease-chip__icon" aria-hidden="true">${unsafeHTML(EASE_ICONS.easy)}</span>
             Easy apply${this.easeFilter ? ' ✕' : ''}
           </button>
+        ` : nothing}
+        ${this._isSaved ? html`
+          <label class="added-filter ${this.addedFilter ? 'is-active' : ''}" title="Filter by when the role was added">
+            <select @change=${(e) => this._setAddedFilter(e.target.value)} .value=${this.addedFilter}>
+              <option value="">Added any time</option>
+              ${ADDED_RANGES.map(x => html`<option value=${x.id} ?selected=${this.addedFilter === x.id}>Added: ${x.label.toLowerCase()}</option>`)}
+            </select>
+          </label>
         ` : nothing}
         ${this._isSaved && this.sortKey !== 'manual' && this._manualOrders.saved.length ? html`
           <button class="btn btn--sm" @click=${() => this._useCustomOrder()}>Use my order</button>
@@ -1291,8 +1358,9 @@ export class JobPipeline extends LitElement {
 
       ${rows.length === 0 ? html`
         <div class="placeholder" style="margin-top:var(--space-4);">
-          <h2>No ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'} yet</h2>
-          <p>${this._isSaved ? 'Add a posting or wait for the crawler to find a fit.'
+          <h2>No ${bucketLabel.toLowerCase()} ${rows.length === 1 ? 'role' : 'roles'} ${this._isSaved && this.addedFilter ? 'in this date range' : 'yet'}</h2>
+          <p>${this._isSaved && this.addedFilter ? html`Nothing was added in this window. <button class="btn btn--sm" @click=${() => this._setAddedFilter('')}>Clear filter</button>`
+              : this._isSaved ? 'Add a posting or wait for the crawler to find a fit.'
               : this._isStageBucket ? `Use a role's row menu → Move to → ${bucketLabel} to bring it here.`
               : 'Archived roles land here, with the reason you gave.'}</p>
         </div>
