@@ -1180,11 +1180,9 @@ async function submitRemove() {
       await writeHouseDecision(applicantId, 'no', note);
     }
     if (a.stage !== opt.stage) await setStage(applicantId, opt.stage);
-    toast(opt.id === 'not_a_fit'
-      ? `${fullName(a)} → Archived — update email queued`
-      : opt.id === 'opted_out'
-        ? `${fullName(a)} → Archived — no update email owed`
-        : `${fullName(a)} saved for ${fmtDay(until)} — they'll come back on their own`);
+    toast(opt.id === 'not_a_fit' || opt.id === 'opted_out'
+      ? `${fullName(a)} → Archived`
+      : `${fullName(a)} saved for ${fmtDay(until)} — they'll come back on their own`);
     renderRailCounts();
     if (VIEWS[view]?.kind === 'applicants') renderApplicants();
     if (!document.getElementById('review').hidden) renderReview();
@@ -1258,8 +1256,7 @@ async function openEmailModal(applicantId, kind) {
   // a time right after turning them down is the worst thing this app could
   // send, so the drafter is unreachable for them rather than merely unused.
   if (a.stage === 'rejected' || a.stage === 'archived') {
-    toast(`${fullName(a)} is archived — the only email left is their update`);
-    if (a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt) openUpdateEmail(applicantId);
+    toast(`${fullName(a)} is archived — no outreach for them`);
     return;
   }
   emailApplicantId = applicantId;
@@ -1321,77 +1318,6 @@ async function clearEmailDraft(applicantId) {
   delete emailDrafts[applicantId];
   const { error } = await sb.from('recruit_email_drafts').delete().eq('applicant_id', applicantId);
   if (error) console.warn('draft clear failed', error.message);
-}
-
-/* Rejection-queue editor: drafts via draft_update, sends via send-update
-   (which stamps the queue state server-side). */
-/* Batch: draft + send every pending update, sequentially with progress. */
-async function sendAllUpdates(btn) {
-  const pending = applicants.filter(x => x.stage === 'rejected' && !x.updateSentAt && !x.updateSkippedAt);
-  if (!pending.length) return;
-  if (!confirm(`Send update emails to ${pending.length} applicant${pending.length === 1 ? '' : 's'}? Each gets an individually drafted community note.`)) return;
-  btn.disabled = true;
-  let done = 0;
-  const { data } = await sb.auth.getSession();
-  const token = data?.session?.access_token;
-  for (const a of pending) {
-    try {
-      btn.textContent = `Sending ${done + 1}/${pending.length}…`;
-      const dr = await (await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ action: 'draft_update', applicantId: a.id }),
-      })).json();
-      if (dr.error) throw new Error(dr.error);
-      await gmailCall({ action: 'send-update', applicantId: a.id, subject: dr.subject, body: dr.body });
-      a.updateSentAt = new Date().toISOString(); a.stage = 'archived';
-      done++;
-    } catch (e) {
-      toast(`${fullName(a)}: ${e.message}`);
-    }
-  }
-  toast(`${done}/${pending.length} update${pending.length === 1 ? '' : 's'} sent`);
-  renderRailCounts(); renderApplicants();
-}
-
-async function openUpdateEmail(applicantId) {
-  const a = applicants.find(x => x.id === applicantId);
-  if (!a) return;
-  emailApplicantId = applicantId;
-  emailMode = 'update';
-  emailKind = null;
-  document.getElementById('email-title').textContent = `Update for ${fullName(a)}`;
-  document.getElementById('email-subject').value = '';
-  document.getElementById('email-body').value = '';
-  document.getElementById('email-send').textContent = 'Send update';
-  const saved = emailDrafts[applicantId];
-  if (saved && saved.mode === 'update') {
-    document.getElementById('email-subject').value = saved.subject || '';
-    document.getElementById('email-body').value = saved.body || '';
-    document.getElementById('email-status').textContent =
-      `Saved draft — ${saved.saved_by_name || 'a housemate'} · ${relTime(saved.updated_at)}. Edit and send, or Regenerate for a fresh one.`;
-    document.getElementById('email-modal').hidden = false;
-    return;
-  }
-  document.getElementById('email-status').textContent = 'Writing a draft you can edit — sending is optional.';
-  document.getElementById('email-modal').hidden = false;
-  try {
-    const { data } = await sb.auth.getSession();
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-match`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data?.session?.access_token}` },
-      body: JSON.stringify({ action: 'draft_update', applicantId }),
-    });
-    const out = await resp.json();
-    if (out.error) throw new Error(out.error);
-    if (emailApplicantId !== applicantId) return;
-    document.getElementById('email-subject').value = out.subject || 'An update from Agape';
-    document.getElementById('email-body').value = out.body || '';
-    document.getElementById('email-status').textContent =
-      'Yours to edit. Close this to leave it unsent — they stay archived either way.';
-  } catch (e) {
-    document.getElementById('email-status').textContent = `Draft failed: ${e.message}`;
-  }
 }
 
 async function generateEmail(applicantId) {
@@ -2349,15 +2275,14 @@ function stageChip(a) {
   const rec = decisions[a.id];
   if (isAutoDecision(rec)) {
     const why = rec.note || (rec.reason ? reasonLabel(rec.reason) : 'A house rule archived them');
-    return `<span class="decision-chip decision-chip--auto" title="${esc(why)}">Auto-archived</span>` +
-      (a.stage === 'rejected' ? `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>` : '');
+    return `<span class="decision-chip decision-chip--auto" title="${esc(why)}">Auto-archived</span>`;
   }
   if (a.stage === 'rejected') {
     const st = voteStats(a.id);
     const why = st.notFit ? `Not a fit — ${reviewerName(st.notFit)}: “${st.notFit.note}”` : (decisions[a.id]?.note || 'Did not pass review');
-    return `<span class="decision-chip decision-chip--hold" title="${esc(why)}">Update queued</span>`;
+    return `<span class="decision-chip decision-chip--pass" title="${esc(why)}">Archived</span>`;
   }
-  if (decisions[a.id]?.reason === 'dropped-out') return `<span class="decision-chip decision-chip--vote" title="They withdrew — no update email owed">Dropped out</span>`;
+  if (decisions[a.id]?.reason === 'dropped-out') return `<span class="decision-chip decision-chip--vote" title="They withdrew">Dropped out</span>`;
   if (a.updateSentAt) return `<span class="decision-chip decision-chip--outreach" title="Update email sent">Update sent ${fmtDate(a.updateSentAt)}</span>`;
   return `<span class="decision-chip decision-chip--pass">Archived</span>`;
 }
@@ -2844,26 +2769,9 @@ function renderApplicants() {
       <span class="listing-head__actions">${listingMenuHtml(l)}</span>`;
   };
 
-  // Archive: the update-email tray sits above the list. Openings: draft
-  // listings detected from occupancy gaps sit above the shortlists.
+  // Openings: draft listings detected from occupancy gaps sit above the
+  // shortlists.
   let outreachChrome = recordingLeadsHtml();
-  if (view === 'archive') {
-    const pending = applicants.filter(x => x.stage === 'rejected' && !x.updateSentAt && !x.updateSkippedAt);
-    if (pending.length) {
-      outreachChrome = `<div class="update-tray">
-        <div class="update-tray__head">
-          <b>${pending.length} applicant${pending.length === 1 ? '' : 's'} haven't been told yet</b>
-          <button type="button" class="btn btn--sm cta--amber" data-send-all-updates>Send all ${pending.length}</button>
-        </div>
-        ${pending.map(x => `<div class="update-tray__row">
-          <span class="update-tray__who">${esc(fullName(x))}</span>
-          <span class="update-tray__why">${isAutoDecision(decisions[x.id]) ? `auto-archived — ${esc(decisions[x.id].note || reasonLabel(decisions[x.id].reason))}` : voteStats(x.id).notFit ? `not a fit — ${esc(reviewerName(voteStats(x.id).notFit))}` : (decisions[x.id]?.note || 'did not pass review')}</span>
-          <button type="button" class="cta-link" data-update-edit="${x.id}">Edit email</button>
-          <button type="button" class="cta-link" data-update-skip="${x.id}">Skip</button>
-        </div>`).join('')}
-      </div>`;
-    }
-  }
   if (view === 'openings') {
     const drafts = listings.filter(l => l.status === 'draft');
     if (drafts.length) {
@@ -5257,16 +5165,12 @@ function renderReview() {
     const sub = quote
       ? `${quote}${by ? ` — ${by}` : ''}`
       : `${fallback}${by ? ` — ${by}` : ''}`;
-    // The update email is offered here when one is genuinely owed, and never
-    // demanded: a closed applicant is closed whether or not anyone writes.
-    const owed = a.stage === 'rejected' && !a.updateSentAt && !a.updateSkippedAt;
     return `<div class="closed-bar closed-bar--${tone}">
       <div class="closed-bar__text">
         <span class="closed-bar__head">${CLOSED_HEAD[tone]}</span>
         <span class="closed-bar__sub">${esc(sub)}</span>
       </div>
       <span class="closed-bar__actions">
-        ${owed ? `<button type="button" class="closed-bar__quiet" data-update-edit="${a.id}">Write update</button>` : ''}
         <button type="button" class="closed-bar__reopen" data-reopen="${a.id}">Reopen</button>
       </span>
     </div>`;
@@ -6283,11 +6187,11 @@ async function submitDecision() {
   const editing = sheetMode === 'edit';
   hideDecisionSheet();
   saveDecision(a.id, d, reason, null, note, listingId);
-  // Recruiter "not a fit" on a candidate auto-archives — the update email is
-  // owed, same as a veto; outreach keeps them a candidate.
+  // Recruiter "not a fit" on a candidate auto-archives, same as a veto;
+  // outreach keeps them a candidate.
   if (d === 'pass' && a.stage !== 'archived') await setStage(a.id, 'rejected');
   if (d === 'outreach' && listingId) await addPlacement(a.id, listingId, 'manual');
-  toast(`${fullName(a)} → ${d === 'pass' ? 'Archived — update email queued' : DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
+  toast(`${fullName(a)} → ${d === 'pass' ? 'Archived' : DECISION_LABELS[d]}${d === 'outreach' ? ` · ${attachmentLabel(decisions[a.id])}` : (reason ? ` (${reasonLabel(reason)})` : '')}`);
   renderRailCounts();
   if (editing) { renderReview(); return; }
   if (qIndex === queue.length - 1) closeReview(); else step(1);
@@ -7167,23 +7071,6 @@ function init() {
     if (gd) { openGiveDecision(gd.dataset.giveDecision); return; }
     const bi = e.target.closest('[data-book-in]');
     if (bi) { openBookIn(bi.dataset.bookIn); return; }
-    const ue = e.target.closest('[data-update-edit]');
-    if (ue) { openUpdateEmail(ue.dataset.updateEdit); return; }
-    const us = e.target.closest('[data-update-skip]');
-    if (us) {
-      const a = applicants.find(x => x.id === us.dataset.updateSkip);
-      if (a && confirm(`Skip the update email for ${fullName(a)}? They're archived without one.`)) {
-        sb.rpc('recruit_skip_update', { p_applicant: a.id }).then(({ error }) => {
-          if (error) { toast(`Skip failed: ${error.message}`); return; }
-          a.updateSkippedAt = new Date().toISOString(); a.stage = 'archived';
-          toast(`${fullName(a)} archived without an update`);
-          renderRailCounts(); renderApplicants();
-        });
-      }
-      return;
-    }
-    const sa = e.target.closest('[data-send-all-updates]');
-    if (sa) { sendAllUpdates(sa); return; }
     const od2 = e.target.closest('[data-open-draft]');
     if (od2) { updateListingStatus(od2.dataset.openDraft, 'open'); return; }
     const pm = e.target.closest('[data-play-mini]');
@@ -7404,9 +7291,7 @@ function init() {
   // warm invite, complete with a booking link, one click away from being sent
   // to someone who was just archived.
   document.getElementById('email-regen').onclick = () => {
-    if (!emailApplicantId) return;
-    if (emailMode === 'update') openUpdateEmail(emailApplicantId);
-    else generateEmail(emailApplicantId);
+    if (emailApplicantId) generateEmail(emailApplicantId);
   };
   document.getElementById('email-send').onclick = async () => {
     if (!gmailStatus.connected) { toast('Connect the shared Gmail first (Emails tab)'); return; }
@@ -7415,7 +7300,7 @@ function init() {
     try {
       const sentFor = emailApplicantId;
       await gmailCall({
-        action: emailMode === 'update' ? 'send-update' : 'send', applicantId: sentFor,
+        action: 'send', applicantId: sentFor,
         subject: document.getElementById('email-subject').value,
         body: document.getElementById('email-body').value,
         // A tour ask opens the tour cycle server-side: the next availability
@@ -7435,19 +7320,11 @@ function init() {
         if (st) st[col] = when;
         if (emailExtras.stamp === 'dayof') ackFor('applicant', sentFor, ['movein_day']);
       }
-      if ((emailKind === 'tour' || emailKind === 'visit') && emailMode !== 'update') {
+      if (emailKind === 'tour' || emailKind === 'visit') {
         tourState[sentFor] = { status: 'asked', askedAt: new Date().toISOString() };
         if (VIEWS[view]?.kind === 'applicants') renderApplicants();
       }
-      if (emailMode === 'update') {
-        const a = applicants.find(x => x.id === sentFor);
-        if (a) { a.updateSentAt = new Date().toISOString(); a.stage = 'archived'; }
-        toast('Update sent — archived clean');
-        renderRailCounts();
-        if (VIEWS[view]?.kind === 'applicants') renderApplicants();
-      } else {
-        toast('Sent from live.at.agapesf@gmail.com');
-      }
+      toast('Sent from live.at.agapesf@gmail.com');
       // Pull the sent message in rather than dropping the cache — clearing
       // it would blank a thread the user is looking at.
       syncEmails(sentFor).then(() => {
@@ -7457,7 +7334,7 @@ function init() {
       clearEmailDraft(sentFor); // sent — the saved draft has done its job
       closeEmailModal();
     } catch (e) { toast(`Send failed: ${e.message}`); }
-    btn.disabled = false; btn.textContent = emailMode === 'update' ? 'Send update' : 'Send via Agape Gmail';
+    btn.disabled = false; btn.textContent = 'Send via Agape Gmail';
   };
   document.getElementById('email-copy').onclick = async () => {
     const text = `Subject: ${document.getElementById('email-subject').value}\n\n${document.getElementById('email-body').value}`;
