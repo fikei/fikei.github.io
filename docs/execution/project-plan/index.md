@@ -34,11 +34,15 @@
 | [Phase 14: Gmail → Jobs Pipe](./phase-14-gmail-jobs-pipe.md) | IN PROGRESS | 0/73 |
 | [Phase 15: Gmail Application Tracker](./phase-15-gmail-application-tracker.md) | IN PROGRESS | 23/25 |
 | [Phase 16: Ladder Easy Apply](./phase-16-easy-apply.md) | Pending | 0/40 |
+| [Phase 17: Program Listings & DJ Residency](./phase-17-program-listings.md) | Pending | 0/48 |
 | [Backlog](./backlog.md) | Future | 1/118 |
 
 ---
 
 ## Recent Milestones
+
+### Recruiting — program listings & DJ residency (planned)
+**Added: 2026-08-21** — Phase 17 filed from [PRD: Program Listings & the DJ Residency](/docs/strategy/prds/agape-program-listings.md). `recruit_listings` becomes a general program-listing engine (draft → open → filled/closed, application deadline, fee, public slug); open program listings surface on the /apply "Kind of stay" step and branch the question flow; $20 Stripe Payment Link gates review; Haiku first-pass scoring makes ~1,000-application triage feasible; finalists reuse the existing vote → interview → stay machinery (`recruit_stays kind='dj_resident'`). Draft listings are a general soft-launch concept for future programs.
 
 ### Recruiting — native application form (/apply) with applicant login
 **Shipped: 2026-08-20** — the Agape application moves off Google Forms onto ctrl.rodeo/apply: Typeform-style one-question-per-screen flow on the Sassy design system, email-OTP login as question one so every answer autosaves server-side, and applications stay editable until the house decides. Sheet-era applicants signing in with the same email claim their existing row. Soft launch: unlisted URL, sheet ingest still live as fallback. Details: [story-native-apply-form.md](./story-native-apply-form.md)
