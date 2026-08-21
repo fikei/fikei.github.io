@@ -168,8 +168,9 @@ export async function setStatus(role, status) {
 }
 
 // Write status / stage / exit_reason in one request. The server applies
-// the auto-promote rule (any stage set → status='Active') and validates
-// exit_reason on transitions to Archive.
+// the auto-promote rule (any stage set → status='Active') and requires
+// exit_reason only when archiving an Active (in-progress) role — archiving
+// from Saved needs none.
 export async function updateRole(role, patch) {
   const slug = typeof role === 'string' ? role : role.slug;
   const headers = await authHeader();

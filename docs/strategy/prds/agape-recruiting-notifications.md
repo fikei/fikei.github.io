@@ -1,4 +1,14 @@
-# Agape recruiting notifications — applicants, openings, occupants
+# Agape recruiting notifications
+
+> **2026-08-21 (v3.82.0):** the "waiting N days for review" nags are retired —
+> `review_stalled` and `review_backlog` no longer detect (old rows still render).
+> The application signal is now: **application_new** (with a "could fit {room}"
+> line, and an *applied again* variant for re-applications, keyed per
+> submission), and **application_updated** — fired only when the applicant's own
+> edit (`self_updated_at`, migration 177 trigger: stamped only by their own
+> session) makes the application material: it now fits an open listing and the
+> stated budget clears the $1,500 floor. The card's second fact
+> (`payload.body`) now rides the Discord line too. — applicants, openings, occupants
 
 **One line:** one ledger records **every** notification as a running in-app log,
 and Discord carries the ones addressed to all housemates on one of three lanes
