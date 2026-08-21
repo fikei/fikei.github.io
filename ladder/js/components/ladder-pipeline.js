@@ -547,11 +547,18 @@ export class JobPipeline extends LitElement {
   // "Move to <bucket>" — the single flat action behind every menu option.
   // Saved / a stage / Archive all live at the same level; a stage promotes the
   // row to Active with that stage (the server mirrors the auto-promote rule),
-  // Saved clears the stage, Archive opens the exit-reason modal.
+  // Saved clears the stage. Archiving an in-progress role opens the
+  // exit-reason modal (the outcome tunes recommendations); archiving straight
+  // from Saved skips it — never applied, so there's no outcome to record.
   async _moveToBucket(r, bucket) {
     this.openMenuSlug = null;
     if (bucket === bucketFor(r)) return;                       // already there
-    if (bucket === 'archive') return this._openArchiveModal(r);
+    if (bucket === 'archive') {
+      if (bucketFor(r) === 'saved') {
+        return this._applyPatch(r, { status: 'Archive', stage: null, exit_reason: null, exit_context: null });
+      }
+      return this._openArchiveModal(r);
+    }
     if (bucket === 'saved')   return this._applyPatch(r, { status: 'Saved', stage: null, exit_reason: null });
     // A stage bucket → Active + that stage.
     return this._applyPatch(r, { status: 'Active', stage: bucket, exit_reason: null });
