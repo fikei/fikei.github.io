@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.4.0';
+const VERSION = '1.6.0';
 console.log(`[apply] v${VERSION} — native application form`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -40,8 +40,13 @@ const QUESTIONS = [
   },
   {
     id: 'essays', type: 'interstitial',
-    label: 'The next three questions matter most.',
+    label: 'These next questions matter most.',
     hint: 'A real person reads every application — what you share here is how we get a feel for whether the house would be a good fit for you, and you for it. Take your time.',
+  },
+  {
+    id: 'about', type: 'textarea', fields: ['about'], required: true,
+    label: 'About you.',
+    hint: 'Whatever feels true — how you spend your time, what you care about, what a good week looks like.',
   },
   {
     id: 'why_agape', type: 'textarea', fields: ['why_agape'], required: true,
@@ -49,14 +54,14 @@ const QUESTIONS = [
     hint: "What drew you here? The honest version beats the polished one.",
   },
   {
-    id: 'about', type: 'textarea', fields: ['about'], required: false,
-    label: 'Tell us about yourself.',
-    hint: 'Whatever feels true — how you spend your time, what you care about, what a good week looks like.',
-  },
-  {
-    id: 'gifts', type: 'textarea', fields: ['gifts'], required: false,
+    id: 'gifts', type: 'textarea', fields: ['gifts'], required: true,
     label: 'What would you bring to the house?',
     hint: "Cooking, music, deep questions at dinner, fixing things — everyone's list is different.",
+  },
+  {
+    id: 'community', type: 'textarea', fields: ['community'], required: false,
+    label: "What's important to you in community?",
+    hint: 'What makes living with people feel good — and what makes it hard?',
   },
   {
     id: 'heard_from', type: 'text', fields: ['heard_from'], required: false,
@@ -97,9 +102,10 @@ function parseTracks(q, residencyRaw, moveinRaw) {
     const keys = Object.keys(map);
     const label = opt ? opt.label : (keys.length === 1 ? keys[0] : null);
     if (!label || !map[label]) continue;
-    const m = p.match(/\d{4}-\d{2}-\d{2}/);
+    const dates = p.match(/\d{4}-\d{2}-\d{2}/g) || [];
     map[label] = {
-      date: m ? m[0] : '',
+      date: dates[0] || '',
+      dateEnd: dates[1] || '', // "soonest → latest"; absent when flexible
       flex: /flexible/i.test(p),
       note: (p.match(/—\s*([^)|]+)\)?\s*$/) || [])[1]?.trim() || '',
     };
@@ -114,16 +120,40 @@ function composeTracks(q, map) {
     if (!t) continue;
     labels.push(opt.label);
     let when = t.date || '';
+    // The latest-date bound only means something when timing is firm.
+    if (!t.flex && t.dateEnd) when += (when ? ' → ' : '…') + t.dateEnd;
     if (t.flex) when += when ? ' (flexible' + (t.note ? ' — ' + t.note : '') + ')' : 'Flexible' + (t.note ? ' — ' + t.note : '');
     else if (t.note) when += (when ? ' — ' : '') + t.note;
-    timing.push(`${opt.short}: ${when || '—'}`);
+    if (when) timing.push(`${opt.short}: ${when}`); // no timing yet → say nothing, not "—"
   }
   return {
     residency: labels.join(' | '),
-    move_in: labels.length === 1
+    move_in: labels.length === 1 && timing.length === 1
       ? timing[0].replace(/^[^:]+:\s*/, '') // single track keeps the legacy plain format
-      : timing.join(' | '),
+      : timing.join(' | '), // multi-track entries keep their prefix so parse can attribute them
   };
+}
+
+const fmtISO = (iso) => {
+  const m = String(iso || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso || '';
+  return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+/* Human summary of the stay answer for the overview row. */
+function prettyTracks(q) {
+  const map = parseTracks(q, state.answers.residency || '', state.answers.move_in || '');
+  const parts = [];
+  for (const opt of q.options) {
+    const t = map[opt.label];
+    if (!t) continue;
+    const bits = [];
+    if (t.date) bits.push(t.dateEnd && !t.flex ? `${fmtISO(t.date)} – ${fmtISO(t.dateEnd)}` : `from ${fmtISO(t.date)}`);
+    if (t.flex) bits.push('flexible');
+    if (t.note) bits.push(t.note);
+    parts.push(opt.short + (bits.length ? ` (${bits.join(', ')})` : ''));
+  }
+  return parts.join(' + ');
 }
 
 /* ---------- state ---------- */
@@ -347,10 +377,13 @@ function inputHtml(q) {
               <label class="apply-field-label">soonest you could move in</label>
               <input class="input" type="date" data-t-date="${esc(opt.label)}" value="${esc(t.date)}" min="${today}">
             </div>
-            <div class="apply-track__flexwrap">
-              <label class="apply-field-label apply-track__flex"><input type="checkbox" data-t-flex="${esc(opt.label)}" ${t.flex ? 'checked' : ''}> my timing is flexible</label>
-            </div>
+            ${t.flex ? '' : `
+            <div>
+              <label class="apply-field-label">latest you could move in</label>
+              <input class="input" type="date" data-t-late="${esc(opt.label)}" value="${esc(t.dateEnd || '')}" min="${esc(t.date || today)}">
+            </div>`}
           </div>
+          <label class="apply-field-label apply-track__flex"><input type="checkbox" data-t-flex="${esc(opt.label)}" ${t.flex ? 'checked' : ''}> my timing is flexible</label>
           <input class="input apply-choice__note" data-t-note="${esc(opt.label)}" placeholder="context on timing? e.g. after my lease ends (optional)" value="${esc(t.note)}">
         </div>` : ''}
       </div>`;
@@ -419,6 +452,7 @@ function renderQuestion(q) {
 
   const syncMulti = () => {
     $screen.querySelectorAll('[data-t-date]').forEach((el) => { if (state._multi[el.dataset.tDate]) state._multi[el.dataset.tDate].date = el.value; });
+    $screen.querySelectorAll('[data-t-late]').forEach((el) => { if (state._multi[el.dataset.tLate]) state._multi[el.dataset.tLate].dateEnd = el.value; });
     $screen.querySelectorAll('[data-t-flex]').forEach((el) => { if (state._multi[el.dataset.tFlex]) state._multi[el.dataset.tFlex].flex = el.checked; });
     $screen.querySelectorAll('[data-t-note]').forEach((el) => { if (state._multi[el.dataset.tNote]) state._multi[el.dataset.tNote].note = el.value.trim(); });
   };
@@ -490,9 +524,14 @@ function renderQuestion(q) {
         syncMulti();
         const label = el.dataset.value;
         if (state._multi[label]) delete state._multi[label];
-        else state._multi[label] = { date: '', flex: false, note: '' };
+        else state._multi[label] = { date: '', dateEnd: '', flex: false, note: '' };
         renderQuestion(q); // re-render so the timing fields follow the selection
       };
+    });
+    // Flexible hides the latest-date bound — a firm deadline and "flexible"
+    // contradict each other. Re-render so the field follows the toggle.
+    $screen.querySelectorAll('[data-t-flex]').forEach((el) => {
+      el.onchange = () => { syncMulti(); renderQuestion(q); };
     });
   } else {
     const first = $screen.querySelector('input, textarea');
@@ -512,8 +551,10 @@ function renderQuestion(q) {
       if (inTextarea && !(e.metaKey || e.ctrlKey)) return;
       e.preventDefault(); return submit();
     }
-    if (e.key === 'ArrowRight' && !typing) { e.preventDefault(); return submit(); }
-    if (e.key === 'ArrowLeft' && !typing) { e.preventDefault(); return goBack(); }
+    // Arrows navigate even from inside a field — speed beats cursor movement
+    // in a one-question-per-screen form.
+    if (e.key === 'ArrowRight') { e.preventDefault(); return submit(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); return goBack(); }
     if ((q.type === 'radio' || q.type === 'multi') && !typing) {
       const i = parseInt(e.key, 10) - 1;
       if (i >= 0 && i < q.options.length) $screen.querySelectorAll('.apply-choice')[i].click();
@@ -525,7 +566,9 @@ function renderQuestion(q) {
 function renderReview() {
   const submitted = state.app?.is_submitted;
   const rows = QUESTIONS.filter((q) => q.type !== 'interstitial').map((q) => {
-    const val = q.fields.map((f) => state.answers[f] || '').filter(Boolean).join(' · ');
+    const val = q.id === 'residency'
+      ? prettyTracks(q)
+      : q.fields.map((f) => state.answers[f] || '').filter(Boolean).join(q.type === 'name' ? ' ' : ' · ');
     return `<div class="apply-review__row" data-q="${q.id}">
       <span class="apply-review__label">${esc(q.label)}</span>
       <span class="apply-review__value ${val ? '' : 'empty'}">${esc(val || '—')}</span>
@@ -560,7 +603,7 @@ function renderDone() {
   $screen.innerHTML = `
     <div class="apply-intro__mark">✳</div>
     <h1 class="apply-q__title">It's in. Thank you.</h1>
-    <p class="apply-q__hint">A housemate will read it soon — every application gets a real read. We'll reach out at ${esc(state.email || state.app?.email || 'your email')} about next steps. Come back to this page any time to update your answers.</p>
+    <p class="apply-q__hint">A housemate will read it soon — every application gets a real read. We'll reach out about next steps, and if anything comes up meanwhile, write us at <a href="mailto:live.at.agapesf@gmail.com" style="color:var(--fg)">live.at.agapesf@gmail.com</a>. Come back to this page any time to update your answers.</p>
     <button class="btn btn--ghost" id="view">View my application</button>`;
   document.getElementById('view').onclick = () => go('review');
 }

@@ -205,6 +205,17 @@ panel on every booked stay. Also: one Discord message per new application — th
 ledger card now posts at ingest time (recruit-ingest v1.7.0). Full spec:
 [agape-move-in-onboarding.md](./agape-move-in-onboarding.md).
 
+### v3.83.0 (2026-08-21): no per-decision update email + drawer bottom area finished
+
+The "Send them an update" checkbox on a Not-a-fit review (and the composer it
+auto-opened) is gone — deciding and writing are separate moments, and updates
+go out in bulk from the Archive queue (which is unchanged: rejected rows still
+read "update queued"; edit/skip/batch-send all still work). The
+`update_email_default` setting is retired. Occupancy drawer: the stay form's
+exits ("Mark leaving", "Remove stay") moved into the bottom transitions area
+with Step back — one ordered block, least → most final; long move-in fact
+values now wrap instead of crowding the drawer edge.
+
 ### Notifications
 Every stage change above now has a lifecycle, but the house only hears about four of them. Proposed notification spine (ledger + dispatcher + daily/weekly digests) for applicants, openings, and occupants: [agape-recruiting-notifications.md](./agape-recruiting-notifications.md) — proposed, not built.
 

@@ -69,6 +69,20 @@ accept & book step this picks up from).
   apartments.com: still says PayPal deposit and rent by the 25th) — a Docs edit, not a
   code change.
 
+## v3.81.0 (2026-08-21): step back + the drawer's bottom action area
+
+- **Step back — reopen the listing** (`recruit_unbook_stay`, migration 175): the
+  accept flow's undo, pre-move-in only. One transaction deletes the booking,
+  reopens the room's filled listing, and puts the person back on it as a
+  candidate (their tombstone there was the accept RPC's, so it flips honestly);
+  everyone else returns via the auto-sweep unless a recruiter explicitly
+  removed them — tombstones keep holding. The yes decision and stage stand.
+- **Stay drawer reorganized**: edit form → move-in panel → onboarding →
+  a single bottom action area holding every transition. "Welcome in" is now
+  **Change to resident**; sublets gain **Add resident trial**
+  (`recruit_sublet_to_trial`, migration 176: sublet closes the day before,
+  trial opens with milestones, application link and buddy ride along).
+
 ## Not built (yet)
 
 Signed-agreement detection from inbound email (the *mark signed* tick is manual);
