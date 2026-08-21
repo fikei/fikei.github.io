@@ -321,11 +321,169 @@
   #d10 .door { position:absolute; inset:0; background:var(--ground);
     transform-origin:left center; border-right:1px solid var(--ink); }
   #d10 .door .center { align-items:flex-end; padding-right:2rem; }
+  /* 41 fridge door */
+  #d41 .fridge { position:relative; width:min(84vw,440px); height:min(58vh,430px); border:1.5px solid var(--ink); }
+  #d41 .note { position:absolute; background:var(--ground); border:1px solid var(--grey); padding:0.5rem 0.7rem;
+    font-size:0.7rem; max-width:17ch; cursor:grab; user-select:none; touch-action:none; }
+  #d41 .note::before { content:""; position:absolute; top:-5px; left:50%; width:9px; height:9px;
+    border-radius:50%; background:var(--ink); transform:translateX(-50%); }
+  #d41 .note.invite { border-color:var(--ink); }
+
+  /* 42 coat rack */
+  #d42 .rack { display:flex; gap:1.8rem; align-items:flex-start; border-top:2px solid var(--ink); padding-top:0.9rem; }
+  #d42 .hook { display:flex; flex-direction:column; align-items:center; gap:0.5rem; cursor:pointer; }
+  #d42 .hook i { width:7px; height:7px; border-radius:50%; background:var(--ink); }
+  #d42 .coat { width:2.6rem; border-radius:0.9rem 0.9rem 0.3rem 0.3rem; background:var(--ink); }
+  #d42 .coat.empty { background:var(--ground); border:1px dashed var(--ink); }
+  #d42 .rackcap { min-height:1.5em; }
+
+  /* 43 seismograph */
+  #d43 canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #d43 .cap { position:absolute; left:50%; bottom:2rem; transform:translateX(-50%); font-size:0.75rem; white-space:nowrap; }
+
+  /* 44 shadow play */
+  #d44 { background:var(--ink); }
+  #d44 .window { width:min(70vw,360px); aspect-ratio:4/5; background:#f2e7c9; position:relative; overflow:hidden; }
+  #d44 .blindline { position:absolute; left:0; right:0; height:2px; background:rgba(0,0,0,0.18); }
+  #d44 .sil { position:absolute; bottom:0; background:#161616; border-radius:45% 45% 0 0; filter:blur(1.5px); }
+  #d44 .shcap { color:var(--grey); min-height:1.5em; }
+
+  /* 45 phone tree */
+  #d45 .term { max-width:520px; margin-inline:auto; padding-top:20vh; padding-inline:1.25rem; }
+  #d45 .opt { display:block; text-align:left; padding:0.3rem 0; text-decoration:underline dotted; }
+  #d45 .resp { min-height:3em; margin-top:1.4rem; }
+
+  /* 46 negotiation */
+  #d46 input[type=range] { width:min(70vw,380px); accent-color:var(--ink); }
+  #d46 .amount { font-size:clamp(2.4rem,8vw,4.5rem); font-variant-numeric:tabular-nums; }
+  #d46 .reply { min-height:2em; }
+
+  /* 47 library card */
+  #d47 .pocket { max-width:440px; margin-inline:auto; padding:6rem 1.25rem; }
+  #d47 .cardface { border:1.5px solid var(--ink); padding:1.2rem; }
+  #d47 table { width:100%; border-collapse:collapse; font-size:0.75rem; }
+  #d47 td { border-bottom:1px solid var(--grey); padding:0.45rem 0.3rem; }
+  #d47 input { font:inherit; font-size:0.75rem; border:none; outline:none; background:none; width:100%; color:var(--ink); }
+
+  /* 48 smoke signal */
+  #d48 canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #d48 .decoded { position:absolute; left:50%; bottom:2rem; transform:translateX(-50%); letter-spacing:0.3em; }
+
+  /* 49 eviction notice */
+  #d49 .doc { max-width:520px; margin-inline:auto; padding:7rem 1.25rem; line-height:2; }
+  #d49 .strike { transition:color 0.4s; }
+  #d49 .strike.done { text-decoration:line-through; color:var(--grey); }
+  #d49 .inword { display:inline-block; font-weight:700; opacity:0; transition:opacity 0.5s; }
+  #d49 .inword.on { opacity:1; }
+
+  /* 50 group chat */
+  #d50 .chat { max-width:480px; margin-inline:auto; padding:5rem 1.25rem 7rem; display:flex; flex-direction:column; gap:0.5rem; }
+  #d50 .msg { border:1px solid var(--grey); padding:0.45rem 0.8rem; max-width:34ch; font-size:0.85rem; align-self:flex-start; }
+  #d50 .msg .who { display:block; font-size:0.65rem; color:var(--grey); }
+  #d50 .msg.mine { align-self:flex-end; border-color:var(--ink); }
+  #d50 .sys { text-align:center; color:var(--grey); font-size:0.7rem; margin:0.4rem 0; }
+  #d50 .bar { position:fixed; left:0; right:0; bottom:0; padding:1rem 1.25rem; background:var(--ground); }
+  #d50 .bar input { font:inherit; border:none; border-top:1px solid var(--ink); outline:none; background:none;
+    width:100%; max-width:480px; display:block; margin-inline:auto; padding-top:0.8rem; color:var(--ink); }
+
+  /* 51 chore wheel */
+  #d51 svg { width:min(70vw,340px); height:auto; }
+  #d51 .wheel { transition:transform 3.2s cubic-bezier(.15,.7,.15,1); transform-origin:150px 170px; }
+  #d51 .wheelcap { min-height:1.5em; }
+
+  /* 52 the toast */
+  #d52 .glasses { display:flex; gap:3.2rem; }
+  #d52 svg { width:3.4rem; height:auto; transition:transform 0.5s; }
+  #d52.clinked .gl { transform:rotate(13deg) translateX(10px); }
+  #d52.clinked .gr { transform:rotate(-13deg) translateX(-10px); }
+  #d52 .toastline { min-height:3em; max-width:34ch; }
+
+  /* 53 missing poster */
+  #d53 .poster { max-width:420px; margin-inline:auto; margin-top:10vh; border:1.5px solid var(--ink);
+    padding:1.6rem 1.4rem 0; text-align:center; }
+  #d53 .tabs { display:flex; margin-top:1.6rem; border-top:1px dashed var(--grey); }
+  #d53 .tab { flex:1; border-right:1px dashed var(--grey); padding:0.9rem 0.2rem; font-size:0.6rem;
+    writing-mode:vertical-rl; cursor:pointer; transition:transform 0.7s, opacity 0.7s; }
+  #d53 .tab:last-child { border-right:none; }
+  #d53 .tab.torn { transform:translateY(90px) rotate(18deg); opacity:0; pointer-events:none; }
+  #d53 .postercap { text-align:center; margin-top:1.2rem; min-height:1.5em; }
+
+  /* 54 doorman */
+  #d54 .term { max-width:480px; margin-inline:auto; padding-top:35vh; padding-inline:1.25rem; }
+  #d54 input { font:inherit; border:none; border-bottom:1px solid var(--ink); outline:none; background:none; width:16ch; color:var(--ink); }
+  #d54 .dlog div { margin-bottom:0.4rem; }
+
+  /* 55 tape measure */
+  #d55 { cursor:crosshair; }
+  #d55 canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #d55 .readout { position:absolute; left:50%; bottom:2rem; transform:translateX(-50%); white-space:nowrap; }
+
+  /* 56 weather report */
+  #d56 pre { margin:0; padding:6rem 1.25rem; max-width:560px; margin-inline:auto; font:inherit; white-space:pre-wrap; }
+
+  /* 57 fire escape */
+  #d57 .shaft { position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    transition:transform 0.55s ease; display:flex; flex-direction:column; align-items:center; }
+  #d57 .rung { width:min(50vw,220px); height:3rem; border:1.5px solid var(--ink); border-bottom:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:var(--grey); }
+  #d57 .roof { padding:2rem 1rem 2.5rem; text-align:center; max-width:30ch; }
+
+  /* 58 intercom */
+  #d58 .btn { border:1px solid var(--ink); padding:1.2rem 2.4rem; user-select:none; touch-action:none; }
+  #d58 .btn:active { background:var(--ink); color:var(--ground); }
+  #d58 .speaker { display:grid; grid-template-columns:repeat(6,8px); gap:6px; }
+  #d58 .speaker i { width:8px; height:8px; border-radius:50%; background:var(--ink); opacity:0.25; transition:opacity 0.15s; }
+  #d58 .talkline { min-height:2.5em; max-width:34ch; }
+  #d58.buzz .center { animation:shake 0.4s linear; }
+
+  /* 59 housewarming */
+  #d59 .opts { display:flex; gap:1.6rem; flex-wrap:wrap; justify-content:center; }
+  #d59 .opts button { border:1px solid var(--ink); padding:0.9rem 1.6rem; }
+  #d59 .opts button:hover { background:var(--ink); color:var(--ground); }
+  #d59 .giftline { min-height:2.5em; max-width:36ch; }
+
+  /* 60 sublet listing */
+  #d60 .card { max-width:500px; margin-inline:auto; padding:0 1.25rem; border:1px solid var(--ink); }
+  #d60 .card > div { padding:0.7rem 1rem; border-bottom:1px solid var(--grey); display:grid; grid-template-columns:9rem 1fr; gap:1rem; }
+  #d60 .card > div:last-child { border-bottom:none; }
+  #d60 .k { color:var(--grey); font-size:0.75rem; }
+
+  /* 61 dominoes */
+  #d61 .run { display:flex; gap:1.1rem; align-items:flex-end; }
+  #d61 .dom { width:0.9rem; height:3.6rem; background:var(--ink); transform-origin:bottom right;
+    transition:transform 0.28s ease-in; cursor:pointer; }
+  #d61 .dom.fallen { transform:rotate(80deg); }
+  #d61 .prize { opacity:0; transition:opacity 0.6s; text-decoration:underline dotted; }
+  #d61 .prize.on { opacity:1; }
+
+  /* 62 head count */
+  #d62 input { font:inherit; font-size:clamp(2rem,7vw,4rem); width:4ch; text-align:center;
+    border:none; border-bottom:2px solid var(--ink); outline:none; background:none; color:var(--ink); }
+  #d62 .hint { min-height:1.5em; }
+
+  /* 63 lost and found */
+  #d63 .box { display:flex; gap:1rem 1.8rem; flex-wrap:wrap; justify-content:center; max-width:560px; }
+  #d63 .item { text-decoration:underline dotted; cursor:pointer; }
+  #d63 .story { min-height:2.5em; max-width:38ch; }
+
+  /* 64 alarm clock */
+  #d64 .clock { font-size:clamp(4rem,16vw,9rem); font-variant-numeric:tabular-nums; }
+  #d64.ringing .clock { animation:shake 0.3s linear infinite; }
+  #d64 .snz { border:1px solid var(--ink); padding:0.9rem 2.2rem; }
+  #d64 .alog { min-height:5em; max-width:36ch; }
+
+  /* 65 wishbone */
+  #d65 svg { width:min(50vw,220px); height:auto; }
+  #d65 .side { transform-origin:110px 150px; transition:transform 0.5s cubic-bezier(.3,1.6,.4,1); }
+  #d65.snapped .sl { transform:rotate(-24deg) translateX(-14px); }
+  #d65.snapped .sr { transform:rotate(11deg) translateX(10px); }
+  #d65 .wishline { min-height:2.5em; max-width:32ch; }
+
 </style>
 
 <!-- ================= INDEX ================= -->
 <div id="index">
-  <div class="head"><h1>AGAPE — /KNOCKS/</h1><span class="grey small">40 ways in</span></div>
+  <div class="head"><h1>AGAPE — /KNOCKS/</h1><span class="grey small">65 ways in</span></div>
   <p class="lede">every landing page is a way of knocking on a door. these are twenty of them —
   working sketches for how agapesf.org could open. each one makes the visitor do something
   small before the house responds: look, ring, sign, answer, lean in. the ones worth keeping
@@ -411,6 +569,56 @@
       <span class="desc">a form titled "exit interviews, 2019–present." the page is blank. "nobody writes these." the strongest claim, made by an empty document.</span></button></li>
     <li><button data-d="d40"><span class="num">40</span><span class="name">the key under the mat</span><span class="hookline">lift it. everyone knows.</span>
       <span class="desc">a doormat that says WELCOME-ISH. drag it aside and there's the key, because of course there is. the least secure house in san francisco, on purpose.</span></button></li>
+    <li><button data-d="d41"><span class="num">41</span><span class="name">the fridge door</span><span class="hookline">held up by magnets</span>
+      <span class="desc">the house's fridge, mid-week: grocery lists, a note about the piano tuner, one labeled yogurt dispute. drag the notes around. one of them was left for you.</span></button></li>
+    <li><button data-d="d42"><span class="num">42</span><span class="name">the coat rack</span><span class="hookline">one hook is bare</span>
+      <span class="desc">a rack of coats by the door, each with a story on hover. the empty hook isn't a gap in the inventory — it's a place being held.</span></button></li>
+    <li><button data-d="d43"><span class="num">43</span><span class="name">the seismograph</span><span class="hookline">the house registers</span>
+      <span class="desc">a needle records the house's tremors live — laughter in the kitchen, the piano fortissimo, sixteen footsteps on one staircase. proof of life as instrumentation.</span></button></li>
+    <li><button data-d="d44"><span class="num">44</span><span class="name">the shadow play</span><span class="hookline">seen from the sidewalk</span>
+      <span class="desc">one lit window on a dark street, silhouettes crossing behind the blinds. you're outside looking in — until one of them waves at you.</span></button></li>
+    <li><button data-d="d45"><span class="num">45</span><span class="name">the phone tree</span><span class="hookline">every option is the same door</span>
+      <span class="desc">an automated menu for the house: press 1 for dinner, 2 for the piano, 3 to speak to a resident. every branch ends at the same place — come by.</span></button></li>
+    <li><button data-d="d46"><span class="num">46</span><span class="name">the negotiation</span><span class="hookline">it was never about the rent</span>
+      <span class="desc">a slider asks what you'd pay. drag it anywhere. the house shrugs at every number, then tells you what it actually charges.</span></button></li>
+    <li><button data-d="d47"><span class="num">47</span><span class="name">the library card</span><span class="hookline">nobody returns it</span>
+      <span class="desc">a checkout card in the back of the house — stamped names, due dates, and a status column that keeps saying "still here." the next line is blank.</span></button></li>
+    <li><button data-d="d48"><span class="num">48</span><span class="name">the smoke signal</span><span class="hookline">the chimney is talking</span>
+      <span class="desc">puffs of smoke rise in short and long bursts — morse, slowly decoding at the bottom of the page. the oldest broadcast technology, saying the simplest thing.</span></button></li>
+    <li><button data-d="d49"><span class="num">49</span><span class="name">the eviction notice</span><span class="hookline">ordered to move in</span>
+      <span class="desc">an official notice to vacate, typed in full legal deadpan — until the last line crosses out one word and replaces it. bureaucracy as a love letter.</span></button></li>
+    <li><button data-d="d50"><span class="num">50</span><span class="name">the group chat</span><span class="hookline">you were added</span>
+      <span class="desc">the house's chat scrolls by — soup logistics, the piano tuner — then a system line: you were added. they notice. they ask you to say something.</span></button></li>
+    <li><button data-d="d51"><span class="num">51</span><span class="name">the chore wheel</span><span class="hookline">spin it. it doesn't matter.</span>
+      <span class="desc">a real chore wheel — dishes, compost, dinner lead. spin it and get your assignment, then the fine print: every slice is the same chore. show up.</span></button></li>
+    <li><button data-d="d52"><span class="num">52</span><span class="name">the toast</span><span class="hookline">glasses up</span>
+      <span class="desc">two glasses and a clink. each toast that types out is for something the house actually toasts to. the last one is for you, provisionally.</span></button></li>
+    <li><button data-d="d53"><span class="num">53</span><span class="name">the missing poster</span><span class="hookline">take a tab</span>
+      <span class="desc">MISSING: the feeling of walking into a room where everyone knows you. tear-off tabs at the bottom, going fast. taking one is the smallest possible yes.</span></button></li>
+    <li><button data-d="d54"><span class="num">54</span><span class="name">the doorman</span><span class="hookline">you're on the list</span>
+      <span class="desc">a velvet-rope prompt asks for your name. type anything. you're on the list. you were always on the list. exclusivity, inverted.</span></button></li>
+    <li><button data-d="d55"><span class="num">55</span><span class="name">the tape measure</span><span class="hookline">closer than you think</span>
+      <span class="desc">drag from the dot and a tape extends, measuring the distance from you to the house. whatever it reads, the annotation is the same: closer than most people get.</span></button></li>
+    <li><button data-d="d56"><span class="num">56</span><span class="name">the weather report</span><span class="hookline">indoor forecast</span>
+      <span class="desc">a seven-day forecast for the inside of the house: 100% chance of soup, gusts of laughter, one warm front that never leaves. weather as personality.</span></button></li>
+    <li><button data-d="d57"><span class="num">57</span><span class="name">the fire escape</span><span class="hookline">climb to the roof</span>
+      <span class="desc">a ladder of rungs going up past the top of the page. click to climb. the reward is the roof at golden hour, which is the house's best argument.</span></button></li>
+    <li><button data-d="d58"><span class="num">58</span><span class="name">the intercom</span><span class="hookline">hold to talk</span>
+      <span class="desc">a buzzer panel. hold the button and the speaker listens; release and the house answers through the static, then buzzes you up mid-sentence.</span></button></li>
+    <li><button data-d="d59"><span class="num">59</span><span class="name">the housewarming gift</span><span class="hookline">what would you bring?</span>
+      <span class="desc">three buttons: wine, nothing, questions. every answer is the right answer, each for a different reason. the house is not testing your gift.</span></button></li>
+    <li><button data-d="d60"><span class="num">60</span><span class="name">the sublet listing</span><span class="hookline">brutally honest zillow</span>
+      <span class="desc">a rental listing that tells the whole truth: natural light hoarded by one room (available), noise level "piano," amenities "sixteen people who will learn your name."</span></button></li>
+    <li><button data-d="d61"><span class="num">61</span><span class="name">the domino run</span><span class="hookline">tip the first one</span>
+      <span class="desc">a line of dominoes across the page. click the first and the chain falls — the last one knocks the door open. one small action, then momentum does the rest.</span></button></li>
+    <li><button data-d="d62"><span class="num">62</span><span class="name">the head count</span><span class="hookline">guess how many live here</span>
+      <span class="desc">one number input. guess low: "more." guess high: "fewer." land on sixteen and the page concedes there's room for one more.</span></button></li>
+    <li><button data-d="d63"><span class="num">63</span><span class="name">the lost &amp; found</span><span class="hookline">people leave things on purpose</span>
+      <span class="desc">a box of items left behind — one glove, an unfinished theory of everything, a casserole dish with a name on it. people leave things here so they have a reason to come back.</span></button></li>
+    <li><button data-d="d64"><span class="num">64</span><span class="name">the alarm clock</span><span class="hookline">the house starts without you</span>
+      <span class="desc">7:00am, ringing. every snooze you press, the house does one more thing without you — coffee, the crossword, the good argument. it would rather not.</span></button></li>
+    <li><button data-d="d65"><span class="num">65</span><span class="name">the wishbone</span><span class="hookline">you get the big half</span>
+      <span class="desc">a wishbone, pulled. it snaps and you win — you always win, the house rigged it. the wish is on them: come to dinner.</span></button></li>
   </ol>
   <p class="small grey" style="margin-top:3rem">+ click a knock. esc returns.</p>
 </div>
@@ -520,7 +728,57 @@
       <li>tenant acknowledges the piano.</li>
       <li>tenant will be known. there is no clause to prevent this.</li>
       <li>quiet hours: negotiable. curiosity hours: 24/7.</li>
-    </ol>
+      <li><button data-d="d41"><span class="num">41</span><span class="name">the fridge door</span><span class="hookline">held up by magnets</span>
+      <span class="desc">the house's fridge, mid-week: grocery lists, a note about the piano tuner, one labeled yogurt dispute. drag the notes around. one of them was left for you.</span></button></li>
+    <li><button data-d="d42"><span class="num">42</span><span class="name">the coat rack</span><span class="hookline">one hook is bare</span>
+      <span class="desc">a rack of coats by the door, each with a story on hover. the empty hook isn't a gap in the inventory — it's a place being held.</span></button></li>
+    <li><button data-d="d43"><span class="num">43</span><span class="name">the seismograph</span><span class="hookline">the house registers</span>
+      <span class="desc">a needle records the house's tremors live — laughter in the kitchen, the piano fortissimo, sixteen footsteps on one staircase. proof of life as instrumentation.</span></button></li>
+    <li><button data-d="d44"><span class="num">44</span><span class="name">the shadow play</span><span class="hookline">seen from the sidewalk</span>
+      <span class="desc">one lit window on a dark street, silhouettes crossing behind the blinds. you're outside looking in — until one of them waves at you.</span></button></li>
+    <li><button data-d="d45"><span class="num">45</span><span class="name">the phone tree</span><span class="hookline">every option is the same door</span>
+      <span class="desc">an automated menu for the house: press 1 for dinner, 2 for the piano, 3 to speak to a resident. every branch ends at the same place — come by.</span></button></li>
+    <li><button data-d="d46"><span class="num">46</span><span class="name">the negotiation</span><span class="hookline">it was never about the rent</span>
+      <span class="desc">a slider asks what you'd pay. drag it anywhere. the house shrugs at every number, then tells you what it actually charges.</span></button></li>
+    <li><button data-d="d47"><span class="num">47</span><span class="name">the library card</span><span class="hookline">nobody returns it</span>
+      <span class="desc">a checkout card in the back of the house — stamped names, due dates, and a status column that keeps saying "still here." the next line is blank.</span></button></li>
+    <li><button data-d="d48"><span class="num">48</span><span class="name">the smoke signal</span><span class="hookline">the chimney is talking</span>
+      <span class="desc">puffs of smoke rise in short and long bursts — morse, slowly decoding at the bottom of the page. the oldest broadcast technology, saying the simplest thing.</span></button></li>
+    <li><button data-d="d49"><span class="num">49</span><span class="name">the eviction notice</span><span class="hookline">ordered to move in</span>
+      <span class="desc">an official notice to vacate, typed in full legal deadpan — until the last line crosses out one word and replaces it. bureaucracy as a love letter.</span></button></li>
+    <li><button data-d="d50"><span class="num">50</span><span class="name">the group chat</span><span class="hookline">you were added</span>
+      <span class="desc">the house's chat scrolls by — soup logistics, the piano tuner — then a system line: you were added. they notice. they ask you to say something.</span></button></li>
+    <li><button data-d="d51"><span class="num">51</span><span class="name">the chore wheel</span><span class="hookline">spin it. it doesn't matter.</span>
+      <span class="desc">a real chore wheel — dishes, compost, dinner lead. spin it and get your assignment, then the fine print: every slice is the same chore. show up.</span></button></li>
+    <li><button data-d="d52"><span class="num">52</span><span class="name">the toast</span><span class="hookline">glasses up</span>
+      <span class="desc">two glasses and a clink. each toast that types out is for something the house actually toasts to. the last one is for you, provisionally.</span></button></li>
+    <li><button data-d="d53"><span class="num">53</span><span class="name">the missing poster</span><span class="hookline">take a tab</span>
+      <span class="desc">MISSING: the feeling of walking into a room where everyone knows you. tear-off tabs at the bottom, going fast. taking one is the smallest possible yes.</span></button></li>
+    <li><button data-d="d54"><span class="num">54</span><span class="name">the doorman</span><span class="hookline">you're on the list</span>
+      <span class="desc">a velvet-rope prompt asks for your name. type anything. you're on the list. you were always on the list. exclusivity, inverted.</span></button></li>
+    <li><button data-d="d55"><span class="num">55</span><span class="name">the tape measure</span><span class="hookline">closer than you think</span>
+      <span class="desc">drag from the dot and a tape extends, measuring the distance from you to the house. whatever it reads, the annotation is the same: closer than most people get.</span></button></li>
+    <li><button data-d="d56"><span class="num">56</span><span class="name">the weather report</span><span class="hookline">indoor forecast</span>
+      <span class="desc">a seven-day forecast for the inside of the house: 100% chance of soup, gusts of laughter, one warm front that never leaves. weather as personality.</span></button></li>
+    <li><button data-d="d57"><span class="num">57</span><span class="name">the fire escape</span><span class="hookline">climb to the roof</span>
+      <span class="desc">a ladder of rungs going up past the top of the page. click to climb. the reward is the roof at golden hour, which is the house's best argument.</span></button></li>
+    <li><button data-d="d58"><span class="num">58</span><span class="name">the intercom</span><span class="hookline">hold to talk</span>
+      <span class="desc">a buzzer panel. hold the button and the speaker listens; release and the house answers through the static, then buzzes you up mid-sentence.</span></button></li>
+    <li><button data-d="d59"><span class="num">59</span><span class="name">the housewarming gift</span><span class="hookline">what would you bring?</span>
+      <span class="desc">three buttons: wine, nothing, questions. every answer is the right answer, each for a different reason. the house is not testing your gift.</span></button></li>
+    <li><button data-d="d60"><span class="num">60</span><span class="name">the sublet listing</span><span class="hookline">brutally honest zillow</span>
+      <span class="desc">a rental listing that tells the whole truth: natural light hoarded by one room (available), noise level "piano," amenities "sixteen people who will learn your name."</span></button></li>
+    <li><button data-d="d61"><span class="num">61</span><span class="name">the domino run</span><span class="hookline">tip the first one</span>
+      <span class="desc">a line of dominoes across the page. click the first and the chain falls — the last one knocks the door open. one small action, then momentum does the rest.</span></button></li>
+    <li><button data-d="d62"><span class="num">62</span><span class="name">the head count</span><span class="hookline">guess how many live here</span>
+      <span class="desc">one number input. guess low: "more." guess high: "fewer." land on sixteen and the page concedes there's room for one more.</span></button></li>
+    <li><button data-d="d63"><span class="num">63</span><span class="name">the lost &amp; found</span><span class="hookline">people leave things on purpose</span>
+      <span class="desc">a box of items left behind — one glove, an unfinished theory of everything, a casserole dish with a name on it. people leave things here so they have a reason to come back.</span></button></li>
+    <li><button data-d="d64"><span class="num">64</span><span class="name">the alarm clock</span><span class="hookline">the house starts without you</span>
+      <span class="desc">7:00am, ringing. every snooze you press, the house does one more thing without you — coffee, the crossword, the good argument. it would rather not.</span></button></li>
+    <li><button data-d="d65"><span class="num">65</span><span class="name">the wishbone</span><span class="hookline">you get the big half</span>
+      <span class="desc">a wishbone, pulled. it snaps and you win — you always win, the house rigged it. the wish is on them: come to dinner.</span></button></li>
+  </ol>
     <p class="small grey" style="margin:2rem 0 0.4rem">sign below to continue</p>
     <canvas id="sig" width="400" height="90"></canvas>
     <p style="margin-top:1.5rem"><a class="granted" id="granted" href="#">witnessed. come in →</a></p>
@@ -615,7 +873,57 @@
       <li>fold in one stranger. they will rise.</li>
       <li>let the conversation rest overnight. it keeps.</li>
       <li>final ingredient: <a href="#" style="text-decoration:underline dotted">you →</a></li>
-    </ol>
+      <li><button data-d="d41"><span class="num">41</span><span class="name">the fridge door</span><span class="hookline">held up by magnets</span>
+      <span class="desc">the house's fridge, mid-week: grocery lists, a note about the piano tuner, one labeled yogurt dispute. drag the notes around. one of them was left for you.</span></button></li>
+    <li><button data-d="d42"><span class="num">42</span><span class="name">the coat rack</span><span class="hookline">one hook is bare</span>
+      <span class="desc">a rack of coats by the door, each with a story on hover. the empty hook isn't a gap in the inventory — it's a place being held.</span></button></li>
+    <li><button data-d="d43"><span class="num">43</span><span class="name">the seismograph</span><span class="hookline">the house registers</span>
+      <span class="desc">a needle records the house's tremors live — laughter in the kitchen, the piano fortissimo, sixteen footsteps on one staircase. proof of life as instrumentation.</span></button></li>
+    <li><button data-d="d44"><span class="num">44</span><span class="name">the shadow play</span><span class="hookline">seen from the sidewalk</span>
+      <span class="desc">one lit window on a dark street, silhouettes crossing behind the blinds. you're outside looking in — until one of them waves at you.</span></button></li>
+    <li><button data-d="d45"><span class="num">45</span><span class="name">the phone tree</span><span class="hookline">every option is the same door</span>
+      <span class="desc">an automated menu for the house: press 1 for dinner, 2 for the piano, 3 to speak to a resident. every branch ends at the same place — come by.</span></button></li>
+    <li><button data-d="d46"><span class="num">46</span><span class="name">the negotiation</span><span class="hookline">it was never about the rent</span>
+      <span class="desc">a slider asks what you'd pay. drag it anywhere. the house shrugs at every number, then tells you what it actually charges.</span></button></li>
+    <li><button data-d="d47"><span class="num">47</span><span class="name">the library card</span><span class="hookline">nobody returns it</span>
+      <span class="desc">a checkout card in the back of the house — stamped names, due dates, and a status column that keeps saying "still here." the next line is blank.</span></button></li>
+    <li><button data-d="d48"><span class="num">48</span><span class="name">the smoke signal</span><span class="hookline">the chimney is talking</span>
+      <span class="desc">puffs of smoke rise in short and long bursts — morse, slowly decoding at the bottom of the page. the oldest broadcast technology, saying the simplest thing.</span></button></li>
+    <li><button data-d="d49"><span class="num">49</span><span class="name">the eviction notice</span><span class="hookline">ordered to move in</span>
+      <span class="desc">an official notice to vacate, typed in full legal deadpan — until the last line crosses out one word and replaces it. bureaucracy as a love letter.</span></button></li>
+    <li><button data-d="d50"><span class="num">50</span><span class="name">the group chat</span><span class="hookline">you were added</span>
+      <span class="desc">the house's chat scrolls by — soup logistics, the piano tuner — then a system line: you were added. they notice. they ask you to say something.</span></button></li>
+    <li><button data-d="d51"><span class="num">51</span><span class="name">the chore wheel</span><span class="hookline">spin it. it doesn't matter.</span>
+      <span class="desc">a real chore wheel — dishes, compost, dinner lead. spin it and get your assignment, then the fine print: every slice is the same chore. show up.</span></button></li>
+    <li><button data-d="d52"><span class="num">52</span><span class="name">the toast</span><span class="hookline">glasses up</span>
+      <span class="desc">two glasses and a clink. each toast that types out is for something the house actually toasts to. the last one is for you, provisionally.</span></button></li>
+    <li><button data-d="d53"><span class="num">53</span><span class="name">the missing poster</span><span class="hookline">take a tab</span>
+      <span class="desc">MISSING: the feeling of walking into a room where everyone knows you. tear-off tabs at the bottom, going fast. taking one is the smallest possible yes.</span></button></li>
+    <li><button data-d="d54"><span class="num">54</span><span class="name">the doorman</span><span class="hookline">you're on the list</span>
+      <span class="desc">a velvet-rope prompt asks for your name. type anything. you're on the list. you were always on the list. exclusivity, inverted.</span></button></li>
+    <li><button data-d="d55"><span class="num">55</span><span class="name">the tape measure</span><span class="hookline">closer than you think</span>
+      <span class="desc">drag from the dot and a tape extends, measuring the distance from you to the house. whatever it reads, the annotation is the same: closer than most people get.</span></button></li>
+    <li><button data-d="d56"><span class="num">56</span><span class="name">the weather report</span><span class="hookline">indoor forecast</span>
+      <span class="desc">a seven-day forecast for the inside of the house: 100% chance of soup, gusts of laughter, one warm front that never leaves. weather as personality.</span></button></li>
+    <li><button data-d="d57"><span class="num">57</span><span class="name">the fire escape</span><span class="hookline">climb to the roof</span>
+      <span class="desc">a ladder of rungs going up past the top of the page. click to climb. the reward is the roof at golden hour, which is the house's best argument.</span></button></li>
+    <li><button data-d="d58"><span class="num">58</span><span class="name">the intercom</span><span class="hookline">hold to talk</span>
+      <span class="desc">a buzzer panel. hold the button and the speaker listens; release and the house answers through the static, then buzzes you up mid-sentence.</span></button></li>
+    <li><button data-d="d59"><span class="num">59</span><span class="name">the housewarming gift</span><span class="hookline">what would you bring?</span>
+      <span class="desc">three buttons: wine, nothing, questions. every answer is the right answer, each for a different reason. the house is not testing your gift.</span></button></li>
+    <li><button data-d="d60"><span class="num">60</span><span class="name">the sublet listing</span><span class="hookline">brutally honest zillow</span>
+      <span class="desc">a rental listing that tells the whole truth: natural light hoarded by one room (available), noise level "piano," amenities "sixteen people who will learn your name."</span></button></li>
+    <li><button data-d="d61"><span class="num">61</span><span class="name">the domino run</span><span class="hookline">tip the first one</span>
+      <span class="desc">a line of dominoes across the page. click the first and the chain falls — the last one knocks the door open. one small action, then momentum does the rest.</span></button></li>
+    <li><button data-d="d62"><span class="num">62</span><span class="name">the head count</span><span class="hookline">guess how many live here</span>
+      <span class="desc">one number input. guess low: "more." guess high: "fewer." land on sixteen and the page concedes there's room for one more.</span></button></li>
+    <li><button data-d="d63"><span class="num">63</span><span class="name">the lost &amp; found</span><span class="hookline">people leave things on purpose</span>
+      <span class="desc">a box of items left behind — one glove, an unfinished theory of everything, a casserole dish with a name on it. people leave things here so they have a reason to come back.</span></button></li>
+    <li><button data-d="d64"><span class="num">64</span><span class="name">the alarm clock</span><span class="hookline">the house starts without you</span>
+      <span class="desc">7:00am, ringing. every snooze you press, the house does one more thing without you — coffee, the crossword, the good argument. it would rather not.</span></button></li>
+    <li><button data-d="d65"><span class="num">65</span><span class="name">the wishbone</span><span class="hookline">you get the big half</span>
+      <span class="desc">a wishbone, pulled. it snaps and you win — you always win, the house rigged it. the wish is on them: come to dinner.</span></button></li>
+  </ol>
   </div>
 </div>
 
@@ -773,12 +1081,253 @@
   </div>
 </div>
 
+
+<!-- 41 fridge door -->
+<div class="dir" id="d41">
+  <div class="center">
+    <div class="fridge" id="fridge"></div>
+    <p class="small grey">the fridge door. drag the notes. one is for you.</p>
+  </div>
+</div>
+
+<!-- 42 coat rack -->
+<div class="dir" id="d42">
+  <div class="center">
+    <div class="rack" id="rack"></div>
+    <p class="rackcap small" id="rackcap">the coats by the door. hover them.</p>
+  </div>
+</div>
+
+<!-- 43 seismograph -->
+<div class="dir" id="d43">
+  <canvas id="seismo"></canvas>
+  <p class="cap" id="seismocap">agape station 01 — recording.</p>
+</div>
+
+<!-- 44 shadow play -->
+<div class="dir" id="d44">
+  <div class="center">
+    <div class="window" id="shwindow"></div>
+    <p class="shcap small" id="shcap">from the sidewalk, 9pm.</p>
+  </div>
+</div>
+
+<!-- 45 phone tree -->
+<div class="dir" id="d45">
+  <div class="term">
+    <p style="margin-bottom:1.4rem">thank you for calling agape. please listen closely,<br>as our options never change:</p>
+    <button class="opt" data-o="0">1 — dinner schedule</button>
+    <button class="opt" data-o="1">2 — hear the piano</button>
+    <button class="opt" data-o="2">3 — speak to a resident</button>
+    <button class="opt" data-o="3">4 — ask about the room</button>
+    <p class="resp small" id="phresp"></p>
+  </div>
+</div>
+
+<!-- 46 negotiation -->
+<div class="dir" id="d46">
+  <div class="center">
+    <p class="small grey">what would you pay to live somewhere like this?</p>
+    <p class="amount" id="rentamt">$1,800</p>
+    <input type="range" id="rentslider" min="400" max="4000" step="50" value="1800">
+    <p class="reply small" id="rentreply"></p>
+  </div>
+</div>
+
+<!-- 47 library card -->
+<div class="dir" id="d47">
+  <div class="pocket">
+    <p class="small grey" style="margin-bottom:1.2rem">found in the back of the house, like a library book:</p>
+    <div class="cardface">
+      <p class="small" style="margin-bottom:0.8rem">AGAPE — DATE DUE</p>
+      <table id="libtable">
+        <tr><td>jun 2019</td><td>maya</td><td class="grey">returned late</td></tr>
+        <tr><td>feb 2021</td><td>silas</td><td class="grey">still here</td></tr>
+        <tr><td>oct 2023</td><td>wren</td><td class="grey">still here</td></tr>
+        <tr><td>may 2025</td><td>gus</td><td class="grey">still here</td></tr>
+        <tr><td>today</td><td><input id="libname" placeholder="your name" autocomplete="off"></td><td class="grey" id="libstatus"></td></tr>
+      </table>
+    </div>
+    <p class="small grey" style="margin-top:1.2rem" id="libcap">nobody returns the house.</p>
+  </div>
+</div>
+
+<!-- 48 smoke signal -->
+<div class="dir" id="d48">
+  <canvas id="smokecv"></canvas>
+  <p class="decoded small" id="decoded"></p>
+</div>
+
+<!-- 49 eviction notice -->
+<div class="dir" id="d49">
+  <div class="doc">
+    <p>NOTICE — SERVED TO: whoever keeps reading</p>
+    <p class="small grey" style="margin:1.2rem 0">pursuant to nothing, on behalf of sixteen residents,
+      regarding one (1) west-facing room, you are hereby ordered to move
+      <span class="strike" id="outword">OUT of wherever you are</span>
+      <span class="inword" id="inword">IN.</span></p>
+    <p class="small" id="evictcap"></p>
+  </div>
+</div>
+
+<!-- 50 group chat -->
+<div class="dir" id="d50">
+  <div class="chat" id="chatbox"></div>
+  <div class="bar"><input id="chatin" placeholder="" autocomplete="off"></div>
+</div>
+
+<!-- 51 chore wheel -->
+<div class="dir" id="d51">
+  <div class="center">
+    <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
+      <path d="M150,18 L142,4 L158,4 Z" fill="var(--ink)"/>
+      <g class="wheel" id="wheel">
+        <circle cx="150" cy="150" r="128" fill="none" stroke="var(--ink)" stroke-width="1.5" transform="translate(0,20)"/>
+      </g>
+    </svg>
+    <button style="text-decoration:underline dotted" id="spinbtn">spin</button>
+    <p class="wheelcap small" id="wheelcap">the chore wheel. it's fair, technically.</p>
+  </div>
+</div>
+
+<!-- 52 the toast -->
+<div class="dir" id="d52">
+  <div class="center">
+    <div class="glasses">
+      <svg class="gl" viewBox="0 0 60 100"><path d="M12,6 h36 c0,26 -10,34 -14,36 v40 h12 v6 h-32 v-6 h12 v-40 c-4,-2 -14,-10 -14,-36 z" fill="none" stroke="var(--ink)" stroke-width="2"/></svg>
+      <svg class="gr" viewBox="0 0 60 100"><path d="M12,6 h36 c0,26 -10,34 -14,36 v40 h12 v6 h-32 v-6 h12 v-40 c-4,-2 -14,-10 -14,-36 z" fill="none" stroke="var(--ink)" stroke-width="2"/></svg>
+    </div>
+    <button style="text-decoration:underline dotted" id="clinkbtn">clink</button>
+    <p class="toastline small" id="toastline"></p>
+  </div>
+</div>
+
+<!-- 53 missing poster -->
+<div class="dir" id="d53">
+  <div class="poster">
+    <p style="font-size:1.6rem; letter-spacing:0.2em">MISSING</p>
+    <p class="small" style="margin-top:1rem">the feeling of walking into a room<br>where everyone knows you.</p>
+    <p class="small grey" style="margin-top:0.8rem">last seen: most places, a while ago.<br>reward: dinner, indefinitely.</p>
+    <div class="tabs" id="tabs"></div>
+  </div>
+  <p class="postercap small grey" id="postercap">the tabs are going fast.</p>
+</div>
+
+<!-- 54 doorman -->
+<div class="dir" id="d54">
+  <div class="term">
+    <div class="dlog" id="dlog"><div>name?</div></div>
+    <input id="doorname" autocomplete="off" spellcheck="false">
+  </div>
+</div>
+
+<!-- 55 tape measure -->
+<div class="dir" id="d55">
+  <canvas id="tapecv"></canvas>
+  <p class="readout small" id="tapereadout">drag from the dot. measure your distance to the house.</p>
+</div>
+
+<!-- 56 weather report -->
+<div class="dir" id="d56"><pre id="wxout"></pre></div>
+
+<!-- 57 fire escape -->
+<div class="dir" id="d57">
+  <div class="shaft" id="shaft"></div>
+</div>
+
+<!-- 58 intercom -->
+<div class="dir" id="d58">
+  <div class="center">
+    <div class="speaker" id="speaker"></div>
+    <button class="btn" id="talkbtn">hold to talk</button>
+    <p class="talkline small" id="talkline">unit 16. they can hear you.</p>
+  </div>
+</div>
+
+<!-- 59 housewarming -->
+<div class="dir" id="d59">
+  <div class="center">
+    <p>you're invited. what do you bring?</p>
+    <div class="opts" id="giftopts">
+      <button data-g="0">wine</button>
+      <button data-g="1">nothing</button>
+      <button data-g="2">questions</button>
+    </div>
+    <p class="giftline small" id="giftline"></p>
+  </div>
+</div>
+
+<!-- 60 sublet listing -->
+<div class="dir" id="d60">
+  <div class="center">
+    <div class="card">
+      <div><span class="k">listing</span><span>1 room in 16-person victorian</span></div>
+      <div><span class="k">natural light</span><span>hoarded by the west room. the west room is the one available.</span></div>
+      <div><span class="k">noise level</span><span>piano, laughter, one recurring argument about consciousness</span></div>
+      <div><span class="k">amenities</span><span>sixteen people who will learn your name by thursday</span></div>
+      <div><span class="k">utilities</span><span>included: soup at 3am, honest feedback</span></div>
+      <div><span class="k">deposit</span><span>your guardedness. non-refundable.</span></div>
+      <div><span class="k">apply</span><span><a href="#" style="text-decoration:underline dotted">no broker fee. no broker. →</a></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 61 domino run -->
+<div class="dir" id="d61">
+  <div class="center">
+    <div class="run" id="domrun"></div>
+    <p class="small grey" id="domcap">tip the first one.</p>
+    <a class="prize" id="domprize" href="#">the door swings open. come in →</a>
+  </div>
+</div>
+
+<!-- 62 head count -->
+<div class="dir" id="d62">
+  <div class="center">
+    <p class="small grey">how many people live in this house?</p>
+    <input id="countguess" inputmode="numeric" autocomplete="off" placeholder="?">
+    <p class="hint small" id="counthint"></p>
+  </div>
+</div>
+
+<!-- 63 lost and found -->
+<div class="dir" id="d63">
+  <div class="center">
+    <p class="small grey">the lost &amp; found box, by the door.</p>
+    <div class="box" id="lfbox"></div>
+    <p class="story small" id="lfstory"></p>
+  </div>
+</div>
+
+<!-- 64 alarm clock -->
+<div class="dir" id="d64">
+  <div class="center">
+    <p class="clock" id="clockface">7:00</p>
+    <button class="snz" id="snzbtn">snooze</button>
+    <p class="alog small grey" id="alog"></p>
+  </div>
+</div>
+
+<!-- 65 wishbone -->
+<div class="dir" id="d65">
+  <div class="center">
+    <svg viewBox="0 0 220 170" xmlns="http://www.w3.org/2000/svg">
+      <g class="side sl"><path d="M110,150 C70,124 56,80 66,34" fill="none" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/></g>
+      <g class="side sr"><path d="M110,150 C150,124 164,80 154,34" fill="none" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/></g>
+    </svg>
+    <button style="text-decoration:underline dotted" id="pullbtn">pull</button>
+    <p class="wishline small" id="wishline"></p>
+  </div>
+</div>
+
 <div class="chrome" id="chrome" style="display:none">
   <span class="tag" id="tag"></span>
   <button class="close" id="closeBtn">esc / back to index</button>
 </div>
 
 <script>
+  const VERSION = "1.1.0";
+  console.log("[knocks] v" + VERSION + " - 65 knocks");
   const $ = (s) => document.querySelector(s);
   const dirs = [...document.querySelectorAll(".dir")];
   let active = null, timers = [];
@@ -1496,6 +2045,556 @@
     d.onpointermove = (e) => { if (e.buttons || e.pointerType === "touch") set(e.clientX / innerWidth); };
     d.onpointerdown = (e) => set(e.clientX / innerWidth);
     set(0);
+  };
+
+  /* 41 fridge door */
+  boot.d41 = () => {
+    const fridge = $("#fridge"); fridge.innerHTML = "";
+    const notes = [
+      ["buy: more soup stuff. yes, again.", 6, 8, -3],
+      ["piano tuner tue 3pm. warn no one.", 52, 6, 2],
+      ["whoever ate my labeled yogurt: it's fine. talk to me.", 8, 34, 1],
+      ["movie night vote: tarkovsky 12, everything else 4", 50, 42, -2],
+      ["rent due friday. also: talent show?", 10, 62, 3],
+      ["one room open. west-facing. if you're reading our fridge, you're basically in →", 42, 72, -1, true],
+    ];
+    notes.forEach(([txt, x, y, rot, invite]) => {
+      const n = document.createElement("div");
+      n.className = "note" + (invite ? " invite" : "");
+      n.textContent = txt;
+      n.style.left = x + "%"; n.style.top = y + "%";
+      n.style.transform = `rotate(${rot}deg)`;
+      let off = null;
+      n.onpointerdown = (e) => {
+        const r = n.getBoundingClientRect();
+        off = [e.clientX - r.left, e.clientY - r.top];
+        n.setPointerCapture(e.pointerId);
+      };
+      n.onpointerup = () => (off = null);
+      n.onpointermove = (e) => {
+        if (!off) return;
+        const fr = fridge.getBoundingClientRect();
+        n.style.left = (e.clientX - fr.left - off[0]) + "px";
+        n.style.top = (e.clientY - fr.top - off[1]) + "px";
+      };
+      fridge.appendChild(n);
+    });
+  };
+
+  /* 42 coat rack */
+  boot.d42 = () => {
+    const rack = $("#rack"); rack.innerHTML = "";
+    const cap = $("#rackcap");
+    const idle = "the coats by the door. hover them.";
+    const coats = [
+      ["silas's. smells like campfire in every season.", 96],
+      ["the communal rain shell. it has seen things.", 120],
+      ["maya's. do not borrow. she will know.", 104],
+      ["a coat nobody claims. it stays. house rules.", 88],
+      ["theo's, patched twice by ada, argued over once.", 112],
+      ["loaners, for guests who stay past midnight. many do.", 100],
+      ["wren's. pockets: receipts, acorns, one guitar pick.", 92],
+    ];
+    coats.forEach(([c, h]) => {
+      const hk = document.createElement("div"); hk.className = "hook";
+      hk.innerHTML = `<i></i><div class="coat" style="height:${h}px"></div>`;
+      hk.onpointerenter = () => (cap.textContent = c);
+      hk.onpointerleave = () => (cap.textContent = idle);
+      rack.appendChild(hk);
+    });
+    const hk = document.createElement("div"); hk.className = "hook";
+    hk.innerHTML = `<i></i><div class="coat empty" style="height:100px"></div>`;
+    hk.onpointerenter = () => (cap.textContent = "empty. being held, not missing.");
+    hk.onpointerleave = () => (cap.textContent = idle);
+    hk.onclick = () => (cap.innerHTML = `this hook is yours if you want it. <a href="#" style="text-decoration:underline dotted">hang something →</a>`);
+    rack.appendChild(hk);
+  };
+
+  /* 43 seismograph */
+  boot.d43 = () => {
+    const cv = $("#seismo"), ctx = cv.getContext("2d");
+    cv.width = innerWidth; cv.height = innerHeight;
+    const events = [
+      "someone laughed in the kitchen",
+      "the piano, fortissimo",
+      "a chair scraped back — dinner",
+      "an argument reached its good part",
+      "sixteen footsteps, one staircase",
+      "the front door. someone new.",
+    ];
+    let x = 0, amp = 2;
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 1.2;
+    let lastY = cv.height / 2;
+    every(() => {
+      amp += (2 - amp) * 0.02;
+      const step = 2.4;
+      ctx.clearRect(x, 0, step + 24, cv.height);
+      const y = cv.height / 2 + (Math.random() - 0.5) * amp * 22;
+      ctx.beginPath(); ctx.moveTo(x, lastY);
+      x += step; ctx.lineTo(x, y); ctx.stroke();
+      lastY = y;
+      if (x > cv.width) x = 0;
+    }, 16);
+    every(() => {
+      amp = 3.5 + Math.random() * 4;
+      $("#seismocap").textContent = "⚡ " + events[Math.floor(Math.random() * events.length)];
+    }, 3200);
+  };
+
+  /* 44 shadow play */
+  boot.d44 = () => {
+    const win = $("#shwindow"); win.innerHTML = "";
+    for (let i = 1; i <= 4; i++) {
+      const b = document.createElement("div");
+      b.className = "blindline"; b.style.top = i * 19 + "%";
+      win.appendChild(b);
+    }
+    const sils = [];
+    [[0.34, 0.62, 0.00025], [0.26, 0.5, -0.00018], [0.3, 0.7, 0.00032]].forEach(([w, h, v]) => {
+      const s = document.createElement("div");
+      s.className = "sil";
+      const d = { el: s, x: Math.random(), v, w };
+      s.style.width = w * 100 + "%"; s.style.height = h * 100 + "%";
+      win.appendChild(s); sils.push(d);
+    });
+    every(() => {
+      sils.forEach((d) => {
+        d.x += d.v * 16;
+        if (d.x > 1.1) d.x = -d.w - 0.1;
+        if (d.x < -d.w - 0.15) d.x = 1.1;
+        d.el.style.left = d.x * 100 + "%";
+      });
+    }, 16);
+    const caps = [
+      "someone carrying a very large pot.",
+      "two people. one point being made.",
+      "the tall one is dancing. there is no music. there is never music for this.",
+      "someone just waved. — wait. that was at you. →",
+    ];
+    let i = 0;
+    $("#shcap").textContent = "from the sidewalk, 9pm.";
+    every(() => { $("#shcap").textContent = caps[i % caps.length]; i++; }, 3400);
+  };
+
+  /* 45 phone tree */
+  boot.d45 = () => {
+    const resps = [
+      "monday. seven o'clock. the seat is real.",
+      "♪ — you had to be there. be there.",
+      "they're mid-argument. it's a good one. hold, please— actually, just come by.",
+      "west-facing. gets the last light of the day. next question.",
+    ];
+    const resp = $("#phresp"); resp.textContent = "";
+    let used = 0;
+    document.querySelectorAll("#d45 .opt").forEach((b) => (b.onclick = () => {
+      used++;
+      resp.innerHTML = resps[b.dataset.o] + (used >= 3
+        ? `<br><br>every option is the same door. <a href="#" style="text-decoration:underline dotted">come by →</a>` : "");
+    }));
+  };
+
+  /* 46 negotiation */
+  boot.d46 = () => {
+    const s = $("#rentslider"), amt = $("#rentamt"), rep = $("#rentreply");
+    s.value = 1800; amt.textContent = "$1,800"; rep.textContent = "";
+    s.oninput = () => {
+      const v = +s.value;
+      amt.textContent = "$" + v.toLocaleString();
+      rep.textContent = v < 900 ? "bold." : v > 3200 ? "that's not the test." : "sure.";
+    };
+    s.onchange = () => {
+      rep.innerHTML = `fine. it was never about the rent. the currency here is showing up. <a href="#" style="text-decoration:underline dotted">pay up →</a>`;
+    };
+  };
+
+  /* 47 library card */
+  boot.d47 = () => {
+    const inp = $("#libname"), st = $("#libstatus"), cap = $("#libcap");
+    inp.value = ""; st.textContent = ""; cap.textContent = "nobody returns the house.";
+    inp.onkeydown = (e) => {
+      if (e.key !== "Enter" || !inp.value.trim()) return;
+      st.textContent = "never returned";
+      cap.innerHTML = `stamped. <a href="#" style="text-decoration:underline dotted">check yourself out →</a>`;
+      inp.blur();
+    };
+  };
+
+  /* 48 smoke signal */
+  boot.d48 = () => {
+    const cv = $("#smokecv"), ctx = cv.getContext("2d");
+    cv.width = innerWidth; cv.height = innerHeight;
+    const morse = [["C", "-.-."], ["O", "---"], ["M", "--"], ["E", "."], [" ", ""], ["I", ".."], ["N", "-."]];
+    const puffs = [];
+    const chimneyX = cv.width / 2, chimneyY = cv.height - 70;
+    let li = 0, si = 0, decoded = "";
+    $("#decoded").textContent = "";
+    every(() => {
+      const [letter, code] = morse[li % morse.length];
+      if (si < code.length) {
+        puffs.push({ x: chimneyX, y: chimneyY, r: code[si] === "-" ? 15 : 7, a: 0.55, dash: code[si] === "-" });
+        si++;
+      } else {
+        decoded += letter;
+        if (li === morse.length - 1) { decoded = ""; }
+        $("#decoded").textContent = decoded + " ▁";
+        li++; si = 0;
+      }
+    }, 560);
+    every(() => {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(chimneyX - 26, cv.height - 54, 52, 54);
+      for (let i = puffs.length - 1; i >= 0; i--) {
+        const p = puffs[i];
+        p.y -= 2.4; p.r += 0.1; p.a -= 0.0035;
+        if (p.a <= 0) { puffs.splice(i, 1); continue; }
+        ctx.fillStyle = `rgba(0,0,0,${p.a})`;
+        ctx.beginPath();
+        ctx.ellipse(p.x + Math.sin(p.y / 30) * 8, p.y, p.dash ? p.r * 1.7 : p.r, p.r, 0, 0, 7);
+        ctx.fill();
+      }
+    }, 16);
+  };
+
+  /* 49 eviction notice */
+  boot.d49 = () => {
+    const out = $("#outword"), inw = $("#inword"), cap = $("#evictcap");
+    out.classList.remove("done"); inw.classList.remove("on"); cap.textContent = "";
+    later(() => out.classList.add("done"), 1800);
+    later(() => inw.classList.add("on"), 2500);
+    later(() => (cap.innerHTML = `failure to comply will result in continued wondering. <a href="#" style="text-decoration:underline dotted">comply →</a>`), 3400);
+  };
+
+  /* 50 group chat */
+  boot.d50 = () => {
+    const box = $("#chatbox"), inp = $("#chatin");
+    box.innerHTML = ""; inp.value = ""; inp.disabled = true;
+    const bubble = (who, txt, mine) =>
+      box.insertAdjacentHTML("beforeend",
+        `<div class="msg${mine ? " mine" : ""}"><span class="who">${who}</span>${txt}</div>`);
+    const sys = (txt) => box.insertAdjacentHTML("beforeend", `<div class="sys">${txt}</div>`);
+    const seq = [
+      () => bubble("maya", "who's on dinner tomorrow"),
+      () => bubble("theo", "me. it's soup. it's always soup"),
+      () => bubble("noor", "piano tuner comes at 3, act surprised"),
+      () => sys("you were added to “agape”"),
+      () => bubble("maya", "wait. who added the new person"),
+      () => bubble("theo", "me. they seemed like they'd fit"),
+      () => bubble("noor", "prove it. say something"),
+      () => { inp.disabled = false; inp.focus(); },
+    ];
+    seq.forEach((fn, i) => later(fn, 900 * (i + 1)));
+    inp.onkeydown = (e) => {
+      if (e.key !== "Enter" || !inp.value.trim()) return;
+      bubble("you", inp.value.replace(/</g, "&lt;"), true);
+      inp.value = ""; inp.disabled = true;
+      later(() => sys("the house went quiet for a second."), 800);
+      later(() => bubble("maya", "ok yeah. see you monday →"), 1800);
+    };
+  };
+
+  /* 51 chore wheel */
+  boot.d51 = () => {
+    const wheel = $("#wheel"), cap = $("#wheelcap");
+    const chores = ["dishes", "compost", "dinner lead", "flowers", "greet strangers", "nothing (suspicious)"];
+    wheel.querySelectorAll(".spoke,text").forEach((n) => n.remove());
+    chores.forEach((c, i) => {
+      const a = (i / chores.length) * Math.PI * 2 - Math.PI / 2;
+      const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      ln.setAttribute("x1", 150); ln.setAttribute("y1", 170);
+      ln.setAttribute("x2", 150 + Math.cos(a + Math.PI / chores.length) * 128);
+      ln.setAttribute("y2", 170 + Math.sin(a + Math.PI / chores.length) * 128);
+      ln.setAttribute("stroke", "var(--ink)"); ln.setAttribute("stroke-width", "1");
+      ln.classList.add("spoke");
+      wheel.appendChild(ln);
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", 150 + Math.cos(a) * 82); t.setAttribute("y", 170 + Math.sin(a) * 82);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", "10");
+      t.setAttribute("fill", "var(--ink)"); t.textContent = c;
+      wheel.appendChild(t);
+    });
+    wheel.style.transition = "none"; wheel.style.transform = "rotate(0deg)";
+    let deg = 0;
+    cap.textContent = "the chore wheel. it's fair, technically.";
+    $("#spinbtn").onclick = () => {
+      wheel.style.transition = "";
+      deg += 1080 + Math.random() * 720;
+      wheel.style.transform = `rotate(${deg}deg)`;
+      cap.textContent = "spinning…";
+      later(() => {
+        const idx = Math.floor((((-deg - 90) % 360 + 360) % 360) / (360 / chores.length));
+        cap.innerHTML = `you got: <b>${chores[(idx + chores.length) % chores.length]}</b>. fine print: every slice is the same chore. <a href="#" style="text-decoration:underline dotted">show up →</a>`;
+      }, 3400);
+    };
+  };
+
+  /* 52 the toast */
+  boot.d52 = () => {
+    const d = $("#d52"), line = $("#toastline");
+    d.classList.remove("clinked"); line.textContent = "";
+    const toasts = [
+      "to the strangers who stayed.",
+      "to soup at 3am, and whoever it was for.",
+      "to arguments that end in better ideas.",
+      "to you. provisionally. come find out →",
+    ];
+    let i = 0;
+    $("#clinkbtn").onclick = () => {
+      d.classList.add("clinked");
+      later(() => d.classList.remove("clinked"), 600);
+      line.textContent = toasts[Math.min(i, toasts.length - 1)];
+      i++;
+    };
+  };
+
+  /* 53 missing poster */
+  boot.d53 = () => {
+    const tabs = $("#tabs"); tabs.innerHTML = "";
+    const cap = $("#postercap");
+    cap.textContent = "the tabs are going fast.";
+    let torn = 0;
+    for (let i = 0; i < 8; i++) {
+      const t = document.createElement("div");
+      t.className = "tab"; t.textContent = "take one";
+      t.onclick = () => {
+        t.classList.add("torn"); torn++;
+        cap.innerHTML = torn < 4 ? `${8 - torn} left. taking one is the smallest possible yes.`
+          : `you took one. that's how it starts. <a href="#" style="text-decoration:underline dotted">call the number →</a>`;
+      };
+      tabs.appendChild(t);
+    }
+  };
+
+  /* 54 doorman */
+  boot.d54 = () => {
+    const log = $("#dlog"), inp = $("#doorname");
+    log.innerHTML = "<div>name?</div>"; inp.value = ""; inp.focus();
+    let tries = 0;
+    inp.onkeydown = (e) => {
+      if (e.key !== "Enter" || !inp.value.trim()) return;
+      const name = inp.value.replace(/</g, "&lt;"); inp.value = "";
+      log.insertAdjacentHTML("beforeend", `<div class="grey">${name}</div>`);
+      later(() => log.insertAdjacentHTML("beforeend", "<div>…checking the list.</div>"), 400);
+      later(() => log.insertAdjacentHTML("beforeend",
+        tries === 0
+          ? `<div>you're on it. you were always on it. <a href="#" style="text-decoration:underline dotted">come in →</a></div>`
+          : `<div>still on it. that doesn't wear off.</div>`), 1400);
+      tries++;
+    };
+  };
+
+  /* 55 tape measure */
+  boot.d55 = () => {
+    const cv = $("#tapecv"), ctx = cv.getContext("2d");
+    cv.width = innerWidth; cv.height = innerHeight;
+    const ox = cv.width / 2, oy = cv.height / 2;
+    const readout = $("#tapereadout");
+    readout.textContent = "drag from the dot. measure your distance to the house.";
+    const drawBase = () => {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#000";
+      ctx.beginPath(); ctx.arc(ox, oy, 5, 0, 7); ctx.fill();
+    };
+    drawBase();
+    let measuring = false;
+    const d = $("#d55");
+    d.onpointerdown = () => (measuring = true);
+    d.onpointerup = () => (measuring = false);
+    d.onpointermove = (e) => {
+      if (!measuring) return;
+      drawBase();
+      const dx = e.clientX - ox, dy = e.clientY - oy;
+      const dist = Math.hypot(dx, dy);
+      ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(e.clientX, e.clientY); ctx.stroke();
+      const ticks = Math.floor(dist / 22);
+      for (let i = 1; i <= ticks; i++) {
+        const tx = ox + (dx * i * 22) / dist, ty = oy + (dy * i * 22) / dist;
+        const px = -dy / dist, py = dx / dist;
+        ctx.beginPath(); ctx.moveTo(tx - px * 5, ty - py * 5); ctx.lineTo(tx + px * 5, ty + py * 5); ctx.stroke();
+      }
+      const miles = (dist / 90).toFixed(1);
+      readout.textContent = `${miles} miles from the house. still closer than most people get. →`;
+    };
+  };
+
+  /* 56 weather report */
+  boot.d56 = () => {
+    const lines = [
+      "INDOOR FORECAST — AGAPE, SAN FRANCISCO", "",
+      "mon ...... soup, 100%. dinner front arrives 7pm, stalls till midnight.",
+      "tue ...... scattered piano. bring earplugs, ignore them.",
+      "wed ...... gusts of laughter from the kitchen, 40mph.",
+      "thu ...... one heated argument, clearing by evening. warmer after.",
+      "fri ...... high pressure to be somewhere else. nobody leaves.",
+      "sat ...... fog outside. inside: none.",
+      "sun ...... golden hour on the roof, standing room only.", "",
+      "extended outlook: one warm front, permanent.",
+      "the forecast inside is better. →",
+    ];
+    const out = $("#wxout"); out.textContent = "";
+    let i = 0;
+    every(() => { if (i < lines.length) out.textContent += lines[i++] + "\n"; }, 340);
+  };
+
+  /* 57 fire escape */
+  boot.d57 = () => {
+    const shaft = $("#shaft"); shaft.innerHTML = "";
+    const roof = document.createElement("div");
+    roof.className = "roof";
+    roof.innerHTML = `the roof. golden hour, standing room only.<br><a href="#" style="text-decoration:underline dotted">stay →</a>`;
+    shaft.appendChild(roof);
+    const RUNGS = 14;
+    for (let i = 0; i < RUNGS; i++) {
+      const r = document.createElement("div");
+      r.className = "rung";
+      if (i === RUNGS - 1) r.textContent = "click to climb";
+      shaft.appendChild(r);
+    }
+    let lvl = 0;
+    shaft.style.transform = "translateX(-50%)";
+    shaft.onclick = () => {
+      lvl++;
+      const max = Math.max(0, shaft.offsetHeight - innerHeight + 60);
+      const y = Math.min(max, lvl * 52);
+      shaft.style.transform = `translateX(-50%) translateY(${y}px)`;
+      if (y >= max) shaft.querySelectorAll(".rung").forEach((r) => (r.textContent = ""));
+    };
+  };
+
+  /* 58 intercom */
+  boot.d58 = () => {
+    const spk = $("#speaker"); spk.innerHTML = "";
+    for (let i = 0; i < 24; i++) spk.appendChild(document.createElement("i"));
+    const dots = [...spk.children];
+    const line = $("#talkline"), btn = $("#talkbtn"), d = $("#d58");
+    line.textContent = "unit 16. they can hear you.";
+    d.classList.remove("buzz");
+    let held = null, heldFor = 0;
+    btn.onpointerdown = () => {
+      heldFor = 0;
+      line.textContent = "listening…";
+      held = setInterval(() => {
+        heldFor += 100;
+        dots.forEach((x) => (x.style.opacity = 0.2 + Math.random() * 0.8));
+      }, 100);
+      timers.push(held);
+    };
+    const release = () => {
+      if (!held) return;
+      clearInterval(held); held = null;
+      dots.forEach((x) => (x.style.opacity = 0.25));
+      if (heldFor < 400) { line.textContent = "hold it longer. say the whole thing."; return; }
+      line.textContent = "…";
+      later(() => (line.textContent = "we heard you. come up. buzzing you in—"), 700);
+      later(() => { d.classList.add("buzz"); line.innerHTML = `bzzzzt. <a href="#" style="text-decoration:underline dotted">door's open →</a>`; }, 1900);
+    };
+    btn.onpointerup = release; btn.onpointerleave = release;
+  };
+
+  /* 59 housewarming */
+  boot.d59 = () => {
+    const replies = [
+      "wine: correct.",
+      "nothing: also correct. you're the gift. (sorry. it's true and we're not sorry.)",
+      "questions: perfect. bring extras. dinner runs long here.",
+    ];
+    const line = $("#giftline"); line.textContent = "";
+    let picks = 0;
+    document.querySelectorAll("#giftopts button").forEach((b) => (b.onclick = () => {
+      picks++;
+      line.innerHTML = replies[b.dataset.g] + (picks >= 2
+        ? ` <br><br>see? there was no wrong answer. <a href="#" style="text-decoration:underline dotted">just come →</a>` : "");
+    }));
+  };
+
+  /* 61 domino run */
+  boot.d61 = () => {
+    const run = $("#domrun"); run.innerHTML = "";
+    $("#domprize").classList.remove("on");
+    $("#domcap").textContent = "tip the first one.";
+    const N = 12;
+    for (let i = 0; i < N; i++) {
+      const dm = document.createElement("div");
+      dm.className = "dom";
+      dm.onclick = () => {
+        for (let j = i; j < N; j++)
+          later(() => run.children[j].classList.add("fallen"), (j - i) * 130);
+        later(() => { $("#domprize").classList.add("on"); $("#domcap").textContent = "one small action. momentum did the rest."; }, (N - i) * 130 + 300);
+      };
+      run.appendChild(dm);
+    }
+  };
+
+  /* 62 head count */
+  boot.d62 = () => {
+    const inp = $("#countguess"), hint = $("#counthint");
+    inp.value = ""; hint.textContent = ""; inp.focus();
+    inp.oninput = () => {
+      const v = parseInt(inp.value, 10);
+      if (isNaN(v)) { hint.textContent = ""; return; }
+      hint.innerHTML = v < 16 ? "more." : v > 16 ? "fewer." :
+        `exactly sixteen. and room for one more. <a href="#" style="text-decoration:underline dotted">be the one →</a>`;
+    };
+  };
+
+  /* 63 lost and found */
+  boot.d63 = () => {
+    const items = [
+      ["one glove", "sentimental value to the other glove, which also lives here now."],
+      ["a theory of everything", "unfinished. picked up most sundays, put down gently."],
+      ["reading glasses", "third pair. the house keeps them all in the same bowl. nobody's."],
+      ["a casserole dish", "has a name taped to it. the name has moved out. the dish refused."],
+      ["someone's whole twenties", "claimed, actually. they say it was worth it."],
+    ];
+    const box = $("#lfbox"); box.innerHTML = "";
+    const story = $("#lfstory"); story.textContent = "";
+    let clicks = 0;
+    items.forEach(([name, s]) => {
+      const el = document.createElement("span");
+      el.className = "item"; el.textContent = name;
+      el.onclick = () => {
+        clicks++;
+        story.innerHTML = s + (clicks >= 3
+          ? ` <br><br>people leave things here so they have a reason to come back. <a href="#" style="text-decoration:underline dotted">leave something →</a>` : "");
+      };
+      box.appendChild(el);
+    });
+  };
+
+  /* 64 alarm clock */
+  boot.d64 = () => {
+    const d = $("#d64"), face = $("#clockface"), log = $("#alog");
+    d.classList.add("ringing");
+    face.textContent = "7:00"; log.textContent = "";
+    const misses = [
+      "the house made coffee without you.",
+      "someone solved the crossword. it was a group effort. you weren't in the group.",
+      "the good argument happened. you'd have won it.",
+    ];
+    let n = 0, mins = 0;
+    $("#snzbtn").onclick = () => {
+      if (n >= misses.length) return;
+      mins += 9;
+      face.textContent = "7:" + String(mins).padStart(2, "0");
+      log.innerHTML = misses.slice(0, ++n).join("<br>");
+      if (n === misses.length) {
+        d.classList.remove("ringing");
+        log.innerHTML += `<br><br>fine. dinner's at seven. <a href="#" style="text-decoration:underline dotted">don't snooze that →</a>`;
+      }
+    };
+  };
+
+  /* 65 wishbone */
+  boot.d65 = () => {
+    const d = $("#d65"), line = $("#wishline");
+    d.classList.remove("snapped"); line.textContent = "";
+    $("#pullbtn").onclick = () => {
+      if (d.classList.contains("snapped")) return;
+      d.classList.add("snapped");
+      later(() => (line.textContent = "snap. you got the big half."), 500);
+      later(() => (line.innerHTML = `you always get the big half. it's rigged. the wish is on us: <a href="#" style="text-decoration:underline dotted">come to dinner →</a>`), 1700);
+    };
   };
 </script>
 </body>
