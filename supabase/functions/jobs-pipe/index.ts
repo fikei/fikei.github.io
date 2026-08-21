@@ -13,14 +13,15 @@
 //
 // Auto-promotion: setting a stage on a Saved row promotes status to
 // Active. Inverse: clearing stage doesn't demote — caller must set
-// status explicitly. Archive transitions require exit_reason.
+// status explicitly. Archiving an Active (in-progress) role requires
+// exit_reason; archiving from Saved does not.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.ts';
 import { db } from '../_shared/job-db.ts';
 
-const VERSION = '0.18.0';
-console.log(`[jobs-pipe] v${VERSION} - apply_ease tier fields in listRoles (Easy Apply badge)`);
+const VERSION = '0.19.0';
+console.log(`[jobs-pipe] v${VERSION} - exit_reason required only when archiving Active roles`);
 
 const STATUS_ENUM = new Set(['Saved', 'Active', 'Archive']);
 const STAGE_ENUM  = new Set(['drafting', 'applied', 'interviewing', 'offer']);
@@ -228,11 +229,12 @@ serve(async (req) => {
       let finalStatus = status ?? currentStatus;
       if (hasStage && stage !== null) finalStatus = 'Active';
 
-      // Archive must carry an exit_reason. If transition is going TO
-      // Archive without one, reject. If row already IS Archive, allow
-      // updates that don't touch exit_reason.
-      if (finalStatus === 'Archive' && currentStatus !== 'Archive' && !exitReason) {
-        return err('exit_reason required when archiving', 400);
+      // Archiving an in-progress (Active) role must carry an exit_reason —
+      // the outcome feeds recommendation tuning. Archiving from Saved needs
+      // none (never applied, nothing to record). If row already IS Archive,
+      // allow updates that don't touch exit_reason.
+      if (finalStatus === 'Archive' && currentStatus === 'Active' && !exitReason) {
+        return err('exit_reason required when archiving an in-progress role', 400);
       }
 
       // Stage only valid on Active rows (Saved/Archive carry stage=null), and
