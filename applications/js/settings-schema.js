@@ -72,6 +72,8 @@ const SETTING_DEFS = {
     label: 'Trial decision lands before the end by', unit: 'months', min: 0, max: 6, step: 1,
     hint: 'Enough runway to say yes, or for them to find somewhere else.',
   },
+  /* update_email_default retired 2026-08-21: the per-decision "Send them an
+     update" offer is gone — rejections queue for bulk sends instead. */
 
   /* --- Move-in ----------------------------------------------------------- *
    * Everything the welcome email, the agreement, and the day-of email merge
