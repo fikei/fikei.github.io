@@ -26,6 +26,7 @@
 export const KINDS: Record<string, { icon: string; label: string }> = {
   // The backlog.
   application_new:        { icon: '📥', label: 'New application' },
+  application_updated:    { icon: '✍️', label: 'Application updated' },
   review_stalled:         { icon: '⏳', label: 'Waiting on a review' },
   review_backlog:         { icon: '📚', label: 'Inbox backlog' },
   needs_input:            { icon: '🙋', label: 'Second read wanted' },
@@ -88,6 +89,8 @@ export const TEMPLATES: Record<string, string> = {
   // --- applicants
   'application_new':              '{subject} applied for {track}.',
   'application_new.timed':        '{subject} applied for {track}, {timing}.',
+  'application_new.again':        '{subject} applied again for {track} — you may remember them from an earlier round.',
+  'application_updated':          '{subject} updated their application.',
   'review_stalled':               '{subject} has been waiting {days} for review.',
   'review_backlog':               '{subject} are waiting for reviews, {window} days.',
   'needs_input':                  '{asker} wants second opinon on {subject}.',
@@ -174,6 +177,8 @@ export const TEMPLATES: Record<string, string> = {
 export const PROMPTS: Record<string, string> = {
   application_new:
     'Know them? Reply here with what you know, or [read their application]({url}).',
+  application_updated:
+    'Worth another look? Reply here, or [read their application]({url}).',
   needs_input:
     'Reply here with your read, or [open the application]({url}).',
   candidate_placed:

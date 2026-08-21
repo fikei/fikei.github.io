@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.81.0';
+const VERSION = '3.82.0';
 console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -1909,6 +1909,7 @@ const ACTIVITY_KINDS = {
   screening_today:        { icon: '📞', label: 'Call today' },
   screening_notes:        { icon: '📝', label: 'Recording ready' },
   screening_followup:     { icon: '⌛', label: 'Owed an answer' },
+  application_updated:    { icon: '✍️', label: 'Application updated' },
   candidate_placed:       { icon: '✅', label: 'Passed review' },
   candidate_parked:       { icon: '🚧', label: 'No room fits yet' },
   decision_open:          { icon: '📊', label: 'Decision open' },
@@ -4033,7 +4034,7 @@ function stayTransitionsHtml(s) {
     }
     parts.push(`<button type="button" class="drawer-cta__alt" data-s2t-open="${s.id}">
       <span>Add resident trial</span>
-      <span class="drawer-cta__exit-hint">they're staying to try for residency — the trial starts when the sublet ends</span>
+      <span class="drawer-cta__exit-hint">they're staying to try for residency — you pick the start date; it defaults to when the sublet ends</span>
     </button>`);
   }
 
