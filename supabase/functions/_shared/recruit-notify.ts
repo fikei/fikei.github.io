@@ -371,86 +371,133 @@ export async function resetPending(db: DB, kind: string, subjectId: string): Pro
 /* A1 — new application. Already posted by recruit-gmail's scan; this records
    the ledger row so the log has it too. Keyed on discord_ping_at, which the
    scan stamps, so the log picks up exactly what was announced. */
-async function detectNewApplications(db: DB): Promise<Notification[]> {
-  const since = new Date(Date.now() - 3 * 86400000).toISOString()
-  const { data } = await db.from('recruit_applicants')
-    .select('id, first_name, last_name, residency, move_in, discord_ping_at')
-    .not('discord_ping_at', 'is', null).gte('discord_ping_at', since)
-  return (data || []).map((a: Record<string, string>) => ({
-    kind: 'application_new',
-    subject_type: 'applicant' as const,
-    subject_id: a.id,
-    subject_label: a.first_name,
-    lane: 'now' as const,
-    dedupe_key: `application_new:${a.id}`,
-    payload: {
-      // The kind's label already says "New application" — the title is just
-      // who, and the body is the two facts that decide whether to read on.
-      title: `${a.first_name} ${a.last_name || ''}`.trim(),
-      copy: moveInClause(a.move_in) ? 'application_new.timed' : 'application_new',
-      vars: {
-        subject: fullName(a),
-        track: /short/i.test(a.residency || '') ? 'a sublet' : 'a full-time room',
-        timing: moveInClause(a.move_in),
-      },
-      section: 'New applications',
-      links: [{ label: ACTIONS.review, url: applicantLink(a.id) }],
-    },
-    // recruit-gmail's scan already posted this one; the row is the log entry.
-    already_broadcast: true,
-  }))
+/* The stated budget's ceiling, as a number, or null when nothing parses.
+   Mirrors the client's budgetMax closely enough for a notification — this
+   feeds a "could fit" hint and the $1,500 floor check, never a decision. */
+function budgetCeiling(raw: string | null | undefined): number | null {
+  const nums = [...String(raw || '').matchAll(/\$?\s?(\d{1,2}[,.]\d{3}|\d{3,5})/g)]
+    .map((m) => Number(m[1].replace(/[,.]/, '')))
+    .filter((n) => n >= 200 && n <= 20000)
+  return nums.length ? Math.max(...nums) : null
 }
 
-/* A2 — waiting on a review. One read decides under the v3.40 model, so this is
-   never "waiting on a quorum"; it is waiting on one person, any person.
-   Escalates at 5 days into its own notification in #recruiting-automation,
-   whose members are on-call.
+/* "Could fit Priest — resident trial from Sep 1", or null. Track must match
+   and the stated budget must cover the rent when both are known. Move-in
+   timing is left to humans — a wrong "fits" claim is worse than none. */
+// deno-lint-ignore no-explicit-any
+function listingFitLine(a: any, openListings: any[], roomName: Map<number, string>): string | null {
+  const wantsSublet = /short/i.test(a.residency || '')
+  const ceiling = budgetCeiling(a.budget)
+  const fit = openListings.find((l) => {
+    if ((l.kind === 'sublet') !== wantsSublet) return false
+    const rent = l.rent_monthly
+    return ceiling === null || rent == null || ceiling >= rent
+  })
+  if (!fit) return null
+  return `could fit ${roomName.get(fit.room_id) || 'a room'} — ${
+    fit.kind === 'resident' ? 'resident trial' : 'sublet'} from ${fmtDay(String(fit.starts_on))}`
+}
 
-   The clock is COALESCE(discord_ping_at, submitted_at), NOT the ping alone.
-   Keying on the ping was wrong in a way only the live data showed: 50 of the 53
-   applications sitting in review were never pinged at all (the ping's 14-day
-   floor exists so switching it on wouldn't dump the backlog), so a
-   ping-keyed detector would have reported "nothing waiting" while 53
-   applications waited. Nobody having been told is worse than having been told
-   and ignored, not better.
+async function openListingsWithRooms(db: DB): Promise<{ open: any[]; roomName: Map<number, string> }> {
+  const [{ data: listings }, { data: rooms }] = await Promise.all([
+    db.from('recruit_listings').select('id, room_id, kind, starts_on, rent_monthly').eq('status', 'open'),
+    db.from('recruit_rooms').select('id, name, rent_monthly'),
+  ])
+  const rentByRoom = new Map((rooms || []).map((r: any) => [r.id, r.rent_monthly]))
+  const open = (listings || []).map((l: any) => ({ ...l, rent_monthly: l.rent_monthly ?? rentByRoom.get(l.room_id) }))
+  return { open, roomName: new Map((rooms || []).map((r: any) => [r.id, r.name])) }
+}
 
-   The 30-day window is what keeps that honest without flooding: an application
-   from March is not a notification, it is backlog, and it gets one counted line
-   from detectReviewBacklog instead of fifty rows. */
-const REVIEW_RECENT_DAYS = 30
-
-async function detectReviewStalled(db: DB): Promise<Notification[]> {
-  const { data: pending } = await db.from('recruit_applicants')
-    .select('id, first_name, last_name, submitted_at, discord_ping_at')
+async function detectNewApplications(db: DB): Promise<Notification[]> {
+  const since = new Date(Date.now() - 3 * 86400000).toISOString()
+  // Two doors in: the ping (ingest/scan) for first-timers, and a fresh
+  // submitted_at for re-applications — a reapply keeps its old ping, so the
+  // ping alone would stay silent exactly when "they're back" matters most.
+  const { data } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name, residency, move_in, discord_ping_at, submitted_at, created_at')
     .eq('stage', 'review')
-    .gte('submitted_at', new Date(Date.now() - REVIEW_RECENT_DAYS * 86400000).toISOString())
-  if (!pending?.length) return []
-  const { data: voted } = await db.from('recruit_votes')
-    .select('applicant_id').in('applicant_id', pending.map((a: { id: string }) => a.id))
-  const hasVote = new Set((voted || []).map((v: { applicant_id: string }) => v.applicant_id))
+    .or(`discord_ping_at.gte.${since},submitted_at.gte.${since}`)
+  if (!data?.length) return []
+  const { open, roomName } = await openListingsWithRooms(db)
+
+  // "Previously mentioned in this chat" is literal: a prior card exists for
+  // them from before this submission.
+  const { data: prior } = await db.from('recruit_notifications')
+    .select('subject_id, created_at').eq('kind', 'application_new')
+    .in('subject_id', data.map((a: { id: string }) => a.id))
+  const priorAt = new Map<string, string>()
+  for (const p of prior || []) {
+    if (!priorAt.has(p.subject_id) || p.created_at < priorAt.get(p.subject_id)!) priorAt.set(p.subject_id, p.created_at)
+  }
+
+  return data.map((a: Record<string, string>) => {
+    const submitted = String(a.submitted_at || '')
+    const isRepeat = !!priorAt.get(a.id) && priorAt.get(a.id)! < new Date(new Date(submitted || Date.now()).getTime() - 2 * 86400000).toISOString()
+    const fit = listingFitLine(a, open, roomName)
+    return {
+      kind: 'application_new',
+      subject_type: 'applicant' as const,
+      subject_id: a.id,
+      subject_label: a.first_name,
+      lane: 'now' as const,
+      // The stable key keeps first-time cards from ever doubling; a repeat is
+      // a new fact, so its key carries the submission date and fires again.
+      dedupe_key: isRepeat ? `application_new:${a.id}:${submitted.slice(0, 10)}` : `application_new:${a.id}`,
+      payload: {
+        // The kind's label already says "New application" — the title is just
+        // who, and the body is the facts that decide whether to read on.
+        title: `${a.first_name} ${a.last_name || ''}`.trim(),
+        copy: isRepeat ? 'application_new.again'
+          : moveInClause(a.move_in) ? 'application_new.timed' : 'application_new',
+        vars: {
+          subject: fullName(a),
+          track: /short/i.test(a.residency || '') ? 'a sublet' : 'a full-time room',
+          timing: moveInClause(a.move_in),
+        },
+        body: fit || undefined,
+        section: 'New applications',
+        links: [{ label: ACTIONS.review, url: applicantLink(a.id) }],
+      },
+      // recruit-gmail's scan already posted this one; the row is the log entry.
+      already_broadcast: true,
+    }
+  })
+}
+
+/* A1b — an application edited while it sits in review, surfaced ONLY when the
+   edit is material: it now fits an open listing (which also means the stated
+   budget clears the $1,500 floor). Keyed on self_updated_at (migration 177),
+   which only the applicant's own session stamps — a recruiter tidying a phone
+   number is not "they updated their application". */
+async function detectApplicationUpdated(db: DB): Promise<Notification[]> {
+  const since = new Date(Date.now() - 3 * 86400000).toISOString()
+  const { data } = await db.from('recruit_applicants')
+    .select('id, first_name, last_name, residency, move_in, budget, submitted_at, self_updated_at')
+    .eq('stage', 'review').eq('is_submitted', true)
+    .gte('self_updated_at', since)
+    .lt('submitted_at', since)   // a fresh submission is the new-application card's story
+  if (!data?.length) return []
+  const { open, roomName } = await openListingsWithRooms(db)
 
   const out: Notification[] = []
-  for (const a of pending) {
-    if (hasVote.has(a.id)) continue
-    const knownAt = new Date(a.discord_ping_at || a.submitted_at).getTime()
-    const days = Math.floor((Date.now() - knownAt) / 86400000)
-    if (days < 2) continue   // 48h of grace before it counts as stalled
-    // Two steps, two dedupe keys: the daily digest line, then the escalation.
-    // The escalation is a second notification, not a repeat of the first.
-    const step = days >= 5 ? 'escalated' : 'waiting'
+  for (const a of data) {
+    const ceiling = budgetCeiling(a.budget)
+    if (ceiling !== null && ceiling < 1500) continue   // still under the house floor
+    const fit = listingFitLine(a, open, roomName)
+    if (!fit) continue                                 // not material — stay quiet
     out.push({
-      kind: 'review_stalled',
+      kind: 'application_updated',
       subject_type: 'applicant',
       subject_id: a.id,
       subject_label: a.first_name,
-      audience: step === 'escalated' ? 'oncall' : 'house',
-      lane: step === 'escalated' ? 'now' : 'daily',
-      dedupe_key: `review_stalled:${a.id}:${step}`,
+      lane: 'now',
+      dedupe_key: `application_updated:${a.id}:${String(a.self_updated_at).slice(0, 10)}`,
       payload: {
         title: `${a.first_name} ${a.last_name || ''}`.trim(),
-        copy: 'review_stalled',
-        vars: { subject: fullName(a), days: plural(days, 'day') },
-        section: 'Needs a review',
+        copy: 'application_updated',
+        vars: { subject: fullName(a) },
+        body: fit,
+        section: 'New applications',
         links: [{ label: ACTIONS.review, url: applicantLink(a.id) }],
       },
     })
@@ -458,45 +505,12 @@ async function detectReviewStalled(db: DB): Promise<Notification[]> {
   return out
 }
 
-/* A2b — the review backlog, as one number. Applications older than the
-   stalled-window that nobody has ever reviewed. Fifty of these exist right now,
-   and fifty notifications would bury everything else in the log on day one — so
-   the backlog is a single weekly line carrying the count, keyed on the ISO week
-   so it says its piece once and waits.
-
-   subject_type 'house': it is not about any one applicant. Clicking through
-   goes to the Inbox, where they already sit. */
-async function detectReviewBacklog(db: DB): Promise<Notification[]> {
-  const floor = new Date(Date.now() - REVIEW_RECENT_DAYS * 86400000).toISOString()
-  const { data: old } = await db.from('recruit_applicants')
-    .select('id').eq('stage', 'review').lt('submitted_at', floor)
-  if (!old?.length) return []
-  const { data: voted } = await db.from('recruit_votes')
-    .select('applicant_id').in('applicant_id', old.map((a: { id: string }) => a.id))
-  const hasVote = new Set((voted || []).map((v: { applicant_id: string }) => v.applicant_id))
-  const n = old.filter((a: { id: string }) => !hasVote.has(a.id)).length
-  if (!n) return []
-
-  // ISO week key: one mention per week however the count moves.
-  const d = new Date()
-  const thursday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3))
-  const week = Math.ceil(((thursday.getTime() - Date.UTC(thursday.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
-  return [{
-    kind: 'review_backlog',
-    subject_type: 'house',
-    subject_id: null,
-    subject_label: 'Inbox backlog',
-    lane: 'weekly',
-    dedupe_key: `review_backlog:${thursday.getUTCFullYear()}-W${week}`,
-    payload: {
-      title: `${plural(n, 'application')}`,
-      copy: 'review_backlog',
-      vars: { subject: plural(n, 'application'), window: REVIEW_RECENT_DAYS },
-      section: 'Backlog',
-      links: [{ label: ACTIONS.inbox, url: viewLink('inbox') }],
-    },
-  }]
-}
+/* No "waiting N days for review" detector, and no weekly backlog count —
+   both retired 2026-08-21 by Ian's call. The nag trained the channel to
+   scroll past the bot; the two application cards above (new / updated, each
+   carrying a "could fit" line) are the signal worth reading. Old
+   review_stalled / review_backlog rows still render in Activity via their
+   copy entries. */
 
 /* No "update email owed" detector, deliberately.
    An earlier draft chased the house for an update email to everyone rejected or
@@ -1682,8 +1696,7 @@ async function detectTrialVotes(db: DB): Promise<Notification[]> {
 function detectors(db: DB): Array<[string, () => Promise<Notification[]>]> {
   return [
     ['application_new', () => detectNewApplications(db)],
-    ['review_stalled', () => detectReviewStalled(db)],
-    ['review_backlog', () => detectReviewBacklog(db)],
+    ['application_updated', () => detectApplicationUpdated(db)],
     ['opening_at_risk', () => detectOpeningsAtRisk(db)],
     ['room_emptying', () => detectRoomsEmptying(db)],
     // Phase 2 — the active candidate's own journey.
@@ -1768,9 +1781,13 @@ function oneLine(n: LineRow): string {
   const url = n.payload?.links?.[0]?.url
   const subject = url ? `[${who}](${url})` : who
   const sentence = n.payload?.sentence
+  // The body is the detector's second fact ("could fit Priest — resident
+  // trial from Sep 1", "2 onboarding items to tick") — it rides the same
+  // card instead of living only in the Activity log.
+  const tail = n.payload?.body ? ` *${n.payload.body}.*` : ''
   // Older rows (and any detector that forgets a sentence) still read sensibly.
   if (!sentence) return `${icon(n.kind)} **${label(n.kind)}** · ${subject}`
-  return `${icon(n.kind)} ${sentence.replace('{}', subject)}`
+  return `${icon(n.kind)} ${sentence.replace('{}', subject)}${tail}`
 }
 
 /* The log's Discord half: every row, unbatched, muted or not. Runs before the

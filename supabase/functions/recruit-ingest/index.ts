@@ -20,7 +20,7 @@
 // slugs ("jane-doe", "jane-doe-2" on duplicate names); each row also gets a
 // stable uuid from the DB default (migration 159).
 
-const VERSION = '1.7.2'
+const VERSION = '1.7.3'
 console.log(`[recruit-ingest] v${VERSION} — application sheet → recruit_applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
