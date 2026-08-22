@@ -1,5 +1,10 @@
 // Shared: the recruiting notification ledger — detect, log, broadcast.
 //
+// Program listings (migration 178, listing_type != 'room') are excluded from
+// every room-listing detector — the residency has its own surfaces and would
+// otherwise trigger opening-at-risk / draft / no-qualifier / filled-without-
+// stay noise and wrongly suppress rooms-emptying nags.
+//
 // Phase 2 adds the active candidate's own journey (needs_input, placement
 // landing, the three call moments, the decision clock, promotion) alongside
 // Phase 1's backlog detectors. Every line is one prose sentence with the
@@ -400,7 +405,7 @@ function listingFitLine(a: any, openListings: any[], roomName: Map<number, strin
 
 async function openListingsWithRooms(db: DB): Promise<{ open: any[]; roomName: Map<number, string> }> {
   const [{ data: listings }, { data: rooms }] = await Promise.all([
-    db.from('recruit_listings').select('id, room_id, kind, starts_on, rent_monthly').eq('status', 'open'),
+    db.from('recruit_listings').select('id, room_id, kind, starts_on, rent_monthly').eq('status', 'open').eq('listing_type', 'room'),
     db.from('recruit_rooms').select('id, name, rent_monthly'),
   ])
   const rentByRoom = new Map((rooms || []).map((r: any) => [r.id, r.rent_monthly]))
@@ -527,7 +532,7 @@ async function detectApplicationUpdated(db: DB): Promise<Notification[]> {
 async function detectOpeningsAtRisk(db: DB): Promise<Notification[]> {
   const { data } = await db.from('recruit_listings')
     .select('id, room_id, kind, starts_on, status, rent_monthly')
-    .eq('status', 'open').lte('starts_on', ptPlusDays(21))
+    .eq('status', 'open').eq('listing_type', 'room').lte('starts_on', ptPlusDays(21))
   if (!data?.length) return []
   const { data: rooms } = await db.from('recruit_rooms').select('id, name')
   const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
@@ -575,7 +580,7 @@ async function detectRoomsEmptying(db: DB): Promise<Notification[]> {
     db.from('recruit_rooms').select('id, name').in('id', roomIds),
     db.from('recruit_stays').select('room_id, starts_on, ends_on').in('room_id', roomIds),
     db.from('recruit_listings').select('room_id, status, starts_on').in('room_id', roomIds)
-      .in('status', ['draft', 'open', 'filled']),
+      .in('status', ['draft', 'open', 'filled']).eq('listing_type', 'room'),
   ])
   const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
 
@@ -1235,7 +1240,7 @@ async function detectMoveInDay(db: DB): Promise<Notification[]> {
 async function detectDraftListings(db: DB): Promise<Notification[]> {
   const { data } = await db.from('recruit_listings')
     .select('id, room_id, kind, starts_on, status, source, created_at')
-    .eq('status', 'draft')
+    .eq('status', 'draft').eq('listing_type', 'room')
   if (!data?.length) return []
   const { data: rooms } = await db.from('recruit_rooms').select('id, name')
   const roomName = new Map((rooms || []).map((r: { id: number; name: string }) => [r.id, r.name]))
@@ -1316,7 +1321,7 @@ async function detectNoQualifiers(db: DB): Promise<Notification[]> {
   const week = new Date(Date.now() - 7 * 86400000).toISOString()
   const { data: open } = await db.from('recruit_listings')
     .select('id, room_id, kind, starts_on, ends_on, rent_monthly, created_at')
-    .eq('status', 'open').lte('created_at', week)
+    .eq('status', 'open').eq('listing_type', 'room').lte('created_at', week)
   if (!open?.length) return []
 
   const [{ data: placements }, { data: candidates }, { data: rooms }] = await Promise.all([
@@ -1378,7 +1383,7 @@ async function detectNoQualifiers(db: DB): Promise<Notification[]> {
 async function detectFilledWithoutStay(db: DB): Promise<Notification[]> {
   const { data: filled } = await db.from('recruit_listings')
     .select('id, room_id, starts_on, ends_on, status')
-    .eq('status', 'filled')
+    .eq('status', 'filled').eq('listing_type', 'room')
   if (!filled?.length) return []
   const [{ data: stays }, { data: rooms }] = await Promise.all([
     db.from('recruit_stays').select('room_id, starts_on, ends_on'),
