@@ -8,8 +8,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const VERSION = '1.2.0'
-console.log(`[generate-podcast] v${VERSION} - ElevenLabs v3 with audio tags, disfluency, cross-talk`)
+const VERSION = '1.2.1'
+console.log(`[generate-podcast] v${VERSION} - migrate to claude-sonnet-4-6 (Sonnet 4 retired)`)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -421,7 +421,7 @@ Respond ONLY with the JSON objects, one per line, no other text.`
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] }),
   })
   console.log(`[Stage 2] Claude response: ${res.status} (${Date.now() - t0}ms)`)
 
@@ -516,7 +516,7 @@ Respond with a JSON array:
   const structureRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, messages: [{ role: 'user', content: structurePrompt }] }),
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2048, messages: [{ role: 'user', content: structurePrompt }] }),
   })
   console.log(`[Stage 3a] Claude response: ${structureRes.status} (${Date.now() - t1}ms)`)
 
@@ -598,7 +598,7 @@ Respond with ONLY a JSON array of transcript cues:
   const scriptRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 16384, messages: [{ role: 'user', content: scriptPrompt }] }),
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 16384, messages: [{ role: 'user', content: scriptPrompt }] }),
   })
   console.log(`[Stage 3b] Claude response: ${scriptRes.status} (${Date.now() - t2}ms)`)
 
@@ -767,7 +767,7 @@ async function generateTitle(topic: string, mode: string, transcript: Transcript
       method: 'POST',
       headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 100,
         messages: [{ role: 'user', content: `Generate ${modeHint[mode] ?? 'a compelling podcast episode headline'} (5-10 words) for a topic about "${topic}". The episode discusses: ${preview}
 
@@ -813,7 +813,7 @@ async function generateDescription(topic: string, mode: string, transcript: Tran
       method: 'POST',
       headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 200,
         messages: [{ role: 'user', content: `Write a 2-3 sentence episode description for ${modeHint[mode] ?? 'a podcast episode'} about "${topic}".
 
