@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const VERSION = '0.6.0'
-console.log(`[taste-graph] v${VERSION} - story-length descriptions, parallel calls`)
+const VERSION = '0.6.1'
+console.log(`[taste-graph] v${VERSION} - migrate to claude-sonnet-4-6 (Sonnet 4 retired)`)
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 
@@ -57,7 +57,7 @@ function parseJSON(text: string): unknown {
   return JSON.parse(cleaned)
 }
 
-async function callAnthropic(prompt: string, maxTokens: number, model = 'claude-sonnet-4-20250514'): Promise<string> {
+async function callAnthropic(prompt: string, maxTokens: number, model = 'claude-sonnet-4-6'): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {

@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.0';
-console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
+const VERSION = '3.85.4';
+console.log(`[applications] v${VERSION} - cache Discord gate verdict, skip cold-boot wait`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -165,7 +165,8 @@ let activityError = null;
 let activityFilter = { kind: 'all', open: false };
 let activityOpenCount = 0;    // unresolved notifications, for the rail badge
 let view = 'inbox';           // current rail view
-let filters = { track: 'all', month: 'any', budget: 'any' }; // shared across applicant views
+let filters = { track: 'all', program: 'all', month: 'any', budget: 'any' }; // shared across applicant views
+let programSort = 'newest';   // 'newest' or 'score' for DJ program applicants
 let rooms = [];               // recruit_rooms, in-pool only — what the funnel places into
 let allRooms = [];            // every room including shared spaces, for costs/details
 let stays = [];               // recruit_stays rows (date-based tenures)
@@ -790,6 +791,16 @@ async function loadAll() {
     updateSentAt: r.update_email_sent_at, updateSkippedAt: r.update_email_skipped_at,
     exitReason: r.exit_reason || null, exitUntil: r.exit_until || null,
     exitNote: r.exit_note || '', exitBy: r.exit_by_name || null,
+    // DJ program fields
+    listingId: r.listing_id || null, artistName: r.artist_name || '', mixLinks: r.mix_links || '',
+    soundEssay: r.sound_essay || '', performanceHistory: r.performance_history || '',
+    gearNotes: r.gear_notes || '', basedIn: r.based_in || '',
+    paymentStatus: r.payment_status || null, paidAt: r.paid_at || null,
+    scoreCredentials: r.score_credentials || null, scoreSound: r.score_sound || null,
+    scoreFit: r.score_fit || null, scoreLogistics: r.score_logistics || null,
+    scoreExcitement: r.score_excitement || null, scoreTotal: r.score_total || null,
+    scoreNotes: r.score_notes || '', scoredAt: r.scored_at || null,
+    flagForReview: r.flag_for_review || false,
   }));
   decisions = {};
   for (const d of (dRes.data || [])) {
@@ -851,6 +862,8 @@ const monthShift = (ym, n) => {
 
 function qualifiesFor(a, l) {
   if (l.status !== 'open') return false;
+  // Program applicants don't qualify for housing listings
+  if (a.listingId) return false;
   // 'Either' applicants qualify for both listing kinds.
   if (l.kind === 'sublet' ? !isSublet(a) : (isSublet(a) && !wantsBoth(a))) return false;
   const bm = budgetMax(a.budget);
@@ -916,7 +929,8 @@ async function syncAutoPlacements() {
   // their date lands, so they're excluded here as well as in matchesView.
   // Booked people (a live trial or sublet) are off the board too — the room
   // question is answered; the calendar owns them now.
-  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason && !liveStayFor(x.id))) {
+  // Program applicants are never auto-placed — they're manually promoted.
+  for (const a of applicants.filter(x => x.stage === 'candidate' && !x.exitReason && !liveStayFor(x.id) && !x.listingId)) {
     // One listing each. Someone already placed is left alone — the sweep
     // must never yank a person out from under whoever is working them.
     if (activePlacements(a.id).length) continue;
@@ -1575,17 +1589,27 @@ function setView(next, push = true) {
   render();
 }
 
+/* The page-head action for the current view. One source of truth — render()
+   sets it and renderApplicants() re-sets it (the score button comes and goes
+   with the residency filter), so both must draw from here. */
+function headActionHtml() {
+  const score = view === 'inbox' && filters.program === 'dj'
+    ? `<button class="btn btn--accent" id="score-inbox-btn" title="Score up to 10 unscored applicants using AI">Score inbox</button>`
+    : '';
+  const base = view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>`
+    // Referrals and walk-ins that never touched the application form.
+    : view === 'inbox' || view === 'candidates'
+      ? `<button class="btn btn--sm" data-add-person="${view === 'candidates' ? 'candidate' : 'review'}">Add person</button>`
+    : '';
+  return score + base;
+}
+
 async function render() {
   const def = VIEWS[view];
   document.getElementById('page-title').textContent = def.title;
   document.getElementById('mobile-title').textContent = def.title;
   const headAction = document.getElementById('page-head-action');
-  if (headAction) headAction.innerHTML =
-    view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>`
-    // Referrals and walk-ins that never touched the application form.
-    : view === 'inbox' || view === 'candidates'
-      ? `<button class="btn btn--sm" data-add-person="${view === 'candidates' ? 'candidate' : 'review'}">Add person</button>`
-    : '';
+  if (headAction) headAction.innerHTML = headActionHtml();
   document.querySelectorAll('[data-view-link]').forEach(el =>
     el.classList.toggle('is-current', el.dataset.viewLink === view
       && (el.classList.contains('rail-nav__row') || el.classList.contains('rail-foot__settings'))));
@@ -2199,6 +2223,8 @@ function budgetBucket(a) {
 }
 
 function matchesFilters(a) {
+  if (filters.program === 'housing' && a.listingId) return false;
+  if (filters.program === 'dj' && !a.listingId) return false;
   if (filters.track === 'fulltime' && isSublet(a) && !wantsBoth(a)) return false;
   if (filters.track === 'sublet' && !isSublet(a)) return false;
   if (filters.month !== 'any' && moveInBucket(a) !== filters.month) return false;
@@ -2212,16 +2238,22 @@ function renderFilterBar(viewList) {
   monthsPresent.sort((x, y) => MONTH_ABBR.indexOf(x) - MONTH_ABBR.indexOf(y));
   const monthDefs = [['any', 'Any move-in'], ...monthsPresent.map(m => [m, m]), ['flex', 'Flexible']];
   const groups = [
+    ...(view === 'inbox' || view === 'candidates' ? [['program', [['all', 'All'], ['housing', 'Housing'], ['dj', 'Artist residency']]]] : []),
     ['track', [['all', 'Everyone'], ['fulltime', 'Full-time'], ['sublet', 'Sublet']]],
     ['month', monthDefs],
     ['budget', [['any', 'Any budget'], ['lt2000', 'Under $2k'], ['mid', '$2k–2.5k'], ['gt2500', '$2.5k+']]],
   ];
-  const active = filters.track !== 'all' || filters.month !== 'any' || filters.budget !== 'any';
+  const active = filters.program !== 'all' || filters.track !== 'all' || filters.month !== 'any' || filters.budget !== 'any';
+  const sortHtml = view === 'inbox' && filters.program === 'dj' ? `<span class="filters__group">
+    <button class="chip ${programSort === 'newest' ? 'is-on' : ''}" data-psort="newest">Newest</button>
+    <button class="chip ${programSort === 'score' ? 'is-on' : ''}" data-psort="score">Score</button>
+  </span>` : '';
   return `<div class="filters">
     ${groups.map(([key, defs]) => `<span class="filters__group">
       ${defs.map(([id, label]) =>
         `<button class="chip ${filters[key] === id ? 'is-on' : ''}" data-fkey="${key}" data-fval="${id}">${label}</button>`).join('')}
     </span>`).join('<span class="filters__sep"></span>')}
+    ${sortHtml ? `<span class="filters__sep"></span>${sortHtml}` : ''}
     ${active ? `<button class="chip chip--clear" data-fclear>Clear</button>` : ''}
   </div>`;
 }
@@ -2301,6 +2333,12 @@ function screeningChip(a) {
   // "Availability received" — describing a state two steps in the past.
   if (phase === 'done') return `<span class="decision-chip decision-chip--vote" title="The call happened${sc.with ? ` with ${sc.with}` : ''} — no recording was captured">Call done · no recording</span>`;
   return `<span class="decision-chip decision-chip--vote">Availability received</span>`;
+}
+
+/* Score chip for program applicants, display-only AI first pass. */
+function scoreChip(a) {
+  if (!a.listingId || !a.scoredAt) return '';
+  return `<span class="decision-chip decision-chip--vote" title="AI first pass: display only">${a.scoreTotal || '—'}/25</span>`;
 }
 
 /* Playback-speed row for a <video>. Browsers bury speed in a menu (and iOS
@@ -2685,7 +2723,7 @@ function bookedChip(a) {
 }
 
 function rowBadge(a) {
-  if (view === 'inbox') return voteChip(a);
+  if (view === 'inbox') return scoreChip(a) || voteChip(a);
   // Archive carries two facts: which kind of no, and whether they've been
   // told. The email chip only earns its place when an email is actually
   // owed or sent — "opted out · Archived" is noise.
@@ -2703,6 +2741,14 @@ function renderApplicants() {
   flushPendingExits();
   const viewList = applicants.filter(matchesView);
   const list = viewList.filter(matchesFilters);
+  // Sort DJ program applicants by score when requested
+  if (filters.program === 'dj' && programSort === 'score') {
+    list.sort((a, b) => {
+      const aScore = a.scoreTotal || 0;
+      const bScore = b.scoreTotal || 0;
+      return bScore - aScore;  // descending
+    });
+  }
   const filtered = list.length !== viewList.length;
   // Openings leads with the rooms (same number the rail badges); people are
   // the second fact. Everywhere else the count IS the people.
@@ -2714,9 +2760,14 @@ function renderApplicants() {
     (view === 'inbox' ? ' waiting on a review · one read decides' :
      view === 'candidates' ? ' passed review — waiting for a room' : '');
 
+  // The score button comes and goes with the residency filter; keep the
+  // view's own action (New listing / Add person) alongside it.
+  const pageAction = document.getElementById('page-head-action');
+  if (pageAction) pageAction.innerHTML = headActionHtml();
+
   const host = document.getElementById('view-root');
   host.className = 'inbox';
-  const bar = view === 'inbox' || view === 'openings' ? '' : renderFilterBar(viewList); // inbox + openings stay clean
+  const bar = view === 'openings' ? '' : renderFilterBar(viewList); // inbox now has DJ program filter; openings stays clean
   if (!list.length) {
     host.innerHTML = bar + `<p class="inbox-empty">${filtered ? 'No applicants match these filters.' : (view === 'inbox' ? 'All caught up — every application has its votes.' : 'Nothing here yet.')}</p>`;
     return;
@@ -2747,15 +2798,23 @@ function renderApplicants() {
       groups.push({ key, items });
     }
   } else {
-    for (const a of list) {
-      const k = monthKey(a.ts_iso);
-      if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
-      groups[groups.length - 1].items.push(a);
+    // When sorting DJ program by score, show as one group sorted by score
+    if (filters.program === 'dj' && programSort === 'score') {
+      groups.push({ key: 'dj-program', items: list });
+    } else {
+      for (const a of list) {
+        const k = monthKey(a.ts_iso);
+        if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
+        groups[groups.length - 1].items.push(a);
+      }
     }
   }
 
   const groupHead = g => {
-    if (view !== 'openings') return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
+    if (view !== 'openings') {
+      if (g.key === 'dj-program') return `<h2 class="inbox-group__label">Residency applicants</h2>`;
+      return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
+    }
     const l = listings.find(x => x.id === g.key);
     if (!l) return `<h2 class="inbox-group__label">Listing removed</h2>`;
     const room = rooms.find(r => r.id === l.room_id);
@@ -4802,43 +4861,77 @@ function listingWindow(l) {
 
 function listingForm(l) {
   const isNew = !l.id;
+  const isProgram = l.listing_type && l.listing_type !== 'room';
+  const feeInDollars = (l.fee_cents || 0) / 100;
   return `<form class="listing-form" data-listing-form="${l.id || 'new'}">
     <div class="listing-form__grid">
-      <label class="listing-form__field">Room
+      <label class="listing-form__field">Listing type
+        <select name="listing_type" class="listing-status" data-listing-type>
+          <option value="room" ${!isProgram ? 'selected' : ''}>Room (housing)</option>
+          <option value="dj_residency" ${isProgram ? 'selected' : ''}>Artist residency</option>
+        </select>
+      </label>
+      <label class="listing-form__field">Room${isProgram ? ' (pegged for occupancy)' : ''}
         <select name="room_id" class="listing-status">${rooms.map(r =>
           `<option value="${r.id}" ${+l.room_id === r.id ? 'selected' : ''}>${esc(r.name)}${r.resident ? ` — ${esc(r.resident)}` : ''}</option>`).join('')}</select>
       </label>
-      <label class="listing-form__field">Type
+      ${isProgram ? '' : `<label class="listing-form__field">Type
         <select name="kind" class="listing-status">
           <option value="sublet" ${l.kind !== 'resident' ? 'selected' : ''}>Sublet (≤ 3 months)</option>
           <option value="resident" ${l.kind === 'resident' ? 'selected' : ''}>Resident (3-month trial)</option>
         </select>
-      </label>
-      <label class="listing-form__field">Opens
+      </label>`}
+      ${isProgram ? `<label class="listing-form__field">Public name
+        <input type="text" name="title" class="listing-status" value="${esc(l.title || '')}" maxlength="200" placeholder="DJ Residency" required>
+      </label>` : ''}
+      <label class="listing-form__field">${isProgram ? 'Begins' : 'Opens'}
         <input type="date" name="starts_on" class="listing-status" value="${l.starts_on || ''}" required>
       </label>
-      <label class="listing-form__field">Sublet ends
+      ${isProgram ? '' : `<label class="listing-form__field">Sublet ends
         <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}"
           min="${l.starts_on || ''}" ${l.kind === 'resident' ? 'disabled title="Resident trials have no sublet end date"' : ''}>
-      </label>
-      <label class="listing-form__field">Rent / mo
+      </label>`}
+      ${isProgram ? `<label class="listing-form__field">Ends
+        <input type="date" name="ends_on" class="listing-status" value="${l.ends_on || ''}" min="${l.starts_on || ''}">
+      </label>` : ''}
+      ${isProgram ? `<label class="listing-form__field">Capacity
+        <input type="number" name="capacity" class="listing-status" min="1" max="100" value="${l.capacity || 1}">
+      </label>` : ''}
+      ${!isProgram ? `<label class="listing-form__field">Rent / mo
         <input type="number" name="rent_monthly" class="listing-status" min="0" max="10000" step="5" value="${l.rent_monthly ?? ''}" placeholder="1490">
-      </label>
-      <label class="listing-form__field">House dues / mo
+      </label>` : ''}
+      ${!isProgram ? `<label class="listing-form__field">House dues / mo
         <input type="number" name="dues_monthly" class="listing-status" min="0" max="5000" step="5" value="${l.dues_monthly ?? ''}" placeholder="0">
-      </label>
-      <label class="listing-form__field">Groceries / mo
+      </label>` : ''}
+      ${!isProgram ? `<label class="listing-form__field">Groceries / mo
         <input type="number" name="groceries_monthly" class="listing-status" min="0" max="5000" step="5" value="${l.groceries_monthly ?? ''}" placeholder="210">
-      </label>
+      </label>` : ''}
+      ${isProgram ? `<label class="listing-form__field">Application deadline
+        <input type="date" name="application_deadline" class="listing-status" value="${l.application_deadline || ''}">
+      </label>` : ''}
+      ${isProgram ? `<label class="listing-form__field">Fee ($)
+        <input type="number" name="fee_cents" class="listing-status" min="0" max="50000" step="0.01" placeholder="20" value="${feeInDollars || ''}">
+      </label>` : ''}
+      ${isProgram ? `<label class="listing-form__field">Public slug
+        <input type="text" name="public_slug" class="listing-status" value="${esc(l.public_slug || '')}" maxlength="100" placeholder="dj-residency">
+      </label>` : ''}
       <label class="listing-form__field">Status
         <select name="status" class="listing-status">
-          ${['open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'open') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
+          ${isProgram
+            ? ['draft', 'open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'draft') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')
+            : ['open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'open') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
         </select>
       </label>
     </div>
-    <label class="listing-form__field">Notes
+    ${isProgram ? `<label class="listing-form__field">Public description — shown on /apply and the landing page
+      <textarea name="public_blurb" class="notes__input listing-form__notes" rows="3" maxlength="1000">${esc(l.public_blurb || '')}</textarea>
+    </label>` : ''}
+    ${isProgram ? `<label class="listing-form__field">Payment link
+      <input type="url" name="payment_link" class="listing-status" value="${esc(l.payment_link || '')}" maxlength="500" placeholder="https://stripe.com/...">
+    </label>` : ''}
+    ${!isProgram ? `<label class="listing-form__field">Notes
       <textarea name="notes" class="notes__input listing-form__notes" rows="2" maxlength="1000">${esc(l.notes || '')}</textarea>
-    </label>
+    </label>` : ''}
     <p class="listing-form__error" data-form-error></p>
     <div class="drawer-cta">
       ${isNew ? `<div class="drawer-cta__row">
@@ -4846,6 +4939,12 @@ function listingForm(l) {
         <button type="submit" class="btn btn--accent drawer-cta__commit">Create listing</button>
       </div>` : `<p class="drawer-cta__flag" data-save-flag></p>
       <div class="drawer-cta__exits">
+        ${isProgram && l.status === 'draft' ? `<button type="button" class="btn btn--sm" data-listing-status="open" data-listing-id="${l.id}">
+          <span class="drawer-cta__exit-label">Open listing</span>
+        </button>` : ''}
+        ${isProgram && l.status === 'open' ? `<button type="button" class="btn btn--sm" data-listing-status="closed" data-listing-id="${l.id}">
+          <span class="drawer-cta__exit-label">Close listing</span>
+        </button>` : ''}
         <button type="button" class="drawer-cta__exit drawer-cta__exit--danger" data-delete-listing="${l.id}">
           <span class="drawer-cta__exit-label">Delete listing</span>
           <span class="drawer-cta__exit-icon" aria-hidden="true">&times;</span>
@@ -4861,20 +4960,48 @@ function openListingModal(idOrNew) {
   const l = idOrNew === 'new'
     ? { kind: 'sublet', room_id: rooms[0]?.id }
     : listings.find(x => x.id === idOrNew) || {};
+  renderListingModal(idOrNew, l);
+  document.getElementById('listing-modal').hidden = false;
+}
+
+function renderListingModal(idOrNew, l) {
+  const isProgram = l.listing_type && l.listing_type !== 'room';
   const body = document.getElementById('listing-modal-body');
   body.innerHTML = `
     <div class="email-modal__head">
       <h3 class="email-modal__title">${idOrNew === 'new' ? 'New listing' : 'Edit listing'}</h3>
       <button class="review__close email-modal__close" data-cancel-listing aria-label="Close">✕</button>
     </div>
-    <p class="notes__empty">A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial.</p>
+    <p class="notes__empty">${isProgram
+      ? 'An artist residency: name it, describe it, set the window, deadline, and fee. It stays a draft until you open it — then it appears on /apply and the landing page.'
+      : "A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial."}</p>
     ${listingForm(l)}`;
-  document.getElementById('listing-modal').hidden = false;
   const lform = body.querySelector('[data-listing-form]');
   lform.addEventListener('submit', onListingCreate);
   if (lform.dataset.listingForm !== 'new') {
-    lform.addEventListener('change', e => autoSaveListing(lform, e.target.name));
+    lform.addEventListener('change', e => {
+      if (e.target.name === 'listing_type') return; // handled by the re-render below
+      autoSaveListing(lform, e.target.name);
+    });
   }
+  // Switching listing type swaps the whole field set — rebuild the form,
+  // carrying over what both types share and seeding program defaults.
+  lform.querySelector('[data-listing-type]').addEventListener('change', (e) => {
+    const fd = new FormData(lform);
+    const next = {
+      ...l,
+      listing_type: e.target.value,
+      room_id: +fd.get('room_id') || l.room_id,
+      starts_on: fd.get('starts_on') || l.starts_on,
+      ends_on: fd.get('ends_on') || l.ends_on,
+    };
+    if (next.listing_type !== 'room' && !next.title) {
+      next.title = 'Artist residency';
+      next.status = next.status === 'open' ? 'open' : 'draft';
+      next.capacity = next.capacity || 1;
+    }
+    renderListingModal(idOrNew, next);
+  });
 }
 
 function closeListingModal() {
@@ -4899,7 +5026,22 @@ async function writeListingForm(form) {
   const id = form.dataset.listingForm;
   const fd = new FormData(form);
   const num = k => { const v = fd.get(k); return v === '' || v === null ? null : Math.round(+v); };
-  const rec = {
+  const isProgram = fd.get('listing_type') === 'dj_residency';
+  const rec = isProgram ? {
+    listing_type: 'dj_residency',
+    room_id: +fd.get('room_id'), // programs peg a room so occupancy stays truthful
+    title: (fd.get('title') || '').trim(),
+    public_blurb: (fd.get('public_blurb') || '').trim(),
+    application_deadline: fd.get('application_deadline') || null,
+    fee_cents: fd.get('fee_cents') ? Math.round(parseFloat(fd.get('fee_cents')) * 100) : null,
+    payment_link: (fd.get('payment_link') || '').trim(),
+    capacity: num('capacity') || 1,
+    public_slug: (fd.get('public_slug') || '').trim(),
+    starts_on: fd.get('starts_on'),
+    ends_on: fd.get('ends_on') || null,
+    status: fd.get('status') || 'draft',
+  } : {
+    listing_type: 'room',
     room_id: +fd.get('room_id'),
     kind: fd.get('kind'),
     starts_on: fd.get('starts_on'),
@@ -4912,21 +5054,39 @@ async function writeListingForm(form) {
   };
   const err = form.querySelector('[data-form-error]');
   if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
-  if (rec.kind === 'resident') rec.ends_on = null; // trial length is fixed at 3 months
-  if (rec.kind === 'sublet' && rec.ends_on) {
-    const days = (new Date(rec.ends_on) - new Date(rec.starts_on)) / 86400000;
-    if (days <= 0) { err.textContent = 'End date must be after the start.'; return; }
-    if (days > 95) { err.textContent = 'A sublet runs 3 months or less — longer stays are a resident trial.'; return; }
+  if (isProgram) {
+    if (!rec.title) { err.textContent = 'Public name is required.'; return; }
+    // Slug is derivable — a blank one comes from the public name, and the
+    // field shows what was minted so the /apply link is copyable.
+    if (!rec.public_slug) {
+      rec.public_slug = rec.title.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s-]+/g, '-').slice(0, 100);
+      const slugInput = form.querySelector('[name="public_slug"]');
+      if (slugInput) slugInput.value = rec.public_slug;
+    }
+    if (!rec.public_slug) { err.textContent = 'Public name needs at least one letter or number for its link.'; return; }
+  } else {
+    if (rec.kind === 'resident') rec.ends_on = null; // trial length is fixed at 3 months
+    if (rec.kind === 'sublet' && rec.ends_on) {
+      const days = (new Date(rec.ends_on) - new Date(rec.starts_on)) / 86400000;
+      if (days <= 0) { err.textContent = 'End date must be after the start.'; return; }
+      if (days > 95) { err.textContent = 'A sublet runs 3 months or less — longer stays are a resident trial.'; return; }
+    }
   }
+  // Postgres speaks in constraint names; the recruiter needs plain language.
+  const friendly = (m) =>
+    /one_open_program/i.test(m) ? 'Another residency listing is already open — close it first (only one runs at a time).'
+    : /public_slug|duplicate key/i.test(m) ? `The slug "${rec.public_slug}" is taken — pick another (each listing needs its own link).`
+    : m;
   if (id === 'new') {
     const { data, error } = await sb.from('recruit_listings').insert({
       ...rec, source: 'manual', created_by: me.id, created_by_name: me.name,
     }).select().single();
-    if (error) { err.textContent = error.message; return; }
+    if (error) { err.textContent = friendly(error.message); return; }
     listings.push(data);
   } else {
     const { error } = await sb.from('recruit_listings').update(rec).eq('id', id);
-    if (error) { err.textContent = error.message; return; }
+    if (error) { err.textContent = friendly(error.message); return; }
     Object.assign(listings.find(l => l.id === id) || {}, rec);
   }
   err.textContent = '';
@@ -5182,7 +5342,7 @@ function renderReview() {
       <div class="review__head">
         ${avatarHtml(a, true)}
         <div class="review__head-text">
-          <h2 class="review__title">${esc(fullName(a))}${a.pronouns ? ` <span class="review__pronouns">${esc(a.pronouns)}</span>` : ''}</h2>
+          <h2 class="review__title">${esc(fullName(a))}${a.pronouns ? ` <span class="review__pronouns">${esc(a.pronouns)}</span>` : ''}${a.listingId && a.artistName ? `<br><span class="review__artist-name">${esc(a.artistName)}</span>` : ''}</h2>
           <p class="review__meta"><a href="mailto:${esc(a.email)}">${esc(a.email)}</a></p>
           <div class="review__badges">
             <span class="review__badge review__badge--track">${trackLabel(a)}</span>
@@ -5207,6 +5367,7 @@ function renderReview() {
     </div>
     ${reviewTab === 'emails' ? `<div id="emails-panel"><p class="notes__empty">Loading emails…</p></div>` : reviewTab === 'call' ? `<div id="call-panel"><p class="notes__empty">Loading the call…</p></div>` : reviewTab === 'activity' ? `<div id="activity-panel"><p class="notes__empty">Loading their history…</p></div>` : `
     ${voteSectionHtml(a)}
+    ${djProgramSectionHtml(a)}
     ${section('About them', a.about)}
     ${section('Why Agape', a.why)}
     ${section('Gifts to share', a.gifts)}
@@ -5418,38 +5579,49 @@ function renderReviewFoot(a) {
       ${liveStayFor(a.id) ? '' : `<span class="foot-links"><button type="button" class="cta-link" data-book-in="${a.id}" title="Skips the funnel — books a room and records the accept in one step">Set their move-in…</button></span>`}`;
     footFor = a.id;
   } else if (a.stage === 'candidate') {
-    const pills = activePlacements(a.id).map(p => {
-      const l = listings.find(x => x.id === p.listing_id);
-      if (!l || l.status !== 'open') return '';
-      const room = rooms.find(r => r.id === l.room_id);
-      return `<button type="button" class="decision-chip decision-chip--outreach placement-pill" data-remove-placement="${a.id}|${p.listing_id}" title="Remove from ${esc(room?.name || 'this listing')} — the auto-sweep won't re-add them">${esc(room?.name || 'Room')} ✕</button>`;
-    }).join('');
-    // Saved for future: they're off the board, so the outreach CTA would be
-    // a lie. Show the standing date and a way back instead.
-    if (a.exitReason === 'future') {
+    // Program applicants: promote to resident
+    if (a.listingId) {
       foot.innerHTML = `
-        <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
+        ${promoted ? `<span class="verdict-tag is-forward foot-promoted">Now a candidate</span>` : ''}
+        <span class="foot-cta"><button class="btn btn--accent review__btn" data-promote-program="${a.id}">Promote to resident</button></span>
         <span class="foot-links">
-          <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back</button>
-          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
           <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
         </span>`;
     } else {
-      // Mid-trial, the question stops being "which listing?" and becomes
-      // "do they stay?". Promotion takes over the primary slot; the listing
-      // controls stay available behind it.
-      const trial = trialStayFor(a.id);
-      foot.innerHTML = `
-        ${promoted ? `<span class="verdict-tag is-forward foot-promoted">Now a candidate</span>` : ''}
-        ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
-        <span class="foot-cta">${trial
-          ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Change to resident</button>`
-          : openingsCta(a)}</span>
-        <span class="foot-links">
-          ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
-          ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
-          <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
-        </span>`;
+      // Housing applicants: existing logic
+      const pills = activePlacements(a.id).map(p => {
+        const l = listings.find(x => x.id === p.listing_id);
+        if (!l || l.status !== 'open') return '';
+        const room = rooms.find(r => r.id === l.room_id);
+        return `<button type="button" class="decision-chip decision-chip--outreach placement-pill" data-remove-placement="${a.id}|${p.listing_id}" title="Remove from ${esc(room?.name || 'this listing')} — the auto-sweep won't re-add them">${esc(room?.name || 'Room')} ✕</button>`;
+      }).join('');
+      // Saved for future: they're off the board, so the outreach CTA would be
+      // a lie. Show the standing date and a way back instead.
+      if (a.exitReason === 'future') {
+        foot.innerHTML = `
+          <span class="foot-cta"><span class="decision-chip decision-chip--exit decision-chip--exit-future">saved for future · ${esc(fmtDay(a.exitUntil))}</span></span>
+          <span class="foot-links">
+            <button type="button" class="cta-link" data-bring-back="${a.id}">Bring back</button>
+            ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
+            <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
+          </span>`;
+      } else {
+        // Mid-trial, the question stops being "which listing?" and becomes
+        // "do they stay?". Promotion takes over the primary slot; the listing
+        // controls stay available behind it.
+        const trial = trialStayFor(a.id);
+        foot.innerHTML = `
+          ${promoted ? `<span class="verdict-tag is-forward foot-promoted">Now a candidate</span>` : ''}
+          ${pills ? `<span class="foot-pills">${pills}</span>` : ''}
+          <span class="foot-cta">${trial
+            ? `<button class="btn btn--accent review__btn" data-promote-applicant="${a.id}">Change to resident</button>`
+            : openingsCta(a)}</span>
+          <span class="foot-links">
+            ${trial ? '' : `<button type="button" class="cta-link" data-open-decision="outreach">${activePlacements(a.id).length ? 'Move to a different listing' : 'Add to a listing'}</button>`}
+            ${liveStayFor(a.id) ? '' : `<button type="button" class="cta-link" data-book-in="${a.id}">Set their move-in…</button>`}
+            <button type="button" class="cta-link cta-link--danger" data-open-remove="${a.id}|">Remove…</button>
+          </span>`;
+      }
     }
   } else {
     /* Closed. Everything this bar used to offer — reopen, and the optional
@@ -5598,6 +5770,48 @@ function section(title, text) {
     <p class="review__prose ${long ? 'is-clamped' : ''}">${esc(text)}</p>
     ${long ? '<button type="button" class="cta-link prose-more" data-prose-toggle>More</button>' : ''}
   </section>`;
+}
+
+/* DJ program applicant profile section: artist name, links, essays, scores */
+function djProgramSectionHtml(a) {
+  if (!a.listingId) return '';
+  const listing = listings.find(l => l.id === a.listingId);
+  // Linkify mix_links: split on whitespace/newlines/commas, only http(s) URLs
+  const linkifyUrls = text => {
+    const urls = (text || '').split(/[\s,]+/).filter(s => /^https?:\/\//.test(s));
+    return urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\//, ''))}</a>`).join(' · ');
+  };
+  const mixLinksHtml = linkifyUrls(a.mixLinks);
+  // Score breakdown: show 5 dimensions + total, note that it's AI first pass, display-only
+  const scoreBreakdown = a.scoredAt ? `
+    <div class="review__section">
+      <h3 class="review__section-title">AI first pass scores (display-only)</h3>
+      <dl class="review__score-breakdown">
+        <div class="review__score-row"><dt>Credentials</dt><dd>${a.scoreCredentials || '—'}/5</dd></div>
+        <div class="review__score-row"><dt>Sound quality</dt><dd>${a.scoreSound || '—'}/5</dd></div>
+        <div class="review__score-row"><dt>Community fit</dt><dd>${a.scoreFit || '—'}/5</dd></div>
+        <div class="review__score-row"><dt>Logistics</dt><dd>${a.scoreLogistics || '—'}/5</dd></div>
+        <div class="review__score-row"><dt>Excitement</dt><dd>${a.scoreExcitement || '—'}/5</dd></div>
+        <div class="review__score-row review__score-row--total"><dt>Total</dt><dd>${a.scoreTotal || '—'}/25</dd></div>
+      </dl>
+      ${a.scoreNotes ? `<p class="review__prose">${esc(a.scoreNotes)}</p>` : ''}
+    </div>` : '';
+  const paymentChip = a.paymentStatus === 'paid' ? '<span class="decision-chip decision-chip--vote">Paid</span>'
+    : (listing?.fee_cents > 0 ? '<span class="decision-chip decision-chip--pass">Unpaid — not reviewable until fee received</span>' : '');
+  return `<section class="review__section">
+    <h3 class="review__section-title">${esc(listing?.title || 'Artist residency')}</h3>
+    ${a.artistName ? `<p class="review__fact"><span class="review__fact-label">Artist name</span><span class="review__fact-value">${esc(a.artistName)}</span></p>` : ''}
+    ${a.basedIn ? `<p class="review__fact"><span class="review__fact-label">Based in</span><span class="review__fact-value">${esc(a.basedIn)}</span></p>` : ''}
+    ${paymentChip}
+  </section>
+  ${mixLinksHtml ? `<section class="review__section">
+    <h3 class="review__section-title">Mix links</h3>
+    <div class="link-chips">${mixLinksHtml}</div>
+  </section>` : ''}
+  ${section('Sound essay', a.soundEssay)}
+  ${section('Performance history', a.performanceHistory)}
+  ${section('Gear notes', a.gearNotes)}
+  ${scoreBreakdown}`;
 }
 
 /* ---------- emails panel ---------- */
@@ -6885,6 +7099,57 @@ function init() {
     }
   }, 2500);
 
+  /* Score up to 10 unscored program applicants with Haiku. Calls recruit-score-apps
+     edge function with {batch:true}, re-fetches applicants, and shows results. */
+  async function scoreInboxApplicants(btn) {
+    btn.disabled = true;
+    btn.textContent = 'Scoring…';
+    try {
+      const { data } = await sb.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) { toast('Sign in first'); return; }
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/recruit-score-apps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ batch: true }),
+      });
+      const result = await resp.json();
+      if (result.error) { toast(`Scoring failed: ${result.error}`); return; }
+      // Re-fetch applicants to get updated scores
+      await loadApplicants();
+      renderApplicants();
+      renderRailCounts();
+      const remain = result.remaining || 0;
+      const msg = `Scored ${result.scored || 0} applicant${result.scored === 1 ? '' : 's'}${remain ? `, ${remain} remaining` : ''}`;
+      toast(msg);
+    } catch (e) {
+      console.error('Scoring error:', e);
+      toast(`Scoring error: ${e.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Score inbox';
+    }
+  }
+
+  /* Promote a DJ program applicant from candidate to resident */
+  async function promoteProgramResident(applicantId) {
+    const a = applicants.find(x => x.id === applicantId);
+    if (!a) return;
+    if (!confirm(`Promote ${esc(fullName(a))} to resident?`)) return;
+    try {
+      const { data, error } = await sb.rpc('recruit_promote_program_resident', { p_applicant_id: applicantId });
+      if (error) { toast(`Promotion failed: ${error.message}`); return; }
+      // Update applicant stage and re-render
+      a.stage = 'resident';
+      toast('Promoted to resident');
+      renderRailCounts();
+      renderReview();
+    } catch (e) {
+      console.error('Promotion error:', e);
+      toast(`Promotion error: ${e.message}`);
+    }
+  }
+
   // delegation
   document.addEventListener('click', e => {
     // ⋯ listing menus: any click closes open menus except the one being toggled
@@ -6923,11 +7188,18 @@ function init() {
     const fchip = e.target.closest('[data-fkey]');
     if (fchip) {
       filters[fchip.dataset.fkey] = fchip.dataset.fval;
+      if (fchip.dataset.fkey === 'program' && fchip.dataset.fval !== 'dj') programSort = 'newest';
       renderApplicants();
       return;
     }
+    const psort = e.target.closest('[data-psort]');
+    if (psort) { programSort = psort.dataset.psort; renderApplicants(); return; }
+    const scoreBtn = e.target.closest('#score-inbox-btn');
+    if (scoreBtn) { scoreInboxApplicants(scoreBtn); return; }
+    const promoteProgram = e.target.closest('[data-promote-program]');
+    if (promoteProgram) { promoteProgramResident(promoteProgram.dataset.promoteProgram); return; }
     const fclear = e.target.closest('[data-fclear]');
-    if (fclear) { filters = { track: 'all', month: 'any', budget: 'any' }; renderApplicants(); return; }
+    if (fclear) { filters = { track: 'all', program: 'all', month: 'any', budget: 'any' }; programSort = 'newest'; renderApplicants(); return; }
     const review = e.target.closest('[data-review]');
     if (review) { openReview(review.dataset.review); return; }
     const vd = e.target.closest('[data-verdict]');
