@@ -16,7 +16,7 @@
 //   sync { applicantId }      → pull recent messages to/from the applicant's
 //                               address into recruit_emails (direction in/out)
 
-const VERSION = '1.38.0'
+const VERSION = '1.39.0'
 console.log(`[recruit-gmail] v${VERSION} — connect triggers an application-sheet pull so reconnecting catches up new applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'

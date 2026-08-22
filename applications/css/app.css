@@ -1978,3 +1978,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
    are new. */
 .add-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 @media (max-width: 560px) { .add-form__row { grid-template-columns: 1fr; } }
+
+/* Program (artist residency) listing badge — v3.85.4 */
+.listing-kind--program { background: var(--accent-muted); color: var(--accent-strong); }
