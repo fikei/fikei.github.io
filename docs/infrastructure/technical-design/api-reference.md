@@ -274,7 +274,7 @@ Analyzes uploaded images using Claude Vision to extract products, URLs, and cont
 - **Product recognition**: Identify brands/products from photos
 - **Receipt/invoice scanning**: Extract merchant info and categorize purchases (planned)
 
-**Model**: Claude Sonnet 4 (`claude-sonnet-4-20250514`)
+**Model**: Claude Sonnet 4.6 (`claude-sonnet-4-6`)
 
 **Source**: `supabase/functions/scan-image/index.ts`
 

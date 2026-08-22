@@ -4,8 +4,8 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.6.0';
-console.log(`[apply] v${VERSION} — native application form`);
+const VERSION = '1.7.1';
+console.log(`[apply] v${VERSION} — native application form + program listings`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
@@ -29,14 +29,42 @@ const QUESTIONS = [
     label: 'What kind of stay are you looking for?',
     hint: 'Pick one — or both, if you could see either working. Rooms open up when they open up, so folks who can hop in when a spot frees up tend to move to the front.',
     options: [
-      { label: 'Full-time resident', short: 'Full-time', desc: 'A long-term home. Full-time starts with a three-month resident trial — live with us, see how it fits — then you join the house proper.' },
-      { label: 'Short-term (sublet)', short: 'Sublet', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
+      { label: 'Full-time resident', short: 'Full-time', tone: 'fulltime', desc: 'A long-term home. Full-time starts with a three-month resident trial — live with us, see how it fits — then you join the house proper.' },
+      { label: 'Short-term (sublet)', short: 'Sublet', tone: 'sublet', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
     ],
   },
   {
-    id: 'budget', type: 'radio', fields: ['budget'], required: true,
+    id: 'budget', type: 'radio', fields: ['budget'], required: true, when: () => hasHousing(),
     label: "What's your monthly budget?",
     options: ['Under $1,500/mo', '$1,500–$2,000/mo', '$2,000–$2,500/mo', '$2,500+/mo'],
+  },
+  /* ---- program (DJ residency) block — shown when a program listing is
+     selected on the kind-of-stay screen. Housing-only questions carry
+     when: hasHousing(); these carry when: hasProgram(). */
+  {
+    id: 'artist_name', type: 'text', fields: ['artist_name'], required: true, when: () => hasProgram(),
+    label: 'What name do you play under?',
+    placeholder: 'your artist name or alias',
+  },
+  {
+    id: 'based_in', type: 'text', fields: ['based_in'], required: true, when: () => hasProgram(),
+    label: 'Where are you based?',
+    placeholder: 'city, country — and anything about travel we should know',
+  },
+  {
+    id: 'mix_links', type: 'textarea', fields: ['mix_links'], required: true, when: () => hasProgram(),
+    label: 'Where can we listen?',
+    hint: 'Links to mixes or sets — SoundCloud, Bandcamp, YouTube, anywhere. One per line is easiest for us.',
+  },
+  {
+    id: 'performance_history', type: 'textarea', fields: ['performance_history'], required: false, when: () => hasProgram(),
+    label: 'Where have you played?',
+    hint: 'Clubs, parties, radio, your bedroom — a short history of your sets. No pedigree required.',
+  },
+  {
+    id: 'gear_notes', type: 'textarea', fields: ['gear_notes'], required: false, when: () => hasProgram(),
+    label: 'What gear would you need?',
+    hint: "The basement has the Neptune sound system and Pioneer decks. Tell us what you'd bring or need beyond that.",
   },
   {
     id: 'essays', type: 'interstitial',
@@ -49,9 +77,14 @@ const QUESTIONS = [
     hint: 'Whatever feels true — how you spend your time, what you care about, what a good week looks like.',
   },
   {
-    id: 'why_agape', type: 'textarea', fields: ['why_agape'], required: true,
+    id: 'why_agape', type: 'textarea', fields: ['why_agape'], required: true, when: () => hasHousing(),
     label: 'Why Agape?',
     hint: "What drew you here? The honest version beats the polished one.",
+  },
+  {
+    id: 'sound_essay', type: 'textarea', fields: ['sound_essay'], required: true, when: () => hasProgram(),
+    label: 'Tell us about your sound.',
+    hint: 'What you play, what you’re reaching for, what a month of focused time would let you make. The honest version beats the polished one.',
   },
   {
     id: 'gifts', type: 'textarea', fields: ['gifts'], required: true,
@@ -134,6 +167,84 @@ function composeTracks(q, map) {
   };
 }
 
+/* ---------- program listings ----------
+   Open program listings (migration 178) become extra kind-of-stay options.
+   ?listing=<slug> deep-links into one; ?payment=success is the Stripe
+   Payment Link return. Selection lands on the applicant via
+   recruit_apply_set_listing, so triage sees listing_id, not just text. */
+const PARAMS = new URLSearchParams(window.location.search);
+const pendingListing = (PARAMS.get('listing') || '').trim().toLowerCase();
+const paymentReturn = PARAMS.get('payment');
+
+const RESIDENCY_Q = QUESTIONS.find((q) => q.id === 'residency');
+
+function trackSelected(opt) {
+  return String(state.answers.residency || '').split('|').map((s) => s.trim())
+    .some((r) => r.startsWith(opt.label) || r.startsWith(opt.short));
+}
+function hasProgram() {
+  return RESIDENCY_Q.options.some((o) => o.program && trackSelected(o));
+}
+function hasHousing() {
+  // Nothing chosen yet reads as housing — the classic form until a program
+  // option is actually picked.
+  return RESIDENCY_Q.options.some((o) => !o.program && trackSelected(o)) || !hasProgram();
+}
+/* The questions active for this applicant's selection. */
+const AQ = () => QUESTIONS.filter((q) => !q.when || q.when());
+
+async function loadProgramListings() {
+  try {
+    const { data, error } = await sb.rpc('recruit_open_program_listings');
+    if (error) throw error;
+    for (const l of (data || [])) {
+      if (!l.slug || RESIDENCY_Q.options.some((o) => o.slug === l.slug)) continue;
+      const dates = [l.starts_on, l.ends_on].filter(Boolean).map(fmtISO).join(' – ');
+      const bits = [
+        dates,
+        l.fee_cents ? `$${Math.round(l.fee_cents / 100)} application fee` : '',
+        l.application_deadline ? `apply by ${fmtISO(l.application_deadline)}` : '',
+      ].filter(Boolean).join(' · ');
+      RESIDENCY_Q.options.push({
+        label: l.title, short: l.title, tone: 'program',
+        desc: (l.blurb ? l.blurb + ' ' : '') + (bits ? `(${bits})` : ''),
+        program: true, slug: l.slug, fee_cents: l.fee_cents || 0,
+      });
+      state.listings.push(l);
+    }
+    // Housing options always lead; programs follow, in date order.
+    RESIDENCY_Q.options.sort((a, b) => (a.program ? 1 : 0) - (b.program ? 1 : 0));
+  } catch (e) { console.warn('[apply] program listings load failed', e); }
+}
+
+/* Keep the applicant's listing_id in step with the kind-of-stay selection. */
+function syncListingSelection(q) {
+  const prog = q.options.find((o) => o.program && state._multi?.[o.label]);
+  const want = prog ? prog.slug : null;
+  const have = state.app?.listing?.slug || null;
+  if (want === have || (!state.app && !want)) return;
+  sb.rpc('recruit_apply_set_listing', { p_slug: want }).then(({ data, error }) => {
+    if (error) console.warn('[apply] set listing failed', error);
+    else if (data) state.app = data;
+  });
+}
+
+const feeDue = () => Boolean(state.app?.listing && (state.app.listing.fee_cents || 0) > 0
+  && state.app.payment_status !== 'paid');
+const feeLabel = () => `$${Math.round((state.app?.listing?.fee_cents || 0) / 100)}`;
+
+function payRedirect() {
+  try {
+    const u = new URL(state.app.listing.payment_link);
+    u.searchParams.set('prefilled_email', state.email || state.app.email || '');
+    u.searchParams.set('client_reference_id', state.app.id);
+    window.location.href = u.toString();
+  } catch (e) {
+    console.warn('[apply] payment link missing or invalid', e);
+    go('done');
+  }
+}
+
 const fmtISO = (iso) => {
   const m = String(iso || '').match(/(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return iso || '';
@@ -161,6 +272,7 @@ const state = {
   email: '',
   answers: {},        // column → value
   app: null,          // recruit_apply_load() result
+  listings: [],       // open program listings (recruit_open_program_listings)
   screen: 'welcome',  // welcome | email | code | q:<id> | review | done | locked
   fromReview: false,
 };
@@ -213,7 +325,7 @@ async function loadApplication() {
 function questionIndex(id) { return QUESTIONS.findIndex((q) => q.id === id); }
 
 function firstUnanswered() {
-  for (const q of QUESTIONS) {
+  for (const q of AQ()) {
     if (q.type === 'interstitial') continue;
     if (q.required && q.fields.every((f) => !(state.answers[f] || '').trim())) return q.id;
   }
@@ -221,11 +333,12 @@ function firstUnanswered() {
 }
 
 function progressFor(screen) {
+  const list = AQ();
   const pre = ['welcome', 'email', 'code'];
-  const total = pre.length + QUESTIONS.length + 1; // + review
+  const total = pre.length + list.length + 1; // + review
   let done = 0;
   if (pre.includes(screen)) done = pre.indexOf(screen);
-  else if (screen.startsWith('q:')) done = pre.length + questionIndex(screen.slice(2));
+  else if (screen.startsWith('q:')) done = pre.length + Math.max(0, list.findIndex((q) => q.id === screen.slice(2)));
   else done = total - (screen === 'review' ? 1 : 0);
   return Math.round((done / total) * 100);
 }
@@ -277,10 +390,17 @@ function bindEnter(fn) {
 function showErr(msg) { const el = document.getElementById('err'); if (el) el.textContent = msg; }
 
 function renderWelcome() {
+  // A ?listing= deep link opens the door with the program's context up top.
+  const l = state.listings.find((x) => x.slug === pendingListing);
+  const dates = l ? [l.starts_on, l.ends_on].filter(Boolean).map(fmtISO).join(' – ') : '';
+  const bits = l ? [dates,
+    l.fee_cents ? `$${Math.round(l.fee_cents / 100)} application fee` : '',
+    l.application_deadline ? `apply by ${fmtISO(l.application_deadline)}` : ''].filter(Boolean).join(' · ') : '';
   $screen.innerHTML = `
     <div class="apply-intro__mark">agape</div>
-    <h1 class="apply-q__title">Apply to live with us.</h1>
-    <p class="apply-q__hint">This takes about ten minutes, and you can leave and come back any time — your answers save as you go. We'll start with your email so you can always find your way back in.</p>
+    ${l ? `<div class="apply-banner"><strong>${esc(l.title)}</strong>${bits ? ' · ' + esc(bits) : ''}</div>` : ''}
+    <h1 class="apply-q__title">${l ? 'Apply for the ' + esc(l.title) + '.' : 'Apply to live with us.'}</h1>
+    <p class="apply-q__hint">${l && l.blurb ? esc(l.blurb) + ' ' : ''}This takes about ten minutes, and you can leave and come back any time — your answers save as you go. We'll start with your email so you can always find your way back in.</p>
     <button class="btn btn--filled btn--lg" id="start">Start</button>`;
   document.getElementById('start').onclick = () => go('email');
 }
@@ -353,7 +473,7 @@ function inputHtml(q) {
       const label = typeof opt === 'string' ? opt : opt.label;
       const desc = typeof opt === 'string' ? '' : (opt.desc || '');
       return `
-      <button type="button" class="apply-choice ${label === cur ? 'selected' : ''}" data-value="${esc(label)}">
+      <button type="button" class="apply-choice ${typeof opt !== 'string' && opt.tone ? 'apply-choice--' + opt.tone : ''} ${label === cur ? 'selected' : ''}" data-value="${esc(label)}">
         <span class="apply-choice__key">${i + 1}</span>
         <span class="apply-choice__body">${esc(label)}${desc ? `<span class="apply-choice__desc">${esc(desc)}</span>` : ''}</span>
       </button>`;
@@ -366,11 +486,11 @@ function inputHtml(q) {
       const t = sel[opt.label];
       return `
       <div class="apply-field">
-        <button type="button" class="apply-choice ${t ? 'selected' : ''}" data-value="${esc(opt.label)}">
+        <button type="button" class="apply-choice ${opt.tone ? 'apply-choice--' + opt.tone : ''} ${t ? 'selected' : ''}" data-value="${esc(opt.label)}">
           <span class="apply-choice__key">${t ? '✓' : i + 1}</span>
           <span class="apply-choice__body">${esc(opt.label)}${opt.desc ? `<span class="apply-choice__desc">${esc(opt.desc)}</span>` : ''}</span>
         </button>
-        ${t ? `
+        ${t && !opt.program ? `
         <div class="apply-track">
           <div class="apply-row">
             <div>
@@ -416,16 +536,21 @@ function collect(q) {
 }
 
 function renderQuestion(q) {
-  const idx = questionIndex(q.id);
+  const idx = AQ().findIndex((x) => x.id === q.id);
   // One document-level key handler at a time — toggle re-renders on multi
   // screens would otherwise stack listeners and double-fire Enter.
   if (state._keyHandler) { document.removeEventListener('keydown', state._keyHandler); state._keyHandler = null; }
   if (q.type === 'multi' && state._multiFor !== q.id) {
     state._multi = parseTracks(q, state.answers.residency || '', state.answers.move_in || '');
+    // Deep link: the ?listing= program option arrives pre-checked.
+    if (pendingListing && !Object.keys(state._multi).length) {
+      const opt = q.options.find((o) => o.program && o.slug === pendingListing);
+      if (opt) state._multi[opt.label] = { date: '', dateEnd: '', flex: false, note: '' };
+    }
     state._multiFor = q.id;
   }
-  const n = QUESTIONS.filter((x) => x.type !== 'interstitial').indexOf(q) + 1;
-  const total = QUESTIONS.filter((x) => x.type !== 'interstitial').length;
+  const n = AQ().filter((x) => x.type !== 'interstitial').indexOf(q) + 1;
+  const total = AQ().filter((x) => x.type !== 'interstitial').length;
 
   if (q.type === 'interstitial') {
     $screen.innerHTML = `
@@ -445,7 +570,11 @@ function renderQuestion(q) {
   const advance = () => {
     if (state.fromReview) { state.fromReview = false; go('review'); }
     else {
-      const nq = QUESTIONS[idx + 1];
+      // Recompute at click time — the kind-of-stay answer just changed which
+      // questions are active.
+      const list = AQ();
+      const i = list.findIndex((x) => x.id === q.id);
+      const nq = i >= 0 ? list[i + 1] : null;
       go(nq ? 'q:' + nq.id : 'review');
     }
   };
@@ -470,7 +599,10 @@ function renderQuestion(q) {
       if (q.required && !Object.keys(state._multi).length) return showErr('Pick at least one to continue.');
       const composed = composeTracks(q, state._multi);
       Object.assign(state.answers, composed);
-      saveFields(composed);
+      // The listing link needs the row to exist — wait for the save that
+      // creates it before syncing listing_id.
+      await saveFields(composed);
+      syncListingSelection(q);
       return advance();
     }
     const fields = collect(q);
@@ -482,7 +614,9 @@ function renderQuestion(q) {
 
   const goBack = () => {
     if (state.fromReview) { state.fromReview = false; return go('review'); }
-    const pq = QUESTIONS[idx - 1];
+    const list = AQ();
+    const i = list.findIndex((x) => x.id === q.id);
+    const pq = i > 0 ? list[i - 1] : null;
     go(pq ? 'q:' + pq.id : 'code');
   };
 
@@ -493,7 +627,7 @@ function renderQuestion(q) {
       if (Object.keys(state._multi).length) {
         const composed = composeTracks(q, state._multi);
         Object.assign(state.answers, composed);
-        saveFields(composed);
+        saveFields(composed).then(() => syncListingSelection(q));
       }
     } else if (q.type !== 'interstitial' && q.type !== 'radio') {
       const fields = collect(q);
@@ -565,7 +699,7 @@ function renderQuestion(q) {
 
 function renderReview() {
   const submitted = state.app?.is_submitted;
-  const rows = QUESTIONS.filter((q) => q.type !== 'interstitial').map((q) => {
+  const rows = AQ().filter((q) => q.type !== 'interstitial').map((q) => {
     const val = q.id === 'residency'
       ? prettyTracks(q)
       : q.fields.map((f) => state.answers[f] || '').filter(Boolean).join(q.type === 'name' ? ' ' : ' · ');
@@ -580,9 +714,11 @@ function renderReview() {
     <h1 class="apply-q__title">${submitted ? 'Your application' : 'Look it over.'}</h1>
     <p class="apply-q__hint">${submitted ? 'Signed in as ' + esc(state.email || state.app?.email || '') + '.' : 'Tap any answer to change it, then send it in.'}</p>
     <div class="apply-review">${rows}</div>
+    ${submitted && feeDue() ? `<div class="apply-banner">The ${feeLabel()} application fee is still owed — your application counts once it's in.</div>` : ''}
     ${nav(submitted
-      ? '<button class="btn btn--ghost" id="signout">sign out</button>'
-      : '<button class="btn btn--filled btn--lg" id="submit">Submit application</button>')}`;
+      ? (feeDue() ? `<button class="btn btn--filled" id="pay">Pay the ${feeLabel()} fee</button>` : '') +
+        '<button class="btn btn--ghost" id="signout">sign out</button>'
+      : `<button class="btn btn--filled btn--lg" id="submit">${feeDue() ? 'Submit & pay the ' + feeLabel() + ' fee' : 'Submit application'}</button>`)}`;
   $screen.querySelectorAll('.apply-review__row').forEach((el) => {
     el.onclick = () => { state.fromReview = true; go('q:' + el.dataset.q); };
   });
@@ -593,18 +729,30 @@ function renderReview() {
     if (error) { sBtn.disabled = false; sBtn.textContent = 'Submit application'; return showErr(error.message.replace(/^.*?: /, '')); }
     state.app = data;
     track('submitted');
+    // Program applications: payment is the last gate — hand off to the
+    // Stripe Payment Link; its return URL lands back here with ?payment=.
+    if (feeDue() && state.app.listing?.payment_link) return payRedirect();
     go('done');
   };
+  const payBtn = document.getElementById('pay');
+  if (payBtn) payBtn.onclick = payRedirect;
   const out = document.getElementById('signout');
   if (out) out.onclick = async () => { await sb.auth.signOut(); state.answers = {}; state.app = null; go('welcome'); };
 }
 
 function renderDone() {
+  const paid = state.app?.payment_status === 'paid';
+  const owes = feeDue() && state.app?.is_submitted;
   $screen.innerHTML = `
     <div class="apply-intro__mark">✳</div>
     <h1 class="apply-q__title">It's in. Thank you.</h1>
+    ${paid && state.app?.listing ? '<div class="apply-banner"><strong>Fee received.</strong> You’re all set.</div>' : ''}
+    ${owes ? `<div class="apply-banner">One last step — the ${feeLabel()} application fee. Your application counts once it's in.</div>` : ''}
     <p class="apply-q__hint">A housemate will read it soon — every application gets a real read. We'll reach out about next steps, and if anything comes up meanwhile, write us at <a href="mailto:live.at.agapesf@gmail.com" style="color:var(--fg)">live.at.agapesf@gmail.com</a>. Come back to this page any time to update your answers.</p>
+    ${owes ? `<button class="btn btn--filled" id="pay">Pay the ${feeLabel()} fee</button> ` : ''}
     <button class="btn btn--ghost" id="view">View my application</button>`;
+  const payBtn = document.getElementById('pay');
+  if (payBtn) payBtn.onclick = payRedirect;
   document.getElementById('view').onclick = () => go('review');
 }
 
@@ -644,10 +792,19 @@ function renderLocked() {
 /* ---------- boot ---------- */
 (async function boot() {
   $fill.style.width = '2%';
+  await loadProgramListings();
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     state.email = session.user?.email || '';
     await loadApplication();
+    if (paymentReturn === 'success' && state.app?.listing) {
+      // Back from the Stripe Payment Link. Provisional — the weekly
+      // reconciliation is the authoritative record.
+      const { data, error } = await sb.rpc('recruit_apply_mark_paid');
+      if (!error && data) state.app = data;
+      window.history.replaceState(null, '', window.location.pathname);
+      return go('done');
+    }
     afterAuthRoute();
   } else {
     render();
