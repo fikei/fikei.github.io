@@ -202,3 +202,13 @@ body {
   .apply-shell { align-items: flex-start; padding-top: 80px; }
   .apply-row { flex-direction: column; }
 }
+
+/* Kind-of-stay tones (v1.7.1) — each option carries its own color so the
+   three stay types read apart at a glance. Program pink matches the
+   Artist residency badge in /applications. */
+.apply-choice--fulltime { border-left: 3px solid rgba(123, 216, 143, .65); }
+.apply-choice--fulltime .apply-choice__key { color: #7bd88f; border-color: rgba(123, 216, 143, .5); }
+.apply-choice--sublet { border-left: 3px solid rgba(237, 200, 67, .6); }
+.apply-choice--sublet .apply-choice__key { color: #edc843; border-color: rgba(237, 200, 67, .5); }
+.apply-choice--program { border-left: 3px solid rgba(244, 114, 182, .65); }
+.apply-choice--program .apply-choice__key { color: #f472b6; border-color: rgba(244, 114, 182, .5); }
