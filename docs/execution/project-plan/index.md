@@ -1,7 +1,7 @@
 # Project Plan - ctrl.rodeo
 
 > Single source of truth for all features, stories, and tasks.
-> **Last Updated**: 2026-04-10 (Added Systemic v2 epic to Backlog — 3 tracks, 16 stories)
+> **Last Updated**: 2026-08-21 (Added Phase 17: Agape Family Dinners — spec)
 
 ---
 
@@ -34,6 +34,7 @@
 | [Phase 14: Gmail → Jobs Pipe](./phase-14-gmail-jobs-pipe.md) | IN PROGRESS | 0/73 |
 | [Phase 15: Gmail Application Tracker](./phase-15-gmail-application-tracker.md) | IN PROGRESS | 23/25 |
 | [Phase 16: Ladder Easy Apply](./phase-16-easy-apply.md) | Pending | 0/40 |
+| [Phase 17: Agape Family Dinners](./phase-17-family-dinners.md) | Spec | 0/22 |
 | [Backlog](./backlog.md) | Future | 1/118 |
 
 ---
