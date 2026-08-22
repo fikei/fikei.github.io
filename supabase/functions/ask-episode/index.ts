@@ -8,6 +8,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const VERSION = '1.0.1'
+console.log(`[ask-episode] v${VERSION} - migrate to claude-sonnet-4-6 (Sonnet 4 retired)`)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -102,7 +105,7 @@ LISTENER QUESTION: "${question}"`
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

@@ -13,7 +13,7 @@
 // The app public key is fetched from GET /applications/@me with the bot token
 // (env DISCORD_PUBLIC_KEY overrides), so no extra secret is needed.
 
-const VERSION = '1.32.0'
+const VERSION = '1.33.0'
 console.log(`[recruit-discord] v${VERSION} — screening claims + tour votes + sign-in + link nudges + trial votes + notification ledger`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'

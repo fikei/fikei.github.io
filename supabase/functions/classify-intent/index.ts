@@ -6,8 +6,8 @@
 // POST /functions/v1/classify-intent
 // Body: { action: 'classify' | 'hypothesize', ...params }
 
-const VERSION = '1.1.0'
-console.log(`[classify-intent] v${VERSION} — intent classification pipeline`)
+const VERSION = '1.1.1'
+console.log(`[classify-intent] v${VERSION} — migrate to claude-sonnet-4-6 (Sonnet 4 retired)`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -22,8 +22,8 @@ const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
 
 const INTENT_CONFIDENCE_THRESHOLD = 0.75
 const LLM_TIMEOUT_MS = 5000
-const CLASSIFY_MODEL = 'claude-sonnet-4-20250514'
-const HYPOTHESIZE_MODEL = 'claude-sonnet-4-20250514'
+const CLASSIFY_MODEL = 'claude-sonnet-4-6'
+const HYPOTHESIZE_MODEL = 'claude-sonnet-4-6'
 
 // Known commerce domains (partial match on domain)
 const COMMERCE_DOMAINS = new Set([
