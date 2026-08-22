@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.0';
-console.log(`[applications] v${VERSION} - program listings: DJ track filter, scores, listing editor, promote`);
+const VERSION = '3.85.1';
+console.log(`[applications] v${VERSION} - program listings: artist-residency listing editor swap + labels`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -2228,7 +2228,7 @@ function renderFilterBar(viewList) {
   monthsPresent.sort((x, y) => MONTH_ABBR.indexOf(x) - MONTH_ABBR.indexOf(y));
   const monthDefs = [['any', 'Any move-in'], ...monthsPresent.map(m => [m, m]), ['flex', 'Flexible']];
   const groups = [
-    ...(view === 'inbox' || view === 'candidates' ? [['program', [['all', 'All'], ['housing', 'Housing'], ['dj', 'DJ residency']]]] : []),
+    ...(view === 'inbox' || view === 'candidates' ? [['program', [['all', 'All'], ['housing', 'Housing'], ['dj', 'Artist residency']]]] : []),
     ['track', [['all', 'Everyone'], ['fulltime', 'Full-time'], ['sublet', 'Sublet']]],
     ['month', monthDefs],
     ['budget', [['any', 'Any budget'], ['lt2000', 'Under $2k'], ['mid', '$2k–2.5k'], ['gt2500', '$2.5k+']]],
@@ -2805,7 +2805,7 @@ function renderApplicants() {
 
   const groupHead = g => {
     if (view !== 'openings') {
-      if (g.key === 'dj-program') return `<h2 class="inbox-group__label">DJ program applicants</h2>`;
+      if (g.key === 'dj-program') return `<h2 class="inbox-group__label">Residency applicants</h2>`;
       return `<h2 class="inbox-group__label">${monthLabel(g.key)}</h2>`;
     }
     const l = listings.find(x => x.id === g.key);
@@ -4861,21 +4861,21 @@ function listingForm(l) {
       <label class="listing-form__field">Listing type
         <select name="listing_type" class="listing-status" data-listing-type>
           <option value="room" ${!isProgram ? 'selected' : ''}>Room (housing)</option>
-          <option value="dj_residency" ${isProgram ? 'selected' : ''}>DJ residency</option>
+          <option value="dj_residency" ${isProgram ? 'selected' : ''}>Artist residency</option>
         </select>
       </label>
-      ${isProgram ? '' : `<label class="listing-form__field">Room
+      <label class="listing-form__field">Room${isProgram ? ' (pegged for occupancy)' : ''}
         <select name="room_id" class="listing-status">${rooms.map(r =>
           `<option value="${r.id}" ${+l.room_id === r.id ? 'selected' : ''}>${esc(r.name)}${r.resident ? ` — ${esc(r.resident)}` : ''}</option>`).join('')}</select>
-      </label>`}
+      </label>
       ${isProgram ? '' : `<label class="listing-form__field">Type
         <select name="kind" class="listing-status">
           <option value="sublet" ${l.kind !== 'resident' ? 'selected' : ''}>Sublet (≤ 3 months)</option>
           <option value="resident" ${l.kind === 'resident' ? 'selected' : ''}>Resident (3-month trial)</option>
         </select>
       </label>`}
-      ${isProgram ? `<label class="listing-form__field">Title
-        <input type="text" name="title" class="listing-status" value="${esc(l.title || '')}" maxlength="200" required>
+      ${isProgram ? `<label class="listing-form__field">Public name
+        <input type="text" name="title" class="listing-status" value="${esc(l.title || '')}" maxlength="200" placeholder="DJ Residency" required>
       </label>` : ''}
       <label class="listing-form__field">${isProgram ? 'Begins' : 'Opens'}
         <input type="date" name="starts_on" class="listing-status" value="${l.starts_on || ''}" required>
@@ -4911,12 +4911,12 @@ function listingForm(l) {
       <label class="listing-form__field">Status
         <select name="status" class="listing-status">
           ${isProgram
-            ? ['draft', 'open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'open') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')
+            ? ['draft', 'open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'draft') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')
             : ['open', 'filled', 'closed'].map(st => `<option value="${st}" ${(l.status || 'open') === st ? 'selected' : ''}>${st[0].toUpperCase()}${st.slice(1)}</option>`).join('')}
         </select>
       </label>
     </div>
-    ${isProgram ? `<label class="listing-form__field">Description
+    ${isProgram ? `<label class="listing-form__field">Public description — shown on /apply and the landing page
       <textarea name="public_blurb" class="notes__input listing-form__notes" rows="3" maxlength="1000">${esc(l.public_blurb || '')}</textarea>
     </label>` : ''}
     ${isProgram ? `<label class="listing-form__field">Payment link
@@ -4953,20 +4953,48 @@ function openListingModal(idOrNew) {
   const l = idOrNew === 'new'
     ? { kind: 'sublet', room_id: rooms[0]?.id }
     : listings.find(x => x.id === idOrNew) || {};
+  renderListingModal(idOrNew, l);
+  document.getElementById('listing-modal').hidden = false;
+}
+
+function renderListingModal(idOrNew, l) {
+  const isProgram = l.listing_type && l.listing_type !== 'room';
   const body = document.getElementById('listing-modal-body');
   body.innerHTML = `
     <div class="email-modal__head">
       <h3 class="email-modal__title">${idOrNew === 'new' ? 'New listing' : 'Edit listing'}</h3>
       <button class="review__close email-modal__close" data-cancel-listing aria-label="Close">✕</button>
     </div>
-    <p class="notes__empty">A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial.</p>
+    <p class="notes__empty">${isProgram
+      ? 'An artist residency: name it, describe it, set the window, deadline, and fee. It stays a draft until you open it — then it appears on /apply and the landing page.'
+      : "A listing is a sublet (≤ 3 months) of a resident's room, or a 3-month resident trial."}</p>
     ${listingForm(l)}`;
-  document.getElementById('listing-modal').hidden = false;
   const lform = body.querySelector('[data-listing-form]');
   lform.addEventListener('submit', onListingCreate);
   if (lform.dataset.listingForm !== 'new') {
-    lform.addEventListener('change', e => autoSaveListing(lform, e.target.name));
+    lform.addEventListener('change', e => {
+      if (e.target.name === 'listing_type') return; // handled by the re-render below
+      autoSaveListing(lform, e.target.name);
+    });
   }
+  // Switching listing type swaps the whole field set — rebuild the form,
+  // carrying over what both types share and seeding program defaults.
+  lform.querySelector('[data-listing-type]').addEventListener('change', (e) => {
+    const fd = new FormData(lform);
+    const next = {
+      ...l,
+      listing_type: e.target.value,
+      room_id: +fd.get('room_id') || l.room_id,
+      starts_on: fd.get('starts_on') || l.starts_on,
+      ends_on: fd.get('ends_on') || l.ends_on,
+    };
+    if (next.listing_type !== 'room' && !next.title) {
+      next.title = 'Artist residency';
+      next.status = next.status === 'open' ? 'open' : 'draft';
+      next.capacity = next.capacity || 1;
+    }
+    renderListingModal(idOrNew, next);
+  });
 }
 
 function closeListingModal() {
@@ -4994,6 +5022,7 @@ async function writeListingForm(form) {
   const isProgram = fd.get('listing_type') === 'dj_residency';
   const rec = isProgram ? {
     listing_type: 'dj_residency',
+    room_id: +fd.get('room_id'), // programs peg a room so occupancy stays truthful
     title: (fd.get('title') || '').trim(),
     public_blurb: (fd.get('public_blurb') || '').trim(),
     application_deadline: fd.get('application_deadline') || null,
@@ -5003,7 +5032,7 @@ async function writeListingForm(form) {
     public_slug: (fd.get('public_slug') || '').trim(),
     starts_on: fd.get('starts_on'),
     ends_on: fd.get('ends_on') || null,
-    status: fd.get('status') || 'open',
+    status: fd.get('status') || 'draft',
   } : {
     listing_type: 'room',
     room_id: +fd.get('room_id'),
@@ -5750,8 +5779,7 @@ function djProgramSectionHtml(a) {
   const paymentChip = a.paymentStatus === 'paid' ? '<span class="decision-chip decision-chip--vote">Paid</span>'
     : (listing?.fee_cents > 0 ? '<span class="decision-chip decision-chip--pass">Unpaid — not reviewable until fee received</span>' : '');
   return `<section class="review__section">
-    <h3 class="review__section-title">DJ program</h3>
-    ${listing ? `<p class="review__meta"><span class="decision-chip">${esc(listing.title)}</span></p>` : ''}
+    <h3 class="review__section-title">${esc(listing?.title || 'Artist residency')}</h3>
     ${a.artistName ? `<p class="review__fact"><span class="review__fact-label">Artist name</span><span class="review__fact-value">${esc(a.artistName)}</span></p>` : ''}
     ${a.basedIn ? `<p class="review__fact"><span class="review__fact-label">Based in</span><span class="review__fact-value">${esc(a.basedIn)}</span></p>` : ''}
     ${paymentChip}
