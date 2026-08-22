@@ -1,4 +1,4 @@
-# Phase 17: Agape Family Dinners
+# Phase 18: Agape Family Dinners
 
 > Back to [Project Plan](./index.md)
 >
@@ -30,7 +30,7 @@ Housemates (Discord resident/subletter role — a new gate, separate from Recrui
 
 ---
 
-## Epic 17-A: Access & schema
+## Epic 18-A: Access & schema
 
 **Story: house-member gate**
 - [ ] `discord-membership`: read guild roles from the existing member fetch; cache `is_house_member` + `house_role` on `user_discord_membership` (new columns); minor version bump
@@ -41,7 +41,7 @@ Housemates (Discord resident/subletter role — a new gate, separate from Recrui
 - [ ] RLS: house-member read/write, own-row update/delete for non-admins
 - [ ] Seed `recruit_settings`: `dinner_guest_limit`, `dinner_quota_resident`, `dinner_rules` (from sheet notes), `dinner_channel_id`
 
-## Epic 17-B: Dinners view MVP
+## Epic 18-B: Dinners view MVP
 
 **Story: quarter grid**
 - [ ] Rail item Dinners (House group); route + view scaffold in `applications/js/app.js`
@@ -53,19 +53,19 @@ Housemates (Discord resident/subletter role — a new gate, separate from Recrui
 - [ ] Dinner drawer admin actions: assign/clear any slot, edit note/time, check-in toggle, cancel dinner
 - [ ] `applications` → v3.85.0
 
-## Epic 17-C: Guests, RSVPs, tallies
+## Epic 18-C: Guests, RSVPs, tallies
 
 - [ ] Dinner drawer: add guests (capped by `dinner_guest_limit`, blocked on check-ins), can't-make-it toggle, computed headcount
 - [ ] Tally sidebar: roster from `recruit_stays` overlapping the quarter; per-person taken/target chips (subletters prorated); quarter taken / remaining / total
 - [ ] Rules panel rendering `dinner_rules` markdown; admin editor in Settings
 
-## Epic 17-D: Discord automation
+## Epic 18-D: Discord automation
 
 - [ ] `recruit-discord` cron tick: Sunday crew summary post (crew, guests, outs, unfilled slots, deep link), dedup-stamped
 - [ ] Head-chef nag: <48h out + `head_chef` empty → one @-mention post
 - [ ] Minor version bump; `dinner_channel_id` wiring
 
-## Epic 17-E: Cutover
+## Epic 18-E: Cutover
 
 - [ ] One-time import script: remaining weeks of the in-flight sheet quarter → tables
 - [ ] Announce on Discord; sheet marked read-only

@@ -1,7 +1,7 @@
 # Family dinners — technical design
 
 Status: **spec** (2026-08-21). PRD: [agape-family-dinners.md](../../strategy/prds/agape-family-dinners.md).
-Plan: [phase 17](../../execution/project-plan/phase-17-family-dinners.md).
+Plan: [phase 18](../../execution/project-plan/phase-18-family-dinners.md).
 
 Lives inside the triage app (`applications/`, Supabase project `yfhudwakpgzswiylhfbh`
 — same project as Boards/recruiting). Everything below reuses existing recruiting

@@ -6,7 +6,7 @@ calendar, and Discord reminders nobody has to remember to post.
 
 Status: **spec** (2026-08-21). Companion docs:
 [technical design](../../infrastructure/technical-design/family-dinners.md) ·
-[phase 17 plan](../../execution/project-plan/phase-17-family-dinners.md).
+[phase 18 plan](../../execution/project-plan/phase-18-family-dinners.md).
 Source of the requirements: the [AGAPE FAMILY DINNER sheet](https://docs.google.com/spreadsheets/d/1h3zgmOarD-3VgQyh5_h4VBgd7Hay9AoaTKggFIDl5KY/)
 (quarterly tabs, Aug–Oct 2026 is current).
 
