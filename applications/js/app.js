@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.2';
-console.log(`[applications] v${VERSION} - program listings: keep New listing/Add person head actions with score button`);
+const VERSION = '3.85.3';
+console.log(`[applications] v${VERSION} - program listings: auto-slug from public name + friendly listing errors`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -5055,8 +5055,16 @@ async function writeListingForm(form) {
   const err = form.querySelector('[data-form-error]');
   if (!rec.starts_on) { err.textContent = 'Start date is required.'; return; }
   if (isProgram) {
-    if (!rec.title) { err.textContent = 'Title is required.'; return; }
-    if (!rec.public_slug) { err.textContent = 'Public slug is required.'; return; }
+    if (!rec.title) { err.textContent = 'Public name is required.'; return; }
+    // Slug is derivable — a blank one comes from the public name, and the
+    // field shows what was minted so the /apply link is copyable.
+    if (!rec.public_slug) {
+      rec.public_slug = rec.title.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s-]+/g, '-').slice(0, 100);
+      const slugInput = form.querySelector('[name="public_slug"]');
+      if (slugInput) slugInput.value = rec.public_slug;
+    }
+    if (!rec.public_slug) { err.textContent = 'Public name needs at least one letter or number for its link.'; return; }
   } else {
     if (rec.kind === 'resident') rec.ends_on = null; // trial length is fixed at 3 months
     if (rec.kind === 'sublet' && rec.ends_on) {
@@ -5065,15 +5073,20 @@ async function writeListingForm(form) {
       if (days > 95) { err.textContent = 'A sublet runs 3 months or less — longer stays are a resident trial.'; return; }
     }
   }
+  // Postgres speaks in constraint names; the recruiter needs plain language.
+  const friendly = (m) =>
+    /one_open_program/i.test(m) ? 'Another residency listing is already open — close it first (only one runs at a time).'
+    : /public_slug|duplicate key/i.test(m) ? `The slug "${rec.public_slug}" is taken — pick another (each listing needs its own link).`
+    : m;
   if (id === 'new') {
     const { data, error } = await sb.from('recruit_listings').insert({
       ...rec, source: 'manual', created_by: me.id, created_by_name: me.name,
     }).select().single();
-    if (error) { err.textContent = error.message; return; }
+    if (error) { err.textContent = friendly(error.message); return; }
     listings.push(data);
   } else {
     const { error } = await sb.from('recruit_listings').update(rec).eq('id', id);
-    if (error) { err.textContent = error.message; return; }
+    if (error) { err.textContent = friendly(error.message); return; }
     Object.assign(listings.find(l => l.id === id) || {}, rec);
   }
   err.textContent = '';
