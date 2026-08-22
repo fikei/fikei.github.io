@@ -11,7 +11,7 @@
 //                                    fresh (<7d) suggestion
 // Response: { suggestions: [{ applicantId, listingId, confidence, rationale, flags }] }
 
-const VERSION = '1.13.0'
+const VERSION = '1.14.0'
 console.log(`[recruit-match] v${VERSION} — AI listing match for Agape applicants`)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -314,7 +314,9 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const [{ data: listings }, { data: rooms }, { data: settingsRows }] = await Promise.all([
-      client.from('recruit_listings').select('*').eq('status', 'open'),
+      // Room listings only — program listings (DJ residency) never enter
+      // housing auto-match; their applicants go through promote instead.
+      client.from('recruit_listings').select('*').eq('status', 'open').eq('listing_type', 'room'),
       client.from('recruit_rooms').select('*'),
       client.from('recruit_settings').select('*'),
     ])

@@ -8,7 +8,7 @@
 
 Extends `recruit_listings` into a general program-listing concept (draft → open → filled/closed lifecycle, application deadline, fee, public slug) and launches the first program: a paid DJ residency in the priest room. Open program listings surface on the /apply "Kind of stay" step and branch the question flow; a $20 Stripe Payment Link gates review; a Haiku auto-scorer makes 1,000-application triage feasible; finalists flow through the existing vote → interview → stay machinery.
 
-**Status:** Pending
+**Status:** Built (2026-08-21) — epics 17.1–17.4 and 17.6 shipped, plus the landing page from 17.5; see [build session plan](./tasks/phase-17-build-plan.md). Awaiting human setup before opening the listing: Stripe Payment Link (+ redirect to `/apply/?payment=success`), real cohort dates in the listing editor, legal read, Instagram link-in-bio. Deferred from 17.5: recruit-gmail template variants and recruit-ingest program ping. Payment runbook: [dj-residency-payments.md](../../infrastructure/dj-residency-payments.md).
 
 **Files touched:**
 
