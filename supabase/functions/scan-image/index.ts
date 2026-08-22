@@ -7,6 +7,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+const VERSION = '1.0.1'
+console.log(`[scan-image] v${VERSION} - migrate to claude-sonnet-4-6 (Sonnet 4 retired)`)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -49,7 +52,7 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         messages: [{
           role: 'user',

@@ -276,7 +276,7 @@ The enrichment queue, confidence scoring, category assignment, and Supabase sync
 
 **Edge Function**: `scan-image` (`supabase/functions/scan-image/index.ts`)
 
-Analyzes uploaded images using Claude Vision (Sonnet 4) to extract structured data. Use cases:
+Analyzes uploaded images using Claude Vision (Sonnet 4.6) to extract structured data. Use cases:
 - **Screenshot scanning**: User shares a browser screenshot → extract visible URLs and identify content
 - **Product recognition**: User photographs a product → identify brand, suggest category, find product URL
 - **Receipt/invoice scanning** (planned): Capture merchant info, categorize purchases
@@ -311,7 +311,7 @@ The Vision API prompt instructs Claude to:
 4. Categorize each item into one of the 8 standard categories
 5. Return confidence scores (0-1)
 
-**Model**: `claude-sonnet-4-20250514` — superior vision capabilities compared to Haiku
+**Model**: `claude-sonnet-4-6` — superior vision capabilities compared to Haiku
 
 **Response handling**: The function parses Claude's JSON response and validates/sanitizes:
 - Titles truncated to 200 chars
@@ -503,7 +503,7 @@ This creates a positive feedback loop: better enrichment leads to better widgets
 All three systems share:
 - **Supabase PostgreSQL** for persistence (links, domain_profiles, strategy_performance, board_metadata tables)
 - **Claude 3 Haiku** for AI operations (categorization, content type classification, widget generation)
-- **Claude Sonnet 4** for vision tasks (image scanning with `scan-image`)
+- **Claude Sonnet 4.6** for vision tasks (image scanning with `scan-image`)
 - **Domain profile cache** used by both enrichment (to skip AI classification) and widgets (brand resolution)
 - **localStorage** as the primary client-side data store
 - **`tags[]` column** on the `links` table used by PinRanker for board-scoped relevance scoring and available for future server-side search

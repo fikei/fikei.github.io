@@ -5,6 +5,9 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
 
+const VERSION = "1.0.1";
+console.log(`[systemic-analyze] v${VERSION} - migrate to claude-sonnet-4-6 (Sonnet 4 retired)`);
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -163,7 +166,7 @@ Deno.serve(async (req) => {
     );
 
     const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [
         {
