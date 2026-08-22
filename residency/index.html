@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DJ Residency — Agape</title>
+  <meta name="description" content="A community-funded DJ residency in a 16-person Victorian in San Francisco's Mission District.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Knock-concept landing: the door answers only after you ring.
+       Self-contained page styles on top of the Sassy tokens. */
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      background: #0c0c0e; color: #ececec;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      min-height: 100dvh; display: flex; flex-direction: column;
+    }
+    .res-shell { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 48px 24px 96px; }
+    .res-mark { font-size: 14px; letter-spacing: .3em; text-transform: lowercase; opacity: .55; }
+
+    /* The bell */
+    .res-bell { text-align: center; padding: 18vh 0 0; transition: opacity .5s, transform .5s; }
+    .res-bell.rung { opacity: 0; transform: translateY(-12px); pointer-events: none; position: absolute; }
+    .res-bell h1 { font-size: clamp(28px, 6vw, 44px); font-weight: 500; margin: 24px 0 8px; }
+    .res-bell p { opacity: .6; }
+    .res-bell button {
+      margin-top: 40px; width: 88px; height: 88px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.04);
+      color: #ececec; font-family: inherit; font-size: 13px; letter-spacing: .1em;
+      cursor: pointer; transition: transform .15s, border-color .2s, background .2s;
+    }
+    .res-bell button:hover { border-color: rgba(255,255,255,.6); background: rgba(255,255,255,.08); }
+    .res-bell button:active { transform: scale(.93); }
+
+    /* The answer */
+    .res-body { opacity: 0; transform: translateY(16px); transition: opacity .7s .15s, transform .7s .15s; }
+    .res-body.open { opacity: 1; transform: none; }
+    .res-body h2 { font-size: clamp(26px, 5vw, 38px); font-weight: 500; line-height: 1.15; margin: 40px 0 16px; }
+    .res-body p { line-height: 1.65; opacity: .82; margin-bottom: 16px; }
+    .res-body .dim { opacity: .55; font-size: 14px; }
+    .res-section { margin-top: 44px; }
+    .res-section h3 { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; opacity: .5; margin-bottom: 14px; }
+    .res-list { list-style: none; padding: 0; }
+    .res-list li { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); line-height: 1.5; }
+    .res-list li:first-child { border-top: 1px solid rgba(255,255,255,.08); }
+
+    .res-listing {
+      margin-top: 44px; padding: 20px; border: 1px solid rgba(255,255,255,.16);
+      border-radius: 10px; background: rgba(255,255,255,.03);
+    }
+    .res-listing .title { font-size: 18px; font-weight: 500; }
+    .res-listing .meta { margin-top: 6px; font-size: 14px; opacity: .6; }
+    .res-cta {
+      display: inline-block; margin-top: 18px; padding: 14px 28px; border-radius: 8px;
+      background: #ececec; color: #0c0c0e; text-decoration: none; font-weight: 500;
+      transition: transform .15s;
+    }
+    .res-cta:active { transform: scale(.97); }
+    .res-closed { margin-top: 6px; opacity: .65; font-size: 15px; line-height: 1.6; }
+    .res-foot { padding: 24px; text-align: center; font-size: 12px; letter-spacing: .2em; opacity: .35; }
+  </style>
+</head>
+<body>
+  <main class="res-shell">
+    <div class="res-mark">agape · sf</div>
+
+    <section class="res-bell" id="bell">
+      <h1>There's a listening room<br>in the basement.</h1>
+      <p>Ring the bell.</p>
+      <button id="ring" aria-label="Ring the bell">ring</button>
+    </section>
+
+    <section class="res-body" id="body" hidden>
+      <h2>A community-funded DJ residency.</h2>
+      <p>We're Agape — a 16-person co-op in a massive old Victorian in San Francisco's Mission District. Over the last few years we've become home to DJs, artists, builders, and people making interesting things. We built a proper listening room in our basement with a Neptune sound system because we wanted a place to throw great parties and listen to music together.</p>
+      <p>Now we want to try an experiment: we'll select a DJ to come live with us. Room and board included. You get the sound system, the decks, time to work on your craft, and a place inside the community. Before you leave, we film a one-hour set in the basement.</p>
+      <p class="dim">The residency is funded entirely by application fees. The goal isn't to make money — it's to see whether enough people believe in the idea to keep this room open as an artist space long-term. Every application funds opportunities for future artists, selected or not.</p>
+
+      <div class="res-section">
+        <h3>Residents receive</h3>
+        <ul class="res-list">
+          <li>Room and board for the residency window</li>
+          <li>The Neptune sound system and Pioneer decks, downstairs from your room</li>
+          <li>Time to work on your craft inside a creative community</li>
+          <li>A one-hour filmed set in the basement before you leave</li>
+        </ul>
+      </div>
+
+      <div class="res-section">
+        <h3>What we ask</h3>
+        <ul class="res-list">
+          <li>Live with us — this is a home, not a hotel</li>
+          <li>An interview and house approval before selection</li>
+          <li>The set: recorded or performed by the end of your stay</li>
+          <li>A residency application fee, which funds the program</li>
+        </ul>
+      </div>
+
+      <div class="res-listing" id="listing">
+        <div class="res-closed">Checking whether applications are open…</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="res-foot">agape · mission district · sf</footer>
+
+  <script>
+    const VERSION = '1.0.0';
+    console.log(`[residency] v${VERSION} — DJ residency landing`);
+
+    const sb = supabase.createClient(
+      'https://yfhudwakpgzswiylhfbh.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI'
+    );
+
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmt = (iso) => {
+      const m = String(iso || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+      return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : '';
+    };
+
+    document.getElementById('ring').onclick = () => {
+      document.getElementById('bell').classList.add('rung');
+      const body = document.getElementById('body');
+      body.hidden = false;
+      requestAnimationFrame(() => body.classList.add('open'));
+    };
+
+    (async () => {
+      const el = document.getElementById('listing');
+      try {
+        const { data, error } = await sb.rpc('recruit_open_program_listings');
+        if (error) throw error;
+        const l = (data || [])[0];
+        if (!l) {
+          el.innerHTML = '<div class="res-closed">Applications aren\'t open right now. Follow <a href="https://instagram.com" style="color:inherit">our Instagram</a> for the next window.</div>';
+          return;
+        }
+        const dates = [l.starts_on, l.ends_on].filter(Boolean).map(fmt).join(' – ');
+        const bits = [dates,
+          l.fee_cents ? `$${Math.round(l.fee_cents / 100)} application fee` : '',
+          l.application_deadline ? `apply by ${fmt(l.application_deadline)}` : ''].filter(Boolean).join(' · ');
+        el.innerHTML = `
+          <div class="title">${esc(l.title)}</div>
+          <div class="meta">${esc(bits)}</div>
+          <a class="res-cta" href="/apply/?listing=${encodeURIComponent(l.slug)}">Apply now</a>`;
+      } catch (e) {
+        console.warn('[residency] listing load failed', e);
+        el.innerHTML = '<div class="res-closed">Couldn\'t reach the application service — try again in a minute.</div>';
+      }
+    })();
+  </script>
+  <script defer src="/analytics/track.js"></script>
+</body>
+</html>
