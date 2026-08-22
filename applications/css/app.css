@@ -1979,5 +1979,6 @@ body[data-auth-state="in"] .gate__spinner { display: block; }
 .add-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 @media (max-width: 560px) { .add-form__row { grid-template-columns: 1fr; } }
 
-/* Program (artist residency) listing badge — v3.85.4 */
-.listing-kind--program { background: var(--accent-muted); color: var(--accent-strong); }
+/* Program (artist residency) listing badge — pink, distinct from the blue
+   Resident trial badge; matches the /apply option tone. */
+.listing-kind--program { background: rgba(244, 114, 182, .18); color: #f472b6; }

@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.4';
-console.log(`[applications] v${VERSION} - program listings: named residency card in Openings + notify guards`);
+const VERSION = '3.85.5';
+console.log(`[applications] v${VERSION} - program listings: pink residency badge`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
