@@ -4,7 +4,7 @@
    and the applicant can come back any time to pick up or edit — until the
    house makes a decision, at which point the RPCs lock the row. */
 
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 console.log(`[apply] v${VERSION} — native application form + program listings`);
 
 const SUPABASE_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
@@ -29,8 +29,8 @@ const QUESTIONS = [
     label: 'What kind of stay are you looking for?',
     hint: 'Pick one — or both, if you could see either working. Rooms open up when they open up, so folks who can hop in when a spot frees up tend to move to the front.',
     options: [
-      { label: 'Full-time resident', short: 'Full-time', desc: 'A long-term home. Full-time starts with a three-month resident trial — live with us, see how it fits — then you join the house proper.' },
-      { label: 'Short-term (sublet)', short: 'Sublet', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
+      { label: 'Full-time resident', short: 'Full-time', tone: 'fulltime', desc: 'A long-term home. Full-time starts with a three-month resident trial — live with us, see how it fits — then you join the house proper.' },
+      { label: 'Short-term (sublet)', short: 'Sublet', tone: 'sublet', desc: 'A few months in an open room — while a resident is away, or a room waits for its person.' },
     ],
   },
   {
@@ -206,12 +206,14 @@ async function loadProgramListings() {
         l.application_deadline ? `apply by ${fmtISO(l.application_deadline)}` : '',
       ].filter(Boolean).join(' · ');
       RESIDENCY_Q.options.push({
-        label: l.title, short: l.title,
+        label: l.title, short: l.title, tone: 'program',
         desc: (l.blurb ? l.blurb + ' ' : '') + (bits ? `(${bits})` : ''),
         program: true, slug: l.slug, fee_cents: l.fee_cents || 0,
       });
       state.listings.push(l);
     }
+    // Housing options always lead; programs follow, in date order.
+    RESIDENCY_Q.options.sort((a, b) => (a.program ? 1 : 0) - (b.program ? 1 : 0));
   } catch (e) { console.warn('[apply] program listings load failed', e); }
 }
 
@@ -471,7 +473,7 @@ function inputHtml(q) {
       const label = typeof opt === 'string' ? opt : opt.label;
       const desc = typeof opt === 'string' ? '' : (opt.desc || '');
       return `
-      <button type="button" class="apply-choice ${label === cur ? 'selected' : ''}" data-value="${esc(label)}">
+      <button type="button" class="apply-choice ${typeof opt !== 'string' && opt.tone ? 'apply-choice--' + opt.tone : ''} ${label === cur ? 'selected' : ''}" data-value="${esc(label)}">
         <span class="apply-choice__key">${i + 1}</span>
         <span class="apply-choice__body">${esc(label)}${desc ? `<span class="apply-choice__desc">${esc(desc)}</span>` : ''}</span>
       </button>`;
@@ -484,7 +486,7 @@ function inputHtml(q) {
       const t = sel[opt.label];
       return `
       <div class="apply-field">
-        <button type="button" class="apply-choice ${t ? 'selected' : ''}" data-value="${esc(opt.label)}">
+        <button type="button" class="apply-choice ${opt.tone ? 'apply-choice--' + opt.tone : ''} ${t ? 'selected' : ''}" data-value="${esc(opt.label)}">
           <span class="apply-choice__key">${t ? '✓' : i + 1}</span>
           <span class="apply-choice__body">${esc(opt.label)}${opt.desc ? `<span class="apply-choice__desc">${esc(opt.desc)}</span>` : ''}</span>
         </button>

@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Process — Ian Fike</title>
+  <meta name="description" content="Design philosophy — Ian Fike.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico" sizes="any">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
@@ -31,6 +34,10 @@
     .hiw-systemic-card { background: #111110; padding: 24px; display: flex; flex-direction: column; gap: 8px; align-items: start; align-self: stretch; }
     .hiw-systemic-card__name { color: #E8E6E3; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; line-height: 18px; margin-bottom: 4px; }
     .hiw-systemic-card__desc { color: #8A8885; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 150%; }
+    @media (max-width: 768px) {
+      .hiw-section { padding: 32px 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .hiw-grid-3 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body class="d-page">

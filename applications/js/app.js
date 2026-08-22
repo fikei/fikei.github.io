@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.4';
+const VERSION = '3.85.6';
 console.log(`[applications] v${VERSION} - cache Discord gate verdict, skip cold-boot wait`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -2820,8 +2820,8 @@ function renderApplicants() {
     const room = rooms.find(r => r.id === l.room_id);
     return `<div class="listing-head__text">
         <h2 class="inbox-group__label">
-          <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="View on the occupancy calendar">${esc(room?.name || 'Room')}</a>
-          <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+          <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="${isProgramListing(l) ? esc(`Pegged to ${room?.name || 'a room'} — view on the occupancy calendar`) : 'View on the occupancy calendar'}">${esc(isProgramListing(l) ? (l.title || 'Artist residency') : (room?.name || 'Room'))}</a>
+          ${listingKindBadge(l)}
         </h2>
         <span class="inbox-group__count">${listingMeta(l)}</span>
       </div>
@@ -2836,6 +2836,14 @@ function renderApplicants() {
     if (drafts.length) {
       outreachChrome = drafts.map(l => {
         const room = rooms.find(r => r.id === l.room_id);
+        if (isProgramListing(l)) return `<div class="draft-card">
+          <span class="draft-card__text"><b>Draft — ${esc(l.title || 'Artist residency')}, ${fmtDay(l.starts_on)} – ${l.ends_on ? fmtDay(l.ends_on) : 'TBD'}</b>
+          <span>Invisible on /apply and the landing page until opened${l.payment_link ? '' : ' · payment link not set yet'}</span></span>
+          <span class="draft-card__actions">
+            <button type="button" class="cta-link" data-edit-listing="${l.id}">Edit</button>
+            <button type="button" class="btn btn--sm" data-open-draft="${l.id}">Open listing</button>
+          </span>
+        </div>`;
         return `<div class="draft-card">
           <span class="draft-card__text"><b>Draft — ${esc(room?.name || 'Room')}, ${l.kind === 'resident' ? `opens ${fmtDay(l.starts_on)}` : `${fmtDay(l.starts_on)} – ${l.ends_on ? fmtDay(l.ends_on) : 'TBD'}`}</b>
           <span>Detected from the occupancy calendar · invisible to bucketing until opened</span></span>
@@ -2857,8 +2865,8 @@ function renderApplicants() {
           return `<li class="inbox-row listing-row is-done">
             <span class="inbox-row__text">
               <span class="inbox-row__title">
-                <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="View on the occupancy calendar">${esc(room?.name || 'Room')}</a>
-                <span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>
+                <a class="listing-head__room" href="?view=occupancy&room=${l.room_id}" data-occ-room-link="${l.room_id}" title="View on the occupancy calendar">${esc(isProgramListing(l) ? (l.title || 'Artist residency') : (room?.name || 'Room'))}</a>
+                ${listingKindBadge(l)}
               </span>
               <span class="inbox-row__sub">${listingWindow(l)}</span>
             </span>
@@ -2876,9 +2884,19 @@ function renderApplicants() {
     <section class="inbox-group ${view === 'openings' && g.key !== 'general' ? 'listing-group' : ''}" ${view === 'openings' ? `data-group-key="${esc(g.key)}"` : ''}>
       <div class="inbox-group__head ${view === 'openings' ? 'listing-head' : ''}">
         ${groupHead(g)}
-        <span class="inbox-group__count listing-head__n">${g.items.length} applicant${g.items.length === 1 ? '' : 's'}</span>
+        <span class="inbox-group__count listing-head__n">${(() => {
+          // Program applicants live in the Inbox, not in placements — count
+          // them by their listing link so the card doesn't read "0".
+          const pl = view === 'openings' ? listings.find(x => x.id === g.key) : null;
+          const n = pl && isProgramListing(pl)
+            ? applicants.filter(a => a.listingId === pl.id && a.stage !== 'rejected' && a.stage !== 'archived').length
+            : g.items.length;
+          return `${n} applicant${n === 1 ? '' : 's'}`;
+        })()}</span>
       </div>
-      ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">No qualifying candidates yet — they land here automatically when they pass review.</p>` : `<ul class="inbox-card">
+      ${view === 'openings' && !g.items.length ? `<p class="inbox-empty inbox-empty--group">${isProgramListing(listings.find(x => x.id === g.key) || {})
+        ? 'Residency applicants stay in the Inbox — filter by Artist residency, review, then promote a finalist to fill this listing.'
+        : 'No qualifying candidates yet — they land here automatically when they pass review.'}</p>` : `<ul class="inbox-card">
         ${g.items.map(a => `
           <li class="inbox-row" ${view === 'openings' ? `draggable="true" data-row-id="${a.id}" data-row-group="${esc(g.key)}"` : ''}>
             ${repliedDot(a)}
@@ -4786,8 +4804,26 @@ function listingPricing(l) {
 
 /* One meta line, no repetition: when + terms + all-in cost (breakdown on
    hover). Notes live in the edit modal, not the header. */
+const isProgramListing = (l) => Boolean(l?.listing_type && l.listing_type !== 'room');
+
+/* The kind badge next to a listing's name — programs get their own color and
+   the generic type name (the listing's own title carries the specifics). */
+function listingKindBadge(l) {
+  if (isProgramListing(l)) return `<span class="listing-kind listing-kind--program">Artist residency</span>`;
+  return `<span class="listing-kind listing-kind--${l.kind}">${l.kind === 'resident' ? 'Resident trial' : 'Sublet'}</span>`;
+}
+
 function listingMeta(l) {
   const bits = [];
+  if (isProgramListing(l)) {
+    bits.push(`<b class="listing-when">${fmtDay(l.starts_on)} – ${l.ends_on ? fmtDay(l.ends_on) : 'TBD'}</b>`);
+    const len = windowLength(l.starts_on, l.ends_on);
+    if (len) bits.push(len);
+    if (l.application_deadline) bits.push(`apply by ${fmtDay(l.application_deadline)}`);
+    if (l.fee_cents) bits.push(`$${Math.round(l.fee_cents / 100)} fee`);
+    if (l.public_slug) bits.push(`<span class="listing-allin" title="The public application link">/apply?listing=${esc(l.public_slug)}</span>`);
+    return bits.join(' · ');
+  }
   // The date is the first thing anyone needs from a listing — it decides who
   // qualifies — so it leads and it's emphasised.
   if (l.kind === 'resident') {
