@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.1';
-console.log(`[applications] v${VERSION} - program listings: artist-residency listing editor swap + labels`);
+const VERSION = '3.85.2';
+console.log(`[applications] v${VERSION} - program listings: keep New listing/Add person head actions with score button`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -1589,17 +1589,27 @@ function setView(next, push = true) {
   render();
 }
 
+/* The page-head action for the current view. One source of truth — render()
+   sets it and renderApplicants() re-sets it (the score button comes and goes
+   with the residency filter), so both must draw from here. */
+function headActionHtml() {
+  const score = view === 'inbox' && filters.program === 'dj'
+    ? `<button class="btn btn--accent" id="score-inbox-btn" title="Score up to 10 unscored applicants using AI">Score inbox</button>`
+    : '';
+  const base = view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>`
+    // Referrals and walk-ins that never touched the application form.
+    : view === 'inbox' || view === 'candidates'
+      ? `<button class="btn btn--sm" data-add-person="${view === 'candidates' ? 'candidate' : 'review'}">Add person</button>`
+    : '';
+  return score + base;
+}
+
 async function render() {
   const def = VIEWS[view];
   document.getElementById('page-title').textContent = def.title;
   document.getElementById('mobile-title').textContent = def.title;
   const headAction = document.getElementById('page-head-action');
-  if (headAction) headAction.innerHTML =
-    view === 'openings' ? `<button class="btn btn--sm" data-new-listing>New listing</button>`
-    // Referrals and walk-ins that never touched the application form.
-    : view === 'inbox' || view === 'candidates'
-      ? `<button class="btn btn--sm" data-add-person="${view === 'candidates' ? 'candidate' : 'review'}">Add person</button>`
-    : '';
+  if (headAction) headAction.innerHTML = headActionHtml();
   document.querySelectorAll('[data-view-link]').forEach(el =>
     el.classList.toggle('is-current', el.dataset.viewLink === view
       && (el.classList.contains('rail-nav__row') || el.classList.contains('rail-foot__settings'))));
@@ -2750,13 +2760,10 @@ function renderApplicants() {
     (view === 'inbox' ? ' waiting on a review · one read decides' :
      view === 'candidates' ? ' passed review — waiting for a room' : '');
 
-  // Add score button for DJ program inbox
+  // The score button comes and goes with the residency filter; keep the
+  // view's own action (New listing / Add person) alongside it.
   const pageAction = document.getElementById('page-head-action');
-  if (view === 'inbox' && filters.program === 'dj') {
-    pageAction.innerHTML = `<button class="btn btn--accent" id="score-inbox-btn" title="Score up to 10 unscored applicants using AI">Score inbox</button>`;
-  } else {
-    pageAction.innerHTML = '';
-  }
+  if (pageAction) pageAction.innerHTML = headActionHtml();
 
   const host = document.getElementById('view-root');
   host.className = 'inbox';
