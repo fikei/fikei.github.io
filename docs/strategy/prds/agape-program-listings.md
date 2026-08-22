@@ -7,9 +7,19 @@
 
 ---
 
+## Decisions (2026-08-21)
+
+1. **Legal read + framing:** informal legal consult before opening; all copy (landing, form, Stripe) says "residency application fee" — never anything tenancy-shaped.
+2. **Payment before final submit** — the form is completed first, payment is the last gate; no unpaid app is reviewable.
+3. **Capacity messaging:** publicly "up to three residency months across the year"; the actual winner count per cohort is decided privately after fee totals land (`capacity` on the listing).
+4. **Duration is a listing-setup parameter** (`starts_on`/`ends_on`), not fixed at one month. First test: a single **2-month residency**, backstopped by existing house funds.
+5. **Set deliverable:** filmed live set at a house party in the final week, published publicly (resident keeps rights, Agape may post); written into the offer email as a condition of the residency.
+6. **Scores are display-only:** shown in triage (breakdown + total), never a gate — no shortlist floor, no auto-decisions on score.
+7. **One application per cohort; cohorts are never published concurrently** — at most one program listing is open at a time. Applying to a later cohort is a new application (existing re-apply machinery).
+
 ## Program overview: the DJ residency
 
-- Up to three one-month residencies in the priest room (target cohorts: September, October, February — exact dates TBD by the house).
+- Residencies in the priest room; duration set per listing at setup (first test: one 2-month residency; later cohorts may be one month — exact dates TBD by the house).
 - Applications open on Instagram: reel → link in bio → landing page → /apply.
 - $20 application fee funds the program; all proceeds go to rent and growing the residency. The house guarantees one month's rent if applications fall short; if income is short, only one cohort is granted.
 - Residents receive one month room & board, access to the Neptune sound system and Pioneer decks, and time to work in a creative community.
@@ -59,7 +69,7 @@ Alumni archive (deferred)
 | `capacity` | Winners per cohort (default 1) |
 | `public_slug` | URL-safe id for deep links, e.g. `dj-sept` |
 
-Existing `starts_on`/`ends_on` are the cohort start/end. One listing per cohort, pegged to the priest room's `room_id`, so occupancy stays truthful.
+Existing `starts_on`/`ends_on` are the cohort start/end — **duration is set at listing setup** (the first test is a 2-month listing). One listing per cohort, pegged to the priest room's `room_id`, so occupancy stays truthful. **At most one program listing is open at a time**; later cohorts are drafted and opened sequentially.
 
 ### 2. Draft & soft-launch lifecycle (general concept)
 
@@ -73,8 +83,8 @@ Existing `starts_on`/`ends_on` are the cohort start/end. One listing per cohort,
 
 The /apply step "What kind of stay are you looking for?" ([form.js:28](../../../apply/js/form.js)) keeps its hardcoded Full-time / Sublet options and dynamically appends one checkable option per **open program listing**, with basic details: title, dates, deadline, fee.
 
-- New anon-safe RPC `recruit_open_program_listings()` returns only the public subset (title, blurb, dates, deadline, fee, slug) for `status='open'` listings.
-- Checked program options record the applicant → listing link (feature 5 schema), so an applicant can apply to multiple cohorts in one pass.
+- New anon-safe RPC `recruit_open_program_listings()` returns only the public subset (title, blurb, dates, deadline, fee, slug) for `status='open'` listings — in practice zero or one, since cohorts never run concurrently.
+- Checking the program option records the applicant → listing link (`listing_id` on the applicant). One application per cohort; a later cohort means a fresh application via the existing re-apply flow.
 
 ### 4. Branching downstream flow
 
@@ -93,7 +103,6 @@ Question sets are keyed by what's checked on Kind of Stay, reusing the existing 
 | Artist name | `artist_name` | Display name in triage alongside legal name |
 | Mix/set links | `mix_links` (JSONB) | SoundCloud / Bandcamp / YouTube / etc. |
 | Music socials | `socials` | IG/TikTok handles for the artist project |
-| Cohort choice | `listing_ids` via `recruit_applicant_listings` join | Which open cohorts they'd accept |
 | Your sound | `sound_essay` | Replaces `why_agape` phrasing for the residency |
 | Performance history | `performance_history` | Where they've played, sets performed |
 | Gear needs | `gear_notes` | Beyond Neptune + Pioneer baseline |
@@ -116,7 +125,7 @@ Question sets are keyed by what's checked on Kind of Stay, reusing the existing 
 ### 8. Volume triage (1,000 applications)
 
 - **Filter:** Inbox filters by listing / listing_type (housing vs program), persisted in URL.
-- **AI first pass:** new `recruit-score-apps` edge function (Haiku, same pattern as `classify-apply-ease`) scores five dimensions — credentials, sound, fit, logistics, excitement — 1–5 each, plus `score_total` (5–25) and a two-sentence note. Deduped on `scored_at`; manual "Score inbox" button first, cron later. Scores are a recruiter-only triage tool, never a decision rule.
+- **AI first pass:** new `recruit-score-apps` edge function (Haiku, same pattern as `classify-apply-ease`) scores five dimensions — credentials, sound, fit, logistics, excitement — 1–5 each, plus `score_total` (5–25) and a two-sentence note. Deduped on `scored_at`; manual "Score inbox" button first, cron later. **Scores are display-only**: shown in triage (breakdown + total, sortable), never a gate — no shortlist floor, no auto-advance or auto-reject on score.
 - **Bulk actions:** multi-select → advance to finalists, reject (queues the v3.83 bulk rejection email), flag for review, rescore.
 - **Finalists only** get the existing collective review: votes 1–5 + veto via `recruit_recompute_stage` — unchanged.
 
@@ -131,8 +140,7 @@ Question sets are keyed by what's checked on Kind of Stay, reusing the existing 
 ## Schema deltas (migration 178, sketch)
 
 - `recruit_listings`: + `listing_type`, `title`, `public_blurb`, `application_deadline`, `fee_cents`, `payment_link`, `capacity`, `public_slug`; `status` CHECK gains `draft`.
-- `recruit_applicant_listings` (new join): `applicant_id`, `listing_id`, `created_at` — which cohorts an applicant applied to.
-- `recruit_applicants`: + `artist_name`, `mix_links` JSONB, `socials`, `sound_essay`, `performance_history`, `gear_notes`, `based_in`, `payment_status`, `payment_ref`, `paid_at`, five `score_*` columns + `score_total`, `score_notes`, `scored_at`, `flag_for_review`. `application_type` is derived from linked listings (no duplicate source of truth).
+- `recruit_applicants`: + `listing_id` (FK, one application per cohort — no join table needed since cohorts never run concurrently), `artist_name`, `mix_links` JSONB, `socials`, `sound_essay`, `performance_history`, `gear_notes`, `based_in`, `payment_status`, `payment_ref`, `paid_at`, five `score_*` columns + `score_total`, `score_notes`, `scored_at`, `flag_for_review`. `application_type` is derived from the linked listing (no duplicate source of truth).
 - `recruit_stays`: + `listing_id`, `set_delivered_at`, `set_url`; `kind` CHECK gains `dj_resident`.
 - `recruit_apply_columns()` extended with the new applicant-editable fields.
 - New RPCs: `recruit_open_program_listings()` (anon-safe), `recruit_promote_program_resident()` (member-gated).
@@ -146,21 +154,15 @@ Vote model and thresholds, `recruit_recompute_stage`, screening claims + Gmail/G
 
 ## Risks (flagged for house review — not resolved here)
 
-1. **Paid-application optics / fair housing:** charging to apply for lodging may carry legal or reputational risk. Get a legal read before launch; framing as an arts-grant application fee (residency, not tenancy) matters.
+1. **Paid-application optics / fair housing:** charging to apply for lodging may carry legal or reputational risk. Decision 1 commits to a pre-launch legal consult and "residency application fee" framing throughout.
 2. **Chargebacks & reconciliation drift:** email-matched Payment Links are lossy at volume; budget for a small unmatched tail and move to webhooks if volume materializes.
 3. **1,000-application load:** human review without the AI first pass is infeasible; expect scoring false positives/negatives — finalists always get human eyes.
-4. **Occupancy collisions:** back-to-back cohorts in a full house; listings pegged to the priest room keep the calendar honest, but confirm dates against occupancy before opening each cohort.
-5. **Set-delivery accountability:** nothing enforces the end-of-month set today; checklist item in v1, tracked fields in Phase 2.
+4. **Occupancy collisions:** sequential cohorts avoid concurrent-listing complexity, but confirm each listing's dates against occupancy before opening it; the first 2-month test takes the priest room off sublet income for that window (house funds backstop it).
+5. **Set-delivery accountability:** the set condition lives in the offer email and onboarding checklist in v1; tracked fields (`set_delivered_at`/`set_url`) in Phase 2.
 
 ## Open questions for the house
 
-1. Exact cohort dates (Sep/Oct/Feb) and capacity per cohort (fixed 1, or flexible with income)?
-2. Payment before submit (recommended) or after?
-3. Set format: recorded vs live, who films, where does it get published?
-4. Interview logistics: who schedules, video or in-person, vote format afterward?
-5. Legal review of the paid application before launch?
-6. Who owns the Instagram campaign and landing-page copy?
-7. Shortfall fallback: fewer cohorts (per the proposal) or cancel?
-8. Alumni sets public, members-only, or private?
-9. Can non-winners re-apply to a later cohort automatically?
-10. Score floor for the shortlist (default 18/25) — tune after the first batch?
+1. Exact dates for the first 2-month test listing?
+2. Interview logistics: who schedules, video or in-person, vote format afterward?
+3. Who owns the Instagram campaign and landing-page copy?
+4. Alumni sets public, members-only, or private? (Default lean: public — the sets are the flywheel for future cohorts.)

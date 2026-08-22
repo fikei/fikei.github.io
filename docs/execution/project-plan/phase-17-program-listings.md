@@ -29,25 +29,25 @@ Extends `recruit_listings` into a general program-listing concept (draft → ope
 | Story | Tasks |
 |---|---|
 | **Program listing schema** | Migration 178: `recruit_listings` + `listing_type`, `title`, `public_blurb`, `application_deadline`, `fee_cents`, `payment_link`, `capacity`, `public_slug`; `status` CHECK gains `draft` |
-| | `recruit_applicant_listings` join table + RLS |
+| | `recruit_applicants.listing_id` FK (one application per cohort; cohorts never open concurrently) |
 | | `recruit_applicants` DJ/payment/score columns; extend `recruit_apply_columns()` |
 | | `recruit_stays` + `listing_id`, `set_delivered_at`, `set_url`; `kind` gains `dj_resident` |
 | | Indexes: `(listing_type, status)`, DJ `score_total DESC NULLS LAST` |
 | **Public listing RPC** | `recruit_open_program_listings()` — anon-safe subset (title, blurb, dates, deadline, fee, slug) of open listings |
 | **Draft / soft-launch lifecycle** | Drafts hidden from public RPC; recruiter preview via `?listing=slug&preview=1` (membership-gated) |
 | | Deadline auto-close (cron or check-on-read); manual open/close in listing editor |
-| **Listing editor (triage app)** | Create/edit program listings in /applications Openings view: draft by default, open button, all program criteria fields |
-| | Seed three draft DJ listings (Sep, Oct, Feb) pegged to the priest room |
+| **Listing editor (triage app)** | Create/edit program listings in /applications Openings view: draft by default, open button, all program criteria fields incl. duration (`starts_on`/`ends_on` set at setup) |
+| | Guard: at most one program listing `open` at a time |
+| | Seed one draft DJ listing: the 2-month test residency, pegged to the priest room (house funds backstop) |
 
 ## Epic 17.2: Kind of Stay + branching form (apply v1.7.0)
 
 | Story | Tasks |
 |---|---|
 | **Dynamic Kind of Stay** | Fetch open program listings on load; append checkable options (title, dates, deadline, fee) after Full-time/Sublet |
-| | Record applicant ↔ listing links on save (join table via `recruit_apply_save`) |
+| | Record `listing_id` on the applicant on save (via `recruit_apply_save`) |
 | **Branching question sets** | DJ question set: artist_name, mix_links, socials, sound_essay, performance_history, gear_notes, based_in |
 | | DJ-exclusive: drop budget, move_in, full-time/sublet framing; Both: union, each question once |
-| | Reuse `parseTracks` multi-track pattern for cohort choice |
 | **Deep link** | `?listing=<slug>` pre-checks the listing + context banner (title, dates, fee, deadline); invalid/closed slug falls back gracefully |
 | **Versioning** | form.js → v1.7.0; console pattern `[apply] v1.7.0 - ...` |
 
@@ -68,7 +68,7 @@ Extends `recruit_listings` into a general program-listing concept (draft → ope
 | | Manual "Score inbox" button in triage first; cron later |
 | **Inbox filter + sort** | Filter by listing / listing_type (URL-persisted); sort by score_total, submitted_at, paid_at |
 | **Bulk actions** | Multi-select → advance to finalists, reject (v3.83 bulk email queue), flag for review, rescore |
-| **DJ profile view** | Artist name prominent; clickable mix links; gear/based-in/cohort chips; score breakdown panel |
+| **DJ profile view** | Artist name prominent; clickable mix links; gear/based-in chips; score breakdown panel (display-only — scores never gate or auto-decide) |
 | **Finalist votes** | Existing 1–5 + veto + `recruit_recompute_stage`, unchanged — verify it fires for program applicants |
 
 ## Epic 17.5: Landing + comms
@@ -107,8 +107,8 @@ Extends `recruit_listings` into a general program-listing concept (draft → ope
 
 | Existing machinery | Reused for |
 |---|---|
-| `parseTracks` (apply/js/form.js) | Multi-listing cohort selection |
 | `recruit_apply_save` RPC + edit-lock | DJ field autosave |
+| Re-apply flow (migration 171) | Applying to a later cohort (one application per cohort) |
 | `recruit_recompute_stage` trigger + vote UI | Finalist review |
 | v3.83 bulk rejection-email queue | Program rejections at volume |
 | Screening claims (recruit-gmail/discord) + GCal | Finalist interviews |
