@@ -483,6 +483,10 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     // BOTH cases — previously we only seeded when history_id was null,
     // so an expired cursor stayed stale forever and every run re-ran the
     // expensive timestamp query.
+    // A truncated history list advances the cursor only to the last
+    // record consumed — chain the auto-drain so the remainder is picked
+    // up now instead of on the next cron tick.
+    if (listRes.truncated) lastRunCapped = true;
     let nextHistory: string | null = listRes.nextHistoryId;
     if (!nextHistory) {
       nextHistory = await getProfileHistoryId(accessToken);

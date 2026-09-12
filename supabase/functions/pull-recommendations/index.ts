@@ -25,8 +25,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.35.0';
-console.log(`[pull-recommendations] v${VERSION} - gmail backlog auto-drain (capped runs self-rekick) + a16z Jobs sender allowlisted`);
+const VERSION = '0.35.1';
+console.log(`[pull-recommendations] v${VERSION} - gmail history.list pagination fix (backlogs no longer silently dropped past page 1)`);
 
 // Auto-drain: a capped gmail-jobs run re-kicks this function for the same
 // source until the backlog is gone. Depth cap bounds the chain so a bug
