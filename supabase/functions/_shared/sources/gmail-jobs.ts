@@ -610,8 +610,20 @@ function senderLabel(sender: string): string {
 }
 
 function senderDomainOf(sender: string): string | undefined {
-  return sender.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase();
+  const domain = sender.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase();
+  if (!domain) return undefined;
+  // Newsletter/ESP platforms are never the hiring company — passing them
+  // as an enrich hint resolves roles to the PLATFORM's own ATS board
+  // (a16z Jobs recs landed on jobs.ashbyhq.com/substack). No hint beats
+  // a wrong hint.
+  if (NEWSLETTER_PLATFORM_DOMAINS.some(d => domain === d || domain.endsWith(`.${d}`))) return undefined;
+  return domain;
 }
+
+const NEWSLETTER_PLATFORM_DOMAINS = [
+  'substack.com', 'beehiiv.com', 'mailchimp.com', 'convertkit.com',
+  'kit.com', 'buttondown.com', 'ghost.io',
+];
 
 // ---------- Phase 1.5 enrichment ----------
 //
