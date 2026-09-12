@@ -205,6 +205,14 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           { afterEpochSec: state.last_scan_at ? Math.floor(new Date(state.last_scan_at).getTime() / 1000) : null },
           builtQuery,
         );
+        // Drop the history cursor NOW so chained drain runs go straight to
+        // the timestamp path instead of re-paginating the same huge window
+        // (~17 history pages ≈ seconds of fixed overhead per run). The
+        // timestamp cursor (last_scan_at) is unchanged, so nothing is lost;
+        // the final non-capped run re-seeds history from the profile.
+        state.history_id = null;
+        await sql`update job.gmail_scan_state set history_id = null, updated_at = now()
+                   where user_email = ${ctx.userEmail}`;
       }
     } catch (e) {
       await markScanError(sql, ctx.userEmail, (e as Error).message);
@@ -464,11 +472,13 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       }
     }
 
-    // Phase 2.0 — application-tracker scan runs UNCONDITIONALLY (before
-    // the cap-vs-drain split). It does its own Gmail query, independent
-    // of the recs cursor, so keeping it inside the capped-run early
-    // return would silently mute the application timeline on busy inboxes.
-    try {
+    // Phase 2.0 — application-tracker scan. Skipped on capped (mid-backlog)
+    // runs: it costs ~40s of the 150s budget and re-scans the same recent
+    // window every chained run — the final non-capped run of the chain
+    // covers the timeline with minutes of delay at most.
+    if (cappedRun) {
+      console.log('[gmail-jobs] backlog run — application-scan deferred to the final run of the chain');
+    } else try {
       const appScan = await scanApplicationResponses({
         userEmail:   ctx.userEmail,
         accessToken,
