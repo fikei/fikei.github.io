@@ -25,8 +25,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.36.2';
-console.log(`[pull-recommendations] v${VERSION} - drain runs shed fixed overhead: history cursor dropped after big-window fallback, application-scan deferred to the chain's final run`);
+const VERSION = '0.36.3';
+console.log(`[pull-recommendations] v${VERSION} - newsletter platform domains (substack etc.) no longer passed as enrich hints (roles were resolving to the platform's own ATS board)`);
 
 // Auto-drain: a capped gmail-jobs run re-kicks this function for the same
 // source until the backlog is gone. Depth cap bounds the chain so a bug
