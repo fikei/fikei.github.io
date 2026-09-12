@@ -25,8 +25,8 @@ import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.36.0';
-console.log(`[pull-recommendations] v${VERSION} - gmail catch-up counters stamped to gmail_scan_state (backlog_total/backlog_left) for the progress UI`);
+const VERSION = '0.36.1';
+console.log(`[pull-recommendations] v${VERSION} - big history windows re-list via sender-filtered timestamp query (avoids per-message getMessage on unrelated mail)`);
 
 // Auto-drain: a capped gmail-jobs run re-kicks this function for the same
 // source until the backlog is gone. Depth cap bounds the chain so a bug
