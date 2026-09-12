@@ -70,23 +70,51 @@ export async function listSinceCursor(
   query?: string,                                       // e.g. 'newer_than:7d category:updates'
 ): Promise<ListResult> {
   if (cursor.historyId) {
-    const url = new URL(`${GMAIL_BASE}/history`);
-    url.searchParams.set('startHistoryId', cursor.historyId);
-    url.searchParams.set('historyTypes', 'messageAdded');
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (r.status === 404 || r.status === 410) {
-      // History expired. Caller should retry with the timestamp path.
-      return { messageIds: [], nextHistoryId: null, historyExpired: true };
-    }
-    if (!r.ok) throw new Error(`gmail history.list ${r.status}: ${await r.text()}`);
-    const data = await r.json() as { history?: Array<{ messagesAdded?: Array<{ message: GmailMessageRef }> }>; historyId?: string };
+    // history.list is PAGED (default 100 history records per page). Reading
+    // only the first page and then stamping the mailbox-current historyId
+    // as the next cursor silently drops everything on later pages — a
+    // 12-day backlog "drains" in one tick with most of it never listed.
+    // Paginate to the end; if we hit the page cap with more remaining,
+    // resume from the last history-record id we actually saw (record ids
+    // are valid startHistoryId values), so nothing is skipped.
     const ids: string[] = [];
-    for (const h of (data.history || [])) {
-      for (const ma of (h.messagesAdded || [])) {
-        if (ma.message?.id) ids.push(ma.message.id);
+    let pageToken: string | undefined;
+    let lastRecordId: string | null = null;
+    let mailboxHistoryId: string | null = null;
+    let truncated = false;
+    const MAX_HISTORY_PAGES = 20;
+    for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
+      const url = new URL(`${GMAIL_BASE}/history`);
+      url.searchParams.set('startHistoryId', cursor.historyId);
+      url.searchParams.set('historyTypes', 'messageAdded');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (r.status === 404 || r.status === 410) {
+        // History expired. Caller should retry with the timestamp path.
+        return { messageIds: [], nextHistoryId: null, historyExpired: true };
       }
+      if (!r.ok) throw new Error(`gmail history.list ${r.status}: ${await r.text()}`);
+      const data = await r.json() as { history?: Array<{ id?: string; messagesAdded?: Array<{ message: GmailMessageRef }> }>; historyId?: string; nextPageToken?: string };
+      mailboxHistoryId = data.historyId || mailboxHistoryId;
+      for (const h of (data.history || [])) {
+        if (h.id) lastRecordId = h.id;
+        for (const ma of (h.messagesAdded || [])) {
+          if (ma.message?.id) ids.push(ma.message.id);
+        }
+      }
+      if (!data.nextPageToken) break;
+      pageToken = data.nextPageToken;
+      if (page === MAX_HISTORY_PAGES - 1) truncated = true;   // more pages remained
     }
-    return { messageIds: dedupe(ids), nextHistoryId: data.historyId || cursor.historyId || null, historyExpired: false };
+    if (truncated) {
+      console.warn(`[gmail] history.list hit ${MAX_HISTORY_PAGES}-page cap from ${cursor.historyId} — resuming next tick at record ${lastRecordId}`);
+    }
+    // Complete read → advance to mailbox-current. Truncated read → advance
+    // only to the last record we consumed so the next tick continues.
+    const nextHistoryId = truncated
+      ? (lastRecordId || cursor.historyId || null)
+      : (mailboxHistoryId || cursor.historyId || null);
+    return { messageIds: dedupe(ids), nextHistoryId, historyExpired: false, truncated };
   }
 
   // Timestamp path. Default to last 14 days if no cursor at all.
