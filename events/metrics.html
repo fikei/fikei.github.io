@@ -51,7 +51,7 @@
 
   <h2>Sources</h2>
   <div class="table-scroll"><table id="sourcesTable"><thead><tr>
-    <th>Source</th><th>Class</th><th>Status</th><th class="num">Events</th><th class="num">Success rate</th><th>Last success</th>
+    <th>Source</th><th>Class</th><th>Status</th><th class="num">Events</th><th class="num">Success rate</th><th>Last success</th><th>Issue → fix</th>
   </tr></thead><tbody></tbody></table></div>
 
   <h2>Recent Scrape Runs</h2>
@@ -98,7 +98,7 @@
   const [evRes, srcRes, healthRes, runsRes, covRes] = await Promise.all([
     fetchAllEvents(),
     sb.from('event_sources').select('id, name, source_class, enabled, demoted'),
-    sb.from('source_health').select('source_id, status, success_rate, last_success_at, last_success_event_count'),
+    sb.from('source_health').select('source_id, status, success_rate, last_success_at, last_success_event_count, last_failure_reason, consecutive_failures'),
     sb.from('scrape_runs').select('started_at, triggered_by, sources_succeeded, sources_failed, events_total, events_new, events_updated').order('started_at', { ascending: false }).limit(8),
     sb.from('agape_coverage').select('*'),
   ]);
@@ -133,6 +133,23 @@
     `<tr><td>${esc(cov.agape_events)}</td><td class="num">${esc(cov.corroborated)}</td><td class="num">${esc(cov.corroboration_pct ?? '—')}${cov.corroboration_pct != null ? '%' : ''}</td></tr>`;
 
   // --- Sources table ---
+  // Known recurring failure reasons → human description + a direct fix link.
+  // Runbook lives in the repo: docs/infrastructure/events-error-runbook.md
+  const RUNBOOK = 'https://github.com/fikei/fikei.github.io/blob/master/docs/infrastructure/events-error-runbook.md';
+  function issueFix(s, h) {
+    if (!h.status || h.status === 'healthy' || h.status === 'unknown') return '';
+    const reason = h.last_failure_reason || '';
+    const fails = h.consecutive_failures || 0;
+    if (s.id && (h.status === 'broken') && /blocked/i.test(reason) && /^eb-|eventbrite/i.test(s.id + (s.source_class || ''))) {
+      return `Eventbrite blocks the unauthenticated org endpoint (${fails} fails in a row). <a href="${RUNBOOK}#eventbrite-org-403">Fix steps</a>`;
+    }
+    if (/blocked/i.test(reason)) return `The site is blocking the scraper (403). <a href="${RUNBOOK}#eventbrite-org-403">Fix steps</a>`;
+    if (/rate.?limit|429/i.test(reason)) return `Rate-limited upstream; usually self-heals. <a href="${RUNBOOK}#ticketmaster-429">If persistent</a>`;
+    if (/zero_results/i.test(reason)) return `Scrape succeeds but finds no events — the page layout likely changed and the parser needs updating (${fails} fails in a row). <a href="${RUNBOOK}#zero-results">Fix steps</a>`;
+    if (/invariant/i.test(reason)) return `An invariant check flagged this source — see pipeline_invariant_checks. <a href="${RUNBOOK}#invariants">Details</a>`;
+    if (/timed? ?out|aborted/i.test(reason)) return `Fetch timed out; usually transient. <a href="${RUNBOOK}#timeouts">If persistent</a>`;
+    return reason ? `${esc(reason)} — <a href="${RUNBOOK}">runbook</a>` : '';
+  }
   const counts = {};
   for (const e of events) counts[e.source_id] = (counts[e.source_id] || 0) + 1;
   const rows = sources
@@ -149,9 +166,10 @@
         <td class="num">${counts[s.id] || 0}</td>
         <td class="num">${h.success_rate != null ? Math.round(h.success_rate * 100) + '%' : '—'}</td>
         <td>${h.last_success_at ? new Date(h.last_success_at).toLocaleString() : '—'}</td>
+        <td>${issueFix(s, h)}</td>
       </tr>`;
     }).join('');
-  document.querySelector('#sourcesTable tbody').innerHTML = rows || '<tr><td colspan="6">No sources</td></tr>';
+  document.querySelector('#sourcesTable tbody').innerHTML = rows || '<tr><td colspan="7">No sources</td></tr>';
 
   // --- Runs table ---
   document.querySelector('#runsTable tbody').innerHTML = (runsRes.data || []).map(r => `<tr>
