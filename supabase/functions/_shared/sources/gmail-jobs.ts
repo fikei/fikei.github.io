@@ -44,6 +44,17 @@ import { scanApplicationResponses } from '../gmail-application-scan.ts';
 // and reused thereafter (see ensureLabel cache in _shared/gmail.ts).
 const LADDER_LABEL = 'Ladder';
 
+// Capped-run signal for auto-drain. pull() sets this when it stops at
+// maxMessagesPerRun with messages still queued; pull-recommendations
+// reads-and-clears it after each gmail-jobs pull and re-kicks itself so
+// a backlog drains across chained runs without waiting for cron.
+let lastRunCapped = false;
+export function consumeGmailCappedRun(): boolean {
+  const v = lastRunCapped;
+  lastRunCapped = false;
+  return v;
+}
+
 interface GmailJobsCfg {
   allowSenders?: string[];
   blockSenders?: string[];
@@ -75,6 +86,10 @@ const DEFAULT_ALLOW_SENDERS = [
   // plain company/title/location listings with tracking links. Mixed
   // relevance; downstream fit scoring filters the noise.
   '@kimblegroup.com',
+  // a16z Jobs — Substack newsletter profiling one portfolio company per
+  // issue with an "Open roles" section (multi-role, no ATS links).
+  // Exact address on purpose: never allowlist bare substack.com.
+  'a16zjobs@substack.com',
 ];
 
 // Subjects/senders that are almost always multi-role digests. We log
@@ -112,6 +127,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
   type: 'gmail-jobs',
 
   async pull(cfg, ctx): Promise<RecommendedRoleInput[]> {
+    lastRunCapped = false;
     const sb = getServiceClient();
 
     // Resolve user_id for the email so we can look up the Google token.
@@ -458,6 +474,7 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           set last_error = null, updated_at = now()
       `;
       console.log(`[gmail-jobs] ${ctx.userEmail} → run capped, cursor unchanged (more messages queued)`);
+      lastRunCapped = true;
       return out;
     }
 
@@ -604,6 +621,9 @@ function looksLikeDigest(subject: string, sender: string): boolean {
   // Kimble Group digests list many roles behind tracking links the
   // link-counter can't see — force the multi-extractor.
   if (/@kimblegroup\.com/i.test(sender)) return true;
+  // a16z Jobs — prose story about one company ending in an "Open roles"
+  // list with no per-role ATS links; force the multi-extractor.
+  if (/a16zjobs@substack\.com/i.test(sender)) return true;
   return false;
 }
 

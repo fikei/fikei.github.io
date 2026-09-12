@@ -18,14 +18,20 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { db } from '../_shared/job-db.ts';
 import { computeFit, compFloorFor, type RoleRow, type UserContext as FitUserContext } from '../jobs-pipe/fit.ts';
 import { SOURCES } from '../_shared/sources/registry.ts';
+import { consumeGmailCappedRun } from '../_shared/sources/gmail-jobs.ts';
 import type { RecommendedRoleInput } from '../_shared/sources/types.ts';
 import { loadFitContext, fetchJdText, haikuRoleMatch } from '../_shared/job-fit-haiku.ts';
 import { extractCompensation, compClears } from '../_shared/comp.ts';
 import { corsHeaders } from '../_shared/job-auth.ts';
 import { loadVisionStringArray, loadVisionField } from '../_shared/job-vision.ts';
 
-const VERSION = '0.34.0';
-console.log(`[pull-recommendations] v${VERSION} - auto-created roles with no posting synthesize a profile (email + contact + company web) so they still grade`);
+const VERSION = '0.35.0';
+console.log(`[pull-recommendations] v${VERSION} - gmail backlog auto-drain (capped runs self-rekick) + a16z Jobs sender allowlisted`);
+
+// Auto-drain: a capped gmail-jobs run re-kicks this function for the same
+// source until the backlog is gone. Depth cap bounds the chain so a bug
+// can never self-invoke forever (8 × 50 msgs = 400 messages per cron tick).
+const MAX_DRAIN_DEPTH = 8;
 
 const ANTHROPIC_MODEL = 'claude-haiku-4-5';
 const ANTHROPIC_URL   = 'https://api.anthropic.com/v1/messages';
@@ -73,12 +79,14 @@ serve(async (req) => {
   // bypasses both the enabled flag and the schedule, so the user can
   // trigger a single source from the UI without waiting for cron.
   let forceId: string | null = null;
+  let drainDepth = 0;
   let rescoreOnly = false;
   let backfillDescriptions = false;
   if (req.method === 'POST') {
     try {
       const body = await req.json();
       if (body && typeof body.id === 'string') forceId = body.id;
+      if (body && typeof body.drain === 'number') drainDepth = body.drain;
       if (body && body.rescore === true) rescoreOnly = true;
       if (body && body.backfillDescriptions === true) backfillDescriptions = true;
     } catch { /* no body, that's fine */ }
@@ -297,6 +305,7 @@ serve(async (req) => {
         where enabled = true`;
 
   const summary: Array<Record<string, unknown>> = [];
+  let cappedGmailId: string | null = null;
   for (const src of sources) {
     if (!forceId && !isDue(src)) { summary.push({ id: src.id, skipped: 'not-due' }); continue; }
     const plugin = SOURCES[src.type];
@@ -308,6 +317,10 @@ serve(async (req) => {
     try {
       const since = src.last_run_at ? new Date(src.last_run_at) : null;
       const pulledRaw = await plugin.pull(src.config, { userEmail: src.user_email, since });
+      // Gmail backlog: a capped run left messages queued behind an
+      // unchanged cursor. Remember the source so we re-kick after the
+      // response instead of waiting for the next cron tick.
+      if (src.type === 'gmail-jobs' && consumeGmailCappedRun()) cappedGmailId = src.id;
       // Firehose gate. tracked-ats pulls a company's ENTIRE board (every
       // eng/design/sales/ops opening), so without a title gate it floods the
       // pipeline with off-target roles and burns grading on them. Keep only
@@ -482,7 +495,7 @@ serve(async (req) => {
         await Promise.all(toBullet.map(row => generateBullets(sql, row, ctx)));
       }
       await markRun(sql, src.id, { count: inserted.length, dropped: droppedToPipeline, error: null });
-      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, droppedToPipeline, inserted: inserted.length });
+      summary.push({ id: src.id, type: src.type, pulled: pulled.length, kept: kept.length, droppedToPipeline, inserted: inserted.length, ...(cappedGmailId === src.id ? { capped: true } : {}) });
     } catch (e) {
       await markRun(sql, src.id, { count: 0, dropped: 0, error: (e as Error).message });
       summary.push({ id: src.id, type: src.type, error: (e as Error).message });
@@ -503,7 +516,23 @@ serve(async (req) => {
     console.warn(`[pull-recommendations] pull_runs bookkeeping failed: ${(e as Error).message}`);
   }
 
-  return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), sources: summary }, null, 2), {
+  // Auto-drain: re-kick ourselves for the capped gmail source. Fire and
+  // forget — waitUntil keeps the chained request alive past this response
+  // where the runtime supports it. drainDepth bounds the chain.
+  if (cappedGmailId && drainDepth < MAX_DRAIN_DEPTH) {
+    const kick = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/pull-recommendations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Cron-Secret': Deno.env.get('CRON_SECRET') || '' },
+      body: JSON.stringify({ id: cappedGmailId, drain: drainDepth + 1 }),
+    }).then(r => console.log(`[pull-recommendations] drain re-kick (depth ${drainDepth + 1}) → ${r.status}`))
+      .catch(e => console.warn(`[pull-recommendations] drain re-kick failed: ${(e as Error).message}`));
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(kick);
+  } else if (cappedGmailId) {
+    console.warn(`[pull-recommendations] gmail backlog still capped at max drain depth ${MAX_DRAIN_DEPTH} — next cron tick continues`);
+  }
+
+  return new Response(JSON.stringify({ ok: true, version: VERSION, ranAt: new Date().toISOString(), drainDepth, sources: summary }, null, 2), {
     status: 200,
     headers: { ...corsHeaders, 'content-type': 'application/json' },
   });
