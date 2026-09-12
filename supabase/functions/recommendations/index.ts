@@ -8,8 +8,8 @@ import { verifyJobUser, jsonResp, err, corsHeaders } from '../_shared/job-auth.t
 import { db } from '../_shared/job-db.ts';
 import { loadVisionStringArray } from '../_shared/job-vision.ts';
 
-const VERSION = '0.23.0';
-console.log(`[recommendations] v${VERSION} - sourceHealth carries the ats-radar lastScan note (verified/unverified board counts) for the Sources row`);
+const VERSION = '0.24.0';
+console.log(`[recommendations] v${VERSION} - ?health=1 light mode + gmail catch-up counters (backlogTotal/backlogLeft) in sourceHealth`);
 
 // Role universe for the below-bar gate when the user hasn't defined their
 // own vision.target_titles. Kept in sync with pull-recommendations'
@@ -49,6 +49,15 @@ serve(async (req) => {
       // (default)      → fit floor 50 + strength floor 50, max 60 rows
       //                  (drives the carousel).
       const url = new URL(req.url);
+
+      // ?health=1 → sourceHealth only, no rec queries. Cheap enough for
+      // the rail status element to poll from every page.
+      if (url.searchParams.get('health') === '1') {
+        const sourceHealth = await loadSourceHealth(sql, email);
+        return new Response(JSON.stringify({ ok: true, version: VERSION, sourceHealth }), {
+          status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' },
+        });
+      }
 
       // ?view=blocked → the caller's "don't recommend" company list, for
       // the Search plan → Rules card. Unblock goes through the existing
@@ -357,33 +366,8 @@ serve(async (req) => {
         console.warn(`[recommendations] recentlyExpired count failed: ${(e as Error).message}`);
       }
       // Source health — lets the UI tell "no new recs" apart from "a
-      // source is dead". needs_reauth is true when the gmail-jobs source
-      // errored with a token problem OR the scan-state row carries one.
-      // Never fail the page over health bookkeeping.
-      let sourceHealth: unknown[] = [];
-      try {
-        sourceHealth = await sql`
-          select s.id,
-                 s.type,
-                 s.enabled,
-                 s.last_run_at   as "lastRunAt",
-                 s.last_run_count as "lastRunCount",
-                 s.last_error    as "lastError",
-                 s.config->'lastScan' as "lastScan",
-                 case when s.type = 'gmail-jobs' and (
-                        coalesce(s.last_error, '')    ilike '%reauth%' or
-                        coalesce(s.last_error, '')    ilike '%not connected%' or
-                        coalesce(g.last_error, '')    ilike '%reauth%' or
-                        coalesce(g.last_error, '')    ilike '%not connected%'
-                      )
-                      then true else false end as "needsReauth"
-            from job.user_sources s
-            left join job.gmail_scan_state g on g.user_email = s.user_email
-           where s.user_email = ${email}
-           order by s.type`;
-      } catch (e) {
-        console.warn(`[recommendations] sourceHealth failed: ${(e as Error).message}`);
-      }
+      // source is dead". Never fail the page over health bookkeeping.
+      const sourceHealth = await loadSourceHealth(sql, email);
       // Gmail scan stats — powers the Inbox scan strip (last run, what
       // landed today, manual re-run). "Today" is the user's day (PT).
       // Never fail the page over stats bookkeeping.
@@ -462,3 +446,36 @@ serve(async (req) => {
     return err((e as Error).message || 'server error', 500);
   }
 });
+
+// Source health rows for the caller — needs_reauth is true when the
+// gmail-jobs source errored with a token problem OR the scan-state row
+// carries one; gmail rows also carry the catch-up counters. Never throws.
+async function loadSourceHealth(sql: ReturnType<typeof db>, email: string): Promise<unknown[]> {
+  try {
+    return await sql`
+      select s.id,
+             s.type,
+             s.enabled,
+             s.last_run_at   as "lastRunAt",
+             s.last_run_count as "lastRunCount",
+             s.last_error    as "lastError",
+             s.config->'lastScan' as "lastScan",
+             case when s.type = 'gmail-jobs' then g.backlog_total end as "backlogTotal",
+             case when s.type = 'gmail-jobs' then g.backlog_left  end as "backlogLeft",
+             case when s.type = 'gmail-jobs' then g.updated_at    end as "scanUpdatedAt",
+             case when s.type = 'gmail-jobs' and (
+                    coalesce(s.last_error, '')    ilike '%reauth%' or
+                    coalesce(s.last_error, '')    ilike '%not connected%' or
+                    coalesce(g.last_error, '')    ilike '%reauth%' or
+                    coalesce(g.last_error, '')    ilike '%not connected%'
+                  )
+                  then true else false end as "needsReauth"
+        from job.user_sources s
+        left join job.gmail_scan_state g on g.user_email = s.user_email
+       where s.user_email = ${email}
+       order by s.type`;
+  } catch (e) {
+    console.warn(`[recommendations] sourceHealth failed: ${(e as Error).message}`);
+    return [];
+  }
+}

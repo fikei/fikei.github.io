@@ -279,6 +279,17 @@ export async function fetchRecommendations(opts = {}) {
   if (!res.ok) throw new Error(`recommendations ${res.status}: ${await res.text()}`);
   return res.json();
 }
+// Source health only (?health=1) — no rec queries, cheap enough for the
+// rail status element to poll from every page. Returns the sourceHealth
+// array ([] on failure).
+export async function fetchSourceHealth() {
+  const headers = await authHeader();
+  const res = await fetch(`${REC_URL}?health=1`, { headers });
+  if (!res.ok) throw new Error(`health ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data?.sourceHealth) ? data.sourceHealth : [];
+}
+
 // Single recommendation by id — powers the pre-save detail page
 // (/ladder/jobs/<slug>/?rec=<id>). Returns the row regardless of score /
 // dismissed / closed state; the page renders those states itself.

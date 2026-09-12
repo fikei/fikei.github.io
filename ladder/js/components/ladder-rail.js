@@ -7,6 +7,7 @@ import { unsafeHTML } from 'https://esm.run/lit@3/directives/unsafe-html.js';
 const V = (new URL(import.meta.url)).search;
 const [{ fetchPipeline, fetchRecommendations, BUCKETS, bucketFor, isVisibleRole, normalizeBucket }] = await Promise.all([
   import('../pipeline.js' + V),
+  import('./ladder-pipeline-status.js' + V),
 ]);
 
 // Primary-nav line icons — 20px, 1.8 stroke, inherit currentColor.
@@ -213,6 +214,7 @@ export class JobRail extends LitElement {
             })}
           </ul>
         </nav>
+        <ladder-pipeline-status></ladder-pipeline-status>
         ${this.email ? html`
           <div class="rail-user">
             <span class="rail-user__dot" aria-hidden="true"></span>

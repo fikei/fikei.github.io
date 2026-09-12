@@ -155,10 +155,10 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     const sql = db();
 
     // Cursor: prefer historyId, fall back to last_scan_at.
-    const stateRows = await sql<{ history_id: string | null; last_scan_at: string | null }[]>`
-      select history_id, last_scan_at from job.gmail_scan_state
+    const stateRows = await sql<{ history_id: string | null; last_scan_at: string | null; backlog_total: number | null }[]>`
+      select history_id, last_scan_at, backlog_total from job.gmail_scan_state
        where user_email = ${ctx.userEmail} limit 1`;
-    const state = stateRows[0] || { history_id: null, last_scan_at: null };
+    const state = stateRows[0] || { history_id: null, last_scan_at: null, backlog_total: null };
 
     const allowSenders = mergeAllowlist(cfg.allowSenders);
     const blockSenders = (cfg.blockSenders || []).map(s => s.toLowerCase());
@@ -231,11 +231,18 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       for (const r of skipRows) if (r.gmail_id) processedIds.add(r.gmail_id);
     }
 
+    // Progress accounting for the catch-up UI: candidates = listed ids we
+    // haven't already processed; consumed = candidates this run got past
+    // (reviewed-and-skipped counts — it's honest "looked at" progress).
+    const candidates = ids.reduce((n, id) => n + (processedIds.has(id) ? 0 : 1), 0);
+    let consumed = 0;
+
     for (const id of ids) {
       if (newWork >= maxMessages) { cappedRun = true; break; }
       // Cheap skip: already processed this Gmail message in a prior run.
       // Avoids the getMessage body download + Haiku on re-list/backfill.
       if (processedIds.has(id)) continue;
+      consumed++;
       let msg: GmailMessage;
       try {
         msg = await getMessage(accessToken, id, 'full');
@@ -465,13 +472,18 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
     // dedup check at the top means already-processed messages skip
     // without paying for Haiku again.
     if (cappedRun) {
-      // Leave gmail_scan_state untouched. Stamp last_error=null and
-      // updated_at so we can see the row was touched this tick.
+      // Leave the cursor untouched. Stamp last_error=null, updated_at, and
+      // the catch-up counters: total anchors to the first sighting of this
+      // backlog (existing total when one is mid-flight, else this window).
+      const backlogTotal = state.backlog_total && state.backlog_total >= candidates
+        ? state.backlog_total
+        : candidates;
+      const backlogLeft = Math.max(candidates - consumed, 0);
       await sql`
-        insert into job.gmail_scan_state (user_email, history_id, last_scan_at, last_error, updated_at)
-          values (${ctx.userEmail}, ${state.history_id}, ${state.last_scan_at}, null, now())
+        insert into job.gmail_scan_state (user_email, history_id, last_scan_at, last_error, backlog_total, backlog_left, updated_at)
+          values (${ctx.userEmail}, ${state.history_id}, ${state.last_scan_at}, null, ${backlogTotal}, ${backlogLeft}, now())
         on conflict (user_email) do update
-          set last_error = null, updated_at = now()
+          set last_error = null, backlog_total = ${backlogTotal}, backlog_left = ${backlogLeft}, updated_at = now()
       `;
       console.log(`[gmail-jobs] ${ctx.userEmail} → run capped, cursor unchanged (more messages queued)`);
       lastRunCapped = true;
@@ -492,12 +504,14 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
       nextHistory = await getProfileHistoryId(accessToken);
     }
     await sql`
-      insert into job.gmail_scan_state (user_email, history_id, last_scan_at, last_error, updated_at)
-        values (${ctx.userEmail}, ${nextHistory}, now(), null, now())
+      insert into job.gmail_scan_state (user_email, history_id, last_scan_at, last_error, backlog_total, backlog_left, updated_at)
+        values (${ctx.userEmail}, ${nextHistory}, now(), null, null, ${listRes.truncated ? Math.max(candidates - consumed, 0) : null}, now())
       on conflict (user_email) do update
         set history_id = coalesce(excluded.history_id, job.gmail_scan_state.history_id),
             last_scan_at = excluded.last_scan_at,
             last_error = null,
+            backlog_total = ${listRes.truncated ? (state.backlog_total && state.backlog_total >= candidates ? state.backlog_total : candidates) : null},
+            backlog_left = ${listRes.truncated ? Math.max(candidates - consumed, 0) : null},
             updated_at = now()
     `;
 

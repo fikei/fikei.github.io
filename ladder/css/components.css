@@ -2726,6 +2726,25 @@ button.link-subtle {
 @media (prefers-reduced-motion: reduce) {
   .recs-draining__spinner { animation-duration: 2.4s; }
 }
+/* Determinate variant — a thin bar fed by the gmail catch-up counters.
+   Same accent family as the spinner: "working", never sentiment colors. */
+.recs-draining__bar {
+  flex: 1;
+  min-width: 80px;
+  max-width: 220px;
+  height: 4px;
+  margin-left: auto;
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  overflow: hidden;
+}
+.recs-draining__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.6s ease;
+}
 
 /* Infinite-scroll footer for the For You table. The sentinel is an
    invisible trip-wire the IntersectionObserver watches; the loadmore row
@@ -6918,6 +6937,64 @@ body[data-auth-state="out"] job-chat { display: none; }
   min-width: 0;
 }
 .rail-user { margin-top: auto; }
+
+/* Rail pipeline status — permanent one-glance email-scan state, pinned
+   above the identity line. Essentials only: dot, label, and (while
+   catching up) a count + thin bar. Sentiment colors are reserved for the
+   paused/attention states; the working state uses the accent, matching
+   .recs-draining. The element links to the Inbox where the banner carries
+   the fix-it action — no CTA here. */
+.app__rail ladder-pipeline-status { display: block; margin-top: auto; }
+.app__rail ladder-pipeline-status + .rail-user,
+.app__rail .rail-user { margin-top: var(--space-3); }
+.rail-status {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+.rail-status:hover { text-decoration: none; border-color: var(--border-strong); }
+.rail-status__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--fg-subtle);
+}
+.rail-status[data-state="active"] .rail-status__dot {
+  background: var(--accent-strong);
+  animation: rail-status-pulse 1.4s ease-in-out infinite;
+}
+.rail-status[data-state="active"] { color: var(--fg); }
+.rail-status[data-state="paused"] .rail-status__dot { background: var(--error); }
+.rail-status[data-state="paused"] { color: var(--fg); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
+.rail-status[data-state="attention"] .rail-status__dot { background: var(--warning); }
+.rail-status__label { min-width: 0; }
+.rail-status__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+.rail-status__bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--accent-strong) 18%, transparent);
+  overflow: hidden;
+}
+.rail-status__bar i {
+  display: block; height: 100%;
+  background: var(--accent-strong);
+  border-radius: inherit;
+  transition: width 0.6s ease;
+}
+@keyframes rail-status-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .rail-status[data-state="active"] .rail-status__dot { animation: none; }
+}
 .rail-user__dot {
   width: 8px;
   height: 8px;

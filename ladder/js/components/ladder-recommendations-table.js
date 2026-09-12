@@ -283,10 +283,30 @@ export class JobRecommendationsTable extends LitElement {
 
   _renderDrainingBanner() {
     if (!this._draining) return nothing;
+    // Determinate when the gmail health row carries catch-up counters
+    // (backlogTotal/backlogLeft, stamped per committed run); otherwise
+    // the indeterminate spinner. Essentials only: label, count, bar.
+    const g = (this._health || []).find(s => s.type === 'gmail-jobs');
+    const total = Number(g?.backlogTotal || 0);
+    const left  = Number(g?.backlogLeft || 0);
+    if (total > 0 && left > 0) {
+      const done = total - left;
+      const pct = Math.round((done / total) * 100);
+      return html`
+        <div class="recs-draining" role="status" aria-live="polite">
+          <span class="recs-draining__spinner" aria-hidden="true"></span>
+          <span class="recs-draining__msg">Catching up on your email — ${done} of ${total}</span>
+          <span class="recs-draining__bar" role="progressbar"
+                aria-valuenow=${pct} aria-valuemin="0" aria-valuemax="100">
+            <i style="width:${pct}%"></i>
+          </span>
+        </div>
+      `;
+    }
     return html`
       <div class="recs-draining" role="status" aria-live="polite">
         <span class="recs-draining__spinner" aria-hidden="true"></span>
-        <span class="recs-draining__msg">Scanning Gmail for new roles… new matches appear here automatically.</span>
+        <span class="recs-draining__msg">Checking your email for new roles… matches appear here automatically.</span>
       </div>
     `;
   }
