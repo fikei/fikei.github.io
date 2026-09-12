@@ -191,6 +191,21 @@ export const gmailJobsSource: Source<GmailJobsCfg> = {
           builtQuery,
         );
       }
+      // Big-window fallback: the history path returns EVERY inbox message
+      // since the cursor with no sender filter, and the loop below pays a
+      // full getMessage per id just to read From. Past a few hundred ids
+      // that alone blows the edge wall clock before any allowlisted mail
+      // is reached. The timestamp path server-filters by sender (`from:`
+      // in builtQuery), so big backlogs re-list through it instead.
+      const HISTORY_LIST_MAX = 300;
+      if (state.history_id && !listRes.historyExpired && listRes.messageIds.length > HISTORY_LIST_MAX) {
+        console.log(`[gmail-jobs] history window too big (${listRes.messageIds.length} ids) — re-listing via sender-filtered timestamp query`);
+        listRes = await listSinceCursor(
+          accessToken,
+          { afterEpochSec: state.last_scan_at ? Math.floor(new Date(state.last_scan_at).getTime() / 1000) : null },
+          builtQuery,
+        );
+      }
     } catch (e) {
       await markScanError(sql, ctx.userEmail, (e as Error).message);
       throw e;
