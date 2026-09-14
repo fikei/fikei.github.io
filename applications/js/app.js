@@ -10,7 +10,7 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.5';
+const VERSION = '3.86.0';
 console.log(`[applications] v${VERSION} - program listings: pink residency badge`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
@@ -6800,6 +6800,80 @@ async function checkMembershipAndEnter() {
   }
 }
 
+// boot-opt: cached gate verdict — 7-day telemetry (35 loads) showed
+// boot_access p75 1060ms vs boot_data p75 766ms (~38% slower), so the
+// Discord membership round-trip, not loadAll, is the boot bottleneck. A
+// verdict cached from a recent successful check lets boot enter immediately
+// and re-verify against Discord in the background instead of blocking first
+// paint on it. A refused or failed check is never written to this cache.
+const GATE_CACHE_KEY = 'agape:gate';
+const GATE_CACHE_MS = 6 * 60 * 60 * 1000;
+
+function readGateVerdict(userId) {
+  try {
+    const raw = localStorage.getItem(GATE_CACHE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (!v || v.userId !== userId) return null;
+    if (!(Date.now() - v.at < GATE_CACHE_MS)) return null;
+    return v;
+  } catch { return null; }
+}
+
+function writeGateVerdict(userId, username, isAdminFlag) {
+  try {
+    localStorage.setItem(GATE_CACHE_KEY, JSON.stringify({ userId, username: username || null, isAdmin: !!isAdminFlag, at: Date.now() }));
+  } catch { /* private mode / quota — cache is an optimization, not a requirement */ }
+}
+
+function clearGateVerdict() {
+  try { localStorage.removeItem(GATE_CACHE_KEY); } catch {}
+}
+
+// Re-checks membership behind an entry that was let in on a cached verdict.
+// A refusal invalidates the cache and kicks the reader back to the gate; a
+// transient server error leaves the cache alone and simply re-verifies next
+// boot; a confirmed pass refreshes the cache window.
+function verifyGateInBackground(token, user) {
+  fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ action: 'status' }),
+  }).then(async (resp) => {
+    const status = await resp.json().catch(() => ({}));
+    if (!resp.ok) return;
+    if (!status.linked || !status.isRecruitingMember) {
+      clearGateVerdict();
+      document.getElementById('app').hidden = true;
+      document.getElementById('gate').hidden = false;
+      _entering = false;
+      if (!status.linked) {
+        setGate('Your account has no Discord linked.', 'Link Discord',
+          'Link the Discord account that’s in the Agape server, then try again.');
+        document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
+      } else {
+        setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+          'Re-check access',
+          'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+        document.getElementById('gate-btn').onclick = async () => {
+          setGate('Re-checking…', null);
+          await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ action: 'verify' }),
+          });
+          checkMembershipAndEnter();
+        };
+      }
+      return;
+    }
+    isAdmin = status.isRecruitingAdmin === true;
+    if (me) me.name = status.discordUsername || me.name;
+    writeGateVerdict(user.id, status.discordUsername || user.email || null, isAdmin);
+    renderRailUser();
+  }).catch(() => { /* network blip — don't punish the user, just skip refreshing */ });
+}
+
 async function _checkMembershipAndEnter() {
   const tEnter = performance.now();
   let token = null;
@@ -6829,7 +6903,6 @@ async function _checkMembershipAndEnter() {
         : 'The browser dropped the sign-in. Try again, or open ctrl.rodeo in a normal browser window.');
     return;
   }
-  setGate('Checking your Recruiting Society access…', null);
   /* The data load doesn't need the access verdict — RLS enforces recruiting
      membership on every row regardless — so it runs IN PARALLEL with the
      access check instead of queued behind it. They used to serialize, and
@@ -6839,56 +6912,72 @@ async function _checkMembershipAndEnter() {
   const tAccess0 = performance.now();
   const dataP = loadAll().then(() => { tData = performance.now(); });
   dataP.catch(() => {}); // surfaced at the await below; never unhandled here
+
+  const authedUser = window.CtrlAuth.getUser();
+  const cachedVerdict = authedUser ? readGateVerdict(authedUser.id) : null;
+  if (!cachedVerdict) setGate('Checking your Recruiting Society access…', null);
+
   try {
-    // No timeout here once cost a housemate a permanent spinner.
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 20000);
-    let resp;
-    try {
-      resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ action: 'status' }),
-        signal: ctl.signal,
-      });
-    } finally { clearTimeout(timer); }
-    const status = await resp.json().catch(() => ({}));
-    // A 500 used to fall through to "no Discord linked", sending people off to
-    // re-link an account that was never the problem. Say what actually broke.
-    if (!resp.ok) {
-      stall('The access check failed.',
-        `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
-      return;
-    }
-    if (!status.linked) {
-      setGate('Your account has no Discord linked.', 'Link Discord',
-        'Link the Discord account that’s in the Agape server, then try again.');
-      document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
-      return;
-    }
-    if (!status.isRecruitingMember) {
-      setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
-        'Re-check access',
-        'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
-      document.getElementById('gate-btn').onclick = async () => {
-        setGate('Re-checking…', null);
-        await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+    let user, username, isAdminFlag;
+    if (cachedVerdict) {
+      user = authedUser;
+      username = cachedVerdict.username;
+      isAdminFlag = cachedVerdict.isAdmin === true;
+      verifyGateInBackground(token, authedUser);
+    } else {
+      // No timeout here once cost a housemate a permanent spinner.
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 20000);
+      let resp;
+      try {
+        resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ action: 'verify' }),
+          body: JSON.stringify({ action: 'status' }),
+          signal: ctl.signal,
         });
-        checkMembershipAndEnter();
-      };
-      return;
+      } finally { clearTimeout(timer); }
+      const status = await resp.json().catch(() => ({}));
+      // A 500 used to fall through to "no Discord linked", sending people off to
+      // re-link an account that was never the problem. Say what actually broke.
+      if (!resp.ok) {
+        stall('The access check failed.',
+          `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+        return;
+      }
+      if (!status.linked) {
+        setGate('Your account has no Discord linked.', 'Link Discord',
+          'Link the Discord account that’s in the Agape server, then try again.');
+        document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
+        return;
+      }
+      if (!status.isRecruitingMember) {
+        setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+          'Re-check access',
+          'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+        document.getElementById('gate-btn').onclick = async () => {
+          setGate('Re-checking…', null);
+          await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ action: 'verify' }),
+          });
+          checkMembershipAndEnter();
+        };
+        return;
+      }
+      user = window.CtrlAuth.getUser();
+      username = status.discordUsername;
+      isAdminFlag = status.isRecruitingAdmin === true;
+      writeGateVerdict(user.id, username || user.email || null, isAdminFlag);
     }
     // in — identify self, load data, render
-    const user = window.CtrlAuth.getUser();
-    me = { id: user.id, name: status.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
+    me = { id: user.id, name: username || user.email || 'Housemate', groupEmail: user.email || null };
     // Admin = can see #recruiting-automation. The function derives it from
     // Discord and writes recruit_admins, which is what RLS actually consults —
     // so this flag only decides whether the controls are disabled, never
     // whether a write is allowed.
-    isAdmin = status.isRecruitingAdmin === true;
+    isAdmin = isAdminFlag;
     // group_email ties this account to its roster identity, which is how a
     // review imported from the sheet becomes yours once you sign in.
     sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
@@ -6953,7 +7042,7 @@ async function _checkMembershipAndEnter() {
         boot_enter: tShown - tEnter,
         boot_since_nav: tShown,
       };
-      console.log(`[applications] boot: access ${phases.boot_access.toFixed(0)}ms ∥ data ${phases.boot_data.toFixed(0)}ms · enter ${phases.boot_enter.toFixed(0)}ms · since nav ${phases.boot_since_nav.toFixed(0)}ms${deepLinked ? ' · deep-link' : ''}`);
+      console.log(`[applications] boot: access ${phases.boot_access.toFixed(0)}ms ∥ data ${phases.boot_data.toFixed(0)}ms · enter ${phases.boot_enter.toFixed(0)}ms · since nav ${phases.boot_since_nav.toFixed(0)}ms${deepLinked ? ' · deep-link' : ''}${cachedVerdict ? ' · cached-gate' : ''}`);
       if (typeof window.ctrlVital === 'function') {
         for (const [name, v] of Object.entries(phases)) window.ctrlVital(deepLinked ? `${name}.deep` : name, v);
       }
