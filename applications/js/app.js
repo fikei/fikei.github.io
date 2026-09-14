@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.5';
-console.log(`[applications] v${VERSION} - program listings: pink residency badge`);
+const VERSION = '3.86.0';
+console.log(`[applications] v${VERSION} - Agape recruiting viewer`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -6780,6 +6780,35 @@ function stall(sub, hint) {
   } catch { /* never let reporting break the gate */ }
 }
 
+/* boot-opt: cached gate verdict. Telemetry (14-day window, days_with_data=6,
+   n=27 boot_access / n=10 deep) showed the Discord membership round-trip
+   outweighing loadAll on deep links — p75 boot_access.deep 1647ms vs
+   boot_data.deep 1256ms, a 31% gap. A returning housemate with a fresh
+   verdict enters without awaiting that fetch; it still runs in the
+   background and evicts the cache + re-gates on an explicit refusal. */
+const GATE_CACHE_KEY = 'agape:gate';
+const GATE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+function readGateCache(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(GATE_CACHE_KEY);
+    if (!raw) return null;
+    const g = JSON.parse(raw);
+    if (g.userId !== userId) return null;
+    if (!g.at || (Date.now() - g.at) > GATE_CACHE_TTL_MS) return null;
+    return g;
+  } catch { return null; }
+}
+
+function writeGateCache(entry) {
+  try { localStorage.setItem(GATE_CACHE_KEY, JSON.stringify(entry)); } catch { /* best-effort */ }
+}
+
+function clearGateCache() {
+  try { localStorage.removeItem(GATE_CACHE_KEY); } catch { /* best-effort */ }
+}
+
 async function checkMembershipAndEnter() {
   // CtrlAuth can dispatch signedin twice (fast-restore + auth event); the
   // enter sequence (load + auto-pass + toast) must only run once.
@@ -6829,7 +6858,6 @@ async function _checkMembershipAndEnter() {
         : 'The browser dropped the sign-in. Try again, or open ctrl.rodeo in a normal browser window.');
     return;
   }
-  setGate('Checking your Recruiting Society access…', null);
   /* The data load doesn't need the access verdict — RLS enforces recruiting
      membership on every row regardless — so it runs IN PARALLEL with the
      access check instead of queued behind it. They used to serialize, and
@@ -6839,6 +6867,177 @@ async function _checkMembershipAndEnter() {
   const tAccess0 = performance.now();
   const dataP = loadAll().then(() => { tData = performance.now(); });
   dataP.catch(() => {}); // surfaced at the await below; never unhandled here
+
+  // Shared enter sequence: load house/roster extras, reveal the app, render,
+  // and report boot vitals. Used by both the cached-verdict fast path and
+  // the normal network-verified path below.
+  async function enterApp(tAccess, user) {
+    // group_email ties this account to its roster identity, which is how a
+    // review imported from the sheet becomes yours once you sign in.
+    sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data?.display_name) me.name = data.display_name;
+        if (data?.group_email) me.groupEmail = data.group_email;
+        if (data) renderRailUser();
+      });
+    fetch(`${SUPABASE_URL}/functions/v1/recruit-gmail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
+      body: JSON.stringify({ action: 'status' }),
+    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; gmailStatusFull = gmailStatus; if (view === 'settings') renderSettings(); }).catch(() => {});
+    await dataP;
+    // background — outreach attachment labels + rail badges need house data;
+    // re-render the open view once it lands so labels don't show stale fallbacks
+    loadHouse().then(async () => {
+      // Saved-for-future people whose date has landed come back first, so the
+      // placement sweep below re-places them in the same pass.
+      const back = await returnDueCandidates();
+      if (back) toast(`${back} saved candidate${back === 1 ? ' is' : 's are'} back — their date arrived`);
+      const added = await syncAutoPlacements();
+      if (added) toast(`${added} auto-placement${added === 1 ? '' : 's'} added across open listings`);
+      const drafted = await syncDraftListings();
+      if (drafted) toast(`${drafted} draft listing${drafted === 1 ? '' : 's'} detected from occupancy gaps`);
+      renderRailCounts();
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    });
+    resolveAvatars(); // background — server resolves any unchecked profile photos
+    scanInbox();      // background — badge replies without opening each thread
+    loadRecordingLeads(); // background — unfiled Discord recording links
+    loadActivityCount();  // background — unresolved-notification badge on Activity
+    document.getElementById('gate').hidden = true;
+    document.getElementById('app').hidden = false;
+    renderRailUser();
+    handleGmailCallback();
+    view = new URLSearchParams(location.search).get('view') || 'openings';
+    view = LEGACY_VIEWS[view] || view;
+    if (!VIEWS[view]) view = 'openings';
+    pendingOccRoom = view === 'occupancy' ? +new URLSearchParams(location.search).get('room') || null : null;
+    render();
+    // The budget-floor sweep writes two rows per flagged applicant and used
+    // to gate first paint. Under-floor applications are rare and re-render
+    // is cheap — run it behind the render instead.
+    applyAutoFlags().then(n => {
+      if (!n) return;
+      toast(`${n} applicant${n === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
+      renderRailCounts();
+      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
+    }).catch(() => {});
+    /* Boot report — one console line, and each phase into the vitals
+       pipeline so slow loads show up in /analytics rather than anecdotes.
+       access+data overlap; "enter" is this function, "since nav" is the
+       user's real wait from tapping the link. A cached-verdict entry reports
+       a near-zero boot_access — the point of the optimization below. */
+    {
+      const tShown = performance.now();
+      const deepLinked = Boolean(new URLSearchParams(location.search).get('a'));
+      const phases = {
+        boot_access: tAccess - tAccess0,
+        boot_data: (tData || tShown) - tAccess0,
+        boot_enter: tShown - tEnter,
+        boot_since_nav: tShown,
+      };
+      console.log(`[applications] boot: access ${phases.boot_access.toFixed(0)}ms ∥ data ${phases.boot_data.toFixed(0)}ms · enter ${phases.boot_enter.toFixed(0)}ms · since nav ${phases.boot_since_nav.toFixed(0)}ms${deepLinked ? ' · deep-link' : ''}`);
+      if (typeof window.ctrlVital === 'function') {
+        for (const [name, v] of Object.entries(phases)) window.ctrlVital(deepLinked ? `${name}.deep` : name, v);
+      }
+    }
+    const deep = new URLSearchParams(location.search).get('a');
+    if (deep) {
+      // Exact id first; then the short name form for legacy timestamp ids
+      // (?a=jane-doe finds jane-doe-20260101120000 — newest wins if the name
+      // repeats); then the stable uuid (migration 159).
+      let hit = applicants.find(x => x.id === deep);
+      if (!hit) {
+        hit = applicants
+          .filter(x => x.id.replace(/-\d{14}$/, '') === deep)
+          .sort((a, b) => b.id.localeCompare(a.id))[0];
+      }
+      if (!hit && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(deep)) {
+        hit = applicants.find(x => x.uuid === deep);
+      }
+      if (hit) openReview(hit.id);
+    }
+    const linkEv = new URLSearchParams(location.search).get('link');
+    if (linkEv) openLinkRecording(linkEv);
+  }
+
+  /* boot-opt: cached gate verdict. Telemetry (14-day window, days_with_data=6,
+     n=27 boot_access / n=10 deep) showed the Discord membership round-trip
+     outweighing loadAll on deep links — p75 boot_access.deep 1647ms vs
+     boot_data.deep 1256ms, a 31% gap. A returning housemate with a fresh
+     verdict enters without awaiting that fetch; it still runs here in the
+     background and evicts the cache + re-gates on an explicit refusal. A
+     refused or failed check is never written to the cache. */
+  async function verifyGateInBackground(user) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 20000);
+      let resp;
+      try {
+        resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ action: 'status' }),
+          signal: ctl.signal,
+        });
+      } finally { clearTimeout(timer); }
+      const status = await resp.json().catch(() => ({}));
+      if (!resp.ok || !status.linked || !status.isRecruitingMember) {
+        clearGateCache();
+        document.getElementById('app').hidden = true;
+        document.getElementById('gate').hidden = false;
+        _entering = false;
+        if (!resp.ok) {
+          stall('The access check failed.',
+            `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+        } else if (!status.linked) {
+          setGate('Your account has no Discord linked.', 'Link Discord',
+            'Link the Discord account that’s in the Agape server, then try again.');
+          document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
+        } else {
+          setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+            'Re-check access',
+            'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+          document.getElementById('gate-btn').onclick = async () => {
+            setGate('Re-checking…', null);
+            await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ action: 'verify' }),
+            });
+            checkMembershipAndEnter();
+          };
+        }
+        return;
+      }
+      // Confirmed — refresh the cached verdict so the next boot stays fast.
+      isAdmin = status.isRecruitingAdmin === true;
+      writeGateCache({ userId: user.id, username: status.discordUsername || user.email || 'Housemate', isAdmin, at: Date.now() });
+    } catch (e) {
+      // Transient (network/timeout) — leave the still-valid cache alone;
+      // only an explicit refusal above evicts it.
+      console.error('gate re-verify failed', e);
+    }
+  }
+
+  const cacheUser = window.CtrlAuth.getUser();
+  const cachedGate = readGateCache(cacheUser?.id);
+  if (cachedGate) {
+    const tAccess = performance.now();
+    me = { id: cacheUser.id, name: cachedGate.username, groupEmail: cacheUser.email || null };
+    isAdmin = cachedGate.isAdmin === true;
+    try {
+      await enterApp(tAccess, cacheUser);
+    } catch (e) {
+      stall('Something went wrong checking access.', e.message || '');
+      console.error(e);
+      return;
+    }
+    verifyGateInBackground(cacheUser);
+    return;
+  }
+
+  setGate('Checking your Recruiting Society access…', null);
   try {
     // No timeout here once cost a housemate a permanent spinner.
     const ctl = new AbortController();
@@ -6889,93 +7088,9 @@ async function _checkMembershipAndEnter() {
     // so this flag only decides whether the controls are disabled, never
     // whether a write is allowed.
     isAdmin = status.isRecruitingAdmin === true;
-    // group_email ties this account to its roster identity, which is how a
-    // review imported from the sheet becomes yours once you sign in.
-    sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data?.display_name) me.name = data.display_name;
-        if (data?.group_email) me.groupEmail = data.group_email;
-        if (data) renderRailUser();
-      });
-    fetch(`${SUPABASE_URL}/functions/v1/recruit-gmail`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data?.session?.access_token}` },
-      body: JSON.stringify({ action: 'status' }),
-    }).then(r => r.json()).then(st => { gmailStatus = st || { connected: false }; gmailStatusFull = gmailStatus; if (view === 'settings') renderSettings(); }).catch(() => {});
+    writeGateCache({ userId: user.id, username: me.name, isAdmin, at: Date.now() });
     const tAccess = performance.now();
-    await dataP;
-    // background — outreach attachment labels + rail badges need house data;
-    // re-render the open view once it lands so labels don't show stale fallbacks
-    loadHouse().then(async () => {
-      // Saved-for-future people whose date has landed come back first, so the
-      // placement sweep below re-places them in the same pass.
-      const back = await returnDueCandidates();
-      if (back) toast(`${back} saved candidate${back === 1 ? ' is' : 's are'} back — their date arrived`);
-      const added = await syncAutoPlacements();
-      if (added) toast(`${added} auto-placement${added === 1 ? '' : 's'} added across open listings`);
-      const drafted = await syncDraftListings();
-      if (drafted) toast(`${drafted} draft listing${drafted === 1 ? '' : 's'} detected from occupancy gaps`);
-      renderRailCounts();
-      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
-    });
-    resolveAvatars(); // background — server resolves any unchecked profile photos
-    scanInbox();      // background — badge replies without opening each thread
-    loadRecordingLeads(); // background — unfiled Discord recording links
-    loadActivityCount();  // background — unresolved-notification badge on Activity
-    document.getElementById('gate').hidden = true;
-    document.getElementById('app').hidden = false;
-    renderRailUser();
-    handleGmailCallback();
-    view = new URLSearchParams(location.search).get('view') || 'openings';
-    view = LEGACY_VIEWS[view] || view;
-    if (!VIEWS[view]) view = 'openings';
-    pendingOccRoom = view === 'occupancy' ? +new URLSearchParams(location.search).get('room') || null : null;
-    render();
-    // The budget-floor sweep writes two rows per flagged applicant and used
-    // to gate first paint. Under-floor applications are rare and re-render
-    // is cheap — run it behind the render instead.
-    applyAutoFlags().then(n => {
-      if (!n) return;
-      toast(`${n} applicant${n === 1 ? '' : 's'} auto-archived by the $1,500 budget floor — tagged, with update emails queued`);
-      renderRailCounts();
-      if (VIEWS[view]?.kind === 'applicants') renderApplicants();
-    }).catch(() => {});
-    /* Boot report — one console line, and each phase into the vitals
-       pipeline so slow loads show up in /analytics rather than anecdotes.
-       access+data overlap; "enter" is this function, "since nav" is the
-       user's real wait from tapping the link. */
-    {
-      const tShown = performance.now();
-      const deepLinked = Boolean(new URLSearchParams(location.search).get('a'));
-      const phases = {
-        boot_access: tAccess - tAccess0,
-        boot_data: (tData || tShown) - tAccess0,
-        boot_enter: tShown - tEnter,
-        boot_since_nav: tShown,
-      };
-      console.log(`[applications] boot: access ${phases.boot_access.toFixed(0)}ms ∥ data ${phases.boot_data.toFixed(0)}ms · enter ${phases.boot_enter.toFixed(0)}ms · since nav ${phases.boot_since_nav.toFixed(0)}ms${deepLinked ? ' · deep-link' : ''}`);
-      if (typeof window.ctrlVital === 'function') {
-        for (const [name, v] of Object.entries(phases)) window.ctrlVital(deepLinked ? `${name}.deep` : name, v);
-      }
-    }
-    const deep = new URLSearchParams(location.search).get('a');
-    if (deep) {
-      // Exact id first; then the short name form for legacy timestamp ids
-      // (?a=jane-doe finds jane-doe-20260101120000 — newest wins if the name
-      // repeats); then the stable uuid (migration 159).
-      let hit = applicants.find(x => x.id === deep);
-      if (!hit) {
-        hit = applicants
-          .filter(x => x.id.replace(/-\d{14}$/, '') === deep)
-          .sort((a, b) => b.id.localeCompare(a.id))[0];
-      }
-      if (!hit && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(deep)) {
-        hit = applicants.find(x => x.uuid === deep);
-      }
-      if (hit) openReview(hit.id);
-    }
-    const linkEv = new URLSearchParams(location.search).get('link');
-    if (linkEv) openLinkRecording(linkEv);
+    await enterApp(tAccess, user);
   } catch (e) {
     const aborted = e.name === 'AbortError';
     stall(aborted ? 'The access check timed out.' : 'Something went wrong checking access.',
