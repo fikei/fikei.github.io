@@ -147,8 +147,24 @@ supabase functions deploy {function-name}
 | `recruit-gmail` | Boards | Shared-inbox applicant email pipe + availability extraction + Discord claim posts | — |
 | `recruit-availability` | Boards | Public applicant schedule picker backend (schedule_token auth) | — |
 | `recruit-discord` | Boards | Discord interactions endpoint for screening-claim buttons | — |
+| `mail-watch` | Boards | Package delivery notices from Gmail → Discord `#mail` | — |
 
 **Intro Call recording (Recall.ai):** optional; enabled by setting `RECALL_API_KEY` (Boards project). When set, `scheduleScreening` sends an "Agape Notes" bot to each Meet at start time; the 15-min recruit-discord cron tick harvests finished recordings, summarizes the transcript with Haiku, posts notes + recording link to #recruiting-society (`1503490895469609211`; `SCREENING_NOTES_CHANNEL_ID` overrides), and stores the summary on `recruit_screenings.recording_summary`. `RECALL_API_BASE` overrides the region (default us-west-2).
+
+**mail-watch setup:** reads merchant "delivered" mail and posts merchant-only notices to `#mail`. Cron is `mail_watch_scan_tick` (migration 180, every 15 min at :07/:22/:37/:52 — offset from the recruiting sweep so they don't contend for the Google quota). Deploy with `--no-verify-jwt`; auth is the one-time nonce from `recruit_cron_nonce`, or `X-Cron-Secret`.
+
+Required env (Boards project):
+
+| Var | Example | Notes |
+|---|---|---|
+| `MAIL_CHANNEL_ID` | `1234…` | Discord `#mail`. **No default** — unset means the function logs and posts nothing, rather than falling back to a recruiting channel. |
+| `MAIL_WATCH_INBOXES` | `fike101@gmail.com:Ian,fikei@uw.edu:Ian` | `email:Label` pairs. Each email needs an `auth.users` row and a `gmail.readonly` grant in `user_google_tokens` (connect via `gmail-auth`). |
+| `MAIL_WATCH_FLOOR` | `0.7` | Optional. Classifier confidence below this is dropped unposted. |
+| `MAIL_WATCH_QUERY` | — | Optional Gmail query override. |
+
+Reuses `RECRUIT_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`) and `DISCORD_BOT_TOKEN`. Dry run without writing or posting: `POST /functions/v1/mail-watch/scan?dry=1` with `X-Cron-Secret`.
+
+Design: [package-mail-notifications.md](./technical-design/package-mail-notifications.md).
 
 **recruit-discord setup:** point the Discord application's *Interactions Endpoint URL* at `https://yfhudwakpgzswiylhfbh.supabase.co/functions/v1/recruit-discord`. It verifies Ed25519 request signatures using the app's `verify_key`, fetched at runtime via `DISCORD_BOT_TOKEN` (`DISCORD_PUBLIC_KEY` env overrides). Claim posts go to `#recruiting-automation` (`1529576830514762029`; `SCREENING_CLAIMS_CHANNEL_ID` env overrides). No extra secrets required.
 

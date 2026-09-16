@@ -22,3 +22,9 @@ verify_jwt = false
 # credential) — no user JWT involved.
 [functions.recruit-watch]
 verify_jwt = false
+
+# mail-watch is invoked by pg_cron (migration 180) with a one-time nonce,
+# and manually with X-Cron-Secret. Both are checked in-function; no user JWT
+# is ever involved, so the gateway's verification only gets in the way.
+[functions.mail-watch]
+verify_jwt = false

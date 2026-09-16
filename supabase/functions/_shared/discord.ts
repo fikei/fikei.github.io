@@ -59,7 +59,7 @@ function botHeaders(): Record<string, string> {
   return { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }
 }
 
-async function discordFetch(path: string, options: RequestInit): Promise<any> {
+async function discordFetch(path: string, options: RequestInit = {}): Promise<any> {
   const resp = await fetch(`${DISCORD_API}${path}`, { ...options, headers: botHeaders() })
   const text = await resp.text()
   if (!resp.ok) {
@@ -807,17 +807,29 @@ export async function editTourConfirmed(
 
 // One channel nudge for a post nobody claimed within 96h.
 // Plain embed post to any channel (new-application pings etc.).
-export async function postChannelEmbed(
-  channelId: string, description: string, color = 0x378add, label = 'Automated post',
+/* Post an embed WITHOUT the #recruiting-automation audit mirror.
+   The mirror exists so the house has one trail of every recruiting decision.
+   Non-recruiting automations (package mail) must not use it: it would flood
+   the recruiting trail with unrelated traffic, and it would republish who is
+   receiving packages into a channel scoped to a different audience. */
+export async function postPlainEmbed(
+  channelId: string, description: string, color = 0x378add,
   links: Array<{ label: string; url: string }> = [],
 ): Promise<any> {
   const components = links.length
     ? [{ type: 1, components: links.slice(0, 5).map((l) => ({ type: 2, style: 5, label: l.label, url: l.url })) }]
     : []
-  const msg = await discordFetch(`/channels/${channelId}/messages`, {
+  return await discordFetch(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: JSON.stringify({ embeds: [{ description, color }], components }),
   })
+}
+
+export async function postChannelEmbed(
+  channelId: string, description: string, color = 0x378add, label = 'Automated post',
+  links: Array<{ label: string; url: string }> = [],
+): Promise<any> {
+  const msg = await postPlainEmbed(channelId, description, color, links)
   await auditMirror(label, description.split('\n')[0], { channelId })
   return msg
 }

@@ -1,6 +1,7 @@
 # Package delivery → #mail — technical design
 
-Status: **draft** (2026-09-16). No PRD yet.
+Status: **phase 1 built, not yet deployed** (2026-09-16). No PRD yet.
+Code: `supabase/functions/mail-watch/`, migration `180_mail_deliveries.sql`.
 
 Goal: when a package lands at the house, say so in the Agape Discord `#mail`
 channel, so the housemate it belongs to knows to grab it off the stoop.
@@ -61,18 +62,23 @@ other Agape automations).
 
 ```sql
 create table mail_deliveries (
-  id           uuid primary key default gen_random_uuid(),
-  gmail_msg_id text not null unique,        -- dedupe key: Gmail message id
-  owner_label  text,                        -- which housemate's inbox it came from
-  merchant     text,                        -- "Garage Grown Gear", "Amazon"
-  summary      text,                        -- "1 Electronics item"
-  carrier      text,
-  delivered_at timestamptz,
-  posted_at    timestamptz,                 -- null until it reaches Discord
+  id             uuid primary key default gen_random_uuid(),
+  gmail_msg_id   text not null unique,   -- dedupe key
+  inbox_email    text not null,
+  owner_label    text not null,
+  merchant       text,
+  carrier        text,
+  delivered_at   timestamptz,
+  confidence     real,
+  posted_at      timestamptz,            -- null until it reaches Discord
   discord_msg_id text,
-  created_at   timestamptz not null default now()
+  created_at     timestamptz not null default now()
 );
 ```
+
+There is deliberately **no column for item names.** Merchant-only is the
+decided default (see Privacy below), and a schema that cannot hold purchase
+detail cannot leak it later by a copy-paste into a new embed string.
 
 `gmail_msg_id unique` is the whole dedupe story — the cron can re-scan an
 overlapping window forever and never double-post. (Amazon in particular sends
@@ -163,8 +169,39 @@ posture is right before the house is invited in.
   meets resistance.
 - **Shopify merchant API.** Wrong side of the transaction; see above.
 
+## Decisions taken (2026-09-16)
+
+1. **Phase 1 only** — Ian's inboxes, to prove parsing quality and channel
+   signal-to-noise before anyone else is asked for Gmail access.
+2. **Merchant only** — "📦 **Ian** — a package from Garage Grown Gear". No item
+   names stored, no item names posted.
+
+Both are wired. Two addresses are swept, not one: the delivery mail splits by
+merchant, with Amazon going to the `.edu` address and the Shopify stores to
+gmail.
+
+## What Phase 1 does NOT do
+
+Worth stating plainly, because it is the gap between this and the original ask:
+**a single inbox only ever sees its own owner's orders.** Phase 1 announces
+Ian's packages. It does not tell a housemate that *their* package arrived,
+because nothing in Ian's mailbox knows about it. Phase 2 (per-housemate OAuth,
+the loop in `scanInbox` is already the seam) is what closes that.
+
+## Notes for whoever picks up Phase 2
+
+- `scanInbox()` already takes one `{email, label}` and is called in a loop with
+  per-inbox error isolation. Phase 2 swaps the `MAIL_WATCH_INBOXES` env for a
+  table of connected housemates; nothing else in the scan changes.
+- `postChannelEmbed()` in `_shared/discord.ts` mirrors every post into
+  `#recruiting-automation`. Package mail must not use it — hence the new
+  `postPlainEmbed()`. Do not "simplify" mail-watch back onto the mirroring one.
+- The tracking-link button is unbuilt on purpose. A tracking URL can expose
+  order detail to anyone in the channel who follows it, which undercuts the
+  merchant-only decision.
+
 ## Open questions
 
-1. Whose inbox — Phase 1 only, or straight to the house?
-2. Does `#mail` exist in the Agape guild yet, and what is its channel id?
-3. Merchant-only by default, or full item detail?
+1. Does `#mail` exist in the Agape guild yet, and what is its channel id?
+   `MAIL_CHANNEL_ID` has no default — the function no-ops and logs rather than
+   falling back to a recruiting channel.
