@@ -1,0 +1,71 @@
+{
+ "name": "Agape · 827 Guerrero",
+ "notes_source": "Room list from the '26 planning sheet (Master Schedule + Occupancy). 'Last year' notes are how each space was used in 2025. Replace them with the 2026 board annotations once the Figma board is shared.",
+ "house_notes": "Tea Lounge lived in a 2nd-floor bedroom last year. Live stage = Loft main room, with the loft hallway/closet opening first.",
+ "floors": [
+  {
+   "id": "roof",
+   "name": "Roof",
+   "rooms": [
+    { "id": "roof", "name": "Roof", "kind": "outdoor", "last": "Open all night · rooftop time at sunrise", "keys": ["roof", "rooftop", "sunrise"] }
+   ]
+  },
+  {
+   "id": "f3",
+   "name": "3rd floor",
+   "rooms": [
+    { "id": "loft", "name": "Loft", "kind": "bedroom", "size": "xl", "last": "Live stage (main room) · hallway/closet opens first", "keys": ["loft", "top floor", "upstairs loft", "live stage", "main room", "tower"] },
+    { "id": "sun", "name": "Sun room", "kind": "bedroom", "keys": ["sun room", "sunroom"] },
+    { "id": "garret", "name": "Garret", "kind": "bedroom", "keys": ["garret", "attic", "tower room"] },
+    { "id": "nook", "name": "Top-of-stairs nook", "kind": "common", "size": "sm", "last": "Open all night", "keys": ["nook", "alcove", "corner", "top of the stairs"] }
+   ]
+  },
+  {
+   "id": "f2",
+   "name": "2nd floor",
+   "rooms": [
+    { "id": "outlook", "name": "Outlook", "kind": "bedroom", "keys": ["outlook"] },
+    { "id": "east", "name": "East room", "kind": "bedroom", "keys": ["east"] },
+    { "id": "balcony", "name": "Balcony room", "kind": "bedroom", "keys": ["balcony"] },
+    { "id": "dmt", "name": "DMT room", "kind": "bedroom", "keys": ["dmt"] },
+    { "id": "garden", "name": "Garden room", "kind": "bedroom", "keys": ["garden room"] },
+    { "id": "city", "name": "City room", "kind": "bedroom", "keys": ["city"] },
+    { "id": "beige", "name": "Beige middle room", "kind": "bedroom", "keys": ["beige", "middle room", "small upstairs room", "small bedroom", "small room"] },
+    { "id": "biggreen", "name": "Big Green (fire escape)", "kind": "bedroom", "size": "lg", "keys": ["big green", "green room", "fire escape", "big room"] },
+    { "id": "shower2", "name": "2nd floor shower", "kind": "service", "size": "sm", "last": "Melt stage", "keys": ["2nd floor shower", "second floor shower", "shower room", "shower", "bathroom", "tub", "melt"] },
+    { "id": "hall2", "name": "Hallways", "kind": "common", "size": "sm", "last": "Open all night", "keys": ["hallway", "hallways", "hall"] }
+   ]
+  },
+  {
+   "id": "f1",
+   "name": "1st floor",
+   "rooms": [
+    { "id": "entrance", "name": "Entrance (sideyard gate)", "kind": "service", "size": "sm", "last": "Ticket check · security · doors 9pm–3am", "keys": ["entrance", "entry", "door", "gate"] },
+    { "id": "sideyard", "name": "Sideyard", "kind": "outdoor", "size": "lg", "last": "Bonfire (lit ~10:30pm)", "keys": ["yard", "sideyard", "side yard", "outside", "outdoor", "bonfire", "fire", "foliage", "tree trunk"] },
+    { "id": "dining", "name": "Dining room", "kind": "common", "size": "lg", "last": "Shoes off · water station", "keys": ["dining"] },
+    { "id": "circle", "name": "Circle room", "kind": "common", "last": "Tree", "keys": ["circle"] },
+    { "id": "piano", "name": "Piano room", "kind": "common", "size": "lg", "last": "Hang-out space · art installations", "keys": ["piano", "living room", "lounge", "annex", "gallery", "back living room"] },
+    { "id": "kitchen", "name": "Kitchen", "kind": "service", "last": "OFF LIMITS except housemates/volunteers · breakfast from 5:30am", "keys": ["kitchen", "food", "breakfast", "cook"] },
+    { "id": "bar", "name": "Bar room", "kind": "bedroom", "keys": ["bar room", "bar"] },
+    { "id": "priest", "name": "Priest room", "kind": "bedroom", "last": "Coat check", "keys": ["priest", "coat"] },
+    { "id": "shower1", "name": "1st floor shower (own hallway)", "kind": "service", "size": "sm", "last": "Open all night", "keys": ["first floor bathroom", "bathroom on the first floor", "1st floor shower", "first floor shower", "back stairs", "bathroom", "tub"] },
+    { "id": "stairs-front", "name": "Front stairs", "kind": "service", "size": "sm", "keys": ["front stairs", "stairs", "staircase"] },
+    { "id": "stairs-back", "name": "Back stairs", "kind": "service", "size": "sm", "keys": ["back stairs", "stairwell"] },
+    { "id": "fluff", "name": "Fluff", "kind": "common", "size": "lg", "last": "Dance space", "keys": ["fluff", "dance floor", "dancefloor", "dance space", "stage", "decks", "dj booth"] }
+   ]
+  },
+  {
+   "id": "basement",
+   "name": "Basement",
+   "rooms": [
+    { "id": "bassroom", "name": "Basement · Bassroom", "kind": "common", "size": "xl", "last": "Dance space · basement bass room", "keys": ["basement", "bass", "dancefloor", "dance floor", "stage", "decks", "dj booth", "music stage"] },
+    { "id": "studio", "name": "Studio", "kind": "common", "keys": ["studio", "sound isolation", "listening"] }
+   ]
+  }
+ ],
+ "zones": [
+  { "id": "roaming", "name": "Roaming · whole house", "hint": "Acts that move through the party", "keys": ["roaming", "roam", "everywhere", "anywhere", "whole house", "wander"] },
+  { "id": "outside-house", "name": "Off-site / TBD", "hint": "Needs a space we don't have yet" },
+  { "id": "declined", "name": "Not this year", "hint": "Passed on, or fell through" }
+ ]
+}

@@ -6,6 +6,16 @@ For Notion sync and ops infrastructure changes, see [docs/infrastructure/ops-cha
 
 ---
 
+## [2026-09-18] - Agape Halloween placement
+
+### Added
+- **/halloween** — new static app to place Call-for-Collaborators proposals into rooms of the house for Halloween XV. House map floor by floor (with 2025 usage notes and editable 2026 notes), searchable/filterable proposal list, drag-and-drop or menu placement with per-placement notes, full-proposal detail pane beside the map, keyword fit hints, localStorage save, share links, JSON export/import, and a copyable room-by-room summary. Reads the responses sheet live when it is link-shareable, otherwise the bundled snapshot (`scripts/halloween-proposals.py` regenerates it). PRD: `docs/strategy/prds/agape-halloween-placement.md`.
+
+### Versions Bumped
+- `halloween` v1.0.0 (new)
+
+---
+
 ## [2026-07-02] - For You Quality Floors, Wildcards Strip & Pre-Save Detail Page
 
 ### Added
