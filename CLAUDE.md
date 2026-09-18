@@ -46,6 +46,7 @@ Personal curation platform — collect, organize, and build on everything that m
   | Product | Version location | Console pattern |
   |---------|-----------------|-----------------|
   | Boards | `boards/index.html` ~line 7625: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
+  | Halloween placement | `halloween/js/app.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/index.html`) | `[halloween] vX.Y.Z - description` |
   | Supabase functions | Each function's `index.ts` top: `const VERSION = 'X.Y.Z'` | `[function-name] vX.Y.Z - description` |
 
   New products/functions: add `const VERSION` + `console.log` at entry point.
@@ -84,6 +85,7 @@ Personal curation platform — collect, organize, and build on everything that m
 | Soundscape | `soundscape/` | `PROJECT_PLAN.md` | Audio-reactive visualization |
 | Systemic | `systemic/` | `js/crawler.js` | Design system analyzer |
 | Recruiting | `applications/` | `applications/index.html` | Agape applicant triage — Discord-gated (Recruiting Society channel) |
+| Halloween placement | `halloween/` | `halloween/js/app.js` | Place Call-for-Collaborators proposals into rooms of the house — static, localStorage + share links |
 
 **Supabase projects:** Boards (`yfhudwakpgzswiylhfbh`), Ops (`ycilriwjnmcelkspmfmg`), Systemic (`atdqdfpdeytfuvvpsasz`)
 

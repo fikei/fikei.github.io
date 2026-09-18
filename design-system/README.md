@@ -7,6 +7,7 @@
 | Hub | Sassy's landing page, indexes every layer | `index.html` |
 | CTRL | Global — Boards, Events, Soundscape, Systemic, Favicon | `ctrl.html` |
 | Agape recruiting | Product — /applications (Storybook-style stories) | `recruiting/index.html` · behavior source of truth: `docs/ux/recruiting-row-states.md` |
+| Halloween placement | Product — /halloween (CTRL tokens + components, product classes in `halloween/css/app.css`) | see [Halloween placement](#halloween-placement-halloweencssappcss) below |
 | Widget audit | Tooling stoplight | `widgets.html` |
 
 Product systems override the global system for their product. New products add a folder here and a card on the hub.
@@ -905,6 +906,26 @@ promote into `components.css` if a second wizard appears.
 - `.apply-review` / `.apply-review__row|__label|__value|__edit` — answer summary list, each row a jump-to-edit
 - `.apply-banner` — status banner (submitted / locked)
 - `.apply-nav`, `.apply-back`, `.apply-error`, `.apply-foot` — step navigation, quiet back link, inline error, save-state footer
+
+## Halloween placement (`/halloween/css/app.css`)
+
+Three-pane planning surface (proposals · house · detail) on CTRL tokens and
+components (`.btn`, `.input`, `.select`, `.filter-token`, `.tab`, `.toast`).
+Page-scoped; the room/chip pattern could promote to `components.css` if a
+second "place things on a map" tool appears.
+
+- `.topbar` / `.topbar__brand|__title|__sub|__status|__actions|__tabs` — app header; `.topbar__status--live` turns the source pill green when the sheet is live; `__tabs` only shows under 900px
+- `.banner` — share-link prompt strip (amber tint)
+- `.layout` — 3-column grid (`--pane-proposals` / `--pane-detail` widths); `data-panel` picks the visible pane on mobile
+- `.panel` (+ `--proposals`, `--house`, `--detail`), `.panel__head` — scrolling panes and the sticky search/filter head
+- `.pcard` / `.pcard__project|__artist|__where|__foot|__placed` (+ `--selected`, `--dragging`, `--declined`) — draggable proposal card; declined = reduced opacity, never strike-through
+- `.tag` (+ `--space`, `--experience`, `--perform`, `--roaming`) — what-the-artist-wants chips, colored with the terminal accents
+- `.house`, `.house__notes`, `.house__label` — map container and the whole-house notes box
+- `.floor` / `.floor__head|__name|__meta|__add|__grid` (+ `--zones`) — one floor; 6-column grid on desktop, 4 under 1100px, 2 on mobile
+- `.room` (+ `--sm|--lg|--xl` span, `--bedroom|--common|--service|--outdoor|--zone|--custom` kind, `--hint` keyword match, `--over` drag target, `--declined`) — drop target
+- `.room__head|__name|__count|__note-btn|__last|__note|__note-edit|__chips|__hint` — room internals; `__last` is last year's use (italic, subtle), `__note` is this year's annotation (amber)
+- `.chip` / `.chip__text|__x` (+ `--selected`) — a placed proposal inside a room, draggable between rooms
+- `.detail` / `.detail__project|__artist|__tags|__place|__place-note|__section|__label|__text|__files|__meta` (+ `--empty`, `__text--muted`) — full proposal reader with the "Place in" control at the top
 
 ## Light Mode
 

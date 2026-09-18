@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Agape Halloween · Placement</title>
+  <meta name="description" content="Place collaborator proposals into rooms of the house for Agape Halloween XV.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="css/app.css?v=1.0.0">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__title">Agape Halloween XV</span>
+      <span class="topbar__sub">Placement · Reassemblage</span>
+    </div>
+    <div class="topbar__status" id="status" title="Where the proposals came from">loading…</div>
+    <nav class="topbar__tabs" id="mobile-tabs" aria-label="Panels">
+      <button class="tab tab--active" data-panel="proposals" type="button">Proposals</button>
+      <button class="tab" data-panel="house" type="button">House</button>
+      <button class="tab" data-panel="detail" type="button">Detail</button>
+    </nav>
+    <div class="topbar__actions">
+      <button class="btn btn--sm" id="btn-share" type="button" title="Copy a link that carries these placements">Share link</button>
+      <button class="btn btn--sm" id="btn-summary" type="button" title="Copy a room-by-room list as text">Copy summary</button>
+      <button class="btn btn--sm" id="btn-export" type="button" title="Download placements as JSON">Export</button>
+      <button class="btn btn--sm" id="btn-import" type="button" title="Load a placements JSON file">Import</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <button class="btn btn--sm btn--ghost" id="btn-refresh" type="button" title="Re-read the proposals sheet">Refresh</button>
+      <button class="btn btn--sm btn--ghost" id="btn-theme" type="button" title="Toggle light/dark">Theme</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden>
+    <span id="banner-text"></span>
+    <button class="btn btn--sm" id="banner-yes" type="button">Load</button>
+    <button class="btn btn--sm btn--ghost" id="banner-no" type="button">Keep mine</button>
+  </div>
+
+  <main class="layout" data-panel="proposals">
+
+    <!-- Proposals -->
+    <section class="panel panel--proposals" id="panel-proposals" aria-label="Proposals">
+      <div class="panel__head">
+        <input class="input search" id="search" type="search" placeholder="Search artist, project, where…" autocomplete="off">
+        <div class="filters" id="status-filters">
+          <button class="filter-token filter-token--active" data-status="all" type="button">All <span class="count" data-count="all"></span></button>
+          <button class="filter-token" data-status="unplaced" type="button">Unplaced <span class="count" data-count="unplaced"></span></button>
+          <button class="filter-token" data-status="placed" type="button">Placed <span class="count" data-count="placed"></span></button>
+          <button class="filter-token" data-status="declined" type="button">Not this year <span class="count" data-count="declined"></span></button>
+        </div>
+        <div class="filters filters--tags" id="tag-filters">
+          <button class="filter-token" data-tag="space" type="button">Space</button>
+          <button class="filter-token" data-tag="experience" type="button">Experience</button>
+          <button class="filter-token" data-tag="perform" type="button">Perform</button>
+          <button class="filter-token" data-tag="roaming" type="button">Roaming</button>
+          <button class="filter-token" data-tag="photo" type="button">Photo</button>
+          <button class="filter-token" data-tag="food" type="button">Food</button>
+        </div>
+      </div>
+      <div class="plist" id="plist" role="list"></div>
+    </section>
+
+    <!-- House -->
+    <section class="panel panel--house" id="panel-house" aria-label="House layout">
+      <div class="house" id="house"></div>
+    </section>
+
+    <!-- Detail -->
+    <aside class="panel panel--detail" id="panel-detail" aria-label="Proposal detail">
+      <div class="detail detail--empty" id="detail">
+        <p class="detail__empty">Pick a proposal to read the whole thing here while you look at the house.</p>
+        <p class="detail__empty detail__empty--hint">Drag a card onto a room, or use the “Place in” menu on this panel.</p>
+      </div>
+    </aside>
+
+  </main>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script src="js/app.js?v=1.0.0"></script>
+</body>
+</html>
