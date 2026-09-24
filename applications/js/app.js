@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.5';
-console.log(`[applications] v${VERSION} - program listings: pink residency badge`);
+const VERSION = '3.86.0';
+console.log(`[applications] v${VERSION} - cached gate verdict for faster boot`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -6839,7 +6839,8 @@ async function _checkMembershipAndEnter() {
   const tAccess0 = performance.now();
   const dataP = loadAll().then(() => { tData = performance.now(); });
   dataP.catch(() => {}); // surfaced at the await below; never unhandled here
-  try {
+
+  const fetchVerdict = async () => {
     // No timeout here once cost a housemate a permanent spinner.
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 20000);
@@ -6853,8 +6854,20 @@ async function _checkMembershipAndEnter() {
       });
     } finally { clearTimeout(timer); }
     const status = await resp.json().catch(() => ({}));
-    // A 500 used to fall through to "no Discord linked", sending people off to
-    // re-link an account that was never the problem. Say what actually broke.
+    return { resp, status };
+  };
+
+  // A 500 used to fall through to "no Discord linked", sending people off to
+  // re-link an account that was never the problem. Say what actually broke.
+  // wasEntered=true means this is a background revocation of an already-open
+  // app (the cached-verdict fast path below), not the first-load gate.
+  const denyAccess = (resp, status, wasEntered) => {
+    if (wasEntered) {
+      _entering = false; // let a gate button retry drive checkMembershipAndEnter() again
+      try { localStorage.removeItem('agape:gate'); } catch {}
+      document.getElementById('app').hidden = true;
+      document.getElementById('gate').hidden = false;
+    }
     if (!resp.ok) {
       stall('The access check failed.',
         `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
@@ -6866,29 +6879,41 @@ async function _checkMembershipAndEnter() {
       document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
       return;
     }
-    if (!status.isRecruitingMember) {
-      setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
-        'Re-check access',
-        'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
-      document.getElementById('gate-btn').onclick = async () => {
-        setGate('Re-checking…', null);
-        await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ action: 'verify' }),
-        });
-        checkMembershipAndEnter();
-      };
-      return;
-    }
+    setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+      'Re-check access',
+      'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+    document.getElementById('gate-btn').onclick = async () => {
+      setGate('Re-checking…', null);
+      await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'verify' }),
+      });
+      checkMembershipAndEnter();
+    };
+  };
+
+  const cacheVerdict = (status) => {
+    try {
+      localStorage.setItem('agape:gate', JSON.stringify({
+        userId: authedUser?.id, username: status.discordUsername || null,
+        isAdmin: status.isRecruitingAdmin === true, at: Date.now(),
+      }));
+    } catch {}
+  };
+
+  // Everything after a good verdict — identify self, finish the data load,
+  // render, and report boot vitals. Shared by the cached-verdict fast path
+  // and the normal network path so the two can't drift apart.
+  const enter = async (verdict) => {
     // in — identify self, load data, render
     const user = window.CtrlAuth.getUser();
-    me = { id: user.id, name: status.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
+    me = { id: user.id, name: verdict.discordUsername || user.email || 'Housemate', groupEmail: user.email || null };
     // Admin = can see #recruiting-automation. The function derives it from
     // Discord and writes recruit_admins, which is what RLS actually consults —
     // so this flag only decides whether the controls are disabled, never
     // whether a write is allowed.
-    isAdmin = status.isRecruitingAdmin === true;
+    isAdmin = verdict.isRecruitingAdmin === true;
     // group_email ties this account to its roster identity, which is how a
     // review imported from the sheet becomes yours once you sign in.
     sb.from('recruit_profiles').select('display_name, group_email').eq('user_id', user.id).maybeSingle()
@@ -6976,6 +7001,46 @@ async function _checkMembershipAndEnter() {
     }
     const linkEv = new URLSearchParams(location.search).get('link');
     if (linkEv) openLinkRecording(linkEv);
+  };
+
+  /* boot-opt: cached gate verdict. Boot telemetry (14-day window, n=35):
+     boot_access p75 1068ms vs. boot_data p75 763ms — the Discord membership
+     check, not loadAll, is the boot bottleneck (~40% slower, access+data
+     already run in parallel). A verdict cached under 6h for this exact user
+     enters immediately and lets the real check confirm in the background;
+     a refused or failed check is never cached, and a background refusal
+     always kicks back out to the gate. */
+  const authedUser = window.CtrlAuth.getUser();
+  let cached = null;
+  try {
+    const raw = localStorage.getItem('agape:gate');
+    if (raw) {
+      const g = JSON.parse(raw);
+      if (g && g.userId === authedUser?.id && typeof g.at === 'number' && (Date.now() - g.at) < 6 * 60 * 60 * 1000) cached = g;
+    }
+  } catch {}
+
+  if (cached) {
+    try {
+      await enter({ discordUsername: cached.username, isRecruitingAdmin: cached.isAdmin });
+    } catch (e) {
+      stall('Something went wrong checking access.', e.message || '');
+      console.error(e);
+      return;
+    }
+    fetchVerdict().then(({ resp, status }) => {
+      if (!resp.ok || !status.linked || !status.isRecruitingMember) { denyAccess(resp, status, true); return; }
+      isAdmin = status.isRecruitingAdmin === true;
+      cacheVerdict(status);
+    }).catch(() => {}); // a flaky background verify alone shouldn't kick anyone out
+    return;
+  }
+
+  try {
+    const { resp, status } = await fetchVerdict();
+    if (!resp.ok || !status.linked || !status.isRecruitingMember) { denyAccess(resp, status, false); return; }
+    cacheVerdict(status);
+    await enter(status);
   } catch (e) {
     const aborted = e.name === 'AbortError';
     stall(aborted ? 'The access check timed out.' : 'Something went wrong checking access.',
