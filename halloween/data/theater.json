@@ -1,18 +1,18 @@
 {
- "rev": 5,
+ "rev": 8,
  "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright' · planning sheet '📝 Collaborators' tab (Location = Theater stage - Justine&Colin's room), read Sep 30 · Call for Collaborators responses ('When might your experience be?', YC vote/result/notes), read Sep 30",
  "generated_at": "2026-09-30",
- "note": "Draft built from the email threads (Sep 30) and Ian's notes. Party runs 9pm–9am; theater shows start at 10pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists. Phone numbers and email addresses are left out on purpose (public site); open the thread for contact details.",
+ "note": "Draft built from the email threads (through Sep 30, 1:12pm), Ian's notes, the planning sheet and the form. Party runs 9pm–9am; the main theater program opens ~10:30–10:45pm when most guests arrive, with a possible early Garden show ~9:45pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists as a schedule. Phone numbers and email addresses are left out on purpose (public site).",
  "event": {
   "name": "Agape XV: Reassemblage",
   "date": "2026-10-24",
   "room": "Theater stage · Justine & Colin's room (2nd floor, under the rear stairs)",
   "loadin": "12:00",
   "doors": "21:00",
-  "shows": "22:00",
+  "shows": "21:45",
   "end": "09:00",
   "photos": "https://photos.google.com/share/AF1QipN57327bLeKcc1J0Pxn2fuhT2uxbS1gzzDvhhRgi32O9h7o8juR3gPRJ9BTAO2mhA?key=Ujl2cktYYU1MLWM1WjRpR2ZMcHA0cnFYcDh3djNB",
-  "notes": "Party runs 9pm–9am; theater shows start at 10pm. Light room design: lighting + cushion layout only. All furniture out; thin curtained storage strip on the right side of the door. Room starts and ends empty. Every theater act gets the $150 contribution. 20–30 min sets are the default ask; the later ambient slots (before 3:30am or after 5am) are for cozy, present crowds.",
+  "notes": "Party runs 9pm–9am. Main theater program opens ~10:30–10:45pm (when most guests arrive) with Ja'Shon first; Garden of Eternal Party may do an early 10–15 min show ~9:45pm. Room: Justine & Colin's room — under the stairs, 2nd floor; more space and rectangular. Light room design: lighting + cushion layout only. All furniture out; storage space in the room for act equipment; greenroom around the corner for valuables. Room starts and ends empty.",
   "needs": [
    {
     "id": "r1",
@@ -42,6 +42,12 @@
     "id": "r9",
     "cat": "setup",
     "text": "Room decor: Lina Bond — cabbage lamps + cushions ($300 grant, 2 comps, POC Justine). Coordinate with the cushion layout",
+    "done": false
+   },
+   {
+    "id": "r11",
+    "cat": "setup",
+    "text": "Greenroom around the corner for acts' valuables (promised to Garden)",
     "done": false
    },
    {
@@ -94,7 +100,7 @@
    "earliest": "21:00",
    "latest": "02:00",
    "slots": [
-    "22:55"
+    "23:45"
    ],
    "comps": 5,
    "compsAsked": 10,
@@ -140,7 +146,7 @@
    "status": "confirmed",
    "poc": "Ja'Shon",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0f370ee8deca21",
-   "summary": "Immersive theatre: Empress of the Universe bound by grief (kinbaku/shibari), freed by the Jade Dragon's sacrifice. Call held Sep 28. Room kept light (lighting + cushions), starts and ends empty. He can set up in about an hour; show runs 30–45 min, never over an hour. Window discussed 9pm–12:30am; he'd like 9:30–10pm for his model/muse, Ian is leaning later. Asked for $300 instead of the $150 standard (approval pending with Justine) and how it's paid out. Planning sheet (Collaborators): $200 grant, 4 tickets — the sheet's $200 differs from the $150 in email and his $300 ask. Form: YC vote: Maybe · note: fit for theatre stage — Ian/Melina communicate.",
+   "summary": "Immersive theatre: Empress of the Universe bound by grief (kinbaku/shibari), freed by the Jade Dragon's sacrifice. Call held Sep 28. Room kept light (lighting + cushions), starts and ends empty. He can set up in about an hour; show runs 30–45 min, never over an hour. Window discussed 9pm–12:30am; he'd like 9:30–10pm for his model/muse, Ian is leaning later. Asked for $300 instead of the $150 standard (approval pending with Justine) and how it's paid out. Planning sheet (Collaborators): $200 grant, 4 tickets — the sheet's $200 differs from the $150 in email and his $300 ask. Form: YC vote: Maybe · note: fit for theatre stage — Ian/Melina communicate. Sep 30 (Ian): $300 agreed — paid after the event via Venmo/Zelle/PayPal. Asked him to open the theater as the first performance ~10:30–10:45pm, and when he wants to set up.",
    "arrive": "20:00",
    "prep": 60,
    "changeover": 20,
@@ -148,35 +154,35 @@
    "earliest": "21:00",
    "latest": "00:30",
    "slots": [
-    "22:00"
+    "22:30"
    ],
    "comps": 4,
    "compsAsked": 4,
-   "grant": 200,
+   "grant": 300,
    "grantAsked": 300,
    "needs": [
     {
      "id": "j1",
      "cat": "money",
-     "text": "Settle his contribution: email offered $150, sheet says $200, he asked $300 (approval pending with Justine)",
-     "done": false
+     "text": "Contribution settled: $300 (house $200 + $100), paid after the event",
+     "done": true
     },
     {
      "id": "j2",
      "cat": "money",
-     "text": "Tell him the payout method (Venmo / Zelle / PayPal)",
-     "done": false
+     "text": "Payout method: any of Venmo / Zelle / PayPal, after the event (told him Sep 30)",
+     "done": true
     },
     {
      "id": "j3",
      "cat": "info",
-     "text": "Confirm set time — he prefers a 9:30–10pm start for his model",
+     "text": "Confirm he'll open the theater ~10:30–10:45pm (asked Sep 30; he'd preferred 9:30–10pm)",
      "done": false
     },
     {
      "id": "j4",
      "cat": "setup",
-     "text": "Give him a pre-party arrival time (~1 hr setup)",
+     "text": "Get his pre-show setup time (~1 hr; asked when he's thinking)",
      "done": false
     },
     {
@@ -207,18 +213,18 @@
    "notes": "",
    "reset": null,
    "strike": null,
-   "formWhen": "Setup (12–9pm), Early (9pm–12am)"
+   "formWhen": "Setup (12–9pm), Early (9pm–12am) · email: prefers 9:30–10pm; asked to open ~10:30–10:45pm"
   },
   {
    "id": "garden",
    "artist": "Jonathan Schoonhoven + crew",
    "project": "Garden of Eternal Party",
    "proposal": "p-ced5efaf",
-   "format": "Theater — shadow puppet musical, 3–5 short shows",
+   "format": "Theater — shadow puppet musical, 10–15 min, repeated across the night",
    "status": "confirmed",
    "poc": "Jonathan (Melina referred)",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d914f7a57c104",
-   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Latest reply (Sep 30): each show runs 10–15 min and they want 3–5 shows to make the setup worth it. Tech (specifics TBD): rear-projection screen, digital projector, old-fashioned overhead projector, up to 3 wired mics with stands, 2 PAs + mixer, aux input for a backing track. Setup and strike take a while, so they asked whether they share the stage with other crews. Need at least 5 comps (offered 2). Planning sheet (Collaborators): $150 grant, 5 tickets — the sheet already gives the 5 they asked for. Form: YC vote: Strong Yes · result: Yes.",
+   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Latest reply (Sep 30): each show runs 10–15 min and they want 3–5 shows to make the setup worth it. Tech (specifics TBD): rear-projection screen, digital projector, old-fashioned overhead projector, up to 3 wired mics with stands, 2 PAs + mixer, aux input for a backing track. Setup and strike take a while, so they asked whether they share the stage with other crews. Need at least 5 comps (offered 2). Planning sheet (Collaborators): $150 grant, 5 tickets — the sheet already gives the 5 they asked for. Form: YC vote: Strong Yes · result: Yes. Sep 30 (Ian): 5 tickets confirmed; told them they share the stage with 4–5 acts and asked back-to-back vs spread out; they'll load in and set up day-of before the party; storage in the room + a greenroom for valuables. Possible first show ~9:45pm.",
    "arrive": "17:30",
    "prep": 120,
    "changeover": 30,
@@ -226,9 +232,9 @@
    "earliest": "21:00",
    "latest": "02:00",
    "slots": [
-    "00:25",
-    "00:50",
-    "01:15"
+    "21:45",
+    "23:20",
+    "01:05"
    ],
    "comps": 5,
    "compsAsked": 5,
@@ -238,7 +244,25 @@
     {
      "id": "g1",
      "cat": "info",
-     "text": "Get setup and strike times (they say both take a while) and earliest/latest",
+     "text": "Get load-in/setup and strike times — load-in is before the party, day-of",
+     "done": false
+    },
+    {
+     "id": "g8",
+     "cat": "info",
+     "text": "Shows spread across the night, not back-to-back (Ian's plan) — confirm with Jonathan; rig stays stored in the room between shows",
+     "done": false
+    },
+    {
+     "id": "g9",
+     "cat": "info",
+     "text": "Early show ~9:45pm — confirm yes/no",
+     "done": false
+    },
+    {
+     "id": "g10",
+     "cat": "setup",
+     "text": "Setup only before the first show and strike after the last; rig stays set (stored in the room) between shows — confirm with Jonathan",
      "done": false
     },
     {
@@ -256,14 +280,14 @@
     {
      "id": "g4",
      "cat": "setup",
-     "text": "Tell them yes, they share the stage — agree where the rig lives before/after their shows",
-     "done": false
+     "text": "Told them they share the stage (4–5 acts); equipment stored in the room",
+     "done": true
     },
     {
      "id": "g5",
      "cat": "tix",
-     "text": "Sheet already lists 5 tickets (email said 2) — tell Jonathan 5 is confirmed",
-     "done": false
+     "text": "5 tickets confirmed (Sep 30)",
+     "done": true
     },
     {
      "id": "g7",
@@ -279,7 +303,7 @@
     }
    ],
    "notes": "",
-   "reset": 10,
+   "reset": 0,
    "strike": 30,
    "formWhen": "Early (9pm–12am), Midnight (12–2am)"
   },
@@ -302,7 +326,7 @@
    "earliest": "00:00",
    "latest": "06:00",
    "slots": [
-    "02:05"
+    "00:50"
    ],
    "comps": null,
    "compsAsked": null,
@@ -354,7 +378,7 @@
    "earliest": "00:00",
    "latest": "06:00",
    "slots": [
-    "02:30"
+    "02:05"
    ],
    "comps": 4,
    "compsAsked": 3,
@@ -420,8 +444,8 @@
    "earliest": "02:00",
    "latest": "08:00",
    "slots": [
-    "06:00",
-    "07:30"
+    "03:20",
+    "06:20"
    ],
    "comps": null,
    "compsAsked": null,
@@ -474,7 +498,7 @@
    "notes": "",
    "reset": null,
    "strike": null,
-   "formWhen": "Not in the form — email: before 3:30am or after 5am"
+   "formWhen": "Not in the form — Ian suggested before 3:30am or after 5am; first set right before the vac bed, harp set before sunrise"
   },
   {
    "id": "vacbed",
@@ -493,7 +517,7 @@
    "earliest": "02:00",
    "latest": null,
    "slots": [
-    "03:45"
+    "04:05"
    ],
    "comps": 2,
    "compsAsked": null,
@@ -547,7 +571,7 @@
    "earliest": "03:00",
    "latest": null,
    "slots": [
-    "06:45"
+    "07:05"
    ],
    "comps": null,
    "compsAsked": null,

@@ -2,7 +2,7 @@
 
 **One line:** A light planning page at `/halloween/theater.html` that puts every theater act on one clock (arrive and pre-party setup before doors, then changeover and show during the party) and tracks what each act still needs.
 
-**Status:** Shipped v1.4.0 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
+**Status:** Shipped v1.4.2 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
 **Related:** [Halloween placement](./agape-halloween-placement.md) (same party; the theater is the "2nd floor room under the rear stairs").
 
 ---
@@ -19,7 +19,7 @@ The theater acts are being negotiated one email thread at a time. Every thread a
   - **Arrive · pre-party setup** — load-in/soundcheck lane before doors. Hidden for now (`SHOW_PREP = false` in `theater.js`); arrival data is kept, and flipping the flag brings back the lane, the noon start and the arrival fields.
   - Drag any block to move it in 5-minute steps. With **Auto-shift later shows** on (default, remembered per browser), the dropped show keeps its time and every show that would now collide keeps its order and is pushed later just enough to fit its own changeover/reset (and the previous act's strike). Shows that finish before the dropped show's changeover don't move; gaps are never closed automatically. **Close gaps** packs every show back-to-back from the first one, in the current order. A show pushed past 9am, or outside an act's window, is flagged rather than blocked. Dashed blocks mean a length is still TBD and a default is drawn. Red borders mean a conflict. Selecting an act shades its availability window.
 - **Conflict checks** — show + changeover/strike overlapping another act, repeat shows overlapping each other, a slot before doors or before shows start, starting before an act's earliest or ending after its latest, pre-party setup running past doors, two load-ins in the room at once, and any TBD run/changeover/arrival.
-- **Needs** — per-act checklists tagged Info / AV / Setup / Tickets / Money / Comms, plus a roll-up across all acts with totals (comps committed vs asked, grants offered vs asked, how many acts have arrival and run times).
+- **Needs** — per-act checklists tagged Info / AV / Setup / Tickets / Artist pay / Comms, plus a roll-up across all acts with totals (comps we give vs requested, what we pay artists vs requested — money only flows from Agape to the acts, how many acts have arrival and run times).
 - **Sharing** — edits save to `localStorage`. "Share link" encodes the whole schedule in the URL (`#t=`); "Copy run of show" writes arrivals, the theater order and all open needs as text for Discord; Export/Import moves it as JSON; Reset reloads the email snapshot.
 
 ## Data
@@ -47,9 +47,9 @@ Times are stored as `HH:MM`. Anything before noon counts as the next morning, so
 
 ## Planning-sheet mismatches (Sep 30)
 
-- Ja'Shon: sheet $200 vs email $150 vs his $300 ask.
+- Ja'Shon: settled Sep 30 at $300 total (house $200 + $100), paid after the event — sheet still says $200.
 - Jordan: sheet 4 tickets vs email 2 (+1 asked).
-- Garden: sheet 5 tickets vs email 2 — sheet already covers their ask.
+- Garden: 5 tickets, confirmed by email Sep 30 — matches the sheet.
 - Spheresay still listed (declined); Tasya and Parlor games not listed.
 - Lina Bond (cabbage lamps + cushions, $300) is room decor, tracked on the Theater room card.
 - The "Theater stage - Justine&Colin's room" tab itself isn't readable through the Drive connector (not indexed; file too large to export).
