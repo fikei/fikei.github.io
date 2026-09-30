@@ -24,6 +24,7 @@
 .pcard__when { font-size: var(--text-xs); margin-top: var(--space-2); color: var(--fg); }
 .pcard__when--none { color: var(--fg-subtle); }
 .pcard__warn { font-size: var(--text-2xs); color: var(--tl-warn); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.pcard__needs + .pcard__needs { margin-left: var(--space-2); }
 .pcard__needs { margin-left: auto; font-size: var(--text-2xs); color: var(--fg-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
 .tag--confirmed { border-color: var(--accent-green); color: var(--accent-green); }
 .tag--pending { border-color: var(--accent-amber); color: var(--accent-amber); }

@@ -5,8 +5,8 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.4.1';
-console.log(`[halloween-theater] v${VERSION} - theater run of show (Sep 30 email updates)`);
+const VERSION = '1.4.2';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (artist-pay wording)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
@@ -16,7 +16,7 @@ const PX = 1.2;                  // px per minute (matches --tl-px)
 const SHOW_PREP = false;         // arrive / pre-party lane hidden for now (data is kept)
 const SNAP = 5;                  // drag snaps to 5 min
 const DEF = { run: 30, changeover: 15, prep: 30 };   // drawn when a value is still TBD
-const CATS = { info: 'Info', av: 'AV', setup: 'Setup', tix: 'Tickets', money: 'Money', comms: 'Comms' };
+const CATS = { info: 'Info', av: 'AV', setup: 'Setup', tix: 'Tickets', money: 'Artist pay', comms: 'Comms' };
 const STATUS = { confirmed: 'Confirmed', pending: 'Pending', declined: 'Declined' };
 
 let seed = null;
@@ -171,6 +171,7 @@ function renderActs() {
       <div class="pcard__foot">
         <span class="tag tag--${a.status}">${STATUS[a.status]}</span>
         ${iss ? `<span class="pcard__warn">${iss} to resolve</span>` : ''}
+        ${a.grant ? `<span class="pcard__needs" title="What we pay this act, after the event">we pay $${a.grant}</span>` : ''}
         <span class="pcard__needs">${openNeeds(a)}/${a.needs.length} open</span>
       </div>
     </div>`);
@@ -270,7 +271,7 @@ function needsHtml() {
     <div class="needs">
       <div class="needs__totals">
         <div class="needs__stat"><b>${sum('comps')}</b><span>comps committed${sum('compsAsked') > sum('comps') ? ` · ${sum('compsAsked')} asked` : ''}</span></div>
-        <div class="needs__stat"><b>$${sum('grant')}</b><span>grants offered${sum('grantAsked') > sum('grant') ? ` · $${Math.max(sum('grantAsked'), 0)} asked` : ''}</span></div>
+        <div class="needs__stat"><b>$${sum('grant')}</b><span>we pay artists${sum('grantAsked') > sum('grant') ? ` · $${sum('grantAsked')} requested` : ''}</span></div>
         ${SHOW_PREP ? `<div class="needs__stat"><b>${acts.filter(a => a.arrive).length}/${acts.length}</b><span>arrival times set</span></div>` : ''}
         <div class="needs__stat"><b>${acts.filter(a => a.run != null && a.changeover != null).length}/${acts.length}</b><span>run + changeover known</span></div>
       </div>
@@ -373,8 +374,8 @@ function renderDetail() {
       <div class="form">
         <label class="form__row"><span class="form__hint">Status</span><select class="select" data-f="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${a.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
         <label class="form__row"><span class="form__hint">Point of contact</span><input class="input" data-f="poc" value="${esc(a.poc || '')}"></label>
-        <label class="form__row"><span class="form__hint">Comps (given / asked)</span><span style="display:flex;gap:4px">${num('comps', a.comps).replace('step="5"', 'step="1"')}${num('compsAsked', a.compsAsked).replace('step="5"', 'step="1"')}</span></label>
-        <label class="form__row"><span class="form__hint">Grant $ (offered / asked)</span><span style="display:flex;gap:4px">${num('grant', a.grant)}${num('grantAsked', a.grantAsked)}</span></label>
+        <label class="form__row"><span class="form__hint">Comp tickets we give (given / requested)</span><span style="display:flex;gap:4px">${num('comps', a.comps).replace('step="5"', 'step="1"')}${num('compsAsked', a.compsAsked).replace('step="5"', 'step="1"')}</span></label>
+        <label class="form__row"><span class="form__hint">We pay the artist $ (agreed / they requested)</span><span style="display:flex;gap:4px">${num('grant', a.grant)}${num('grantAsked', a.grantAsked)}</span></label>
         <label class="form__row form__row--full"><span class="form__hint">Project</span><input class="input" data-f="project" value="${esc(a.project)}"></label>
         <label class="form__row form__row--full"><span class="form__hint">Artist</span><input class="input" data-f="artist" value="${esc(a.artist)}"></label>
         <label class="form__row form__row--full"><span class="form__hint">Format</span><input class="input" data-f="format" value="${esc(a.format || '')}"></label>
@@ -526,6 +527,12 @@ function runOfShowText() {
     lines.push(`  ${fmt(b.start)}–${fmt(b.end)}  ${b.act.project} — ${b.act.artist}${b.runGuess ? ' (run time TBD)' : ''}`);
     if (b.strike) lines.push(`  ${fmt(b.end)}–${fmt(b.stop)}  strike`);
   });
+  const paid = live().filter(a => a.grant);
+  if (paid.length) {
+    lines.push('', 'ARTIST PAY (we pay, after the event)');
+    paid.forEach(a => lines.push(`  $${a.grant}  ${a.project} — ${a.artist}`));
+    lines.push(`  Total: $${paid.reduce((t, a) => t + Number(a.grant), 0)}`);
+  }
   lines.push('', 'OPEN NEEDS');
   [{ name: 'Room', needs: ev.needs }, ...live().map(a => ({ name: a.project, needs: a.needs }))].forEach(r =>
     r.needs.filter(n => !n.done).forEach(n => lines.push(`  - [${CATS[n.cat] || n.cat}] ${r.name}: ${n.text}`)));
