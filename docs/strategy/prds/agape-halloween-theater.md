@@ -2,7 +2,7 @@
 
 **One line:** A light planning page at `/halloween/theater.html` that puts every theater act on one clock (arrive and pre-party setup before doors, then changeover and show during the party) and tracks what each act still needs.
 
-**Status:** Shipped v1.4.2 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
+**Status:** Shipped v1.4.3 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
 **Related:** [Halloween placement](./agape-halloween-placement.md) (same party; the theater is the "2nd floor room under the rear stairs").
 
 ---

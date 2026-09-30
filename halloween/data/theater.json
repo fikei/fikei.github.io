@@ -1,5 +1,5 @@
 {
- "rev": 8,
+ "rev": 9,
  "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright' · planning sheet '📝 Collaborators' tab (Location = Theater stage - Justine&Colin's room), read Sep 30 · Call for Collaborators responses ('When might your experience be?', YC vote/result/notes), read Sep 30",
  "generated_at": "2026-09-30",
  "note": "Draft built from the email threads (through Sep 30, 1:12pm), Ian's notes, the planning sheet and the form. Party runs 9pm–9am; the main theater program opens ~10:30–10:45pm when most guests arrive, with a possible early Garden show ~9:45pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists as a schedule. Phone numbers and email addresses are left out on purpose (public site).",
@@ -436,16 +436,16 @@
    "status": "pending",
    "poc": "Tasya (via Andy Maag)",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d91835603be7b",
-   "summary": "Stepping in after Spheresay (Andy Maag) declined — out of state that weekend. Mostly vocal: soft layered choral noise, few words. Maybe an amplified embroidery piece; a seated sound performance either way. Could do a second, sleepy harp set before sunrise with somewhere to rest in between and minimal setup. Ian suggested 20–30 min sets, before 3:30am or after 5am; promised room details and maybe a call.",
+   "summary": "Stepping in after Spheresay (Andy Maag) declined — out of state that weekend. Mostly vocal: soft layered choral noise, few words. Maybe an amplified embroidery piece; a seated sound performance either way. Could do a second, sleepy harp set before sunrise with somewhere to rest in between and minimal setup. Ian suggested 20–30 min sets, before 3:30am or after 5am; promised room details and maybe a call. Sep 30 reply: setup is fairly minimal — depends on whether there's house sound or she brings amplification — and she'd like 45–60 min of setup padding. Run time flexible (10 min to 3 hrs). Prefers no earlier than 9pm; could maybe do the super-late/early set with downtime between. Wants a call (today, before 7pm).",
    "arrive": null,
    "prep": null,
-   "changeover": 15,
+   "changeover": 45,
    "run": 30,
-   "earliest": "02:00",
+   "earliest": "21:00",
    "latest": "08:00",
    "slots": [
-    "03:20",
-    "06:20"
+    "03:50",
+    "07:05"
    ],
    "comps": null,
    "compsAsked": null,
@@ -455,25 +455,25 @@
     {
      "id": "t1",
      "cat": "info",
-     "text": "Get setup time, run time, earliest/latest (asked Sep 30)",
-     "done": false
+     "text": "Setup 45–60 min (padding), run flexible 10 min–3 hrs, no earlier than 9pm (got Sep 30)",
+     "done": true
     },
     {
      "id": "t2",
      "cat": "comms",
-     "text": "Send room setup details / hop on a call (promised Sep 30)",
+     "text": "Call her — she's free Sep 30 before 7pm; send room setup details",
      "done": false
     },
     {
      "id": "t3",
      "cat": "info",
-     "text": "Confirm she's in — and whether the harp set happens",
+     "text": "Confirm she's in, and whether the late harp set happens (needs downtime between sets)",
      "done": false
     },
     {
      "id": "t4",
      "cat": "av",
-     "text": "Amplification for vocals / amplified embroidery",
+     "text": "House sound or her own amp? Tell her so she knows what to bring (vocals / amplified embroidery)",
      "done": false
     },
     {
@@ -493,12 +493,18 @@
      "cat": "comms",
      "text": "Not in the planning sheet yet — add her (Spheresay's row is still there)",
      "done": false
+    },
+    {
+     "id": "t8",
+     "cat": "setup",
+     "text": "Could her 45–60 min setup happen pre-party / in storage so the in-show changeover is shorter?",
+     "done": false
     }
    ],
    "notes": "",
-   "reset": null,
+   "reset": 30,
    "strike": null,
-   "formWhen": "Not in the form — Ian suggested before 3:30am or after 5am; first set right before the vac bed, harp set before sunrise"
+   "formWhen": "Email Sep 30: no earlier than 9pm; flexible run (10 min–3 hrs); maybe the very late/early set if there's downtime between"
   },
   {
    "id": "vacbed",
@@ -517,7 +523,7 @@
    "earliest": "02:00",
    "latest": null,
    "slots": [
-    "04:05"
+    "04:35"
    ],
    "comps": 2,
    "compsAsked": null,
@@ -571,7 +577,7 @@
    "earliest": "03:00",
    "latest": null,
    "slots": [
-    "07:05"
+    "07:50"
    ],
    "comps": null,
    "compsAsked": null,
