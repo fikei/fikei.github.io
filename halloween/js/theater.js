@@ -5,8 +5,8 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.4.2';
-console.log(`[halloween-theater] v${VERSION} - theater run of show (artist-pay wording)`);
+const VERSION = '1.4.3';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (Tasya reply Sep 30)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
