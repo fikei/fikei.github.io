@@ -4,8 +4,8 @@
    link-shareable, bundled snapshot otherwise); placements live in
    localStorage and travel between people as a share link or a JSON export. */
 
-const VERSION = '1.0.0';
-console.log(`[halloween] v${VERSION} - placement app`);
+const VERSION = '1.0.1';
+console.log(`[halloween] v${VERSION} - placement app (theater link)`);
 
 const SHEET_ID = '1CT_3fD50yJ0i6US7rvjjpo8oJj9VUGKfBhat8zXjOqo';
 const SHEET_GID = '909181316';

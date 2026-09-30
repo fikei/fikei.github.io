@@ -54,6 +54,8 @@ body {
   white-space: nowrap;
 }
 .topbar__status--live { color: var(--accent-green); border-color: var(--accent-green); }
+.topbar__link { color: var(--fg-muted); text-decoration: none; }
+.topbar__link:hover { color: var(--fg); border-color: var(--fg-muted); }
 .topbar__actions { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
 .topbar__tabs { display: none; }
 

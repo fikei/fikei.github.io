@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Agape Halloween · Theater</title>
+  <meta name="description" content="Schedule the Agape Halloween XV theater acts and track their load-in, changeover and production needs.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <link rel="stylesheet" href="css/app.css?v=1.0.1">
+  <link rel="stylesheet" href="css/theater.css?v=1.0.0">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__title">Agape Halloween XV</span>
+      <span class="topbar__sub">Theater · run of show</span>
+    </div>
+    <a class="topbar__status topbar__link" href="./" title="Room placement for all proposals">← Placement</a>
+    <nav class="topbar__tabs" id="mobile-tabs" aria-label="Panels">
+      <button class="tab tab--active" data-panel="acts" type="button">Acts</button>
+      <button class="tab" data-panel="plan" type="button">Schedule</button>
+      <button class="tab" data-panel="detail" type="button">Detail</button>
+    </nav>
+    <div class="topbar__actions">
+      <button class="btn btn--sm" id="btn-share" type="button" title="Copy a link that carries this schedule">Share link</button>
+      <button class="btn btn--sm" id="btn-copy" type="button" title="Copy the run of show + open needs as text">Copy run of show</button>
+      <button class="btn btn--sm" id="btn-export" type="button" title="Download as JSON">Export</button>
+      <button class="btn btn--sm" id="btn-import" type="button" title="Load an exported JSON file">Import</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <button class="btn btn--sm btn--ghost" id="btn-reset" type="button" title="Throw away local edits and reload the email snapshot">Reset</button>
+      <button class="btn btn--sm btn--ghost" id="btn-theme" type="button" title="Toggle light/dark">Theme</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" hidden>
+    <span id="banner-text"></span>
+    <button class="btn btn--sm" id="banner-yes" type="button">Load</button>
+    <button class="btn btn--sm btn--ghost" id="banner-no" type="button">Keep mine</button>
+  </div>
+
+  <main class="layout layout--theater" data-panel="acts">
+
+    <section class="panel panel--acts" aria-label="Acts">
+      <div class="plist" id="acts" role="list"></div>
+    </section>
+
+    <section class="panel panel--plan" aria-label="Schedule">
+      <div class="plan__head">
+        <div class="filters" id="view-tabs">
+          <button class="filter-token filter-token--active" data-view="timeline" type="button">Timeline</button>
+          <button class="filter-token" data-view="needs" type="button">Needs <span class="count" id="needs-count"></span></button>
+        </div>
+        <div class="plan__summary" id="summary"></div>
+      </div>
+      <div id="plan"></div>
+    </section>
+
+    <aside class="panel panel--detail" aria-label="Act detail">
+      <div class="detail" id="detail"></div>
+    </aside>
+
+  </main>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script src="js/theater.js?v=1.0.0"></script>
+</body>
+</html>
