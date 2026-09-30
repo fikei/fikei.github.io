@@ -5,14 +5,15 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.0.0';
-console.log(`[halloween-theater] v${VERSION} - theater run of show`);
+const VERSION = '1.2.0';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (10pm shows, reset/strike, pre-party hidden)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
 const NOON = 12 * 60;            // the timeline starts at noon on party day
 const SPAN = 21 * 60;            // …and runs to 9am the next morning
 const PX = 1.2;                  // px per minute (matches --tl-px)
+const SHOW_PREP = false;         // arrive / pre-party lane hidden for now (data is kept)
 const SNAP = 5;                  // drag snaps to 5 min
 const DEF = { run: 30, changeover: 15, prep: 30 };   // drawn when a value is still TBD
 const CATS = { info: 'Info', av: 'AV', setup: 'Setup', tix: 'Tickets', money: 'Money', comms: 'Comms' };
@@ -24,11 +25,26 @@ let ui = { sel: null, view: 'timeline', panel: 'acts', needs: 'open', dirty: fal
 
 // ---------- state ----------
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-function fromSeed() { return { event: clone(seed.event), acts: clone(seed.acts), updated: null }; }
+function fromSeed() { return { event: clone(seed.event), acts: clone(seed.acts), rev: seed.rev || 1, updated: null }; }
+// A newer seed (acts added from later emails/requests) merges into saved edits once:
+// new acts are appended, event fields that didn't exist yet are filled, nothing saved is overwritten.
+function upgrade(s) {
+  if ((s.rev || 1) >= (seed.rev || 1)) return s;
+  const have = new Set(s.acts.map(a => a.id));
+  const added = seed.acts.filter(a => !have.has(a.id));
+  s.acts.push(...clone(added));
+  s.event = { ...clone(seed.event), ...s.event };
+  s.rev = seed.rev;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (_) {}
+  setTimeout(() => toast(added.length
+    ? `Added ${added.map(a => a.project).join(', ')} — your saved times were kept (Reset loads the new draft)`
+    : 'A newer draft is available — Reset loads it (replaces your local edits)'), 300);
+  return s;
+}
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (s && Array.isArray(s.acts) && s.event) return s;
+    if (s && Array.isArray(s.acts) && s.event) return upgrade(s);
   } catch (_) { /* fall through */ }
   return fromSeed();
 }
@@ -55,15 +71,26 @@ function fmt(v) {
 }
 function pad(n) { return String(n).padStart(2, '0'); }
 const doors = () => toMin(state.event.doors) ?? 540;
+const showsStart = () => toMin(state.event.shows) ?? doors();
+const timelineStart = () => SHOW_PREP ? 0 : doors();
 
 // ---------- schedule model ----------
 function showBlocks() {
   const out = [];
-  live().forEach(a => a.slots.forEach((s, i) => {
-    const start = toMin(s); if (start == null) return;
-    const run = a.run ?? DEF.run, co = a.changeover ?? DEF.changeover;
-    out.push({ act: a, i, start, end: start + run, coStart: start - co, runGuess: a.run == null, coGuess: a.changeover == null });
-  }));
+  // First show of an act gets the full changeover; repeat shows only the reset.
+  // Strike (tear-down) hangs off the act's last show.
+  live().forEach(a => {
+    const mine = a.slots.map((s, i) => ({ i, start: toMin(s) })).filter(x => x.start != null).sort((x, y) => x.start - y.start);
+    mine.forEach((x, k) => {
+      const run = a.run ?? DEF.run;
+      const repeat = k > 0 && a.reset != null;
+      const co = repeat ? a.reset : (a.changeover ?? DEF.changeover);
+      const last = k === mine.length - 1;
+      const strike = last ? (a.strike || 0) : 0;
+      out.push({ act: a, i: x.i, start: x.start, end: x.start + run, stop: x.start + run + strike, strike, coStart: x.start - co, repeat,
+        runGuess: a.run == null, coGuess: !repeat && a.changeover == null });
+    });
+  });
   return out.sort((x, y) => x.start - y.start);
 }
 function prepBlocks() {
@@ -81,17 +108,20 @@ function issuesFor(a) {
   if (!a.slots.length) out.push('No theater slot yet');
   if (a.run == null) out.push('Run time TBD');
   if (a.changeover == null) out.push('Changeover (setup during party) TBD');
-  if (a.arrive == null) out.push('Arrival / pre-party setup TBD');
+  if (SHOW_PREP && a.arrive == null) out.push('Arrival / pre-party setup TBD');
   const shows = showBlocks();
   shows.filter(b => b.act === a).forEach(b => {
     const label = `Slot ${fmt(b.start)}`;
     if (b.start < d) out.push(`${label} starts before doors`);
+    else if (b.start < showsStart()) out.push(`${label} starts before shows begin (${fmt(showsStart())})`);
     if (a.earliest && b.start < toMin(a.earliest)) out.push(`${label} is before their earliest (${fmt(toMin(a.earliest))})`);
     if (a.latest && b.end > toMin(a.latest)) out.push(`${label} runs past their latest (${fmt(toMin(a.latest))})`);
-    shows.filter(o => o !== b && overlaps(b.coStart, b.end, o.coStart, o.end))
-      .forEach(o => out.push(`${label} collides with ${o.act.project} ${fmt(o.start)} (counting changeover)`));
+    shows.filter(o => o.act !== a && overlaps(b.coStart, b.stop, o.coStart, o.stop))
+      .forEach(o => out.push(`${label} collides with ${o.act.project} ${fmt(o.start)} (counting changeover/strike)`));
+    shows.filter(o => o.act === a && o.start > b.start && o.coStart < b.end)
+      .forEach(o => out.push(`${label} overlaps their next show ${fmt(o.start)}`));
   });
-  const p = prepBlocks().find(b => b.act === a);
+  const p = SHOW_PREP && prepBlocks().find(b => b.act === a);
   if (p) {
     if (p.end > d) out.push('Pre-party setup runs past doors');
     prepBlocks().filter(o => o.act !== a && overlaps(p.start, p.end, o.start, o.end))
@@ -134,7 +164,7 @@ function renderActs() {
     <div class="pcard ${ui.sel === a.id ? 'pcard--selected' : ''} ${a.status === 'declined' ? 'pcard--declined' : ''}" data-sel="${esc(a.id)}" role="listitem">
       <div class="pcard__project">${esc(a.project)}</div>
       <div class="pcard__artist">${esc(a.artist)}</div>
-      ${a.status === 'declined' ? '' : `<div class="pcard__when ${shows.length ? '' : 'pcard__when--none'}">${when}${a.arrive ? ` <span class="pcard__artist">· in ${fmt(toMin(a.arrive))}</span>` : ''}</div>`}
+      ${a.status === 'declined' ? '' : `<div class="pcard__when ${shows.length ? '' : 'pcard__when--none'}">${when}${SHOW_PREP && a.arrive ? ` <span class="pcard__artist">· in ${fmt(toMin(a.arrive))}</span>` : ''}</div>`}
       <div class="pcard__foot">
         <span class="tag tag--${a.status}">${STATUS[a.status]}</span>
         ${iss ? `<span class="pcard__warn">${iss} to resolve</span>` : ''}
@@ -157,28 +187,30 @@ function renderPlan() {
 }
 
 function timelineHtml() {
-  const ev = state.event, d = doors(), H = SPAN * PX;
+  const ev = state.event, d = doors();
+  const T0 = timelineStart(), H = (SPAN - T0) * PX, y = m => (m - T0) * PX;
   const hours = [];
-  for (let m = 0; m <= SPAN; m += 60) hours.push(`<div class="tl__hour ${m === d || m === 720 ? 'tl__hour--major' : ''}" style="top:${m * PX}px">${fmt(m)}</div>`);
+  for (let m = T0; m <= SPAN; m += 60) hours.push(`<div class="tl__hour ${m === d || m === 720 ? 'tl__hour--major' : ''}" style="top:${y(m)}px">${fmt(m)}</div>`);
   const sel = actById(ui.sel);
   const win = sel && (sel.earliest || sel.latest)
-    ? `<div class="tl__window" style="top:${(toMin(sel.earliest) ?? d) * PX}px;height:${((toMin(sel.latest) ?? SPAN) - (toMin(sel.earliest) ?? d)) * PX}px" title="${esc(sel.project)}: their window"></div>` : '';
-  const warnSet = new Set(live().filter(a => issuesFor(a).some(i => /collides|before doors|earliest|latest|past doors|shares the room/.test(i))).map(a => a.id));
+    ? `<div class="tl__window" style="top:${y(Math.max(T0, toMin(sel.earliest) ?? d))}px;height:${((toMin(sel.latest) ?? SPAN) - Math.max(T0, toMin(sel.earliest) ?? d)) * PX}px" title="${esc(sel.project)}: their window"></div>` : '';
+  const warnSet = new Set(live().filter(a => issuesFor(a).some(i => /collides|before doors|before shows|earliest|latest|past doors|shares the room/.test(i))).map(a => a.id));
 
   const prep = columns(prepBlocks()).map(b => {
     const w = 100 / b.cols;
     return `<div class="blk blk--prep ${b.guess ? 'blk--guess' : ''} ${ui.sel === b.act.id ? 'blk--sel' : ''} ${warnSet.has(b.act.id) ? 'blk--warn' : ''}"
-      data-drag="arrive" data-act="${esc(b.act.id)}" style="top:${b.start * PX}px;height:${Math.max(18, (b.end - b.start) * PX)}px;left:${b.col * w}%;width:${w}%"
+      data-drag="arrive" data-act="${esc(b.act.id)}" style="top:${y(b.start)}px;height:${Math.max(18, (b.end - b.start) * PX)}px;left:${b.col * w}%;width:${w}%"
       title="${esc(b.act.project)} — arrive ${fmt(b.start)}, setup ${b.act.prep ?? DEF.prep + '? (TBD)'} min">
       <b>${esc(b.act.project)}</b><span class="blk__t">${fmt(b.start)}–${fmt(b.end)}${b.guess ? ' · TBD' : ''}</span></div>`;
   }).join('');
 
-  const shows = columns(showBlocks(), b => b.coStart, b => b.end).map(b => {
+  const shows = columns(showBlocks(), b => b.coStart, b => b.stop).map(b => {
     const w = 100 / b.cols, pos = `left:${b.col * w}%;width:${w}%`;
     const co = b.start - b.coStart;
-    return `<div class="blk blk--co ${b.coGuess ? 'blk--guess' : ''}" style="top:${b.coStart * PX}px;height:${co * PX}px;${pos}" title="Changeover / setup during party: ${co} min${b.coGuess ? ' (TBD)' : ''}">${co * PX >= 14 ? `setup ${co}m` : ''}</div>
+    const strike = b.strike ? `<div class="blk blk--co blk--strike" style="top:${y(b.end)}px;height:${b.strike * PX}px;${pos}" title="Strike / tear-down: ${b.strike} min">${b.strike * PX >= 14 ? `strike ${b.strike}m` : ''}</div>` : '';
+    return `${strike}<div class="blk blk--co ${b.coGuess ? 'blk--guess' : ''}" style="top:${y(b.coStart)}px;height:${co * PX}px;${pos}" title="${b.repeat ? 'Reset between shows' : 'Changeover / setup during party'}: ${co} min${b.coGuess ? ' (TBD)' : ''}">${co * PX >= 14 ? `${b.repeat ? 'reset' : 'setup'} ${co}m` : ''}</div>
       <div class="blk blk--show ${b.runGuess ? 'blk--guess' : ''} ${ui.sel === b.act.id ? 'blk--sel' : ''} ${warnSet.has(b.act.id) ? 'blk--warn' : ''}"
-      data-drag="slot" data-act="${esc(b.act.id)}" data-slot="${b.i}" style="top:${b.start * PX}px;height:${Math.max(18, (b.end - b.start) * PX)}px;${pos}"
+      data-drag="slot" data-act="${esc(b.act.id)}" data-slot="${b.i}" style="top:${y(b.start)}px;height:${Math.max(18, (b.end - b.start) * PX)}px;${pos}"
       title="${esc(b.act.project)} — ${fmt(b.start)}–${fmt(b.end)}${b.runGuess ? ' (run time TBD)' : ''}">
       <b>${esc(b.act.project)}</b><span class="blk__t">${fmt(b.start)}–${fmt(b.end)}${b.runGuess ? ' · run TBD' : ''}</span></div>`;
   }).join('');
@@ -186,20 +218,23 @@ function timelineHtml() {
   const unsched = live().filter(a => !a.slots.some(s => toMin(s) != null));
   return `
     <div class="plan__note"><b>Draft.</b> ${esc(seed.note)} ${ev.photos ? `<a href="${esc(ev.photos)}" target="_blank" rel="noopener">Room photos</a>.` : ''}</div>
-    <div class="tl">
+    <div class="tl ${SHOW_PREP ? '' : 'tl--solo'}">
       <div class="tl__lanes-head">
         <span></span>
-        <span class="tl__lane-title"><b>Arrive · pre-party setup</b><br>load-in, soundcheck</span>
+        ${SHOW_PREP ? '<span class="tl__lane-title"><b>Arrive · pre-party setup</b><br>load-in, soundcheck</span>' : ''}
         <span class="tl__lane-title"><b>Theater · during party</b><br>setup/changeover + show</span>
       </div>
       <div class="tl__grid" id="tl-grid" style="height:${H}px">
         <div class="tl__gutter">${hours.join('')}</div>
-        <div class="tl__lane" id="lane-prep"><div class="tl__zone tl__zone--pre" style="top:${d * PX}px;height:${(SPAN - d) * PX}px"></div>${prep}</div>
-        <div class="tl__lane" id="lane-show"><div class="tl__zone tl__zone--pre" style="top:0;height:${d * PX}px"></div>${win}${shows}</div>
-        <div class="tl__line" style="top:${d * PX}px"><span>Doors ${fmt(d)}</span></div>
+        ${SHOW_PREP ? `<div class="tl__lane" id="lane-prep"><div class="tl__zone tl__zone--pre" style="top:${y(d)}px;height:${(SPAN - d) * PX}px"></div>${prep}</div>` : ''}
+        <div class="tl__lane" id="lane-show">${T0 < d ? `<div class="tl__zone tl__zone--pre" style="top:0;height:${(d - T0) * PX}px"></div>` : ''}${win}${shows}</div>
+        <div class="tl__line" style="top:${y(d)}px"><span>Doors ${fmt(d)}</span></div>
+        ${showsStart() > d ? `<div class="tl__line tl__line--shows" style="top:${y(showsStart())}px"><span>Shows ${fmt(showsStart())}</span></div>` : ''}
+        <div class="tl__line" style="top:${y(SPAN)}px"><span>Party ends ${fmt(SPAN)}</span></div>
       </div>
       <div class="tl__legend">
-        <span><i style="border-color:var(--tl-prep);background:var(--tl-prep-dim)"></i>Arrive + setup</span>
+        ${SHOW_PREP ? '<span><i style="border-color:var(--tl-prep);background:var(--tl-prep-dim)"></i>Arrive + setup</span>' : ''}
+        <span><i style="border-color:var(--border-subtle)"></i>Strike</span>
         <span><i style="border-color:var(--border-subtle)"></i>Changeover</span>
         <span><i style="border-color:var(--tl-show);background:var(--tl-show-dim)"></i>Show</span>
         <span><i style="border-style:dashed"></i>Length still TBD</span>
@@ -231,7 +266,7 @@ function needsHtml() {
       <div class="needs__totals">
         <div class="needs__stat"><b>${sum('comps')}</b><span>comps committed${sum('compsAsked') > sum('comps') ? ` · ${sum('compsAsked')} asked` : ''}</span></div>
         <div class="needs__stat"><b>$${sum('grant')}</b><span>grants offered${sum('grantAsked') > sum('grant') ? ` · $${Math.max(sum('grantAsked'), 0)} asked` : ''}</span></div>
-        <div class="needs__stat"><b>${acts.filter(a => a.arrive).length}/${acts.length}</b><span>arrival times set</span></div>
+        ${SHOW_PREP ? `<div class="needs__stat"><b>${acts.filter(a => a.arrive).length}/${acts.length}</b><span>arrival times set</span></div>` : ''}
         <div class="needs__stat"><b>${acts.filter(a => a.run != null && a.changeover != null).length}/${acts.length}</b><span>run + changeover known</span></div>
       </div>
       <div class="filters" id="needs-filter" style="position:static;border:none;padding:0">
@@ -269,6 +304,7 @@ function renderDetail() {
         <label class="form__row form__row--full"><span class="detail__label">Room</span><input class="input" data-ev="room" value="${esc(ev.room)}"></label>
         <label class="form__row"><span class="detail__label">Load-in opens</span><input class="input" type="time" data-ev="loadin" value="${esc(ev.loadin)}"></label>
         <label class="form__row"><span class="detail__label">Doors</span><input class="input" type="time" data-ev="doors" value="${esc(ev.doors)}"></label>
+        <label class="form__row"><span class="detail__label">Shows start</span><input class="input" type="time" data-ev="shows" value="${esc(ev.shows || '')}"></label>
         <label class="form__row form__row--full"><span class="detail__label">Room notes</span><textarea class="input" data-ev="notes">${esc(ev.notes)}</textarea></label>
       </div>
       ${ev.photos ? `<a class="detail__meta" href="${esc(ev.photos)}" target="_blank" rel="noopener">Room photos ↗</a>` : ''}
@@ -285,8 +321,8 @@ function renderDetail() {
   const run = a.run ?? DEF.run, co = a.changeover ?? DEF.changeover;
   const arr = toMin(a.arrive);
   const flow = [];
-  if (arr != null) flow.push(`<span>Arrive <b>${fmt(arr)}</b> → pre-party setup ${a.prep ?? '?'} min → ready <b>${fmt(arr + (a.prep ?? DEF.prep))}</b></span>`);
-  a.slots.forEach(s => { const st = toMin(s); if (st != null) flow.push(`<span>Changeover <b>${fmt(st - co)}</b> → show <b>${fmt(st)}–${fmt(st + run)}</b></span>`); });
+  if (SHOW_PREP && arr != null) flow.push(`<span>Arrive <b>${fmt(arr)}</b> → pre-party setup ${a.prep ?? '?'} min → ready <b>${fmt(arr + (a.prep ?? DEF.prep))}</b></span>`);
+  showBlocks().filter(b => b.act === a).forEach(b => flow.push(`<span>${b.repeat ? 'Reset' : 'Changeover'} <b>${fmt(b.coStart)}</b> → show <b>${fmt(b.start)}–${fmt(b.end)}</b>${b.strike ? ` → strike until <b>${fmt(b.stop)}</b>` : ''}</span>`));
   const num = (f, v) => `<input class="input" type="number" min="0" step="5" data-f="${f}" value="${v ?? ''}" placeholder="TBD">`;
   el.innerHTML = `
     <div>
@@ -297,19 +333,21 @@ function renderDetail() {
     ${iss.length ? `<ul class="issues">${iss.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}
     ${flow.length ? `<div class="flow">${flow.join('')}</div>` : ''}
 
-    <div class="detail__section">
+    ${SHOW_PREP ? `<div class="detail__section">
       <div class="detail__label">Arrive / pre-party setup</div>
       <div class="form">
         <label class="form__row"><span class="form__hint">Arrival</span><input class="input" type="time" data-f="arrive" value="${esc(a.arrive || '')}"></label>
         <label class="form__row"><span class="form__hint">Setup / soundcheck (min)</span>${num('prep', a.prep)}</label>
       </div>
-    </div>
+    </div>` : ''}
 
     <div class="detail__section">
       <div class="detail__label">Theater slot · during party</div>
       <div class="form">
         <label class="form__row"><span class="form__hint">Changeover before (min)</span>${num('changeover', a.changeover)}</label>
-        <label class="form__row"><span class="form__hint">Run time (min)</span>${num('run', a.run)}</label>
+        <label class="form__row"><span class="form__hint">Run time per show (min)</span>${num('run', a.run)}</label>
+        <label class="form__row"><span class="form__hint">Reset between repeat shows (min)</span>${num('reset', a.reset)}</label>
+        <label class="form__row"><span class="form__hint">Strike after last show (min)</span>${num('strike', a.strike)}</label>
         <label class="form__row"><span class="form__hint">Earliest start</span><input class="input" type="time" data-f="earliest" value="${esc(a.earliest || '')}"></label>
         <label class="form__row"><span class="form__hint">Latest end</span><input class="input" type="time" data-f="latest" value="${esc(a.latest || '')}"></label>
       </div>
@@ -349,7 +387,7 @@ function renderDetail() {
 }
 
 // ---------- editing ----------
-const NUM_FIELDS = new Set(['prep', 'changeover', 'run', 'comps', 'compsAsked', 'grant', 'grantAsked']);
+const NUM_FIELDS = new Set(['prep', 'changeover', 'run', 'reset', 'strike', 'comps', 'compsAsked', 'grant', 'grantAsked']);
 // Text/time/number edits leave the detail pane alone until focus leaves the field
 // (re-rendering mid-edit would kick the cursor out of a half-typed time).
 function commit(keepDetail) { save(); renderActs(); renderPlan(); if (keepDetail) ui.dirty = true; else renderDetail(); }
@@ -414,7 +452,7 @@ function onPointerMove(e) {
   drag.mins = mins;
   drag.blk.style.top = (drag.top0 + mins * PX) + 'px';
   const t = drag.blk.querySelector('.blk__t');
-  if (t) t.textContent = fmt(Math.round(drag.top0 / PX) + mins);
+  if (t) t.textContent = fmt(timelineStart() + Math.round(drag.top0 / PX) + mins);
 }
 function onPointerUp() {
   if (!drag) return;
@@ -422,7 +460,7 @@ function onPointerUp() {
   d.blk.classList.remove('blk--dragging');
   if (!d.moved || !d.mins) { select(d.act); return; }
   const a = actById(d.act);
-  const v = Math.min(SPAN, Math.max(0, Math.round(d.top0 / PX) + d.mins));
+  const v = Math.min(SPAN, Math.max(0, timelineStart() + Math.round(d.top0 / PX) + d.mins));
   if (d.kind === 'arrive') a.arrive = toHHMM(v); else a.slots[d.slot] = toHHMM(v);
   ui.sel = a.id; save(); render();
 }
@@ -433,13 +471,17 @@ function unb64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.lengt
 
 function runOfShowText() {
   const ev = state.event, lines = [`${ev.name} — Theater run of show (${ev.date})`, ev.room, ''];
-  lines.push('ARRIVE / PRE-PARTY SETUP');
-  prepBlocks().forEach(b => lines.push(`  ${fmt(b.start)}–${fmt(b.end)}  ${b.act.project}${b.guess ? ' (setup length TBD)' : ''}`));
-  const noArr = live().filter(a => !a.arrive); if (noArr.length) lines.push(`  TBD: ${noArr.map(a => a.project).join(', ')}`);
-  lines.push('', `DOORS ${fmt(doors())}`, '', 'THEATER');
+  if (SHOW_PREP) {
+    lines.push('ARRIVE / PRE-PARTY SETUP');
+    prepBlocks().forEach(b => lines.push(`  ${fmt(b.start)}–${fmt(b.end)}  ${b.act.project}${b.guess ? ' (setup length TBD)' : ''}`));
+    const noArr = live().filter(a => !a.arrive); if (noArr.length) lines.push(`  TBD: ${noArr.map(a => a.project).join(', ')}`);
+    lines.push('');
+  }
+  lines.push(`DOORS ${fmt(doors())} · SHOWS FROM ${fmt(showsStart())} · PARTY ENDS ${fmt(SPAN)}`, '', 'THEATER');
   showBlocks().forEach(b => {
-    lines.push(`  ${fmt(b.coStart)}  changeover ${b.start - b.coStart}m${b.coGuess ? ' (TBD)' : ''}`);
+    lines.push(`  ${fmt(b.coStart)}  ${b.repeat ? 'reset' : 'changeover'} ${b.start - b.coStart}m${b.coGuess ? ' (TBD)' : ''}`);
     lines.push(`  ${fmt(b.start)}–${fmt(b.end)}  ${b.act.project} — ${b.act.artist}${b.runGuess ? ' (run time TBD)' : ''}`);
+    if (b.strike) lines.push(`  ${fmt(b.end)}–${fmt(b.stop)}  strike`);
   });
   lines.push('', 'OPEN NEEDS');
   [{ name: 'Room', needs: ev.needs }, ...live().map(a => ({ name: a.project, needs: a.needs }))].forEach(r =>
@@ -450,7 +492,7 @@ function runOfShowText() {
 let pendingShare = null;
 function checkShareHash() {
   const m = location.hash.match(/#t=([A-Za-z0-9_-]+)/); if (!m) return;
-  try { pendingShare = JSON.parse(unb64u(m[1])); if (!Array.isArray(pendingShare.acts)) throw 0; }
+  try { pendingShare = JSON.parse(unb64u(m[1])); if (!Array.isArray(pendingShare.acts)) throw 0; pendingShare = upgrade(pendingShare); }
   catch (_) { toast('Share link is malformed', true); pendingShare = null; return; }
   history.replaceState(null, '', location.pathname);
   if (!state.updated) { state = pendingShare; pendingShare = null; save(); return; }
@@ -467,7 +509,7 @@ function bind() {
     const dn = e.target.closest('[data-del-need]');
     if (dn) { const list = needsOf(dn.dataset.owner); const i = list.findIndex(n => n.id === dn.dataset.delNeed); if (i >= 0) list.splice(i, 1); save(); render(); return; }
     const ds = e.target.closest('[data-del-slot]'); if (ds) { actById(ui.sel).slots.splice(+ds.dataset.delSlot, 1); save(); render(); return; }
-    if (e.target.id === 'btn-add-slot') { const a = actById(ui.sel); const last = Math.max(doors(), ...showBlocks().map(b => b.end)); a.slots.push(toHHMM(Math.min(SPAN - 30, last + (a.changeover ?? DEF.changeover)))); save(); render(); return; }
+    if (e.target.id === 'btn-add-slot') { const a = actById(ui.sel); const last = Math.max(showsStart(), ...showBlocks().map(b => b.stop)); a.slots.push(toHHMM(Math.min(SPAN - 30, last + (a.changeover ?? DEF.changeover)))); save(); render(); return; }
     if (e.target.id === 'btn-add') { addAct(); return; }
     if (e.target.id === 'btn-del-act') { const a = actById(ui.sel); if (a && confirm(`Delete ${a.project}?`)) { state.acts = state.acts.filter(x => x !== a); ui.sel = null; save(); render(); } }
   });

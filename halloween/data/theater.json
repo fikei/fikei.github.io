@@ -1,16 +1,18 @@
 {
+ "rev": 3,
  "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright'",
  "generated_at": "2026-09-30",
- "note": "Draft built from the email threads on Sep 30. Times are a first pass for planning; nothing here has been sent to artists. Phone numbers and email addresses are left out on purpose (public site); open the thread for contact details.",
+ "note": "Draft built from the email threads (Sep 30) and Ian's notes. Party runs 9pm–9am; theater shows start at 10pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists. Phone numbers and email addresses are left out on purpose (public site); open the thread for contact details.",
  "event": {
   "name": "Agape XV: Reassemblage",
   "date": "2026-10-24",
   "room": "Theater · 2nd floor, room under the rear stairs",
   "loadin": "12:00",
   "doors": "21:00",
+  "shows": "22:00",
   "end": "09:00",
   "photos": "https://photos.google.com/share/AF1QipN57327bLeKcc1J0Pxn2fuhT2uxbS1gzzDvhhRgi32O9h7o8juR3gPRJ9BTAO2mhA?key=Ujl2cktYYU1MLWM1WjRpR2ZMcHA0cnFYcDh3djNB",
-  "notes": "Light room design: lighting + cushion layout only. All furniture out; thin curtained storage strip on the right side of the door. Room starts and ends empty. Every theater act gets the $150 contribution. 20–30 min sets are the default ask; the later ambient slots (before 3:30am or after 5am) are for cozy, present crowds.",
+  "notes": "Party runs 9pm–9am; theater shows start at 10pm. Light room design: lighting + cushion layout only. All furniture out; thin curtained storage strip on the right side of the door. Room starts and ends empty. Every theater act gets the $150 contribution. 20–30 min sets are the default ask; the later ambient slots (before 3:30am or after 5am) are for cozy, present crowds.",
   "needs": [
    {
     "id": "r1",
@@ -80,7 +82,7 @@
    "earliest": "21:00",
    "latest": "02:00",
    "slots": [
-    "21:15"
+    "01:00"
    ],
    "comps": 5,
    "compsAsked": 10,
@@ -112,7 +114,9 @@
      "done": false
     }
    ],
-   "notes": ""
+   "notes": "",
+   "reset": null,
+   "strike": null
   },
   {
    "id": "jashon",
@@ -131,7 +135,7 @@
    "earliest": "21:00",
    "latest": "00:30",
    "slots": [
-    "22:35"
+    "22:00"
    ],
    "comps": 4,
    "compsAsked": 4,
@@ -187,60 +191,70 @@
      "done": false
     }
    ],
-   "notes": ""
+   "notes": "",
+   "reset": null,
+   "strike": null
   },
   {
    "id": "garden",
    "artist": "Jonathan Schoonhoven + crew",
    "project": "Garden of Eternal Party",
    "proposal": "p-ced5efaf",
-   "format": "Theater — shadow puppet musical",
+   "format": "Theater — shadow puppet musical, 3–5 short shows",
    "status": "confirmed",
    "poc": "Jonathan (Melina referred)",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d914f7a57c104",
-   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Bringing a screen, projector, mics and PAs (could borrow ours) — 'a lot of tech', wants to plan build logistics soon. Proposal asked for early/midnight. Ian asked for setup time, run time, window, their tech list, and whether other acts can share the rig.",
+   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Latest reply (Sep 30): each show runs 10–15 min and they want 3–5 shows to make the setup worth it. Tech (specifics TBD): rear-projection screen, digital projector, old-fashioned overhead projector, up to 3 wired mics with stands, 2 PAs + mixer, aux input for a backing track. Setup and strike take a while, so they asked whether they share the stage with other crews. Need at least 5 comps (offered 2).",
    "arrive": "17:30",
    "prep": 120,
    "changeover": 30,
-   "run": null,
+   "run": 15,
    "earliest": "21:00",
-   "latest": "01:00",
+   "latest": "01:30",
    "slots": [
-    "23:50"
+    "23:15",
+    "23:40",
+    "00:05"
    ],
    "comps": 2,
-   "compsAsked": null,
+   "compsAsked": 5,
    "grant": 150,
    "grantAsked": null,
    "needs": [
     {
      "id": "g1",
      "cat": "info",
-     "text": "Get setup time, run time, earliest/latest (asked Sep 30)",
+     "text": "Get setup and strike times (they say both take a while) and earliest/latest",
      "done": false
     },
     {
      "id": "g2",
      "cat": "av",
-     "text": "Get their tech list and what they expect in the room",
-     "done": false
+     "text": "Tech list in (screen, 2 projectors, 3 mics, 2 PAs + mixer, aux) — confirm final list",
+     "done": true
     },
     {
      "id": "g3",
      "cat": "av",
-     "text": "Can other acts use their PA/mics? (asked Sep 30)",
+     "text": "Can other acts use their PA/mics/mixer? (asked Sep 30, not answered)",
      "done": false
     },
     {
      "id": "g4",
      "cat": "setup",
-     "text": "Build logistics call — where the screen/projector live all night",
+     "text": "Tell them yes, they share the stage — agree where the rig lives before/after their shows",
      "done": false
     },
     {
      "id": "g5",
      "cat": "tix",
-     "text": "Collect names for 2 comps (crew may need more)",
+     "text": "They need at least 5 comps (2 offered) — decide",
+     "done": false
+    },
+    {
+     "id": "g7",
+     "cat": "info",
+     "text": "How many shows: 3 or up to 5? (10–15 min each)",
      "done": false
     },
     {
@@ -250,7 +264,9 @@
      "done": false
     }
    ],
-   "notes": ""
+   "notes": "",
+   "reset": 10,
+   "strike": 30
   },
   {
    "id": "jordan",
@@ -269,7 +285,7 @@
    "earliest": "00:00",
    "latest": "03:30",
    "slots": [
-    "01:30"
+    "02:15"
    ],
    "comps": 2,
    "compsAsked": 3,
@@ -313,7 +329,9 @@
      "done": false
     }
    ],
-   "notes": ""
+   "notes": "",
+   "reset": null,
+   "strike": null
   },
   {
    "id": "tasya",
@@ -330,10 +348,10 @@
    "changeover": 15,
    "run": 30,
    "earliest": "02:00",
-   "latest": "07:00",
+   "latest": "08:00",
    "slots": [
-    "02:50",
-    "05:30"
+    "05:45",
+    "07:30"
    ],
    "comps": null,
    "compsAsked": null,
@@ -377,7 +395,103 @@
      "done": false
     }
    ],
-   "notes": ""
+   "notes": "",
+   "reset": null,
+   "strike": null
+  },
+  {
+   "id": "vacbed",
+   "artist": "Bizzy",
+   "project": "Vac bed",
+   "proposal": "",
+   "format": "Theater — vac bed, late night",
+   "status": "pending",
+   "poc": "Bizzy",
+   "thread": "",
+   "summary": "Bizzy's vac bed in the theater from 2am onward, about 2 hours (from Ian; not in the email threads).",
+   "arrive": null,
+   "prep": null,
+   "changeover": 15,
+   "run": 120,
+   "earliest": "02:00",
+   "latest": null,
+   "slots": [
+    "03:30"
+   ],
+   "comps": null,
+   "compsAsked": null,
+   "grant": null,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "v1",
+     "cat": "info",
+     "text": "Confirm with Bizzy: setup time, exact window, what they bring",
+     "done": false
+    },
+    {
+     "id": "v2",
+     "cat": "setup",
+     "text": "Consent + safety plan: spotter/attendant the whole time, release procedure, queue at the door",
+     "done": false
+    },
+    {
+     "id": "v3",
+     "cat": "setup",
+     "text": "Power for the vacuum pump; floor space and mats",
+     "done": false
+    },
+    {
+     "id": "v4",
+     "cat": "setup",
+     "text": "Where the bed is stored before 2am and after",
+     "done": false
+    }
+   ],
+   "notes": "",
+   "reset": null,
+   "strike": null
+  },
+  {
+   "id": "parlor",
+   "artist": "TBD",
+   "project": "Parlor games",
+   "proposal": "",
+   "format": "Theater — late-night parlor games",
+   "status": "pending",
+   "poc": "",
+   "thread": "",
+   "summary": "Added by Ian (not in the email threads): parlor games in the theater late night. Possibly related to The Preposterous Game Parlour proposal (Ava Maag & Emily Miller), which asked for a small room all night — confirm.",
+   "arrive": null,
+   "prep": null,
+   "changeover": 15,
+   "run": null,
+   "earliest": "03:00",
+   "latest": null,
+   "slots": [
+    "06:30"
+   ],
+   "comps": null,
+   "compsAsked": null,
+   "grant": null,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "q1",
+     "cat": "info",
+     "text": "Who hosts it, how long, and the late-night window",
+     "done": false
+    },
+    {
+     "id": "q2",
+     "cat": "setup",
+     "text": "Tables/cushions + games — what stays in the room vs brought in",
+     "done": false
+    }
+   ],
+   "notes": "",
+   "reset": null,
+   "strike": null
   },
   {
    "id": "spheresay",
@@ -401,7 +515,9 @@
    "grant": null,
    "grantAsked": null,
    "needs": [],
-   "notes": ""
+   "notes": "",
+   "reset": null,
+   "strike": null
   }
  ]
 }
