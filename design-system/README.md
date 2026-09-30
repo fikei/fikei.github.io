@@ -940,6 +940,8 @@ Run-of-show page on top of `app.css` (reuses `.topbar`, `.layout`, `.panel`, `.p
 - `.tl` / `.tl__lanes-head|__lane-title|__grid|__gutter|__lane|__hour(--major)|__zone--pre|__line|__window|__legend|__unsched` — two-lane vertical timeline (arrive/pre-party · theater); `__line` is doors, `__window` shades the selected act's availability
 - `.tl--solo` — single-lane timeline (pre-party lane hidden); `.tl__line--shows` — the shows-start line
 - `.blk` (+ `--prep` cyan, `--show` magenta, `--co` hatched changeover/reset, `--strike` tear-down after the last show, `--guess` dashed = length TBD, `--sel`, `--warn` red = conflict, `--dragging`), `.blk__t` — draggable time blocks
+- `.topbar__status--error` — sync pill when a shared save failed (red); `#sync` pill + `#btn-auth` sign-in button live in the theater topbar
+- `.is-readonly` (on `<body>`) — view-only visitor: dims disabled detail inputs, blocks drag cursor
 - `.tl__opt` — inline checkbox option in the timeline legend (Auto-shift later shows)
 - `.needs` / `.needs__totals|__stat|__group` — needs roll-up with totals
 - `.need` / `.need__text|__who|__x|__add` (+ `--done`) — one checklist row (roll-up and detail pane) and the add-need form

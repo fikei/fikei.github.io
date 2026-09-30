@@ -87,7 +87,7 @@ Personal curation platform — collect, organize, and build on everything that m
 | Systemic | `systemic/` | `js/crawler.js` | Design system analyzer |
 | Recruiting | `applications/` | `applications/index.html` | Agape applicant triage — Discord-gated (Recruiting Society channel) |
 | Halloween placement | `halloween/` | `halloween/js/app.js` | Place Call-for-Collaborators proposals into rooms of the house — static, localStorage + share links |
-| Halloween theater | `halloween/theater.html` | `halloween/js/theater.js` | Theater run of show — schedule acts (arrive / pre-party setup, changeover, show) and track their needs — static, localStorage + share links |
+| Halloween theater | `halloween/theater.html` | `halloween/js/theater.js` | Theater run of show — schedule acts (arrive / pre-party setup, changeover, show) and track their needs — shared via Supabase Boards `halloween_theater` (public read, Agape Discord members edit) |
 
 **Supabase projects:** Boards (`yfhudwakpgzswiylhfbh`), Ops (`ycilriwjnmcelkspmfmg`), Systemic (`atdqdfpdeytfuvvpsasz`)
 

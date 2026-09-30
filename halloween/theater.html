@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/design-system/tokens.css">
   <link rel="stylesheet" href="/design-system/components.css">
   <link rel="stylesheet" href="css/app.css?v=1.0.1">
-  <link rel="stylesheet" href="css/theater.css?v=1.4.0">
+  <link rel="stylesheet" href="css/theater.css?v=1.5.0">
 </head>
 <body>
 
@@ -23,12 +23,14 @@
       <span class="topbar__sub">Theater · run of show</span>
     </div>
     <a class="topbar__status topbar__link" href="./" title="Room placement for all proposals">← Placement</a>
+    <span class="topbar__status" id="sync" aria-live="polite">Local only</span>
     <nav class="topbar__tabs" id="mobile-tabs" aria-label="Panels">
       <button class="tab tab--active" data-panel="acts" type="button">Acts</button>
       <button class="tab" data-panel="plan" type="button">Schedule</button>
       <button class="tab" data-panel="detail" type="button">Detail</button>
     </nav>
     <div class="topbar__actions">
+      <button class="btn btn--sm" id="btn-auth" type="button" hidden>Sign in with Discord to edit</button>
       <button class="btn btn--sm" id="btn-share" type="button" title="Copy a link that carries this schedule">Share link</button>
       <button class="btn btn--sm" id="btn-copy" type="button" title="Copy the run of show + open needs as text">Copy run of show</button>
       <button class="btn btn--sm" id="btn-export" type="button" title="Download as JSON">Export</button>
@@ -70,6 +72,7 @@
 
   <div class="toast-container" id="toasts"></div>
 
-  <script src="js/theater.js?v=1.4.3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/theater.js?v=1.5.0"></script>
 </body>
 </html>
