@@ -2,7 +2,7 @@
 
 **One line:** A light planning page at `/halloween/theater.html` that puts every theater act on one clock (arrive and pre-party setup before doors, then changeover and show during the party) and tracks what each act still needs.
 
-**Status:** Shipped v1.4.0 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
+**Status:** Shipped v1.4.1 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
 **Related:** [Halloween placement](./agape-halloween-placement.md) (same party; the theater is the "2nd floor room under the rear stairs").
 
 ---
@@ -47,9 +47,9 @@ Times are stored as `HH:MM`. Anything before noon counts as the next morning, so
 
 ## Planning-sheet mismatches (Sep 30)
 
-- Ja'Shon: sheet $200 vs email $150 vs his $300 ask.
+- Ja'Shon: settled Sep 30 at $300 total (house $200 + $100), paid after the event — sheet still says $200.
 - Jordan: sheet 4 tickets vs email 2 (+1 asked).
-- Garden: sheet 5 tickets vs email 2 — sheet already covers their ask.
+- Garden: 5 tickets, confirmed by email Sep 30 — matches the sheet.
 - Spheresay still listed (declined); Tasya and Parlor games not listed.
 - Lina Bond (cabbage lamps + cushions, $300) is room decor, tracked on the Theater room card.
 - The "Theater stage - Justine&Colin's room" tab itself isn't readable through the Drive connector (not indexed; file too large to export).
