@@ -47,6 +47,7 @@ Personal curation platform — collect, organize, and build on everything that m
   |---------|-----------------|-----------------|
   | Boards | `boards/index.html` ~line 7625: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
   | Halloween placement | `halloween/js/app.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/index.html`) | `[halloween] vX.Y.Z - description` |
+  | Halloween theater | `halloween/js/theater.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/theater.html`) | `[halloween-theater] vX.Y.Z - description` |
   | Supabase functions | Each function's `index.ts` top: `const VERSION = 'X.Y.Z'` | `[function-name] vX.Y.Z - description` |
 
   New products/functions: add `const VERSION` + `console.log` at entry point.
@@ -86,6 +87,7 @@ Personal curation platform — collect, organize, and build on everything that m
 | Systemic | `systemic/` | `js/crawler.js` | Design system analyzer |
 | Recruiting | `applications/` | `applications/index.html` | Agape applicant triage — Discord-gated (Recruiting Society channel) |
 | Halloween placement | `halloween/` | `halloween/js/app.js` | Place Call-for-Collaborators proposals into rooms of the house — static, localStorage + share links |
+| Halloween theater | `halloween/theater.html` | `halloween/js/theater.js` | Theater run of show — schedule acts (arrive / pre-party setup, changeover, show) and track their needs — static, localStorage + share links |
 
 **Supabase projects:** Boards (`yfhudwakpgzswiylhfbh`), Ops (`ycilriwjnmcelkspmfmg`), Systemic (`atdqdfpdeytfuvvpsasz`)
 

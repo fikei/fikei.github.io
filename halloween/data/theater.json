@@ -1,0 +1,407 @@
+{
+ "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright'",
+ "generated_at": "2026-09-30",
+ "note": "Draft built from the email threads on Sep 30. Times are a first pass for planning; nothing here has been sent to artists. Phone numbers and email addresses are left out on purpose (public site); open the thread for contact details.",
+ "event": {
+  "name": "Agape XV: Reassemblage",
+  "date": "2026-10-24",
+  "room": "Theater · 2nd floor, room under the rear stairs",
+  "loadin": "12:00",
+  "doors": "21:00",
+  "end": "09:00",
+  "photos": "https://photos.google.com/share/AF1QipN57327bLeKcc1J0Pxn2fuhT2uxbS1gzzDvhhRgi32O9h7o8juR3gPRJ9BTAO2mhA?key=Ujl2cktYYU1MLWM1WjRpR2ZMcHA0cnFYcDh3djNB",
+  "notes": "Light room design: lighting + cushion layout only. All furniture out; thin curtained storage strip on the right side of the door. Room starts and ends empty. Every theater act gets the $150 contribution. 20–30 min sets are the default ask; the later ambient slots (before 3:30am or after 5am) are for cozy, present crowds.",
+  "needs": [
+   {
+    "id": "r1",
+    "cat": "av",
+    "text": "Lock the theater AV plan (PA, mixer, monitors, mics) and send it to every act",
+    "done": false
+   },
+   {
+    "id": "r2",
+    "cat": "av",
+    "text": "Find a sound person to run the board for amplified sets (Jordan asked)",
+    "done": false
+   },
+   {
+    "id": "r3",
+    "cat": "setup",
+    "text": "Clear all furniture; hang curtain for the storage strip right of the door",
+    "done": false
+   },
+   {
+    "id": "r4",
+    "cat": "setup",
+    "text": "Cushion layout + low, moody lighting (warm/colored for the late sets)",
+    "done": false
+   },
+   {
+    "id": "r5",
+    "cat": "setup",
+    "text": "Decide if Garden of Eternal Party's rig (screen, projector, PA) stays in the room and is shared",
+    "done": false
+   },
+   {
+    "id": "r6",
+    "cat": "setup",
+    "text": "Assign a theater stage manager for changeovers + door during closed-door sets",
+    "done": false
+   },
+   {
+    "id": "r7",
+    "cat": "setup",
+    "text": "Strike at end of night — room back to empty",
+    "done": false
+   },
+   {
+    "id": "r8",
+    "cat": "comms",
+    "text": "Post the theater run of show in Discord once acts confirm times",
+    "done": false
+   }
+  ]
+ },
+ "acts": [
+  {
+   "id": "wizards",
+   "artist": "Carla Bagdonas + crew",
+   "project": "The Wizards",
+   "proposal": "p-8f96dcf1",
+   "format": "Roaming all night + at least one theater round",
+   "status": "confirmed",
+   "poc": "Kyle (\"Seabass\") while Carla is in the mountains (~1 week from Sep 26)",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0d90c81dffb49b",
+   "summary": "Nonverbal musical 'magicians' — improvised group singing and movement games. Roaming all night; proposed a closed-door 1–2 hr room activation (10–50 people per cycle) sometime 9pm–2am. A door for sound isolation helps. Crew has costumes; no budget asked. Carla cc'd crew (Emerald, Drea, Marcus, Skip, Kyle) and will buy her own ticket.",
+   "arrive": null,
+   "prep": null,
+   "changeover": 10,
+   "run": 60,
+   "earliest": "21:00",
+   "latest": "02:00",
+   "slots": [
+    "21:15"
+   ],
+   "comps": 5,
+   "compsAsked": 10,
+   "grant": 0,
+   "grantAsked": 0,
+   "needs": [
+    {
+     "id": "w1",
+     "cat": "info",
+     "text": "Get setup time, run time, earliest/latest for the theater round (asked Sep 30)",
+     "done": false
+    },
+    {
+     "id": "w2",
+     "cat": "tix",
+     "text": "Assign 5 comps to the cc'd crew (Carla buys her own)",
+     "done": false
+    },
+    {
+     "id": "w3",
+     "cat": "comms",
+     "text": "Kyle joins Discord as point of contact",
+     "done": false
+    },
+    {
+     "id": "w4",
+     "cat": "setup",
+     "text": "Door closed during the round; greeter Wizard at the door",
+     "done": false
+    }
+   ],
+   "notes": ""
+  },
+  {
+   "id": "jashon",
+   "artist": "Ja'Shon Wright (Haus of Hyte)",
+   "project": "Blood of the Dragon — Gothic Wonderland",
+   "proposal": "p-ad4f5f31",
+   "format": "Theater performance (roaming option)",
+   "status": "confirmed",
+   "poc": "Ja'Shon",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0f370ee8deca21",
+   "summary": "Immersive theatre: Empress of the Universe bound by grief (kinbaku/shibari), freed by the Jade Dragon's sacrifice. Call held Sep 28. Room kept light (lighting + cushions), starts and ends empty. He can set up in about an hour; show runs 30–45 min, never over an hour. Window discussed 9pm–12:30am; he'd like 9:30–10pm for his model/muse, Ian is leaning later. Asked for $300 instead of the $150 standard (approval pending with Justine) and how it's paid out.",
+   "arrive": "20:00",
+   "prep": 60,
+   "changeover": 20,
+   "run": 45,
+   "earliest": "21:00",
+   "latest": "00:30",
+   "slots": [
+    "22:35"
+   ],
+   "comps": 4,
+   "compsAsked": 4,
+   "grant": 150,
+   "grantAsked": 300,
+   "needs": [
+    {
+     "id": "j1",
+     "cat": "money",
+     "text": "Decide on $300 vs $150 contribution (with Justine)",
+     "done": false
+    },
+    {
+     "id": "j2",
+     "cat": "money",
+     "text": "Tell him the payout method (Venmo / Zelle / PayPal)",
+     "done": false
+    },
+    {
+     "id": "j3",
+     "cat": "info",
+     "text": "Confirm set time — he prefers a 9:30–10pm start for his model",
+     "done": false
+    },
+    {
+     "id": "j4",
+     "cat": "setup",
+     "text": "Give him a pre-party arrival time (~1 hr setup)",
+     "done": false
+    },
+    {
+     "id": "j5",
+     "cat": "setup",
+     "text": "Shibari: floor-only or rigging points? Check what the room can hold",
+     "done": false
+    },
+    {
+     "id": "j6",
+     "cat": "av",
+     "text": "Send the AV setup (still pending)",
+     "done": false
+    },
+    {
+     "id": "j7",
+     "cat": "tix",
+     "text": "Collect names + emails for 4 comps",
+     "done": false
+    },
+    {
+     "id": "j8",
+     "cat": "comms",
+     "text": "Joined Discord?",
+     "done": false
+    }
+   ],
+   "notes": ""
+  },
+  {
+   "id": "garden",
+   "artist": "Jonathan Schoonhoven + crew",
+   "project": "Garden of Eternal Party",
+   "proposal": "p-ced5efaf",
+   "format": "Theater — shadow puppet musical",
+   "status": "confirmed",
+   "poc": "Jonathan (Melina referred)",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0d914f7a57c104",
+   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Bringing a screen, projector, mics and PAs (could borrow ours) — 'a lot of tech', wants to plan build logistics soon. Proposal asked for early/midnight. Ian asked for setup time, run time, window, their tech list, and whether other acts can share the rig.",
+   "arrive": "17:30",
+   "prep": 120,
+   "changeover": 30,
+   "run": null,
+   "earliest": "21:00",
+   "latest": "01:00",
+   "slots": [
+    "23:50"
+   ],
+   "comps": 2,
+   "compsAsked": null,
+   "grant": 150,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "g1",
+     "cat": "info",
+     "text": "Get setup time, run time, earliest/latest (asked Sep 30)",
+     "done": false
+    },
+    {
+     "id": "g2",
+     "cat": "av",
+     "text": "Get their tech list and what they expect in the room",
+     "done": false
+    },
+    {
+     "id": "g3",
+     "cat": "av",
+     "text": "Can other acts use their PA/mics? (asked Sep 30)",
+     "done": false
+    },
+    {
+     "id": "g4",
+     "cat": "setup",
+     "text": "Build logistics call — where the screen/projector live all night",
+     "done": false
+    },
+    {
+     "id": "g5",
+     "cat": "tix",
+     "text": "Collect names for 2 comps (crew may need more)",
+     "done": false
+    },
+    {
+     "id": "g6",
+     "cat": "comms",
+     "text": "Joined Discord?",
+     "done": false
+    }
+   ],
+   "notes": ""
+  },
+  {
+   "id": "jordan",
+   "artist": "Jordan Corey",
+   "project": "Jordan Corey — acoustic set",
+   "proposal": "p-465a5da1",
+   "format": "Theater — acoustic alt-R&B set with guitarist/pianist",
+   "status": "confirmed",
+   "poc": "Jordan",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0d9171dbfe2967",
+   "summary": "Acoustic set opening and closing with a guided meditation; best at the '2am cuddle puddle' — squishy, warm colored light. Available and keen (Sep 30). Asked: available slots, PA/monitors/mixer set up in the room, a sound engineer to run the board, soundcheck before doors, and lighting (bring own?). Wants a 3rd comp so someone can film the set.",
+   "arrive": "19:30",
+   "prep": 30,
+   "changeover": 15,
+   "run": 60,
+   "earliest": "00:00",
+   "latest": "03:30",
+   "slots": [
+    "01:30"
+   ],
+   "comps": 2,
+   "compsAsked": 3,
+   "grant": 150,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "c1",
+     "cat": "comms",
+     "text": "Answer his Sep 30 questions (slots, PA, engineer, soundcheck, lighting)",
+     "done": false
+    },
+    {
+     "id": "c2",
+     "cat": "av",
+     "text": "PA + monitors + mixer in the room for his set",
+     "done": false
+    },
+    {
+     "id": "c3",
+     "cat": "av",
+     "text": "Sound engineer on the board during his set",
+     "done": false
+    },
+    {
+     "id": "c4",
+     "cat": "setup",
+     "text": "Soundcheck slot before doors",
+     "done": false
+    },
+    {
+     "id": "c5",
+     "cat": "setup",
+     "text": "Lighting: warm/colored — tell him whether to bring his own",
+     "done": false
+    },
+    {
+     "id": "c6",
+     "cat": "tix",
+     "text": "Decide on a 3rd comp for his videographer",
+     "done": false
+    }
+   ],
+   "notes": ""
+  },
+  {
+   "id": "tasya",
+   "artist": "Tasya Abbot",
+   "project": "Solo experimental vocal / looping set",
+   "proposal": "p-b43f0e01",
+   "format": "Theater — ambient; optional pre-sunrise harp set",
+   "status": "pending",
+   "poc": "Tasya (via Andy Maag)",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0d91835603be7b",
+   "summary": "Stepping in after Spheresay (Andy Maag) declined — out of state that weekend. Mostly vocal: soft layered choral noise, few words. Maybe an amplified embroidery piece; a seated sound performance either way. Could do a second, sleepy harp set before sunrise with somewhere to rest in between and minimal setup. Ian suggested 20–30 min sets, before 3:30am or after 5am; promised room details and maybe a call.",
+   "arrive": null,
+   "prep": null,
+   "changeover": 15,
+   "run": 30,
+   "earliest": "02:00",
+   "latest": "07:00",
+   "slots": [
+    "02:50",
+    "05:30"
+   ],
+   "comps": null,
+   "compsAsked": null,
+   "grant": 150,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "t1",
+     "cat": "info",
+     "text": "Get setup time, run time, earliest/latest (asked Sep 30)",
+     "done": false
+    },
+    {
+     "id": "t2",
+     "cat": "comms",
+     "text": "Send room setup details / hop on a call (promised Sep 30)",
+     "done": false
+    },
+    {
+     "id": "t3",
+     "cat": "info",
+     "text": "Confirm she's in — and whether the harp set happens",
+     "done": false
+    },
+    {
+     "id": "t4",
+     "cat": "av",
+     "text": "Amplification for vocals / amplified embroidery",
+     "done": false
+    },
+    {
+     "id": "t5",
+     "cat": "setup",
+     "text": "A resting spot between her two sets",
+     "done": false
+    },
+    {
+     "id": "t6",
+     "cat": "tix",
+     "text": "Settle comp count (Andy's offer was 4)",
+     "done": false
+    }
+   ],
+   "notes": ""
+  },
+  {
+   "id": "spheresay",
+   "artist": "Andy Maag",
+   "project": "Spheresay",
+   "proposal": "p-b43f0e01",
+   "format": "Theater — surround acoustic guitar sound bath",
+   "status": "declined",
+   "poc": "Andy",
+   "thread": "https://mail.google.com/mail/u/0/#all/1a0d91835603be7b",
+   "summary": "Declined Sep 25 — out of California that weekend. Connected Ian with bandmate Tasya Abbot for a solo set.",
+   "arrive": null,
+   "prep": null,
+   "changeover": null,
+   "run": null,
+   "earliest": null,
+   "latest": null,
+   "slots": [],
+   "comps": null,
+   "compsAsked": null,
+   "grant": null,
+   "grantAsked": null,
+   "needs": [],
+   "notes": ""
+  }
+ ]
+}

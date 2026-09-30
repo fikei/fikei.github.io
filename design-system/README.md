@@ -8,6 +8,7 @@
 | CTRL | Global — Boards, Events, Soundscape, Systemic, Favicon | `ctrl.html` |
 | Agape recruiting | Product — /applications (Storybook-style stories) | `recruiting/index.html` · behavior source of truth: `docs/ux/recruiting-row-states.md` |
 | Halloween placement | Product — /halloween (CTRL tokens + components, product classes in `halloween/css/app.css`) | see [Halloween placement](#halloween-placement-halloweencssappcss) below |
+| Halloween theater | Product — /halloween/theater.html (builds on `app.css`, adds `halloween/css/theater.css`) | see [Halloween theater](#halloween-theater-halloweencsstheatercss) below |
 | Widget audit | Tooling stoplight | `widgets.html` |
 
 Product systems override the global system for their product. New products add a folder here and a card on the hub.
@@ -926,6 +927,21 @@ second "place things on a map" tool appears.
 - `.room__head|__name|__count|__note-btn|__last|__note|__note-edit|__chips|__hint` — room internals; `__last` is last year's use (italic, subtle), `__note` is this year's annotation (amber)
 - `.chip` / `.chip__text|__x` (+ `--selected`) — a placed proposal inside a room, draggable between rooms
 - `.detail` / `.detail__project|__artist|__tags|__place|__place-note|__section|__label|__text|__files|__meta` (+ `--empty`, `__text--muted`) — full proposal reader with the "Place in" control at the top
+- `.topbar__link` — a topbar pill that is a link (Placement ↔ Theater)
+
+## Halloween theater (`/halloween/css/theater.css`)
+
+Run-of-show page on top of `app.css` (reuses `.topbar`, `.layout`, `.panel`, `.pcard`, `.tag`, `.detail`). Three panes: acts · schedule · detail. `--tl-px` is one minute on the timeline (JS `PX` must match).
+
+- `.layout--theater`, `.panel--acts|--plan` — pane variants; `data-panel="acts|plan|detail"` on mobile
+- `.pcard--room`, `.pcard__when(--none)|__warn|__needs` — act-card additions; `--room` is the dashed production card
+- `.tag--confirmed|--pending|--declined` — act status
+- `.plan__head|__summary|__note` — sticky Timeline/Needs switch, counts, draft note
+- `.tl` / `.tl__lanes-head|__lane-title|__grid|__gutter|__lane|__hour(--major)|__zone--pre|__line|__window|__legend|__unsched` — two-lane vertical timeline (arrive/pre-party · theater); `__line` is doors, `__window` shades the selected act's availability
+- `.blk` (+ `--prep` cyan, `--show` magenta, `--co` hatched changeover, `--guess` dashed = length TBD, `--sel`, `--warn` red = conflict, `--dragging`), `.blk__t` — draggable time blocks
+- `.needs` / `.needs__totals|__stat|__group` — needs roll-up with totals
+- `.need` / `.need__text|__who|__x|__add` (+ `--done`) — one checklist row (roll-up and detail pane) and the add-need form
+- `.form` / `.form__row(--full)|__hint`, `.slots`, `.slot` / `.slot__range`, `.issues`, `.flow` — detail-pane editor, slot list, conflict list, arrive→ready / changeover→show summary
 
 ## Light Mode
 
