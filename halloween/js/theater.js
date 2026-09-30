@@ -5,8 +5,8 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.3.0';
-console.log(`[halloween-theater] v${VERSION} - theater run of show (planning-sheet + form timing cross-reference)`);
+const VERSION = '1.4.0';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (auto-reflow on drag)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
@@ -21,7 +21,9 @@ const STATUS = { confirmed: 'Confirmed', pending: 'Pending', declined: 'Declined
 
 let seed = null;
 let state = null;
-let ui = { sel: null, view: 'timeline', panel: 'acts', needs: 'open', dirty: false };
+const REFLOW_KEY = 'halloween-theater-reflow';
+let ui = { sel: null, view: 'timeline', panel: 'acts', needs: 'open', dirty: false, reflow: true };
+try { ui.reflow = localStorage.getItem(REFLOW_KEY) !== 'off'; } catch (_) {}
 
 // ---------- state ----------
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -112,6 +114,7 @@ function issuesFor(a) {
   const shows = showBlocks();
   shows.filter(b => b.act === a).forEach(b => {
     const label = `Slot ${fmt(b.start)}`;
+    if (b.stop > SPAN) out.push(`${label} runs past the end of the party (${fmt(SPAN)})`);
     if (b.start < d) out.push(`${label} starts before doors`);
     else if (b.start < showsStart()) out.push(`${label} starts before shows begin (${fmt(showsStart())})`);
     if (a.earliest && b.start < toMin(a.earliest)) out.push(`${label} is before their earliest (${fmt(toMin(a.earliest))})`);
@@ -240,6 +243,8 @@ function timelineHtml() {
         <span><i style="border-style:dashed"></i>Length still TBD</span>
         <span><i style="border-color:var(--tl-warn)"></i>Conflict</span>
         <span>Drag a block to move it (5 min steps).</span>
+        <label class="tl__opt"><input type="checkbox" id="opt-reflow" ${ui.reflow ? 'checked' : ''}> Auto-shift later shows</label>
+        <button class="btn btn--sm btn--ghost" id="btn-close-gaps" type="button" title="Pack all shows back-to-back, keeping their order">Close gaps</button>
       </div>
       ${unsched.length ? `<div class="tl__unsched">Not on the clock yet: ${unsched.map(a => `<button data-sel="${esc(a.id)}" type="button">${esc(a.project)}</button>`).join(', ')}</div>` : ''}
     </div>`;
@@ -463,7 +468,44 @@ function onPointerUp() {
   const a = actById(d.act);
   const v = Math.min(SPAN, Math.max(0, timelineStart() + Math.round(d.top0 / PX) + d.mins));
   if (d.kind === 'arrive') a.arrive = toHHMM(v); else a.slots[d.slot] = toHHMM(v);
+  if (d.kind === 'slot' && ui.reflow) {
+    const n = reflow(a.id, d.slot);
+    if (n) toast(`Shifted ${n} later show${n > 1 ? 's' : ''} to make room`);
+  }
   ui.sel = a.id; save(); render();
+}
+
+// ---------- auto-reflow ----------
+// The show that was just dropped keeps its time. Anything that still ends before its
+// changeover starts stays put; everything else keeps its order and is pushed later
+// just far enough to fit its own changeover/reset after the previous show (and strike).
+// Gaps are never closed here — "Close gaps" does that on request.
+function reflow(actId, idx) {
+  const bs = showBlocks();
+  const me = bs.find(b => b.act.id === actId && b.i === idx); if (!me) return 0;
+  const after = bs.filter(b => b !== me && !(b.stop <= me.coStart && b.start < me.start)).sort((x, y) => x.start - y.start);
+  return push(me.stop, after);
+}
+function push(cursor, blocks) {
+  let moved = 0;
+  blocks.forEach(b => {
+    const co = b.start - b.coStart, tail = b.stop - b.start;
+    const need = cursor + co;
+    if (b.start < need) { b.act.slots[b.i] = toHHMM(need); b.start = need; moved++; }
+    cursor = b.start + tail;
+  });
+  return moved;
+}
+// Pack every show back-to-back from the first one, keeping the current order.
+function closeGaps() {
+  const bs = showBlocks(); if (!bs.length) return;
+  let cursor = bs[0].stop, moved = 0;
+  bs.slice(1).forEach(b => {
+    const co = b.start - b.coStart, tail = b.stop - b.start, want = Math.max(cursor + co, showsStart());
+    if (b.start !== want) { b.act.slots[b.i] = toHHMM(want); moved++; }
+    cursor = want + tail;
+  });
+  save(); render(); toast(moved ? `Closed gaps — moved ${moved} show${moved > 1 ? 's' : ''}` : 'No gaps to close');
 }
 
 // ---------- share / export / copy ----------
@@ -512,10 +554,12 @@ function bind() {
     const ds = e.target.closest('[data-del-slot]'); if (ds) { actById(ui.sel).slots.splice(+ds.dataset.delSlot, 1); save(); render(); return; }
     if (e.target.id === 'btn-add-slot') { const a = actById(ui.sel); const last = Math.max(showsStart(), ...showBlocks().map(b => b.stop)); a.slots.push(toHHMM(Math.min(SPAN - 30, last + (a.changeover ?? DEF.changeover)))); save(); render(); return; }
     if (e.target.id === 'btn-add') { addAct(); return; }
+    if (e.target.id === 'btn-close-gaps') { closeGaps(); return; }
     if (e.target.id === 'btn-del-act') { const a = actById(ui.sel); if (a && confirm(`Delete ${a.project}?`)) { state.acts = state.acts.filter(x => x !== a); ui.sel = null; save(); render(); } }
   });
   document.addEventListener('change', e => {
     if (e.target.matches('input[data-need]')) { toggleNeed(e.target.dataset.owner, e.target.dataset.need, e.target.checked); return; }
+    if (e.target.id === 'opt-reflow') { ui.reflow = e.target.checked; try { localStorage.setItem(REFLOW_KEY, ui.reflow ? 'on' : 'off'); } catch (_) {} return; }
     if (e.target.closest('#detail')) onDetailChange(e);
   });
   document.addEventListener('submit', e => {
