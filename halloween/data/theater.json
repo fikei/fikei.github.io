@@ -1,12 +1,12 @@
 {
- "rev": 3,
- "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright'",
+ "rev": 5,
+ "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright' · planning sheet '📝 Collaborators' tab (Location = Theater stage - Justine&Colin's room), read Sep 30 · Call for Collaborators responses ('When might your experience be?', YC vote/result/notes), read Sep 30",
  "generated_at": "2026-09-30",
  "note": "Draft built from the email threads (Sep 30) and Ian's notes. Party runs 9pm–9am; theater shows start at 10pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists. Phone numbers and email addresses are left out on purpose (public site); open the thread for contact details.",
  "event": {
   "name": "Agape XV: Reassemblage",
   "date": "2026-10-24",
-  "room": "Theater · 2nd floor, room under the rear stairs",
+  "room": "Theater stage · Justine & Colin's room (2nd floor, under the rear stairs)",
   "loadin": "12:00",
   "doors": "21:00",
   "shows": "22:00",
@@ -39,6 +39,12 @@
     "done": false
    },
    {
+    "id": "r9",
+    "cat": "setup",
+    "text": "Room decor: Lina Bond — cabbage lamps + cushions ($300 grant, 2 comps, POC Justine). Coordinate with the cushion layout",
+    "done": false
+   },
+   {
     "id": "r5",
     "cat": "setup",
     "text": "Decide if Garden of Eternal Party's rig (screen, projector, PA) stays in the room and is shared",
@@ -61,6 +67,12 @@
     "cat": "comms",
     "text": "Post the theater run of show in Discord once acts confirm times",
     "done": false
+   },
+   {
+    "id": "r10",
+    "cat": "comms",
+    "text": "Planning sheet (Collaborators): mark Spheresay declined, add Tasya Abbot and Parlor games, align Ja'Shon's grant and Jordan's tickets",
+    "done": false
    }
   ]
  },
@@ -74,7 +86,7 @@
    "status": "confirmed",
    "poc": "Kyle (\"Seabass\") while Carla is in the mountains (~1 week from Sep 26)",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d90c81dffb49b",
-   "summary": "Nonverbal musical 'magicians' — improvised group singing and movement games. Roaming all night; proposed a closed-door 1–2 hr room activation (10–50 people per cycle) sometime 9pm–2am. A door for sound isolation helps. Crew has costumes; no budget asked. Carla cc'd crew (Emerald, Drea, Marcus, Skip, Kyle) and will buy her own ticket.",
+   "summary": "Nonverbal musical 'magicians' — improvised group singing and movement games. Roaming all night; proposed a closed-door 1–2 hr room activation (10–50 people per cycle) sometime 9pm–2am. A door for sound isolation helps. Crew has costumes; no budget asked. Carla cc'd crew (Emerald, Drea, Marcus, Skip, Kyle) and will buy her own ticket. Planning sheet (Collaborators): Roaming / Theater stage, no grant, 5 tickets, POC Ian & Melina — matches. Form: YC vote: No (selected later).",
    "arrive": null,
    "prep": null,
    "changeover": 10,
@@ -82,7 +94,7 @@
    "earliest": "21:00",
    "latest": "02:00",
    "slots": [
-    "01:00"
+    "22:55"
    ],
    "comps": 5,
    "compsAsked": 10,
@@ -116,7 +128,8 @@
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Early (9pm–12am), Midnight (12–2am), All night; room activation 9pm–2am"
   },
   {
    "id": "jashon",
@@ -127,7 +140,7 @@
    "status": "confirmed",
    "poc": "Ja'Shon",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0f370ee8deca21",
-   "summary": "Immersive theatre: Empress of the Universe bound by grief (kinbaku/shibari), freed by the Jade Dragon's sacrifice. Call held Sep 28. Room kept light (lighting + cushions), starts and ends empty. He can set up in about an hour; show runs 30–45 min, never over an hour. Window discussed 9pm–12:30am; he'd like 9:30–10pm for his model/muse, Ian is leaning later. Asked for $300 instead of the $150 standard (approval pending with Justine) and how it's paid out.",
+   "summary": "Immersive theatre: Empress of the Universe bound by grief (kinbaku/shibari), freed by the Jade Dragon's sacrifice. Call held Sep 28. Room kept light (lighting + cushions), starts and ends empty. He can set up in about an hour; show runs 30–45 min, never over an hour. Window discussed 9pm–12:30am; he'd like 9:30–10pm for his model/muse, Ian is leaning later. Asked for $300 instead of the $150 standard (approval pending with Justine) and how it's paid out. Planning sheet (Collaborators): $200 grant, 4 tickets — the sheet's $200 differs from the $150 in email and his $300 ask. Form: YC vote: Maybe · note: fit for theatre stage — Ian/Melina communicate.",
    "arrive": "20:00",
    "prep": 60,
    "changeover": 20,
@@ -139,13 +152,13 @@
    ],
    "comps": 4,
    "compsAsked": 4,
-   "grant": 150,
+   "grant": 200,
    "grantAsked": 300,
    "needs": [
     {
      "id": "j1",
      "cat": "money",
-     "text": "Decide on $300 vs $150 contribution (with Justine)",
+     "text": "Settle his contribution: email offered $150, sheet says $200, he asked $300 (approval pending with Justine)",
      "done": false
     },
     {
@@ -193,7 +206,8 @@
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Setup (12–9pm), Early (9pm–12am)"
   },
   {
    "id": "garden",
@@ -204,19 +218,19 @@
    "status": "confirmed",
    "poc": "Jonathan (Melina referred)",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d914f7a57c104",
-   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Latest reply (Sep 30): each show runs 10–15 min and they want 3–5 shows to make the setup worth it. Tech (specifics TBD): rear-projection screen, digital projector, old-fashioned overhead projector, up to 3 wired mics with stands, 2 PAs + mixer, aux input for a backing track. Setup and strike take a while, so they asked whether they share the stage with other crews. Need at least 5 comps (offered 2).",
+   "summary": "Shadow puppet musical (Act I written, Act II in progress). Confirmed Sep 30. Latest reply (Sep 30): each show runs 10–15 min and they want 3–5 shows to make the setup worth it. Tech (specifics TBD): rear-projection screen, digital projector, old-fashioned overhead projector, up to 3 wired mics with stands, 2 PAs + mixer, aux input for a backing track. Setup and strike take a while, so they asked whether they share the stage with other crews. Need at least 5 comps (offered 2). Planning sheet (Collaborators): $150 grant, 5 tickets — the sheet already gives the 5 they asked for. Form: YC vote: Strong Yes · result: Yes.",
    "arrive": "17:30",
    "prep": 120,
    "changeover": 30,
    "run": 15,
    "earliest": "21:00",
-   "latest": "01:30",
+   "latest": "02:00",
    "slots": [
-    "23:15",
-    "23:40",
-    "00:05"
+    "00:25",
+    "00:50",
+    "01:15"
    ],
-   "comps": 2,
+   "comps": 5,
    "compsAsked": 5,
    "grant": 150,
    "grantAsked": null,
@@ -248,7 +262,7 @@
     {
      "id": "g5",
      "cat": "tix",
-     "text": "They need at least 5 comps (2 offered) — decide",
+     "text": "Sheet already lists 5 tickets (email said 2) — tell Jonathan 5 is confirmed",
      "done": false
     },
     {
@@ -266,7 +280,62 @@
    ],
    "notes": "",
    "reset": 10,
-   "strike": 30
+   "strike": 30,
+   "formWhen": "Early (9pm–12am), Midnight (12–2am)"
+  },
+  {
+   "id": "jyotsna",
+   "artist": "Jyotsna Jayamaran (housemate)",
+   "project": "The Body is an Archive",
+   "proposal": "p-0ad1d3a6",
+   "format": "Theater — ~10 min dance / physical theater, 2–3 runs",
+   "status": "pending",
+   "poc": "Jyotsna (Ian & Melina)",
+   "thread": "",
+   "summary": "From the planning sheet (Collaborators: Theater stage, $150 grant, housemate) and her proposal: a ~10-minute dance and physical-theater piece — a voice names body parts, then fear, desire, memory, shame, home; a second layer about AI reading our patterns. Audience of 15–30 in a circle, 6–10 with spoken cues. Needs flat wooden floor space. Could run 2–3 times; proposal asked for midnight/late. No email thread found. Form: YC vote: Yes.",
+   "arrive": null,
+   "prep": null,
+   "changeover": 5,
+   "reset": null,
+   "strike": null,
+   "run": 10,
+   "earliest": "00:00",
+   "latest": "06:00",
+   "slots": [
+    "02:05"
+   ],
+   "comps": null,
+   "compsAsked": null,
+   "grant": 150,
+   "grantAsked": null,
+   "needs": [
+    {
+     "id": "y1",
+     "cat": "info",
+     "text": "Confirm she's in, run time, how many runs and when",
+     "done": false
+    },
+    {
+     "id": "y2",
+     "cat": "setup",
+     "text": "Clear cushions for flat floor + audience circle (15–30)",
+     "done": false
+    },
+    {
+     "id": "y3",
+     "cat": "av",
+     "text": "Voice cues: live mic or playback?",
+     "done": false
+    },
+    {
+     "id": "y4",
+     "cat": "setup",
+     "text": "Theater is full late — find a spot for her 2nd/3rd run (another room?)",
+     "done": false
+    }
+   ],
+   "notes": "",
+   "formWhen": "Midnight (12–2am), Late night (2–6am)"
   },
   {
    "id": "jordan",
@@ -277,17 +346,17 @@
    "status": "confirmed",
    "poc": "Jordan",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d9171dbfe2967",
-   "summary": "Acoustic set opening and closing with a guided meditation; best at the '2am cuddle puddle' — squishy, warm colored light. Available and keen (Sep 30). Asked: available slots, PA/monitors/mixer set up in the room, a sound engineer to run the board, soundcheck before doors, and lighting (bring own?). Wants a 3rd comp so someone can film the set.",
+   "summary": "Acoustic set opening and closing with a guided meditation; best at the '2am cuddle puddle' — squishy, warm colored light. Available and keen (Sep 30). Asked: available slots, PA/monitors/mixer set up in the room, a sound engineer to run the board, soundcheck before doors, and lighting (bring own?). Wants a 3rd comp so someone can film the set. Planning sheet (Collaborators): $150 grant, 4 tickets — more than the 2 in email and the 3 he asked for. Form: YC vote: Yes.",
    "arrive": "19:30",
    "prep": 30,
    "changeover": 15,
    "run": 60,
    "earliest": "00:00",
-   "latest": "03:30",
+   "latest": "06:00",
    "slots": [
-    "02:15"
+    "02:30"
    ],
-   "comps": 2,
+   "comps": 4,
    "compsAsked": 3,
    "grant": 150,
    "grantAsked": null,
@@ -325,19 +394,20 @@
     {
      "id": "c6",
      "cat": "tix",
-     "text": "Decide on a 3rd comp for his videographer",
+     "text": "Sheet lists 4 tickets (email offered 2, he asked 3 for a videographer) — confirm and tell him",
      "done": false
     }
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Midnight (12–2am), Late night (2–6am)"
   },
   {
    "id": "tasya",
    "artist": "Tasya Abbot",
    "project": "Solo experimental vocal / looping set",
-   "proposal": "p-b43f0e01",
+   "proposal": "",
    "format": "Theater — ambient; optional pre-sunrise harp set",
    "status": "pending",
    "poc": "Tasya (via Andy Maag)",
@@ -350,7 +420,7 @@
    "earliest": "02:00",
    "latest": "08:00",
    "slots": [
-    "05:45",
+    "06:00",
     "07:30"
    ],
    "comps": null,
@@ -393,22 +463,29 @@
      "cat": "tix",
      "text": "Settle comp count (Andy's offer was 4)",
      "done": false
+    },
+    {
+     "id": "t7",
+     "cat": "comms",
+     "text": "Not in the planning sheet yet — add her (Spheresay's row is still there)",
+     "done": false
     }
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Not in the form — email: before 3:30am or after 5am"
   },
   {
    "id": "vacbed",
-   "artist": "Bizzy",
-   "project": "Vac bed",
+   "artist": "Bizzie Bisignani",
+   "project": "Latex vac bed",
    "proposal": "",
    "format": "Theater — vac bed, late night",
    "status": "pending",
-   "poc": "Bizzy",
+   "poc": "Bizzie",
    "thread": "",
-   "summary": "Bizzy's vac bed in the theater from 2am onward, about 2 hours (from Ian; not in the email threads).",
+   "summary": "Bizzie's latex vac bed in the theater from 2am onward, about 2 hours (from Ian). Planning sheet (Collaborators): no grant, 2 tickets, POC Ian & Melina.",
    "arrive": null,
    "prep": null,
    "changeover": 15,
@@ -416,9 +493,9 @@
    "earliest": "02:00",
    "latest": null,
    "slots": [
-    "03:30"
+    "03:45"
    ],
-   "comps": null,
+   "comps": 2,
    "compsAsked": null,
    "grant": null,
    "grantAsked": null,
@@ -426,7 +503,7 @@
     {
      "id": "v1",
      "cat": "info",
-     "text": "Confirm with Bizzy: setup time, exact window, what they bring",
+     "text": "Confirm with Bizzie: setup time, exact window, what they bring",
      "done": false
     },
     {
@@ -450,7 +527,8 @@
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Not in the form — Ian: 2am onward, ~2 hours"
   },
   {
    "id": "parlor",
@@ -469,7 +547,7 @@
    "earliest": "03:00",
    "latest": null,
    "slots": [
-    "06:30"
+    "06:45"
    ],
    "comps": null,
    "compsAsked": null,
@@ -487,11 +565,18 @@
      "cat": "setup",
      "text": "Tables/cushions + games — what stays in the room vs brought in",
      "done": false
+    },
+    {
+     "id": "q3",
+     "cat": "comms",
+     "text": "Not in the planning sheet yet — add once a host is confirmed",
+     "done": false
     }
    ],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Not in the form as 'parlor games' — The Preposterous Game Parlour (Ava Maag & Emily Miller) asked for All night in a small room (basement bathroom / 1st-floor tub room); YC Yes/Yes"
   },
   {
    "id": "spheresay",
@@ -502,7 +587,7 @@
    "status": "declined",
    "poc": "Andy",
    "thread": "https://mail.google.com/mail/u/0/#all/1a0d91835603be7b",
-   "summary": "Declined Sep 25 — out of California that weekend. Connected Ian with bandmate Tasya Abbot for a solo set.",
+   "summary": "Declined Sep 25 — out of California that weekend. Connected Ian with bandmate Tasya Abbot for a solo set. Still listed in the planning sheet (4 tickets) — mark declined there. Form: YC vote: Yes.",
    "arrive": null,
    "prep": null,
    "changeover": null,
@@ -517,7 +602,8 @@
    "needs": [],
    "notes": "",
    "reset": null,
-   "strike": null
+   "strike": null,
+   "formWhen": "Early (9pm–12am), Midnight (12–2am)"
   }
  ]
 }
