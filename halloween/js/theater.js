@@ -5,8 +5,8 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.4.3';
-console.log(`[halloween-theater] v${VERSION} - theater run of show (Tasya reply Sep 30)`);
+const VERSION = '1.5.0';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (shared backend: Supabase, Discord sign-in)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
@@ -22,7 +22,7 @@ const STATUS = { confirmed: 'Confirmed', pending: 'Pending', declined: 'Declined
 let seed = null;
 let state = null;
 const REFLOW_KEY = 'halloween-theater-reflow';
-let ui = { sel: null, view: 'timeline', panel: 'acts', needs: 'open', dirty: false, reflow: true };
+let ui = { sel: null, view: 'timeline', panel: 'acts', needs: 'open', dirty: false, reflow: true, bannerYes: null };
 try { ui.reflow = localStorage.getItem(REFLOW_KEY) !== 'off'; } catch (_) {}
 
 // ---------- state ----------
@@ -51,8 +51,10 @@ function loadState() {
   return fromSeed();
 }
 function save() {
+  if (readOnly()) { toast('Sign in with Discord to edit', true); return; }
   state.updated = new Date().toISOString();
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) { toast('Could not save locally', true); }
+  if (cloud.live && cloud.member) queuePush();
 }
 const actById = id => state.acts.find(a => a.id === id);
 const live = () => state.acts.filter(a => a.status !== 'declined');
@@ -147,8 +149,17 @@ function columns(blocks, s = b => b.start, e = b => b.end) {
 
 // ---------- render ----------
 function render() { renderActs(); renderPlan(); renderDetail(); }
+// View-only visitors: disable every editing control after each paint.
+function lockUI() {
+  const ro = readOnly();
+  document.body.classList.toggle('is-readonly', ro);
+  if (!ro) return;
+  document.querySelectorAll('#detail input, #detail select, #detail textarea, #detail button:not([data-sel]), #plan input[data-need], #btn-add, #btn-close-gaps, #btn-reset, #btn-import')
+    .forEach(el => { el.disabled = true; });
+}
 
-function renderActs() {
+function renderActs() { renderActsInner(); lockUI(); }
+function renderActsInner() {
   const el = document.getElementById('acts');
   const roomOpen = state.event.needs.filter(n => !n.done).length;
   const cards = [`
@@ -180,7 +191,8 @@ function renderActs() {
   el.innerHTML = cards.join('');
 }
 
-function renderPlan() {
+function renderPlan() { renderPlanInner(); lockUI(); }
+function renderPlanInner() {
   document.querySelectorAll('#view-tabs [data-view]').forEach(b => b.classList.toggle('filter-token--active', b.dataset.view === ui.view));
   const allOpen = state.event.needs.filter(n => !n.done).length + live().reduce((s, a) => s + openNeeds(a), 0);
   document.getElementById('needs-count').textContent = allOpen;
@@ -300,7 +312,8 @@ function needsEditor(needs, owner) {
   </div>`;
 }
 
-function renderDetail() {
+function renderDetail() { renderDetailInner(); lockUI(); }
+function renderDetailInner() {
   const el = document.getElementById('detail');
   if (ui.sel === 'room') {
     const ev = state.event;
@@ -447,6 +460,7 @@ let drag = null;
 function onPointerDown(e) {
   const blk = e.target.closest('.blk[data-drag]'); if (!blk) return;
   e.preventDefault();
+  if (readOnly()) { select(blk.dataset.act); return; }
   blk.setPointerCapture(e.pointerId);
   drag = { blk, y0: e.clientY, top0: parseFloat(blk.style.top), moved: false, act: blk.dataset.act, kind: blk.dataset.drag, slot: +blk.dataset.slot };
   blk.classList.add('blk--dragging');
@@ -509,6 +523,151 @@ function closeGaps() {
   save(); render(); toast(moved ? `Closed gaps — moved ${moved} show${moved > 1 ? 's' : ''}` : 'No gaps to close');
 }
 
+// ---------- shared backend (Supabase · Boards project) ----------
+// One row (halloween_theater.id = 'xv-2026') holds the whole schedule. Anyone can
+// read it; verified Agape Discord members can write (RLS, migration 180). Saves
+// are compare-and-set on `version`, so a stale tab can't overwrite a newer save.
+const SB_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
+const ROW_ID = 'xv-2026';
+const TABLE = 'halloween_theater';
+const cloud = { sb: null, live: false, user: null, member: false, name: null, why: '', version: null, docRev: null, timer: null, pushing: false, again: false, sync: '', updatedBy: null };
+const readOnly = () => cloud.live && !cloud.member;
+
+function cloudInit() {
+  if (!window.supabase?.createClient) return false;
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  cloud.sb = window.supabase.createClient(SB_URL, SB_KEY, {
+    auth: { detectSessionInUrl: true, flowType: mobile ? 'implicit' : 'pkce', autoRefreshToken: true, persistSession: true },
+  });
+  return true;
+}
+async function cloudLoad() {
+  const { data, error } = await cloud.sb.from(TABLE).select('doc, version, updated_at, updated_by_name').eq('id', ROW_ID).maybeSingle();
+  if (error) throw error;
+  cloud.live = true;
+  if (data) applyRemote(data);
+  else { cloud.version = null; cloud.docRev = null; state = fromSeed(); } // nobody has saved yet: everyone sees the email snapshot
+}
+function applyRemote(row) {
+  cloud.version = row.version;
+  cloud.updatedBy = row.updated_by_name || null;
+  cloud.docRev = row.doc?.rev || 1;
+  state = upgrade(clone(row.doc));
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) {}
+}
+function subscribe() {
+  cloud.sb.channel('halloween-theater-' + ROW_ID)
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE, filter: `id=eq.${ROW_ID}` }, p => {
+      const row = p.new;
+      if (!row || row.version == null) return;
+      if (cloud.version != null && row.version <= cloud.version) return; // our own save echoing back
+      if (cloud.timer || cloud.pushing) return; // our pending save will hit the version check and reload
+      applyRemote(row); render(); setSync();
+      toast(`Updated by ${row.updated_by_name || 'another planner'}`);
+    })
+    .subscribe();
+}
+
+// Membership: read our own cached row first (RLS lets users read theirs). Only call
+// the discord-membership function when there's no fresh verdict — it logs every call.
+async function cloudAuth() {
+  const { data } = await cloud.sb.auth.getSession();
+  const session = data?.session || null;
+  cloud.user = session?.user || null;
+  cloud.member = false; cloud.why = '';
+  if (!session) { setSync(); render(); return; }
+  const meta = session.user.user_metadata || {};
+  cloud.name = meta.full_name || meta.name || meta.custom_claims?.global_name || session.user.email || 'a planner';
+  try {
+    const { data: row } = await cloud.sb.from('user_discord_membership').select('is_agape_member, discord_username, verified_at').eq('user_id', session.user.id).maybeSingle();
+    const fresh = row && (Date.now() - new Date(row.verified_at).getTime()) < 7 * 864e5;
+    if (row?.is_agape_member && fresh) {
+      cloud.member = true; cloud.name = row.discord_username || cloud.name;
+    } else {
+      const resp = await fetch(`${SB_URL}/functions/v1/discord-membership`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'status' }),
+      });
+      const st = await resp.json().catch(() => ({}));
+      if (!resp.ok) cloud.why = 'access check failed';
+      else if (!st.linked) cloud.why = 'no Discord linked to this account';
+      else if (!st.isMember) cloud.why = `${st.discordUsername || 'this account'} isn't in the Agape Discord`;
+      cloud.member = !!(resp.ok && st.isMember);
+      if (st.discordUsername) cloud.name = st.discordUsername;
+    }
+  } catch (e) { cloud.why = 'access check failed'; }
+  setSync(); render();
+}
+function afterAuth(localSnap) {
+  if (!cloud.member) return;
+  if (cloud.version == null || (state.rev || 1) > (cloud.docRev || 1)) queuePush(); // first save / newer seed merged in
+  // Edits made in this browser before the backend existed: offer to publish them once.
+  const strip = s => JSON.stringify({ event: s.event, acts: s.acts });
+  if (localSnap?.updated && strip(localSnap) !== strip(state)) {
+    ui.bannerYes = () => { state = localSnap; ui.sel = null; save(); render(); toast('Your local edits are now the shared schedule'); };
+    document.getElementById('banner-text').textContent =
+      `This browser has edits from ${new Date(localSnap.updated).toLocaleString()} that aren't in the shared schedule. Upload them? (Replaces the shared version for everyone.)`;
+    document.getElementById('banner-yes').textContent = 'Upload';
+    document.getElementById('banner-no').textContent = 'Keep shared';
+    document.getElementById('banner').hidden = false;
+  }
+}
+function queuePush() { clearTimeout(cloud.timer); setSync('saving'); cloud.timer = setTimeout(() => { cloud.timer = null; pushCloud(); }, 800); }
+async function pushCloud() {
+  if (cloud.pushing) { cloud.again = true; return; }
+  cloud.pushing = true;
+  try {
+    const doc = clone(state);
+    const res = cloud.version == null
+      ? await cloud.sb.from(TABLE).insert({ id: ROW_ID, doc, updated_by_name: cloud.name }).select('version').maybeSingle()
+      : await cloud.sb.from(TABLE).update({ doc, updated_by_name: cloud.name }).eq('id', ROW_ID).eq('version', cloud.version).select('version').maybeSingle();
+    if (res.error && res.error.code !== '23505') throw res.error;
+    if (res.error || !res.data) { await onConflict(); return; }
+    cloud.version = res.data.version; cloud.docRev = state.rev || 1; cloud.updatedBy = cloud.name;
+    setSync('saved');
+  } catch (e) {
+    console.warn('[halloween-theater] save failed:', e.message);
+    setSync('error'); toast('Couldn’t save to the shared schedule — your change is only in this browser', true);
+  } finally {
+    cloud.pushing = false;
+    if (cloud.again) { cloud.again = false; pushCloud(); }
+  }
+}
+async function onConflict() {
+  const { data } = await cloud.sb.from(TABLE).select('doc, version, updated_at, updated_by_name').eq('id', ROW_ID).maybeSingle();
+  if (data) { applyRemote(data); render(); }
+  setSync('saved');
+  toast(`${data?.updated_by_name || 'Someone'} saved first — showing their version. Redo your last change.`, true);
+}
+async function signIn() {
+  const { error } = await cloud.sb.auth.signInWithOAuth({
+    provider: 'discord',
+    options: { redirectTo: location.origin + location.pathname, scopes: 'identify email' },
+  });
+  if (error) toast(error.message || 'Discord sign-in failed', true);
+}
+async function signOut() { await cloud.sb.auth.signOut(); await cloudAuth(); }
+function setSync(mode) {
+  if (mode) cloud.sync = mode;
+  const pill = document.getElementById('sync'), btn = document.getElementById('btn-auth');
+  if (!pill) return;
+  let text, cls = '';
+  if (!cloud.sb || !cloud.live) { text = cloud.sb ? 'Local only · shared schedule unreachable' : 'Local only'; btn.hidden = true; }
+  else if (cloud.member) {
+    text = cloud.sync === 'saving' ? 'Saving…' : cloud.sync === 'error' ? 'Not saved — retry by editing' : `Live · ${cloud.name}`;
+    cls = cloud.sync === 'error' ? 'topbar__status--error' : 'topbar__status--live';
+    btn.hidden = false; btn.textContent = 'Sign out';
+  } else {
+    text = cloud.user ? `View only · ${cloud.why || 'not an Agape member'}` : 'View only';
+    btn.hidden = false; btn.textContent = cloud.user ? 'Sign out' : 'Sign in with Discord to edit';
+  }
+  pill.textContent = text;
+  pill.className = 'topbar__status ' + cls;
+  pill.title = cloud.updatedBy ? `Last saved by ${cloud.updatedBy}` : '';
+}
+
 // ---------- share / export / copy ----------
 function b64u(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function unb64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
@@ -546,6 +705,9 @@ function checkShareHash() {
   catch (_) { toast('Share link is malformed', true); pendingShare = null; return; }
   history.replaceState(null, '', location.pathname);
   if (!state.updated) { state = pendingShare; pendingShare = null; save(); return; }
+  ui.bannerYes = () => { state = pendingShare; pendingShare = null; save(); render(); toast('Shared schedule loaded'); };
+  document.getElementById('banner-yes').textContent = 'Load';
+  document.getElementById('banner-no').textContent = 'Keep mine';
   document.getElementById('banner-text').textContent = `This link carries a theater schedule with ${pendingShare.acts.length} acts. Load it and replace what's saved here?`;
   document.getElementById('banner').hidden = false;
 }
@@ -607,6 +769,11 @@ function bind() {
     e.target.value = '';
   });
   document.getElementById('btn-reset').addEventListener('click', () => {
+    if (cloud.live) {
+      if (!confirm('Replace the SHARED schedule — for everyone — with the email snapshot?')) return;
+      state = fromSeed(); ui.sel = null; save(); render(); toast('Shared schedule reset to the email snapshot');
+      return;
+    }
     if (!confirm('Throw away local edits and reload the email snapshot?')) return;
     state = fromSeed(); try { localStorage.removeItem(STORE_KEY); } catch (_) {} ui.sel = null; render(); toast('Reset to the email snapshot');
   });
@@ -614,8 +781,16 @@ function bind() {
     const light = document.documentElement.classList.toggle('light');
     try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (_) {}
   });
-  document.getElementById('banner-yes').addEventListener('click', () => { state = pendingShare; pendingShare = null; save(); render(); document.getElementById('banner').hidden = true; toast('Shared schedule loaded'); });
-  document.getElementById('banner-no').addEventListener('click', () => { document.getElementById('banner').hidden = true; });
+  document.getElementById('banner-yes').addEventListener('click', () => { document.getElementById('banner').hidden = true; const f = ui.bannerYes; ui.bannerYes = null; f && f(); });
+  document.getElementById('banner-no').addEventListener('click', () => { document.getElementById('banner').hidden = true; ui.bannerYes = null; });
+  document.getElementById('btn-auth').addEventListener('click', () => (cloud.user ? signOut() : signIn()));
+  // Belt and braces for view-only visitors: swallow edits even if a control slipped past lockUI().
+  document.addEventListener('click', e => {
+    if (readOnly() && e.target.closest('#btn-add, #btn-close-gaps, #btn-del-act, #btn-add-slot, #btn-reset, #btn-import, [data-del-need], [data-del-slot], input[data-need], .need__add button')) {
+      e.preventDefault(); e.stopImmediatePropagation(); toast('Sign in with Discord to edit', true);
+    }
+  }, true);
+  document.addEventListener('submit', e => { if (readOnly()) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 }
 
 // ---------- utils ----------
@@ -631,7 +806,19 @@ function toast(msg, err) {
   try { if (localStorage.getItem(THEME_KEY) === 'light') document.documentElement.classList.add('light'); } catch (_) {}
   bind();
   seed = await (await fetch('data/theater.json?v=' + VERSION)).json();
-  state = loadState();
+  const localSnap = loadState();
+  state = localSnap;
   checkShareHash();
-  render();
+  render(); setSync();
+  if (!cloudInit()) { setSync(); return; }
+  try { await cloudLoad(); } catch (e) { console.warn('[halloween-theater] shared schedule unavailable:', e.message); cloud.live = false; }
+  render(); setSync();
+  if (!cloud.live) return;
+  subscribe();
+  await cloudAuth();
+  afterAuth(localSnap);
+  cloud.sb.auth.onAuthStateChange(async (ev, session) => {
+    if ((session?.user?.id || null) === (cloud.user?.id || null)) return;
+    await cloudAuth(); afterAuth(null);
+  });
 })();
