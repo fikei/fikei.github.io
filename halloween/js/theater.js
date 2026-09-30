@@ -328,7 +328,7 @@ function renderDetail() {
   const arr = toMin(a.arrive);
   const flow = [];
   if (SHOW_PREP && arr != null) flow.push(`<span>Arrive <b>${fmt(arr)}</b> → pre-party setup ${a.prep ?? '?'} min → ready <b>${fmt(arr + (a.prep ?? DEF.prep))}</b></span>`);
-  showBlocks().filter(b => b.act === a).forEach(b => flow.push(`<span>${b.repeat ? 'Reset' : 'Changeover'} <b>${fmt(b.coStart)}</b> → show <b>${fmt(b.start)}–${fmt(b.end)}</b>${b.strike ? ` → strike until <b>${fmt(b.stop)}</b>` : ''}</span>`));
+  showBlocks().filter(b => b.act === a).forEach(b => flow.push(`<span>${b.repeat && b.coStart === b.start ? 'Rig stays set' : `${b.repeat ? 'Reset' : 'Changeover'} <b>${fmt(b.coStart)}</b>`} → show <b>${fmt(b.start)}–${fmt(b.end)}</b>${b.strike ? ` → strike until <b>${fmt(b.stop)}</b>` : ''}</span>`));
   const num = (f, v) => `<input class="input" type="number" min="0" step="5" data-f="${f}" value="${v ?? ''}" placeholder="TBD">`;
   el.innerHTML = `
     <div>
@@ -523,7 +523,7 @@ function runOfShowText() {
   }
   lines.push(`DOORS ${fmt(doors())} · SHOWS FROM ${fmt(showsStart())} · PARTY ENDS ${fmt(SPAN)}`, '', 'THEATER');
   showBlocks().forEach(b => {
-    lines.push(`  ${fmt(b.coStart)}  ${b.repeat ? 'reset' : 'changeover'} ${b.start - b.coStart}m${b.coGuess ? ' (TBD)' : ''}`);
+    if (b.start > b.coStart) lines.push(`  ${fmt(b.coStart)}  ${b.repeat ? 'reset' : 'changeover'} ${b.start - b.coStart}m${b.coGuess ? ' (TBD)' : ''}`);
     lines.push(`  ${fmt(b.start)}–${fmt(b.end)}  ${b.act.project} — ${b.act.artist}${b.runGuess ? ' (run time TBD)' : ''}`);
     if (b.strike) lines.push(`  ${fmt(b.end)}–${fmt(b.stop)}  strike`);
   });

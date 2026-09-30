@@ -1,5 +1,5 @@
 {
- "rev": 7,
+ "rev": 8,
  "source": "Gmail threads 'Your proposal was selected to be part of Agape XV: Reassemblage', 'Next steps - Agape XV: Reassemblage', 'Agape between Ian Fike and Ja'Shon Wright' · planning sheet '📝 Collaborators' tab (Location = Theater stage - Justine&Colin's room), read Sep 30 · Call for Collaborators responses ('When might your experience be?', YC vote/result/notes), read Sep 30",
  "generated_at": "2026-09-30",
  "note": "Draft built from the email threads (through Sep 30, 1:12pm), Ian's notes, the planning sheet and the form. Party runs 9pm–9am; the main theater program opens ~10:30–10:45pm when most guests arrive, with a possible early Garden show ~9:45pm. Pre-party arrival is hidden for now. Nothing here has been sent to artists as a schedule. Phone numbers and email addresses are left out on purpose (public site).",
@@ -100,7 +100,7 @@
    "earliest": "21:00",
    "latest": "02:00",
    "slots": [
-    "23:55"
+    "23:45"
    ],
    "comps": 5,
    "compsAsked": 10,
@@ -233,8 +233,8 @@
    "latest": "02:00",
    "slots": [
     "21:45",
-    "23:30",
-    "01:25"
+    "23:20",
+    "01:05"
    ],
    "comps": 5,
    "compsAsked": 5,
@@ -262,7 +262,7 @@
     {
      "id": "g10",
      "cat": "setup",
-     "text": "Between/after shows: pack into the in-room storage (~15 min); full strike after the party — confirm with Jonathan",
+     "text": "Setup only before the first show and strike after the last; rig stays set (stored in the room) between shows — confirm with Jonathan",
      "done": false
     },
     {
@@ -303,8 +303,8 @@
     }
    ],
    "notes": "",
-   "reset": 15,
-   "strike": 15,
+   "reset": 0,
+   "strike": 30,
    "formWhen": "Early (9pm–12am), Midnight (12–2am)"
   },
   {
@@ -326,7 +326,7 @@
    "earliest": "00:00",
    "latest": "06:00",
    "slots": [
-    "01:00"
+    "00:50"
    ],
    "comps": null,
    "compsAsked": null,
@@ -378,7 +378,7 @@
    "earliest": "00:00",
    "latest": "06:00",
    "slots": [
-    "02:10"
+    "02:05"
    ],
    "comps": 4,
    "compsAsked": 3,
@@ -444,8 +444,8 @@
    "earliest": "02:00",
    "latest": "08:00",
    "slots": [
-    "03:25",
-    "06:25"
+    "03:20",
+    "06:20"
    ],
    "comps": null,
    "compsAsked": null,
@@ -517,7 +517,7 @@
    "earliest": "02:00",
    "latest": null,
    "slots": [
-    "04:10"
+    "04:05"
    ],
    "comps": 2,
    "compsAsked": null,
@@ -571,7 +571,7 @@
    "earliest": "03:00",
    "latest": null,
    "slots": [
-    "07:10"
+    "07:05"
    ],
    "comps": null,
    "compsAsked": null,
