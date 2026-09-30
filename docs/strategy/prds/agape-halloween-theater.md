@@ -2,7 +2,7 @@
 
 **One line:** A light planning page at `/halloween/theater.html` that puts every theater act on one clock (arrive and pre-party setup before doors, then changeover and show during the party) and tracks what each act still needs.
 
-**Status:** Shipped v1.2.0 (2026-09-30). Seeded from the Agape XV selection email threads plus Ian's notes (vac bed, parlor games).
+**Status:** Shipped v1.3.0 (2026-09-30). Seeded from the Agape XV selection email threads, Ian's notes (vac bed, parlor games), the planning sheet's 📝 Collaborators tab (Location = "Theater stage - Justine&Colin's room") and each act's "When might your experience be?" form answer (shown in the detail pane as *Asked for*).
 **Related:** [Halloween placement](./agape-halloween-placement.md) (same party; the theater is the "2nd floor room under the rear stairs").
 
 ---
@@ -40,9 +40,19 @@ Times are stored as `HH:MM`. Anything before noon counts as the next morning, so
 | Garden of Eternal Party (Jonathan Schoonhoven) | Confirmed | Shadow puppet musical, 10–15 min shows × 3–5. Rear-projection screen, digital + overhead projectors, 3 mics, 2 PAs + mixer, aux. Long setup/strike; needs 5+ comps. |
 | Jordan Corey | Confirmed | Acoustic set, midnight–late. Needs PA/mixer, a sound engineer, soundcheck; asked for a 3rd comp for a videographer. |
 | Tasya Abbot | Pending | Replacing Spheresay. Vocal/looping set before 3:30am, optional harp set after 5am. |
-| Vac bed (Bizzy) | Pending | From Ian: 2am+, about 2 hours. |
+| Latex vac bed (Bizzie Bisignani) | Pending | From Ian: 2am+, about 2 hours. Sheet: 2 tickets. |
+| The Body is an Archive (Jyotsna, housemate) | Pending | From the sheet ($150) + proposal: ~10 min dance/physical theater, 2–3 runs, midnight/late, needs flat floor + audience circle. |
 | Parlor games | Pending | From Ian: late night. Host TBD (possibly The Preposterous Game Parlour). |
 | Spheresay (Andy Maag) | Declined | Out of state that weekend. |
+
+## Planning-sheet mismatches (Sep 30)
+
+- Ja'Shon: sheet $200 vs email $150 vs his $300 ask.
+- Jordan: sheet 4 tickets vs email 2 (+1 asked).
+- Garden: sheet 5 tickets vs email 2 — sheet already covers their ask.
+- Spheresay still listed (declined); Tasya and Parlor games not listed.
+- Lina Bond (cabbage lamps + cushions, $300) is room decor, tracked on the Theater room card.
+- The "Theater stage - Justine&Colin's room" tab itself isn't readable through the Drive connector (not indexed; file too large to export).
 
 ## Open items
 

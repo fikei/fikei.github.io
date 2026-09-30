@@ -5,8 +5,8 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.2.0';
-console.log(`[halloween-theater] v${VERSION} - theater run of show (10pm shows, reset/strike, pre-party hidden)`);
+const VERSION = '1.3.0';
+console.log(`[halloween-theater] v${VERSION} - theater run of show (planning-sheet + form timing cross-reference)`);
 
 const STORE_KEY = 'halloween-theater-v1';
 const THEME_KEY = 'halloween-theme';
@@ -343,6 +343,7 @@ function renderDetail() {
 
     <div class="detail__section">
       <div class="detail__label">Theater slot · during party</div>
+      ${a.formWhen ? `<div class="form__hint">Asked for: ${esc(a.formWhen)}</div>` : ''}
       <div class="form">
         <label class="form__row"><span class="form__hint">Changeover before (min)</span>${num('changeover', a.changeover)}</label>
         <label class="form__row"><span class="form__hint">Run time per show (min)</span>${num('run', a.run)}</label>
