@@ -938,7 +938,8 @@ Run-of-show page on top of `app.css` (reuses `.topbar`, `.layout`, `.panel`, `.p
 - `.tag--confirmed|--pending|--declined` — act status
 - `.plan__head|__summary|__note` — sticky Timeline/Needs switch, counts, draft note
 - `.tl` / `.tl__lanes-head|__lane-title|__grid|__gutter|__lane|__hour(--major)|__zone--pre|__line|__window|__legend|__unsched` — two-lane vertical timeline (arrive/pre-party · theater); `__line` is doors, `__window` shades the selected act's availability
-- `.blk` (+ `--prep` cyan, `--show` magenta, `--co` hatched changeover, `--guess` dashed = length TBD, `--sel`, `--warn` red = conflict, `--dragging`), `.blk__t` — draggable time blocks
+- `.tl--solo` — single-lane timeline (pre-party lane hidden); `.tl__line--shows` — the shows-start line
+- `.blk` (+ `--prep` cyan, `--show` magenta, `--co` hatched changeover/reset, `--strike` tear-down after the last show, `--guess` dashed = length TBD, `--sel`, `--warn` red = conflict, `--dragging`), `.blk__t` — draggable time blocks
 - `.needs` / `.needs__totals|__stat|__group` — needs roll-up with totals
 - `.need` / `.need__text|__who|__x|__add` (+ `--done`) — one checklist row (roll-up and detail pane) and the add-need form
 - `.form` / `.form__row(--full)|__hint`, `.slots`, `.slot` / `.slot__range`, `.issues`, `.flow` — detail-pane editor, slot list, conflict list, arrive→ready / changeover→show summary

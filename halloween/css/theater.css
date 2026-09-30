@@ -57,6 +57,10 @@
 .tl__zone--pre { background: var(--bg-surface); opacity: 0.6; }
 .tl__line { position: absolute; left: 56px; right: 0; border-top: var(--border-thin) dashed var(--hw-accent); pointer-events: none; z-index: 1; }
 .tl__line span { position: absolute; right: 0; top: -1.4em; font-size: var(--text-2xs); color: var(--hw-accent); text-transform: uppercase; letter-spacing: var(--tracking-wide); background: var(--bg); padding: 0 var(--space-1); }
+.blk--strike { border-top: none; border-bottom: var(--border-thin) solid var(--border-subtle); }
+.tl--solo .tl__grid, .tl--solo .tl__lanes-head { grid-template-columns: 56px 1fr; }
+.tl__line--shows { border-top-style: solid; border-top-color: var(--tl-show); }
+.tl__line--shows span { color: var(--tl-show); }
 .tl__window { position: absolute; left: 0; right: 0; border-top: var(--border-thin) solid var(--hw-accent); border-bottom: var(--border-thin) solid var(--hw-accent); background: var(--hw-accent-dim); pointer-events: none; }
 
 .blk {
@@ -133,6 +137,7 @@
   .plan__head { position: static; }
   .tl__lanes-head { top: 0; }
   .tl__grid, .tl__lanes-head { grid-template-columns: 44px 1fr 1.3fr; }
+  .tl--solo .tl__grid, .tl--solo .tl__lanes-head { grid-template-columns: 44px 1fr; }
   .tl__line { left: 44px; }
   .form { grid-template-columns: 1fr; }
 }
