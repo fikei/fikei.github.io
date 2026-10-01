@@ -1,0 +1,1181 @@
+{
+ "event": {
+  "name": "Agape XV: Reassemblage",
+  "date": "2026-10-24",
+  "tz": "America/Los_Angeles",
+  "start": "2026-10-24T21:00:00-07:00",
+  "end": "2026-10-25T09:00:00-07:00",
+  "discord": "https://discord.gg/qunsekyQS"
+ },
+ "generated_at": "2026-10-01",
+ "source": "Planning sheet (📝 Performers YES + 📝 Collaborators) for who/where; Call for Collaborators form for descriptions; theater.json for theater times.",
+ "mediums": [
+  {
+   "id": "theater",
+   "name": "Theater & performance"
+  },
+  {
+   "id": "music",
+   "name": "Music & DJ"
+  },
+  {
+   "id": "installation",
+   "name": "Installation & space"
+  },
+  {
+   "id": "interactive",
+   "name": "Interactive experience"
+  },
+  {
+   "id": "photo",
+   "name": "Photo & film"
+  },
+  {
+   "id": "food",
+   "name": "Food & drink"
+  }
+ ],
+ "floors": [
+  {
+   "id": "roof",
+   "name": "Roof",
+   "rooms": [
+    {
+     "id": "roof",
+     "name": "Roof",
+     "sub": "Sunrise",
+     "grid": [
+      0,
+      0,
+      4,
+      1
+     ],
+     "outdoor": true
+    }
+   ]
+  },
+  {
+   "id": "f3",
+   "name": "3rd floor",
+   "rooms": [
+    {
+     "id": "loft",
+     "name": "Loft",
+     "sub": "Ambient stage",
+     "grid": [
+      0,
+      0,
+      3,
+      2
+     ]
+    },
+    {
+     "id": "kate",
+     "name": "Kate's room",
+     "sub": "Tea lounge",
+     "grid": [
+      3,
+      0,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "bathtub",
+     "name": "Bathtub restroom",
+     "grid": [
+      3,
+      1,
+      1,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f2",
+   "name": "2nd floor",
+   "rooms": [
+    {
+     "id": "theater",
+     "name": "Theater",
+     "sub": "Justine & Colin's room · under the rear stairs",
+     "grid": [
+      0,
+      0,
+      2,
+      2
+     ]
+    },
+    {
+     "id": "ianmelina",
+     "name": "Ian & Melina's room",
+     "grid": [
+      2,
+      0,
+      2,
+      1
+     ]
+    },
+    {
+     "id": "franky",
+     "name": "Franky's room",
+     "grid": [
+      2,
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "sophia",
+     "name": "Sophia's room",
+     "grid": [
+      3,
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "jo",
+     "name": "Jo's room",
+     "grid": [
+      0,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "chris",
+     "name": "Chris' room",
+     "grid": [
+      1,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "shower2",
+     "name": "Shower",
+     "sub": "Melt stage",
+     "grid": [
+      2,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "backstairs",
+     "name": "Back stairs",
+     "grid": [
+      3,
+      2,
+      1,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "id": "f1",
+   "name": "1st floor",
+   "rooms": [
+    {
+     "id": "living",
+     "name": "Living room",
+     "sub": "Main stage",
+     "grid": [
+      0,
+      0,
+      2,
+      2
+     ]
+    },
+    {
+     "id": "piano",
+     "name": "Piano room",
+     "grid": [
+      2,
+      0,
+      2,
+      1
+     ]
+    },
+    {
+     "id": "dining",
+     "name": "Dining room",
+     "grid": [
+      2,
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "circle",
+     "name": "Circle room",
+     "grid": [
+      3,
+      1,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "sam",
+     "name": "Sam's room",
+     "grid": [
+      0,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "closet",
+     "name": "Front storage closet",
+     "sub": "Lost & found",
+     "grid": [
+      1,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "storagebath",
+     "name": "Storage bathroom",
+     "grid": [
+      2,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "kitchen",
+     "name": "Kitchen",
+     "sub": "Breakfast",
+     "grid": [
+      3,
+      2,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "sideyard",
+     "name": "Sideyard",
+     "sub": "Entrance · bonfire",
+     "grid": [
+      0,
+      3,
+      4,
+      1
+     ],
+     "outdoor": true
+    }
+   ]
+  },
+  {
+   "id": "basement",
+   "name": "Basement",
+   "rooms": [
+    {
+     "id": "bassroom",
+     "name": "Bass room",
+     "sub": "Basement stage",
+     "grid": [
+      0,
+      0,
+      3,
+      2
+     ]
+    },
+    {
+     "id": "basebath",
+     "name": "Basement bathroom",
+     "grid": [
+      3,
+      0,
+      1,
+      1
+     ]
+    },
+    {
+     "id": "basehall",
+     "name": "Hallway to bathroom",
+     "grid": [
+      3,
+      1,
+      1,
+      1
+     ]
+    }
+   ]
+  },
+  {
+   "id": "outside",
+   "name": "Yard",
+   "rooms": [
+    {
+     "id": "yard",
+     "name": "Yard",
+     "sub": "Out back",
+     "grid": [
+      0,
+      0,
+      4,
+      1
+     ],
+     "outdoor": true
+    }
+   ]
+  },
+  {
+   "id": "roaming",
+   "name": "Roaming",
+   "rooms": [
+    {
+     "id": "roaming",
+     "name": "Roaming",
+     "sub": "Moving through the whole house",
+     "grid": [
+      0,
+      0,
+      4,
+      1
+     ]
+    }
+   ]
+  }
+ ],
+ "pieces": [
+  {
+   "id": "twins-online",
+   "title": "TWINS ONLINE",
+   "artists": "Michaela & Milana Vachuska",
+   "medium": "music",
+   "rooms": [
+    "living"
+   ],
+   "roaming": false,
+   "blurb": "DJ set on the main stage.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "arreola-grande",
+   "title": "Arreola Grande",
+   "artists": "Chris Arreola",
+   "medium": "music",
+   "rooms": [
+    "living"
+   ],
+   "roaming": false,
+   "blurb": "DJ set on the main stage.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "ms-smith",
+   "title": "MS.SMITH",
+   "artists": "Kel Lynn Smith",
+   "medium": "music",
+   "rooms": [
+    "living"
+   ],
+   "roaming": false,
+   "blurb": "DJ set on the main stage.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "clearcast",
+   "title": "Clearcast",
+   "artists": "Franky Kohn",
+   "medium": "music",
+   "rooms": [
+    "living"
+   ],
+   "roaming": false,
+   "blurb": "Live/DJ set on the main stage.",
+   "description": "DJ Set",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": "p-5c59d62f"
+  },
+  {
+   "id": "cyber1a",
+   "title": "CYBER1A",
+   "artists": "Jess Yeung & Juliette Mohr",
+   "medium": "music",
+   "rooms": [
+    "bassroom"
+   ],
+   "roaming": false,
+   "blurb": "DJ set in the basement bass room.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "subfeels",
+   "title": "subfeels",
+   "artists": "Justine Sun Dela Cruz",
+   "medium": "music",
+   "rooms": [
+    "bassroom"
+   ],
+   "roaming": false,
+   "blurb": "DJ set in the basement bass room.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "em-tomio",
+   "title": "Modular + Tape + DJ ambient set",
+   "artists": "Emily & Tomio Ueda",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "We want to do a hybrid ambient modular + tape + DJ set drawing inspiration from the \"Discarded Beauty\" theme.",
+   "description": "We want to do a hybrid ambient modular + tape + DJ set drawing inspiration from the \"Discarded Beauty\" theme. We want to stitch together cassette tape field recordings and ambient tracks into our set. As for artist support -- if the set time is early morning (5am or later), we would prefer to be able to arrive closer to our set time because we have a baby at home.",
+   "journey": "This is a chill passive musical experience for people to sit and/or lay down in a cozy, cushioned and dimly lit space. We want everyone to feel calm and refreshed as the night goes on (or when the sun rises!)",
+   "times": null,
+   "theater": null,
+   "proposal": "p-8b3cc800"
+  },
+  {
+   "id": "optia",
+   "title": "Optia",
+   "artists": "Gray Crawford",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "A live ambient set — arpeggios, reverb and organic synthesis.",
+   "description": "Hoping to play some chill ambient music, if there’s a similar top floor laydown loft as in years past. I’m currently grappling with and sort of steeped in a decade of my own music production/composition (esp in the ambient zone) that I’d love to reassemble, redigest, and recast this bulk, while I play live accompaniment of more textures/instruments rediscovered from this anthology of partials; I’m expecting arpeggiation, reverb, organic synthesis, and precessing layers, improvisation, overlaying of textures, consonance, buoyancy; I’m especially interested to have this as an opportunity to explore what parallel views of slices of self and melody from now and from then",
+   "journey": "- I’m imagining something similar to the loft ambient lounge, part of a sequence of music /audio sets, chill space, hoping for a slightly more ambient zone than I played in 2024, I especially enjoyed Andreas’s keyboard set when the room calmed down. - hoping that ppl feel comfortable laying down, I’m not expecting much if any percussion, I remember it’s normal for ppl to move in and out of the space but nice when it settles in and there is a sort of bubble,",
+   "times": null,
+   "theater": null,
+   "proposal": "p-6c9dec65"
+  },
+  {
+   "id": "dj-habibz",
+   "title": "DJ Habibz",
+   "artists": "Haytham Hakim",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "DJ set on the ambient stage.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "babys-first-firearm",
+   "title": "baby's first firearm",
+   "artists": "Andi Doud & Alex Zharchuk",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "Live set on the ambient stage.",
+   "description": "",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "beyond-light",
+   "title": "Remember your Echo",
+   "artists": "Beyond Light (Arthur Wandzel)",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "A merging of nature and synthetic, I would like to perform a DJ mix covering the genres of ambient, world instrumental, minimal, and deep techno.",
+   "description": "A merging of nature and synthetic, I would like to perform a DJ mix covering the genres of ambient, world instrumental, minimal, and deep techno. It's a masterful composition that finds the thread and layering between underground genres and eclectic beats/melodies. Some samples: https://www.youtube.com/watch?v=3visud9Z3wc https://www.youtube.com/watch?v=quuAXwgrgiI https://www.youtube.com/watch?v=kr1wCpRomyk https://www.youtube.com/watch?v=mVBhj4OvHlc Let's have some funnnnn!!!! (づ｡◕‿‿◕｡)づ",
+   "journey": "Mhhm just a downtempo dj set to warm up the roomヽ(•‿•)ノ",
+   "times": null,
+   "theater": null,
+   "proposal": "p-ce6725f6"
+  },
+  {
+   "id": "fp-matrix",
+   "title": "FP Matrix",
+   "artists": "Franky Kohn & Pauline",
+   "medium": "music",
+   "rooms": [
+    "loft"
+   ],
+   "roaming": false,
+   "blurb": "Hybrid live set similar to the last one we did in the Agape basement, this time possibly incorporating live guitar and other theatrical props TBD",
+   "description": "Hybrid live set similar to the last one we did in the Agape basement, this time possibly incorporating live guitar and other theatrical props TBD",
+   "journey": "",
+   "times": null,
+   "theater": null,
+   "proposal": "p-be368733"
+  },
+  {
+   "id": "jashon",
+   "title": "Blood of the Dragon",
+   "artists": "Ja'Shon Wright (Haus of Hyte)",
+   "medium": "theater",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "Immersive theatre: the Empress of the Universe, bound by grief, is freed by the Jade Dragon's sacrifice.",
+   "description": "Theme: Discarded Beauty - I plan to create an immersive experience that embodies elements of Theatre meant to encapsulate the moving sensations of a World of Surrealism & Etherealism. Concept: “Empress of The Universe” - Bound by her own Grief - The burden of her command constricts her leaving her paralyzed with Anxiety. This accumulated Spiritual Pressure has gathered the attention of - [The “Jade” Dragon of The West] - Who throughout the Cosmic Heavens can sense the weight of her Sorrows & Darkness that consumes the depths of her Heart. - For the sake of the Universe - A “Sacrifice” Must Be Made - One that would restore the balance of the Universe & Cure the “Empress” of her grief - A sacrificial gesture meant to empower her Essence & Equip her with the reassuring presence of Divine Intervention - For she be purified with - [The Blood of The Dragon] - Who sacrifices his heart for her. By the shedding of his own blood which is expressed to honor his Love for her. A “Cosmic Love” that is Boundless & Unapologetic - He cuts out his own heart as an offering of Blood & Tears that she may rest assured in the Baptism of his Blood - “May Her Soul… May Her Spirit - Find Peace In All of The Universe That She Commands.” - 🐉🔱📈🥀✨ This relates to the theme of - [Discarded Beauty] - by embodying the essence of the Universe which is ultimately pure of heart - A heart bound in Darkness & In nature aspects of that Darkness ultimately consuming her. For the burden of her commands knows no consideration that she too is a force that inevitably consumes all that she produces. “Empress of the Universe” - ultimately deserving of grace to be able to accept the Law of her “Nature” - The “Jade” Dragon of the West - Displays an act of Bloody Self-Sacrifice to demonstrate that gesture of “Life Everlasting” by returning his life force back onto which it was Given - Sacrifice - Life & Death - Immortality - Afterlife - The Cosmic Cycle of Energy & The Universes Law & Will to channel that energy. The beauty in sacrifice - [The “Jade” Dragon of the West] - In all his glory sacrificed himself to reinforce the “Empress of the Universe” - who’s nature is Chaotic & Unstable that very aspect of chaos is the most beautiful characteristic of the universe. That she is Everything & Nothing at all. That she should feel not sorrow for the cycles of Life & Death attached to the cycles of her existence.",
+   "journey": "- Enter - “Ethereal” Plane - [Empress of the Universe] - Travel through “Ethereal” Plane - Enter - [Chamber of the Universe] - Empress - Bound by Grief - [Kinbaku/Shibari Performance] - Dragon Enters To Release Her From A Bound State - Sacrifices Himself To Revive “Empress” of her Paralysis - [Empress] - Upon Revival she is met with Revelations of Acceptance - Dismantling Grief & Resurrecting her appreciation for Life & Death - Expresses gratitude to the “Jade Dragon of the West Accepting Her Fate This is a [Guided Experience] that leads to an [Open-Ended Interactive Space] that allows for passive Interactivity Multiple Parties - Up to as much as space allows comfortably",
+   "times": [
+    [
+     "22:30",
+     "23:15"
+    ]
+   ],
+   "theater": "jashon",
+   "proposal": "p-ad4f5f31"
+  },
+  {
+   "id": "garden",
+   "title": "Garden of Eternal Party",
+   "artists": "Jonathan Schoonhoven & crew",
+   "medium": "theater",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "A shadow-puppet musical — short shows through the night.",
+   "description": "Shadow puppet musical. Act 1 is already written, currently working on act II for Room Service. Garden of Eternal Party: The Musical | Garden of Eternal Party https://share.google/5wiJxktNJh5x3Az2w",
+   "journey": "Shadow puppet musical. We would bring a screen and projector and mics and PAs (or could borrow if you have extra). We'd need a dedicated space to set up in, since there's a lot of tech.",
+   "times": [
+    [
+     "21:45",
+     "22:00"
+    ],
+    [
+     "23:20",
+     "23:35"
+    ],
+    [
+     "01:05",
+     "01:20"
+    ]
+   ],
+   "theater": "garden",
+   "proposal": "p-ced5efaf"
+  },
+  {
+   "id": "wizards",
+   "title": "The Wizards",
+   "artists": "Carla Bagdonas & crew",
+   "medium": "theater",
+   "rooms": [
+    "roaming",
+    "theater"
+   ],
+   "roaming": true,
+   "blurb": "Nonverbal musical \"magicians\" who pull strangers into improvised group singing.",
+   "description": "The Wizards are a roaming troupe of nonverbal musical \"magicians\" who enroll participants in spontaneous acts of collective musical expression. In practical terms: we're a group of trained musical facilitators, practiced and skilled at bringing groups of strangers into improvised collective music-making through games and facilitated forms: call and response, follow the leader, circle singing, and more. (https://thedownbeatcollective.com/) In thematic terms: vocal improvisation is reassemblage made audible and visible, through voices and bodies. In an increasingly digital, mediated, isolated world, we invite participants into analog, immediate, connective co-creation, where together we create a ritual musical experience that none of us could create alone. In addition to the roaming version of the offering, we’re also proposing a contained 1 to 2 hour room activation, similar to the more immersive format we’ve run at previous events (e.g. Room Service, Love Party), where a smaller group gets a deeper, guided version of the same practice: entering a no-talking space and building a full improvised piece together from nothing but voice.",
+   "journey": "**Roaming** — open-ended, passive-to-active interactivity, self-paced: The Wizards roam through the party, watching and listening for scraps of movement and sound that are already there: a cluster, a shared rhythm, a repeated gesture, a half-formed dance. They approach and invite people nonverbally. No talking allowed, but gibberish and singing are fair game – the vibe is playful, inviting, and organic. The Wizards help to build a shared musical experience through lightly structured but playful games: mimic-a-movement, call-and-response, or take whatever fragment the group is already generating and feed it back, layered and amplified The fragment builds into a collective jam, patched together in real time, sourced from the participants themselves. It may gain momentum and carry into an extended experience, or peter out on its own, eventually resolving and releasing the group (though people can come and go at any time). Wizards move on to find the next spark. Participants can opt in or out at any point, no set duration. Scales from 2 people to an ad hoc crowd of 50+, forming and dissolving continuously throughout the night **Room activation** — guided, clear beginning-to-end arc, ~10-50 participants per session (depending on room size), 1 to 2 hours total (can run multiple short cycles): A greeter Wizard orients people entering the room: no talking, but gibberish and singing are welcome -- playful and welcoming. Group enters, door closes. Wizards lead them nonverbally through vocal/sound games (made up language, call and response, circle songs) paired with movement (pairing off, circling, conga line). Games build into a full improvised piece with multiple parts: solos, quiet moments, ecstatic peaks, all patched together from whatever the group brought in with them. A unifying closing moment brings the jam to a peak and back down. ~15 seconds of shared silence to let the music reverberate. Group is released. Room resets for the next cycle if time allows.",
+   "times": [
+    [
+     "23:45",
+     "00:45"
+    ]
+   ],
+   "theater": "wizards",
+   "proposal": "p-8f96dcf1"
+  },
+  {
+   "id": "jyotsna",
+   "title": "The Body is an Archive",
+   "artists": "Jyotsna Jayamaran",
+   "medium": "theater",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "\"The Body is an Archive\" a ~10-minute dance and physical-theater work about the body as something continually named, inherited, fragmented, and reassembled.",
+   "description": "\"The Body is an Archive\" a ~10-minute dance and physical-theater work about the body as something continually named, inherited, fragmented, and reassembled. I’m interested in the body as an archive - shaped by personal experience but also by family, culture, ancestral histories, gender, trauma, pleasure, shame, and everything we have learned we are or are not allowed to be. The piece begins with anatomy: head, lungs, stomach, pelvis, heart. A voice names a body part, and the body responds. Gradually, the language becomes less anatomically certain: fear, desire, memory, shame, love, home. Where do these live? Do they live in the same place for everyone? A second layer explores this in relation to artificial intelligence. As algorithms become increasingly capable of recognizing patterns in our preferences, memories, fears, and desires, I’m interested in what happens when highly individual embodied experiences are translated into categories and predictions. AI may know thousands of ways humans describe love, desire, trauma, or grief but what happens when something messy, embodied, inherited, and individual gets translated into pattern? The sound score will move between human voices, fragmented emotional language, and synthetic forms of speech, in part also inspired by Esther Perel’s \"My AI Loves Me Better Than Anyone Ever Could\" episode. The piece relates to Reassemblage through the idea that reconstruction does not restore an “original” self. The body becomes an assemblage of memory, culture, technology, inheritance, resistance, and choice. The goal is not to put the body back together correctly, but to ask whether there was ever one correct arrangement in the first place.",
+   "journey": "I'd like a room that has some space to move and where the audience can gather in a circle. The piece can accommodate approximately 15-30 participants at a time, depending on the size of the room. Around 6–10 people may have a more active role through spoken cues, while the rest experience the work as a performance. I can imagine performing the work 2-3 times through the night.",
+   "times": [
+    [
+     "00:50",
+     "01:00"
+    ]
+   ],
+   "theater": "jyotsna",
+   "proposal": "p-0ad1d3a6"
+  },
+  {
+   "id": "jordan",
+   "title": "Jordan Corey",
+   "artists": "Jordan Corey",
+   "medium": "music",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "An acoustic alt-R&B set that opens and closes with a guided meditation.",
+   "description": "Mine would be a sonic contribution, a non physical space created in real time that myself, a guitarist/pianist and the audience would co-create. This would be an acoustic set, best performed at the 2am cuddle puddle, or in a room that's intended for people to gather, rest, cuddle, connect and drop into presence. I am an alternative rnb, soul, bedroom pop, singer songwriter with over 15+ years experience as a working artist, producer and songwriter. Conceptually my music is centered around themes of self exploration, relationships as both a coping strategy and a doorway and the unfurling of the ego to make space for the beautiful, painful and everything-in-between realities of being a human. My music relates to the theme in a variety of ways, thematically exploring rupture, repair, reuse, reclamation, blending and stitching different genres to create one, cohesive, sonic world. Spotify: https://open.spotify.com/artist/7fVAMCPyWtZf1yx92YTBmJ?si=k-a9Cry1SPeLSQso-pFwOA Examples of my stripped down/acoustic sets: - https://www.instagram.com/reel/DXaB1AGkpT1/?utm_source=ig_web_copy_link&stkn=MzRlODBiNWFlZA== - https://www.instagram.com/reel/DZc8yKKvp-c/?utm_source=ig_web_copy_link&stkn=MzRlODBiNWFlZA== - https://www.instagram.com/reel/DboUwCnyPak/?utm_source=ig_web_copy_link&stkn=MzRlODBiNWFlZA== - https://www.instagram.com/reel/DZXwhLUvnQN/?utm_source=ig_web_copy_link&stkn=MzRlODBiNWFlZA==",
+   "journey": "This would ideally be a chill space and a guided experience in the sense that they are watching a show. The set opens with a guided meditation, then we dive into the music and we close with a guided meditation.",
+   "times": [
+    [
+     "02:05",
+     "03:05"
+    ]
+   ],
+   "theater": "jordan",
+   "proposal": "p-465a5da1"
+  },
+  {
+   "id": "vacbed",
+   "title": "Latex vac bed",
+   "artists": "Bizzie Bisignani",
+   "medium": "interactive",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "A latex vacuum bed in the theater, from 2am.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "04:35",
+     "06:35"
+    ]
+   ],
+   "theater": "vacbed",
+   "proposal": null
+  },
+  {
+   "id": "mise-en-pieces",
+   "title": "Mise en Pièces",
+   "artists": "Diane Rodriguez",
+   "medium": "theater",
+   "rooms": [
+    "sam"
+   ],
+   "roaming": false,
+   "blurb": "Mise en Pièces is a mysterious, absurdist fine-dining experience for up to 16 guests per service, with about two services per hour.",
+   "description": "Mise en Pièces is a mysterious, absurdist fine-dining experience for up to 16 guests per service, with about two services per hour. Guests enter as individual “parties of one,” then discover a restaurant where fine dining has been taken apart and must be put back together. Prix-fixe becomes literally “pre-fixed.” Menus, plates, courses, dress codes, sensory experiences, and even dining rituals are disassembled and reassembled through playful guest participation. Smoking cloches, custom ice metal branding, unusual tableside service, sound, lighting, and other visual fine-dining spectacles heighten the illusion. The experience turns Reassemblage into both a visual language and a social mechanic. Guests begin separately, but increasingly need to combine, trade, and collaborate to complete the meal together.",
+   "journey": "1.Discover: Guests can find the restaurant directly or follow optional blacklight clues hidden throughout the event. 2.Get a table: There are 16 buzzers maximum and one is required per guest. Couples become two “parties of one.” No buzzer? Wait, beg, borrow, or barter. 3.Enter: When buzzed, guests hand over their buzzers, enter, and the doors close behind them. 4.Reassemble yourself: The restaurant’s mandatory black-tie dress code is “corrected” with provided ties, mustaches, and other accessories. 5.Reassemble the meal: Guests reconstruct their “pre-fixed” menu and encounter a rapid series of interactive, theatrical courses and tableside rituals. 6.Opt in: Adventurous diners can choose from an optional “taze-sting” sensory menu, including collaborative experiences. 7.Reassemble together: What begins as separate “parties of one” increasingly requires interaction and collaboration with the rest of the table. 8.Complete service: The experience reaches its finale, the doors reopen, and the reassembled diners are released back into the party.",
+   "times": null,
+   "theater": null,
+   "proposal": "p-a1f60766"
+  },
+  {
+   "id": "dental-damned",
+   "title": "Dental Damned",
+   "artists": "Jose (WHO) Sanabria & crew",
+   "medium": "theater",
+   "rooms": [
+    "franky"
+   ],
+   "roaming": false,
+   "blurb": "We are creating a \"dentist nightmare\", an immersive piece that explores reassemble through repairing and rebuilding the mouth, like a strange living machine.",
+   "description": "We are creating a \"dentist nightmare\", an immersive piece that explores reassemble through repairing and rebuilding the mouth, like a strange living machine. The entire room is a large open-mouth installation where people can sit, explore and interact with teeth, braces, dental tools, toothbrushes, floss, etc. Hanging from the roof of the mouth is a large uvula trash candy disco ball, covered in chunks of different jagged materials and sticky candy. The centerpiece is an altar where 2-3 people can sit around a large candy bowl of gumballs, where they're invited to take a piece, chew it up, and stick their chewed gum onto a wall or surface. The theme of reassemble shows up in metal wires and orthodontics reconstructing or repairing the mouth, thinking about consumption, food, candy, desire, cavities, rot, decay, and how what we consume becomes part of us. It's eerie and grotesque, playful and clowny, cartoonish and inviting. Participants: Who Sanabria (design and fabrication, live participant) Justin Kiene (design and fabrication, live participant) Cheraya Esthers (design and fabrication, construction planning, live participant) Olivia Warmer (specializing in sewing and fabrics, pillow fabrication, will not be able to attend party) Diego Mireles (audio and visuals)",
+   "journey": "-You enter on an eerie trippy vibe with electronic ambience music -Then discover the main altar piece in the center -Lounge around it on the seating and tooth pillows provided -Engage with elements at your own pace -You can interact with the artists who will be present and dressed as dentists and dental assistants, other guests, or just the installation itself -Distorted and weird dimensionality will come into play: large teeth, small teeth, giant cartoonish toothbrush -Lighting will be moody, dark reds and yellows, with a spotlight shining on the mirrored metallic elements of the disco ball uvula -Depending on space and access to materials, a dentist chair of sorts for patients to lay on could be included -Leave experiencing a playful, spooky, surreal space Many participants can engage at once, depending on room size. When people leave other people can come in.",
+   "times": null,
+   "theater": null,
+   "proposal": "p-a798a5fc"
+  },
+  {
+   "id": "cabbage-lamps",
+   "title": "Cabbage lamps + cushions",
+   "artists": "Lina Bond",
+   "medium": "installation",
+   "rooms": [
+    "theater"
+   ],
+   "roaming": false,
+   "blurb": "Cabbage lamps and cushions that dress the theater.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "simple-lights",
+   "title": "Simple lights",
+   "artists": "Colin O'Donnell",
+   "medium": "installation",
+   "rooms": [
+    "basehall"
+   ],
+   "roaming": false,
+   "blurb": "Light along the basement hallway.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "textiles",
+   "title": "Textiles",
+   "artists": "Linden JL",
+   "medium": "installation",
+   "rooms": [
+    "basebath"
+   ],
+   "roaming": false,
+   "blurb": "A textile installation in the basement bathroom.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "tag-island",
+   "title": "Tag Island",
+   "artists": "Toni Antonova",
+   "medium": "installation",
+   "rooms": [
+    "ianmelina"
+   ],
+   "roaming": false,
+   "blurb": "A concrete wall and island to sit on and tag with markers — plus Walkmen loaded with 90s CDs.",
+   "description": "I’d love to work with concrete as the aesthetic and create some a kind of wall and island for people to sit on that they can tag and graffiti on with sharpies and other paint markers. Dim lighting in the room and also some lighting in the structure itself. I’m also thinking some obsolete 90s technology like several Walkmen with cds in them already, preselected and wired headphones. And a cassette player speaker. Think like 90s skater heaven but a bit of a modern look. So: rough, social, nostalgic, but not too explicitly retro-aesthetically. I plan to make it at home in advance of the event in modular bits that can be carried up and down stairs. Worked with ChatGPT for a long while to create an image of the general shape of it- the upright wall may be a bit shorter bc of costs and weight. The structure itself isn’t made of concrete internally, and there will be pieces that made of scrap acrylic and translucent material with warm leds inside.",
+   "journey": "Chill space, they sit on concrete structure and cushions around it. There will be pillows and it will be shaped to be comfortable to hang out on. There are materials for people to tag the structure or graffiti on it. Maybe could be something in small room? Or somewhere else?",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-1f9ec6c3"
+  },
+  {
+   "id": "bioplastic-town",
+   "title": "bioplastic town",
+   "artists": "Justine Sun Dela Cruz",
+   "medium": "installation",
+   "rooms": [
+    "piano",
+    "dining"
+   ],
+   "roaming": false,
+   "blurb": "Glowing bioplastic panels and lanterns made from gelatin and glycerin.",
+   "description": "my bioplastic panels and lanterns i made for all the campouts this year! its reconstituted gelatin and glycerin and other food stuff 🙂‍↕️",
+   "journey": "for chill space/ transitory space",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-293a2512"
+  },
+  {
+   "id": "ecdysis-oracle",
+   "title": "ecdysis oracle",
+   "artists": "Nele Ponce",
+   "medium": "installation",
+   "rooms": [
+    "yard"
+   ],
+   "roaming": false,
+   "blurb": "ecdysis oracle: earthseed desert temple is an immersive, interactive oracle reading that fuses analog video, sensor technology, and a participant-sculpted sand interface.",
+   "description": "ecdysis oracle: earthseed desert temple is an immersive, interactive oracle reading that fuses analog video, sensor technology, and a participant-sculpted sand interface. guests sit before an altar-like assemblage—a bowl of sand beneath an overhead depth sensor, surrounded by sandstone boulders and bare branches—and are invited to shape and sculpt the sand for a sustained moment. when their hands withdraw, the sensor reads the unique topography they've created and interprets it as one of fifteen possible oracle outcomes, delivering a personalized reading through a CRT screen and an intimate whispered message over headphones. ecdysis oracle was originally created for an 'earthseed remnants' exhibition. the core mechanics and concept are complete and tested. i'm open to adapting the aesthetic—curtain colors, branch arrangements, sand trail styling—to deepen its resonance with the reassemblage theme, depending on timeline and collaborator availability. the work is flexible enough to layer new visual language onto its foundation without compromising the installation's core experience.",
+   "journey": "participant journey approach — encounter the installation: octagon altar with sand, suspended branch, crt tv, fabric backdrop, moss-covered rocks. read instructions — card on the octagon explains the engagement: \"put on headphones. wave your hands over the sand. shape for 30 seconds. listen.\" put on headphones — crt screen displays invitation: \"place your hands in the sand. the oracle reads what you leave behind.\" shape (30 seconds) — sculpt the sand while the screen shows an abstract countdown visual and \"shaping…\" the sensor reads the topography. withdraw — screen prompts: \"withdraw your hands. what you leave behind is enough.\" oracle reads (2 seconds) — sensor captures and classifies the sand topology into one of 15 readings. reading plays (2–3 minutes) — visual, soundscape, and spoken message via headphones and crt. personal, meditative oracle reading. ending — screen: \"the oracle has spoken. what remains is yours.\" reflection (optional) — write or draw in the provided journal. departure — leave carrying the reading. total time: ~5–7 minutes per participant experience structure guided experience with passive interactivity. clear beginning-to-end sequence; participants engage at their own pace. intimate, meditative, solo engagement (one participant at a time). no artist present; interaction is between participant's body and the oracle system. capacity: one participant at a time. others can observe, wait, or engage with the space. suggested pacing: 8–10 people per hour.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-ac97964d"
+  },
+  {
+   "id": "memory-melange",
+   "title": "Memory Melange",
+   "artists": "Charlie Stigler & Zain Shah",
+   "medium": "installation",
+   "rooms": [
+    "sophia"
+   ],
+   "roaming": false,
+   "blurb": "Memory Melange (working title) is a memory-combining video pensieve room.",
+   "description": "Memory Melange (working title) is a memory-combining video pensieve room. Participants record stories and imbue them into small reclaimed objects, which can then play them back at the central pensieve bowl. But if multiple objects are placed in the bowl, they will be blended together, and the listeners will hear a new story made up of clips from each of the original stories blended together. Nothing is synthesized - no generated voices, no invented words. Every sound produced is a real person's original recording, only rearranged. It is visible mending for memory: strange new stories made, visibly, from old ones. On one level, Memory Melange is a simple tribute to the power of nostalgic storytelling, and how it relates to the objects that have existed with us. On another, it is a statement about the haziness and unreliability of memory, which is often composed just as much by the family and friends who were there as by our own personal experience. Finally, it is a commentary on the unreliability of narrative: despite using only their original statements, the end result may tell an entirely different story. As it will require quite a lot of tech and fabrication, this project will be expensive.",
+   "journey": "Memory Melange is an open-ended interactive experience with a few possible journeys. At least 6 participants can be engaging with the experience in the room at one time, and possibly many more. The room can comfortably hold a dozen if people are standing. It’s designed to run unattended all night, but we’ll check in periodically. When you enter the room, you find yourself in a dimly-lit space, with orange and blue accent lights, and a large shallow bowl in the center of it. The bowl is surrounded by cozy floor pads to sit on. This bowl is the Memory Pensieve. This Memory Pensieve is a large, shallow, low bowl with a frosted top that dances with light. The top may have light mist blowing over it. The Pensieve is surrounded by baskets of reclaimed old objects, and signage instructs you that you can place objects in the bowl to recall their memories. It also instructs you that you can place many in the bowl at once, but the memories may be mixed up in that case. When an object is placed in bowl, sound and light effects indicate that it has been registered, and the top glows with lights in a spinning pattern to indicate that the Pensieve is thinking. This will take about 5 seconds for single objects and about 30 seconds for multiple. When it’s ready, the top of the Pensieve will play back the recorded message. Ideally, this will be video projected on the surface of the Pensieve from the ceiling. If multiple objects are placed on the Pensieve, you will hear a new story, made up of clips from each of the original stories blended together. If you merge two, you’ll get a somewhat-coherent mixture of the two stories. If you merge 30, you’ll get a chaotic blend with only a word or two from each story. See attachments for an example of a blended story. You can also choose to record your own stories into objects at our Imbuing Station, a recording booth located in the room (likely in a closet). Here, you can take a reclaimed object from our pile, and record a short personal story that comes to your mind - whether inspired by the object or not. Signage at the Imbuing Station makes clear that recordings may be played back and blended for other guests. Then, back in the main room, you can place your object in our big Pensieve bowl to play back the memory imbued in it, or combine it with other memories.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-4ba8fb58"
+  },
+  {
+   "id": "digest-me",
+   "title": "Digest me, damn it!",
+   "artists": "Emma Strebel, Emma Arnesty-Good & Chandler",
+   "medium": "installation",
+   "rooms": [
+    "jo"
+   ],
+   "roaming": false,
+   "blurb": "Crawl into a patchwork creature's mouth, through its gut, to a guided meditation in its stomach.",
+   "description": "WHAT: A creature’s mouth is wide open at the entry of a doorway. Nothing else can be seen in the room. The mouth, patched with different fabrics, beckons viewers to enter inside it. Visitors crawl into the mouth, twisting and turning through the creature’s intestines. Digestive gurgles fill the space and dim lighting guides the way. The visitor arrives at a wider opening – the stomach. They lay down, put headphones on, close their eyes, and press play. An erotic, guided meditation begins. The voice starts disassembling the body–limb by limb–until the stomach acids have dissolved each layer of flesh and personhood. From this place of dissolution, the voice begins to reassemble the pieces of body and soul, until the listener is newly whole, both individual body and part of Anima Mundi. Once the creature has fully digested the visitor, they are excreted through the same orifice they were consumed in. On the way out, they are invited to take a dismembered finger lollipop – the only element the creature couldn’t fully digest. Viewers are invited to continue digesting as they move on throughout Agape. BIGGER THEMES: What is more contested than the human body? A place haunted by ideals of perfection, optimization, and immortality. Through this installation, we encourage participants to dissolve the layers of personhood that stand in the way of connection to self and universe, and then stitch their flesh back together into a new whole. We will procure the materials for the physical environment (including fabric, stuffing, structure, cushions), lights, extension cords, audio equipment (headphones, devices to play the audio, speakers), mold-making equipment and ingredients for the finger lollipops. WHO: Emma Strebel and Emma Arnesty-Good will collaborate on this project with audio support from Chandler Abraham. Emma A-G is a writer and storyteller and Emma S is an installation artist. Together we are excited to create a cohesive and transformative space!",
+   "journey": "- This is a meditative, guided, chill space. 3-4 people can experience it at one time. The whole experience lasts about 15min. - The doorway to this room is blocked off and all that remains is a large mouth of a creature. - A tunnel invites viewers to crawl into the mouth - The visitor crawls through a winding tube – wide enough for two people to pass each other but narrow enough that crawling is necessary. Dim lighting guides the way. Digestive sounds are playing in the room. - After a couple turns, the space opens into a squishy dome where pillows line the space. - Visitors are encouraged to put on headphones and lie down. 3-4 sets of headphones are available - Visitors listen to the recording (disassembling their individual body and reassembling into a greater whole by the end) which lasts approximately 10 min - They are invited to take a finger lollipop on their way out to finish digesting the experience - They are excreted and crawl out (this creature excretes from the same orifice that it eats)",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-7789b7fe"
+  },
+  {
+   "id": "the-bower",
+   "title": "The Bower",
+   "artists": "Hannah Long",
+   "medium": "installation",
+   "rooms": [
+    "chris"
+   ],
+   "roaming": false,
+   "blurb": "My project is inspired by the nests and structures of birds like magpies and bowerbirds, which combine natural and human-made materials on a spectrum from branches to ephemera to…",
+   "description": "My project is inspired by the nests and structures of birds like magpies and bowerbirds, which combine natural and human-made materials on a spectrum from branches to ephemera to trash. They are highly decorated and evidently laborious. From far away they look like colorful, dripping tangles. Up close, one can see how they are pure intentionality. Materials are manipulated, braided, woven, stitched together to form the skeleton. Junk and discarded objects become armor or even bait for potential mates. The beauty is in the eye of the beholder. To me, these nests are a perfect representation of reassemblage. The literal, physical, and structural parallels are obvious, as disparate fragments are manipulated to create something new. But they also respond to the conceptual prompt of creating new worlds. One could view a bird's nest made up of trash with overwhelming sadness (and certainly I do sometimes). We could also choose to see adaptation, resourcefulness, and a clever refusal to give up. My concept is to create a fully analog, interactive, human sized version of one of these nests. It will be made from locally sourced natural and non-natural materials, including found objects from around SF, flora from my garden, even remnants from past Agape halloweens. It becomes a material portrait of our city’s stitching of people, places, and things. It speaks to a city forever being declared dead, and forever making something new from the remains. Crucially, the nest is not finished when the party begins, inviting each viewer to contribute to its tapestry. A party is itself an act of reassemblage. The Bower makes that process material. The nest will exist as the centerpiece of a room. The room will present an immersive, womb-like environment, through fabric coverings and lighting. The environment reflects the source materials of the nest, with garlands and braided wires hanging from the ceiling, branches extending from the corners, accumulations of rocks and ephemera around the borders, etc. Safety pins, carabiners, cord, and other fasteners will allow guests to attach new elements to the nest, sourcing from the room or even a piece of their costume or a fragment from the party. The nest will accumulate evidence of the party and the people who have passed through it. In this way, the party itself becomes the bird, gathering fragments and weaving them in. By sunrise, it will be a different object from the one that existed at 9pm. Note - there is an alternative interpretation of this concept that excites me, that could lend itself to a smaller footprint if a full room is not available: an environment that represents the inside of one of these nests. As opposed to a sculptural interpretation of a nest, we would instead create a completely immersive maximalist expression of what it would feel like to be inside the nest. Draped, mismatched fabrics lining all walls, endless trinkets dangling, large braided ropes and cordage crossing the space, and more. The scale and execution are different, but the underlying inspiration remains. Monetary support for materials would be highly appreciated and help this project express its fullest potential, but it won’t be a blocker.",
+   "journey": "- Structure: Open-ended interactive / chill space. Participants can engage for a few seconds or stay for an extended period, with no set beginning or end. - Guests cross a threshold into a space that feels distinctly different from the surrounding party. The room is dimly lit, perhaps in a deep orange or red hue, with ambient or trance music playing. Fabric obscures the architecture creating a dark, enveloping atmosphere. - Their attention is drawn to a sculpture at the center of the room. From a distance it reads as a dark mass. Approaching it reveals increasingly tiny details of braids, knots, botanical matter, jewelry, trash and fragments of everyday life. The longer you look, the more there is to find. - At first, the surrounding room feels comparatively sparse. As guests' eyes adjust, they notice traces of the sculpture's material world around its periphery, including branches, fabric, rocks, ephemera and small caches of objects. - Participants are encouraged to add to the nest. They can come back throughout the evening to see how it has changed or even contribute multiple times. There is no set path. - The edges of the room provide seating and space to lounge. Guests can stop in for a few minutes between dance floors, spend an hour chatting with friends, stare into the sculpture, contribute something, or simply enjoy the atmosphere. - Throughout the night, the room and the nest change. Materials migrate from the periphery toward the sculpture as more people contribute. - The number of participants will depend on the room available. Many people could be lounging in the room at any given time, while a smaller number interact directly with the sculpture. For the smaller-space experience - The installation is experienced as an all-encompassing pass-through space meant to evoke a temporary, intense, and immersive atmosphere - Entering the space will present a brief sensory overload, eliciting wonder and delight at the beautiful shiny objects, tangled objects, and endless things to look at. Like the main proposal, it rewards looking into the details. - This version is designed primarily for brief solitary or small-group encounters rather than lounging or extended participation.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-c6f1e1d5"
+  },
+  {
+   "id": "hong-kong",
+   "title": "Journey Through Hong Kong",
+   "artists": "Nicole Shek",
+   "medium": "installation",
+   "rooms": [
+    "backstairs"
+   ],
+   "roaming": false,
+   "blurb": "I've made a textile collage called \"Journey Through Hong Kong\" that includes screenprint, lithographs, and woodcut patches on found/scrap fabric.",
+   "description": "I've made a textile collage called \"Journey Through Hong Kong\" that includes screenprint, lithographs, and woodcut patches on found/scrap fabric. Every image is a hand-pulled print, and hand sewn by me personally. Also lots of visible mending and some light sewing experimentations for aesthetic. This would be hung on the wall. I want to create an accompanying piece perhaps called \"Journey of Light Through Hong Kong\" (or tbd :p) which will be a hanging paper lantern. For the form, I plan to use wire, reed, or maybe even found sticks (need to experiment. attached a previous lantern project w. sticks). I plan to collage and collect my personal photography, print on mylar, then use alcohol transfer methods to \"print\" the collages onto thin wrapping or stencil paper. The alcohol transfer process involves soaking the inkjet printed mylar image in alcohol, then pressing the image onto a different surface. This allows for some happy accidents and a more hand made quality to the printed images. Sample attached. I would like the pieces to be near one another. I would definitely be happy either way to share my textile piece and try to create my lantern as well. These works hold near and dear to me as Hong Kong is my homeland and culture. I also signed up to be a photographer! I would love to document the event, even better if I can do both. I'm experienced with low light photography, and love photographing art and creative spaces. Please check out my website for my photo portfolio.",
+   "journey": "Passive interactivity, installed visual art. They enter the space and see the pieces. Upon further inspection, viewers may recognize that it's Hong Kong and get a taste of if through street photography. The more they look, the more they notice the hand made quality of the works. Maybe looking at the patches wondering how they were created and printed, observing the stitching details, walking around the lantern to view all the images.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-567753e2"
+  },
+  {
+   "id": "listening-room",
+   "title": "A Listening Room",
+   "artists": "Winnie Xu",
+   "medium": "interactive",
+   "rooms": [
+    "ianmelina"
+   ],
+   "roaming": false,
+   "blurb": "This project builds a small, intimate listening room, a space modeled on the devotional, slowed-down listening rituals of systems like Devon Turnbull's OJAS/HiFi Pursuit…",
+   "description": "This project builds a small, intimate listening room, a space modeled on the devotional, slowed-down listening rituals of systems like Devon Turnbull's OJAS/HiFi Pursuit installations, but constructed entirely from handmade and upcycled, visible-mechanism instruments rather than vintage hi-fi components. At its center are two experimental speaker bodies: a set of transparent distributed-mode loudspeaker (DML) panels strung with roughly 100 lengths of red sashiko thread, and a single ceramic speaker enclosure whose form is thrown, molded and/or carved to work as an acoustic horn rather than just house one. Where Turnbull's rooms ask visitors to sit still and receive sound from concealed, engineered systems, this room asks them to watch the mechanism as the sound unravels. The thread moves. The glaze reflects light differently depending on the frequency passing through the clay (tbd if true, an open research question). Listening becomes something you can also see happening.",
+   "journey": "It's a chill space, people can queue up songs (kind of like a collaborative listening bar) and learn to appreciate the aesthetics of good acoustics. We'll have it mostly be a self-guided experience, some visuals and physical ceramic objects will also be displayed in the room to complement the theme.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-0fc3aabe"
+  },
+  {
+   "id": "sewing-station",
+   "title": "Sewing station",
+   "artists": "Chaz Pratt",
+   "medium": "interactive",
+   "rooms": [
+    "piano"
+   ],
+   "roaming": false,
+   "blurb": "Stitch, patch and mend — a sewing station in the piano room.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "game-parlour",
+   "title": "The Preposterous Game Parlour",
+   "artists": "Ava Maag & Emily Miller",
+   "medium": "interactive",
+   "rooms": [
+    "piano"
+   ],
+   "roaming": false,
+   "blurb": "Classic board games remixed into absurd, play-with-able chaos.",
+   "description": "Welcome to the Preposterous Game Parlour. Here, we remix classic board games with psychedelic humor. Shit is absurd, but why choose despair when you could choose whimsy? Life is brutal. Play where you can. The Preposterous Game Parlour features three (maybe more?) nearly unplayable but certainly play-with-able games: Existential Monopoly, Dimensional Twister, and Guess Who (It’s You). Each game has a rulezine (Many copies! Take one home!) to confuse and delight would-be players into engaging with the games in their own way. We work almost entirely with repurposed materials, sourcing everything we possibly can from the street, friends, creative reuse stores, and Ava’s junky basement. The parlour gives new, playful life to that which is broken or missing pieces.",
+   "journey": "The Preposterous Game Parlour greets you with warm light and bright colors, decked out with garlands of discarded game materials. Cushions frame small tables with shiny games on them. As you interact with the elements at your own pace, you might first notice the pink, teal, green, and yellow dots of Dimensional Twister scattered around the room. Its spinning wheel directs you where to put your body, mind, spirit, and left foot. From its table, the broken mirror board of Existential Monopoly invites you to roll again on every square, except for the one that says NOW. Draw a card for Guess Who (It’s You). It’s you! Underneath all the flippy bits (you’ve played Guess Who, yeah?) are mirrors. Attempt to play the games or just hang out and consider the futility of all effort. TL;DR Play the games. They don’t work. Well, maybe kind of. Either way, they’re jokes taken a little too far. Roughly 1-4 participants can engage with each game at a time. Really, it depends how much space there is in the room.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-960fc99b"
+  },
+  {
+   "id": "memory-stitcher",
+   "title": "Memory Stitcher",
+   "artists": "Timothy Monkiewicz",
+   "medium": "interactive",
+   "rooms": [
+    "yard"
+   ],
+   "roaming": false,
+   "blurb": "An 8-foot sculpture, lamp and shrine built from reclaimed materials.",
+   "description": "8' tall sculpture/lamp/shrine from reclaimed materials",
+   "journey": "participants can etch their initial on a bottle cap and add it to the sculpture. also can leave/take offerings.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-8612e793"
+  },
+  {
+   "id": "broken-toy-box",
+   "title": "The Broken Toy Box",
+   "artists": "M.E. Francis & JB Bolber",
+   "medium": "interactive",
+   "rooms": [
+    "closet"
+   ],
+   "roaming": false,
+   "blurb": "Tucked away in a corner of the party lies The Broken Toy Box—a forgotten, whimsical pocket dimension run by two living, frankensteined toys (us!) who have escaped the scrap heap.",
+   "description": "Tucked away in a corner of the party lies The Broken Toy Box—a forgotten, whimsical pocket dimension run by two living, frankensteined toys (us!) who have escaped the scrap heap. Part sanctuary, part living workshop, the space is draped in dangling ribbon, discarded material, stray limbs, and fuzzy remnants. As living dolls, our view of human perfection is skewed: we think pristine clothing and unblemished souls look a little... unfinished. Guests who stumble into our box are invited into a creepy-cute ritual of transformation. Depending on what they need, we might mend a torn seam, attach a random piece of fabric via safety pin, punch a fresh grommet into an overly polished outfit, or perform a whimsical micro-ritual to patch up an internal heartbreak or fear. We are the abandoned, reclaimed items giving value back to the discarded. The Broken Toy Box takes the theme's rejection of \"frictionless, manufactured monoculture\" and turns it into a playful, living performance. By embodying discarded toys who actively patch, scuff, and alter the guests. We celebrate the searching ➔ mending ➔ renewing cycle by proving that being scuffed, stitched, and put back together is far more beautiful, and a lot more fun, than being clean and brand new.",
+   "journey": "Experience Type: Open-ended art space with scheduled guided pop-up experience throughout the night. The goal is to have the experience change depending on the time of night, so that we organically transform the space as the party evolves, going from active participation to passive vibey squish. Capacity: 1-3 participants at a time (designed to move quickly to keep flow moving: 5–10 mins max per group). Step 1: Discovery & Entry Participants stumble upon the space, drawn in by low, atmospheric lighting, soft fog, and a canopy of hanging threads, fabric strips, and repurposed doll limbs overhead. **This will be available at all times, even when experience isn’t actively happening. Room will be filled with things feeding all of the senses: touch, sight, sound, AND scent (musky). Maybe some snacks(?) Step 2: Pop-up experience Two costumed menders (us) who are frankenstein'd toys/dolls left in the toy box, welcome guests in. Guests are invited to look over the \"Mending Menu” which will be a selection of objects that we invite participants to choose (vs. a literal written menu). Timing is slightly TBD: Early Night Activation: ~10:00 PM – 12 AM Participants select from different paths all focused on “fixing”: - Fix External: We mend a hole, add a patch, stitch on a button, or safety pin on a scrap of fabric - Fix Internal: A quick, playful, yet earnest ritual addressing an internal \"flaw\" (heartbreak, shame, fears, etc.), accompanied by a custom, slightly stupid sticker takeaway (e.g., \"I am becoming more perfect\", which makes no sense). - Un-fix: Someone is too perfect and needs their edges roughed up a bit. With consent, we mess something up about their costume and then “fix” it – revealing that it was perfect all along. We laugh, we cry, we fall in love. Heartbreak feels good in a place like this. Just kidding, but it’ll be cute. Step 3: The Takeaway & Exit Participants leave within 5–10 minutes carrying a tangible badge of their experience (a mended garment, a distressed edge, an extra button, or a sticker marking their experience) making room for the next group. Passive Participation: 12 AM - 3AM: The room will remain open for guests to stumble upon it. Instead of being (wo)manned, there will be signage and materials so that guests can contribute/add to a central large broken toy (doll or plushie, we're imagining it's a giant bear you'd get winning a game at the boardwalk) with materials to hot glue, stitch, tape, safety pin, etc, creating one collaborative toy. The Witching Hour Activation (~3 AM onwards) For this activation, ME and JB, will bring in more squish in the form of stuffed animals and the room will become a cuddle puddle/hang zone. The space shifts into a late-night surreal dreamscape for partygoers that have lasted this long. Things are a little bit more “off”. Weirder toys/dolls, lighting changes, music changes, dolls get more fucked up and chaotic, as a result of contributions from earlier in the night. The space shifts to passive immersion, eerie ambient interaction, and gentle weirdness.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-16a931e9"
+  },
+  {
+   "id": "empathy-kintsugi",
+   "title": "Empathy Kintsugi",
+   "artists": "Louis Anderson",
+   "medium": "interactive",
+   "rooms": [
+    "storagebath"
+   ],
+   "roaming": false,
+   "blurb": "Two strangers, one projection, and a few shared vulnerable moments.",
+   "description": "Two participants walk into the space. On one wall is a projection of a camera feed. They walk up, and then they are being projected onto the wall, and the experience starts. It starts by explaining how it can be sometimes hard to find common ground in this time of divisiveness, but that all it takes is a few shared, vulnerable moments to really begin the process of empathizing with someone. The colored lights in the room slowly change from one color to another, with an accompanying poetic description of a particularly vulnerable moment: first kiss, first breakup, the feeling of being seen, of being held. It transitions to \"These experiences can start to bring two people so close that the boundaries begin to blur.\" It uses photos that it had taken while the colors were changing and a data moshing algorithm to actually take the image of one person and move the pixels such that they make up the image of the other person. It prints out the photos of each other that were made using each other's pixels. It asks them to write an experience that they find to be deeply meaningful in their life, and then that experience gets put on the wall. By the end of the night, one of the walls is a big quilt of human experience. If you're having trouble picturing the face morphing it's using an algorithm similar to this:https://github.com/Spu7Nix/obamify",
+   "journey": "It's a guided experience for two people at a time that should take 7 minutes, while other people in the room can be adding to the quilt of human experience that exists on one of the walls.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-7c1f76cc"
+  },
+  {
+   "id": "regenerative-touch",
+   "title": "Regenerative Touch",
+   "artists": "Elena Lake Polozova",
+   "medium": "interactive",
+   "rooms": [
+    "circle"
+   ],
+   "roaming": false,
+   "blurb": "Bodywork sessions in a new modality, Regenerative Touch.",
+   "description": "Hi, I'm a professional bodyworker who's created a new modality, Regenerative Touch, that I'd like to share with party guests! It combines dreamy trancelike levels of relaxation (often including emotional resolution and release) with hyperanatomical structural repair (for example, of old injuries and tension patterns). I've been near-obsessively traveling and learning from the most interesting teachers I can find for the last three years - recently I did a month with two 70-year-old lineage holders in June. So I'd like to put up a massage table for 2.5 hours, and do 15 minute sessions for party guests! The experience of receiving looks halfway between massage and craniosacral. It can be more or less massagey versus craniosacral-style light touch, depending on guest preferences.",
+   "journey": "TBD how exactly they find me - if a private room, I will come up with signage. OR if it's in a semi-public space, probably people will just walk past me. The rest of the flow is \"they get on my table and receive a session\" and wake up feeling soothed and de-tensioned :)",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-e8869634"
+  },
+  {
+   "id": "message-future",
+   "title": "Send a Message to the Future",
+   "artists": "Kat Ramirez",
+   "medium": "interactive",
+   "rooms": [
+    "roaming"
+   ],
+   "roaming": true,
+   "blurb": "Pass analog messages between guests: leave one, receive one.",
+   "description": "I don’t need any support, and not sure you even need me to submit this, but figured you might enjoy hearing the plan. It’s an interactive experience that will pass messages between guests. It will be in analog form, retro recording",
+   "journey": "It’s essentially part of my costume. I plan to dress as a sort of.. future punk, analog, reporter.. type of character. I will have a small led sign with me that will say something along the lines of: “Record a message for the future” I’m going to bring a classic children’s tape recorder with a mic attached (think old fisher price toy).Someone who wishes to participate will record a short 10-30 second message to the future. But before they do, I will ask if they want to hear a message from the past? And I will play the previous persons recording. There’s no way to keep prior messages, and when one is recorded it simply erases the previous. So all messages are ephemeral and passing from guest to guest. It’s short sweet and just an opt in if you find me type of experience.",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-ba937349"
+  },
+  {
+   "id": "photo",
+   "title": "Party photography",
+   "artists": "Elizabeth Alexeyev",
+   "medium": "photo",
+   "rooms": [
+    "roaming"
+   ],
+   "roaming": true,
+   "blurb": "Roaming photographer — say hi.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "video",
+   "title": "Party film",
+   "artists": "Fern Lukban",
+   "medium": "photo",
+   "rooms": [
+    "roaming"
+   ],
+   "roaming": true,
+   "blurb": "Roaming videographer capturing the night.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "tea-lounge",
+   "title": "Tea lounge",
+   "artists": "Carmen Liu",
+   "medium": "food",
+   "rooms": [
+    "kate"
+   ],
+   "roaming": false,
+   "blurb": "A tea lounge in Kate's room — sit down, slow down.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "21:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": null
+  },
+  {
+   "id": "boschian-breakfast",
+   "title": "Boschian Breakfast",
+   "artists": "Samantha Ong",
+   "medium": "food",
+   "rooms": [
+    "kitchen"
+   ],
+   "roaming": false,
+   "blurb": "A Hieronymus Bosch–inspired breakfast as the sun comes up.",
+   "description": "",
+   "journey": "",
+   "times": [
+    [
+     "07:00",
+     "09:00"
+    ]
+   ],
+   "theater": null,
+   "proposal": "p-ef6b279c"
+  }
+ ]
+}

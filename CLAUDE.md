@@ -47,6 +47,7 @@ Personal curation platform — collect, organize, and build on everything that m
   |---------|-----------------|-----------------|
   | Boards | `boards/index.html` ~line 7625: `const VERSION = 'X.Y.Z'` | `[boards] vX.Y.Z - description` |
   | Halloween placement | `halloween/js/app.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/index.html`) | `[halloween] vX.Y.Z - description` |
+  | Halloween guide | `halloween/guide/guide.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/guide/index.html`) | `[halloween-guide] vX.Y.Z - description` |
   | Halloween theater | `halloween/js/theater.js` top: `const VERSION = 'X.Y.Z'` (also the `?v=` on css/js in `halloween/theater.html`) | `[halloween-theater] vX.Y.Z - description` |
   | Supabase functions | Each function's `index.ts` top: `const VERSION = 'X.Y.Z'` | `[function-name] vX.Y.Z - description` |
 
@@ -87,6 +88,7 @@ Personal curation platform — collect, organize, and build on everything that m
 | Systemic | `systemic/` | `js/crawler.js` | Design system analyzer |
 | Recruiting | `applications/` | `applications/index.html` | Agape applicant triage — Discord-gated (Recruiting Society channel) |
 | Halloween placement | `halloween/` | `halloween/js/app.js` | Place Call-for-Collaborators proposals into rooms of the house — static, localStorage + share links |
+| Halloween guide | `halloween/guide/` | `halloween/guide/guide.js` | Guest guide — map + list of every room and its art, colour-coded by medium; Discord sign-in + Agape server required (`halloween-guide-member` fn); live mode shows what's on now |
 | Halloween theater | `halloween/theater.html` | `halloween/js/theater.js` | Theater run of show — schedule acts (arrive / pre-party setup, changeover, show) and track their needs — shared via Supabase Boards `halloween_theater` (public read, Agape Discord members edit) |
 
 **Supabase projects:** Boards (`yfhudwakpgzswiylhfbh`), Ops (`ycilriwjnmcelkspmfmg`), Systemic (`atdqdfpdeytfuvvpsasz`)

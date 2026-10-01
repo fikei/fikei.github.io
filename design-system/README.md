@@ -8,6 +8,7 @@
 | CTRL | Global — Boards, Events, Soundscape, Systemic, Favicon | `ctrl.html` |
 | Agape recruiting | Product — /applications (Storybook-style stories) | `recruiting/index.html` · behavior source of truth: `docs/ux/recruiting-row-states.md` |
 | Halloween placement | Product — /halloween (CTRL tokens + components, product classes in `halloween/css/app.css`) | see [Halloween placement](#halloween-placement-halloweencssappcss) below |
+| Halloween guide | Product — /halloween/guide/ (mobile-first; CTRL tokens + components, product classes in `halloween/guide/guide.css`) | see [Halloween guide](#halloween-guide-halloweenguideguidecss) below |
 | Halloween theater | Product — /halloween/theater.html (builds on `app.css`, adds `halloween/css/theater.css`) | see [Halloween theater](#halloween-theater-halloweencsstheatercss) below |
 | Widget audit | Tooling stoplight | `widgets.html` |
 
@@ -946,6 +947,21 @@ Run-of-show page on top of `app.css` (reuses `.topbar`, `.layout`, `.panel`, `.p
 - `.needs` / `.needs__totals|__stat|__group` — needs roll-up with totals
 - `.need` / `.need__text|__who|__x|__add` (+ `--done`) — one checklist row (roll-up and detail pane) and the add-need form
 - `.form` / `.form__row(--full)|__hint`, `.slots`, `.slot` / `.slot__range`, `.issues`, `.flow` — detail-pane editor, slot list, conflict list, arrive→ready / changeover→show summary
+
+## Halloween guide (`/halloween/guide/guide.css`)
+
+Mobile-first guest guide. Uses CTRL `.btn`, `.filter-token`, `.toast`. Medium palette tokens `--m-theater|music|installation|interactive|photo|food` (CTRL accents + violet/coral), applied via `.m-<medium>` which sets `--m`.
+
+- `.gate` / `.gate__card|__kicker|__title|__sub|__hint|__btn` — full-screen Discord gate; `body[data-auth]` = loading · out · join · error · in
+- `.top` / `.top__brand|__title|__mode(--live)|__icon` — sticky app bar with preview/live pill
+- `.stories` / `.story` / `.story__ring|__inner|__name` (+ `--seen`) — Instagram-style room circles; `--ring` is a conic-gradient of the room's mediums
+- `.legend`, `.mchip` (+ `--on`, `--static`) — medium filter chips / colour key
+- `.floors`, `.floor-tab`, `.plan`, `.tile` / `.tile__name|__sub|__dots|__count|__bar` (+ `--outdoor`, `--empty`), `.dot` — map mode: floor tabs + 4-column schematic room grid
+- `.group` / `.group__floor`, `.roomrow` / `.roomrow__name|__sub|__go` — list mode
+- `.piece` / `.piece__top|__title|__medium|__artists|__blurb|__meta|__more|__label|__text|__rooms` (+ `--open`), `.when` (+ `--now`), `.roomlink` — expandable art card
+- `.me` / `.me__card|__name|__muted` — You tab
+- `.tabbar` / `.tabbar__btn` (+ `--on`) — fixed bottom nav (Map · List · You), safe-area aware
+- `.sheet` / `.sheet__bar|__head|__kicker|__title|__nav|__close|__body|__sub` — full-screen room view with prev/next + swipe
 
 ## Light Mode
 
