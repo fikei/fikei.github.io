@@ -5,7 +5,7 @@
    the seed is a snapshot of the email threads (data/theater.json); edits live
    in localStorage and travel as a share link or a JSON export. */
 
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 console.log(`[halloween-theater] v${VERSION} - theater run of show (shared backend: Supabase, Discord sign-in)`);
 
 const STORE_KEY = 'halloween-theater-v1';
