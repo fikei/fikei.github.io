@@ -13,7 +13,8 @@
   const META = '__meta';
   const STORE = 'agape-massage-2026';
 
-  const DATES = ['2026-10-07', '2026-10-14', '2026-10-28', '2026-10-29',
+  // Didi's dates, as Justine posted them Oct 6 (Oct 28/29 dropped in her correction).
+  const DATES = ['2026-10-07', '2026-10-14',
     '2026-11-07', '2026-11-11', '2026-11-15', '2026-11-18',
     '2026-11-23', '2026-11-25', '2026-11-28', '2026-11-30'];
   const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]; // slot starts, 9am to 9pm
