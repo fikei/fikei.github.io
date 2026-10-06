@@ -1,7 +1,12 @@
-// Agape house massage day poll · /agape/massage/
-// One row per person in house_polls (Supabase "playground"), poll_id = 'massage-2026'.
-// The row person = '__meta' carries { chosen_date }; once set, the page asks for in-day hours instead.
-// No login. Name is remembered on the device. Every tap autosaves.
+// Agape house polls · /agape/massage/?poll=<id>  (no ?poll= means massage-2026, the link already sent)
+// One row per person in house_polls (Supabase "playground"). The row person = '__meta' is the poll's
+// definition: { title, subtitle, question, mode: 'dates', dates: [iso…] } or
+// { …, mode: 'hours', date: iso, start: 9, end: 21 }, plus chosen_date once the organizer picks a day.
+// The hardcoded massage definition is used only when massage-2026 has no __meta row.
+// No login. Name is remembered on the device.
+// Three beats (Ian: "Name -> Ask day preferences -> Show results"): (1) "Who's voting?", Next;
+// (2) tap the dates, Next writes the row; (3) the house's results, never shown before that.
+// A remembered name is prefilled on beat 1 with "Not you?"; a phone that already submitted lands on results.
 // If the table is missing or the network is down, answers stay on this phone and sync later.
 (() => {
   'use strict';
@@ -9,18 +14,30 @@
   const SB_URL = 'https://yfhudwakpgzswiylhfbh.supabase.co';
   const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmaHVkd2FrcGd6c3dpeWxoZmJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTE3ODYsImV4cCI6MjA4NTM4Nzc4Nn0.bemC-CPA2vkoM5P4P-tmsPQ1RPr4ifPa5iginUXPKLI';
   const TABLE = 'house_polls';
-  const POLL = 'massage-2026';
+  const DEFAULT_POLL = 'massage-2026';
+  const asked = (new URLSearchParams(location.search).get('poll') || '').trim().toLowerCase();
+  const POLL = /^[a-z0-9][a-z0-9-]{0,59}$/.test(asked) ? asked : DEFAULT_POLL;
   const META = '__meta';
-  const STORE = 'agape-massage-2026';
+  const STORE = POLL === DEFAULT_POLL ? 'agape-massage-2026' : `agape-poll-${POLL}`;
 
-  // Didi's dates, as Justine posted them Oct 6 (Oct 28/29 dropped in her correction).
-  const DATES = ['2026-10-07', '2026-10-14',
-    '2026-11-07', '2026-11-11', '2026-11-15', '2026-11-18',
-    '2026-11-23', '2026-11-25', '2026-11-28', '2026-11-30'];
-  const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]; // slot starts, 9am to 9pm
+  // The fallback definition: Didi's dates, as Justine posted them Oct 6 (Oct 28/29 dropped).
+  const MASSAGE_DEF = {
+    title: 'Massage day', subtitle: 'Agape, with Didi',
+    question: 'Didi is coming to the house. Tap a date: Can do, then Possible, then back to Can\u2019t.',
+    mode: 'dates',
+    dates: ['2026-10-07', '2026-10-14',
+      '2026-11-07', '2026-11-11', '2026-11-15', '2026-11-18',
+      '2026-11-23', '2026-11-25', '2026-11-28', '2026-11-30'],
+  };
+  const DEFS = ['title', 'subtitle', 'question', 'mode', 'dates', 'date', 'start', 'end'];
+  let DATES = [];
+  let HOURS = [];
   // Untapped = can't. Dates cycle: (nothing) -> can -> maybe -> (nothing). Hours use the same cycle.
   const NEXT = { undefined: 'can', can: 'maybe', maybe: undefined };
-  const WORD = { can: 'Can', maybe: 'Maybe' };
+  // One scale, shown on every row: untapped reads Can't.
+  const WORD = { can: 'Can do', maybe: 'Possible' };
+  const CANT = 'Can\u2019t';
+  const word = (v) => WORD[v] || CANT;
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -38,17 +55,19 @@
   const blank = () => ({ name: '', dates: {}, first: null, second: null, slots: {} });
   let me = blank();
   let dirty = false;         // local answers not yet on the server
+  let pending = false;       // the final Next was pressed but the write has not landed yet
+  let submitted = false;     // this phone has been through both beats; results are shown only after that
   let rows = new Map();      // person key -> answers (other people, from the server)
   let meta = {};
   const cloud = { sb: null, live: false, timer: null, retry: null };
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
-    if (saved && saved.me) { me = { ...blank(), ...saved.me }; dirty = !!saved.dirty; meta = saved.meta || {}; }
+    if (saved && saved.me) { me = { ...blank(), ...saved.me }; dirty = !!saved.dirty; pending = !!saved.pending; submitted = !!saved.submitted; meta = saved.meta || {}; }
   } catch (_) { /* private mode: run without memory */ }
 
   const persistLocal = () => {
-    try { localStorage.setItem(STORE, JSON.stringify({ me, dirty, meta })); } catch (_) {}
+    try { localStorage.setItem(STORE, JSON.stringify({ me, dirty, pending, submitted, meta })); } catch (_) {}
   };
 
   // ---------- saved mark ----------
@@ -62,18 +81,57 @@
 
   // ---------- render ----------
   const hasName = () => keyOf(me.name).length > 0;
-  const phase2 = () => !!meta.chosen_date;
+  // The poll's definition comes from its __meta row; massage-2026 falls back to MASSAGE_DEF.
+  const def = () => (meta && meta.mode ? meta : (POLL === DEFAULT_POLL ? { ...MASSAGE_DEF, ...meta } : null));
+  const phase2 = () => !!def() && def().mode === 'hours';
+  function applyDef() {
+    const d = def();
+    DATES = d && d.mode === 'dates' && Array.isArray(d.dates) ? d.dates.filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x)) : [];
+    const a = d ? Math.max(0, Math.min(23, Number(d.start ?? 9))) : 9;
+    const b = d ? Math.max(a + 1, Math.min(24, Number(d.end ?? 21))) : 21;
+    HOURS = Array.from({ length: b - a }, (_, i) => a + i);
+    document.body.classList.toggle('no-poll', !d);
+    if (d) {
+      document.title = `${d.title || 'House poll'} \u00b7 Agape`;
+      $('title').textContent = d.title || 'House poll';
+      $('subtitle').textContent = d.subtitle ? `\u00b7 ${d.subtitle}` : '';
+    }
+  }
+
+  // 'name' -> 'dates' -> 'results'. A visitor who already submitted on this phone lands on results.
+  let beat = submitted && me.name ? 'results' : 'name';
+  const answered = () => (phase2()
+    ? Object.values(me.slots).some((v) => v === 'can' || v === 'maybe')
+    : Object.values(me.dates).some((v) => v === 'can' || v === 'maybe'));
 
   function render() {
+    applyDef();
+    if (!def()) { $('missing').hidden = !cloud.loaded; return; }
+    $('missing').hidden = true;
+    document.body.dataset.beat = beat;
     const name = $('name');
-    if (document.activeElement !== name) name.value = me.name || '';
+    if (document.activeElement !== name && !name.value) name.value = me.name || '';
     phase2() ? renderSlots() : renderDates();
+    $('save').disabled = !answered();
+    $('me-name').textContent = me.name || '';
+    $('not-you').hidden = !me.name || keyOf(name.value) !== keyOf(me.name);
     renderResults();
     renderAdmin();
   }
 
+  function go(next) {
+    beat = next;
+    render();
+    window.scrollTo(0, 0);
+    if (next === 'name') {
+      const n = $('name');
+      n.value = me.name || '';
+      $('not-you').hidden = !me.name;
+    }
+  }
+
   function renderDates() {
-    $('sub').textContent = 'Didi is coming to the house. Tap the dates you can do. Tap again for maybe. Leave the rest.';
+    $('sub').textContent = def().question || 'Tap a date: Can do, then Possible, then back to Can\u2019t.';
     const rowsHtml = DATES.map((d) => {
       const v = me.dates[d] === 'can' || me.dates[d] === 'maybe' ? me.dates[d] : '';
       const star = me.first === d ? 1 : me.second === d ? 2 : 0;
@@ -83,9 +141,9 @@
           aria-label="${star ? (star === 1 ? 'First pick' : 'Second pick') : 'Not starred'}. Tap to star ${esc(dayLabel(d))}.">
           ${star ? '★' : '☆'}<small>${starText}</small></button>` : '';
       return `<div class="tile row" data-v="${v}">
-        <button class="cycle" data-date="${d}" aria-label="${esc(longDate(d))}: ${v ? WORD[v] : 'can\u2019t'}. Tap to change.">
+        <button class="cycle" data-date="${d}" aria-label="${esc(longDate(d))}: ${word(v)}. Tap to change.">
           <span class="l"><span class="d">${esc(weekday(d))}</span> <span class="w">${esc(dayLabel(d))}</span></span>
-          <span class="s">${v ? WORD[v] : ''}</span>
+          <span class="s">${word(v)}</span>
         </button>${starBtn}
       </div>`;
     }).join('');
@@ -97,18 +155,19 @@
   }
 
   function renderSlots() {
-    const d = meta.chosen_date;
-    $('sub').textContent = 'Which hours work for you that day? Tap the hours you can do. Tap again for maybe.';
+    const d = def().date;
+    $('sub').textContent = def().question || 'Which hours work for you that day? Tap an hour: Can do, then Possible, then back to Can\u2019t.';
     const tiles = HOURS.map((h) => {
       const v = me.slots[h];
       return `<div class="tile" data-v="${v || ''}">
-        <button class="cycle" data-hour="${h}" aria-label="${hourLabel(h)}: ${v ? WORD[v] : 'no answer'}. Tap to change.">
+        <button class="cycle" data-hour="${h}" aria-label="${hourLabel(h)}: ${word(v)}. Tap to change.">
           <span class="d">${hourLabel(h)}</span>
-          <span class="s">${v ? WORD[v] : 'Tap'}</span>
+          <span class="s">${word(v)}</span>
         </button>
       </div>`;
     }).join('');
-    $('vote').innerHTML = `<div class="chosen">The day is <b>${esc(longDate(d))}</b>.</div><div class="grid slots">${tiles}</div>`;
+    const day = d ? `<div class="chosen">The day is <b>${esc(longDate(d))}</b>.</div>` : '';
+    $('vote').innerHTML = `${day}<div class="grid slots">${tiles}</div>`;
   }
 
   function everyone() {
@@ -122,13 +181,14 @@
   }
 
   function renderResults() {
+    if (!submitted) { $('results').innerHTML = ''; $('count-line').textContent = ''; return; }
     const people = everyone();
     $('count-line').textContent = people.length ? `· ${people.length} ${people.length === 1 ? 'person' : 'people'} answered` : '';
     const ul = $('results');
     if (!people.length) { ul.innerHTML = '<li class="empty">Nobody has answered yet. Be the first.</li>'; return; }
 
     if (phase2()) {
-      $('results-title').firstChild.textContent = 'Hours so far ';
+      $('results-title').firstChild.textContent = 'The hours so far ';
       const list = HOURS.map((h) => tally(people, (a) => a.slots && a.slots[h]));
       const best = Math.max(...list.map((t) => t.can.length));
       ul.innerHTML = HOURS.map((h, i) => item(hourLabel(h), list[i], people.length, best > 0 && list[i].can.length === best, '')).join('');
@@ -147,8 +207,12 @@
       || b.firsts - a.firsts || b.seconds - a.seconds || a.date.localeCompare(b.date));
     ul.innerHTML = list.map((t, i) => {
       const stars = t.firsts || t.seconds
-        ? `<div class="who" style="color:var(--accent)">★ ${t.firsts} first · ${t.seconds} second</div>` : '';
-      const pick = isAdmin ? `<button class="pick" data-choose="${t.date}">Pick this day</button>` : '';
+        ? `<div class="who">★ ${t.firsts} first · ${t.seconds} second</div>` : '';
+      const kid = childId(t.date);
+      const pick = !isAdmin ? ''
+        : meta.chosen_date === t.date || started[kid]
+          ? `<div class="who">In-day poll: <a href="${esc(childUrl(kid))}">${esc(childUrl(kid))}</a></div>`
+          : `<button class="pick" data-choose="${t.date}">Start the in-day poll for this date</button>`;
       const when = `${dayLabel(t.date)} · ${weekday(t.date).slice(0, 3)}`;
       return item(when, t, people.length, i === 0 && t.can.length > 0, stars + pick);
     }).join('');
@@ -162,23 +226,51 @@
 
   function item(when, t, total, lead, extra) {
     const pc = (n) => (total ? (100 * n) / total : 0);
-    const who = [namesLine(t.can, '', 'Can'), namesLine(t.maybe, '', 'Maybe')]
+    const who = [namesLine(t.can, '', WORD.can), namesLine(t.maybe, '', WORD.maybe)]
       .filter(Boolean).join(' · ');
-    return `<li class="${lead ? 'lead' : ''}">
+    return `<li>
       <div class="top"><span class="when">${esc(when)}</span>
-        <span class="nums"><span class="c">${t.can.length} can</span> · <span class="m">${t.maybe.length} maybe</span></span></div>
+        <span class="nums"><span class="c">${t.can.length} can do</span> · <span class="m">${t.maybe.length} possible</span></span></div>
       <div class="bar"><i class="c" style="width:${pc(t.can.length)}%"></i><i class="m" style="width:${pc(t.maybe.length)}%"></i></div>
       ${who ? `<div class="who">${who}</div>` : ''}${extra}
     </li>`;
   }
 
+  // ---------- organizer ----------
+  // The in-day round is its own poll: <this poll>-<mon><day>, e.g. massage-2026-nov15.
+  const started = {};
+  const childId = (iso) => `${POLL}-${fmt(iso, { month: 'short' }).toLowerCase()}${Number(iso.slice(8))}`;
+  const childUrl = (id) => `${location.origin}${location.pathname}?poll=${id}`;
+
   function renderAdmin() {
     const el = $('admin-row');
     if (!isAdmin) { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = phase2()
-      ? `Organizer view. <button data-unchoose="1">Back to the date vote</button>`
-      : 'Organizer view: “Pick this day” on a result switches everyone to the hours grid.';
+    el.textContent = phase2()
+      ? 'Organizer view: the in-day poll.'
+      : 'Organizer view: \u201cStart the in-day poll for this date\u201d on a result makes its own link for the hours.';
+  }
+
+  async function startChild(iso) {
+    if (!cloud.live) { mark('Needs live sharing', true); return; }
+    const d = def();
+    const kid = childId(iso);
+    const childDef = {
+      title: d.title, subtitle: d.subtitle,
+      question: 'Which hours work for you that day? Tap an hour: Can do, then Possible, then back to Can\u2019t.',
+      mode: 'hours', date: iso, start: 9, end: 21, parent: POLL,
+    };
+    const now = new Date().toISOString();
+    const { error } = await cloud.sb.from(TABLE).upsert(
+      { poll_id: kid, person: META, answers: childDef, updated_at: now }, { onConflict: 'poll_id,person' });
+    if (error) { mark('Could not start that poll', true); console.warn(error); return; }
+    started[kid] = true;
+    // Record the pick on this poll too, keeping its whole definition in the row.
+    const parent = { ...Object.fromEntries(DEFS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]])), ...meta, chosen_date: iso };
+    await cloud.sb.from(TABLE).upsert(
+      { poll_id: POLL, person: META, answers: parent, updated_at: now }, { onConflict: 'poll_id,person' });
+    meta = parent;
+    persistLocal(); render(); mark('In-day poll started');
   }
 
   // ---------- taps ----------
@@ -192,10 +284,17 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.choose) return setMeta({ chosen_date: b.dataset.choose });
-    if (b.dataset.unchoose) return setMeta({ chosen_date: null });
-    if (!hasName() && nameEl.value.trim()) commitName();
-    if (!hasName()) return needName();
+    if (b.dataset.choose) return startChild(b.dataset.choose);
+    if (b.id === 'continue') return toDates();
+    if (b.id === 'save') { if (answered()) save(); return; }
+    if (b.id === 'back') return go('name');
+    if (b.id === 'edit') return go('name');
+    if (b.id === 'not-you') {
+      // Someone else on a shared phone: start them clean, with no remembered name or answers.
+      me = blank(); dirty = false; pending = false; submitted = false; persistLocal();
+      nameEl.value = ''; b.hidden = true; render(); nameEl.focus();
+      return;
+    }
 
     if (b.dataset.date) {
       const d = b.dataset.date;
@@ -219,41 +318,42 @@
     changed();
   });
 
-  // The name: committed on blur or Enter. A name already on the server brings its answers back.
+  // Beat 1: the name. Enter or Next moves on to the dates; a name already on the server brings its answers.
   const nameEl = $('name');
-  nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') nameEl.blur(); });
-  nameEl.addEventListener('change', commitName);
+  nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); toDates(); } });
 
-  // Never rebuilds the vote grid unless answers came back from the server: the blur that commits
-  // the name is usually the same touch as the first date tap, and a rebuilt grid would eat it.
-  function commitName() {
+  function toDates() {
     let v = nameEl.value.trim().replace(/\s+/g, ' ').slice(0, 40);
     if (v.startsWith('__')) v = v.replace(/^_+/, '');
-    if (nameEl.value !== v) nameEl.value = v;
-    if (v === me.name) return;
-    const prev = rows.get(keyOf(v));
-    const myVotes = Object.keys(me.dates).length + Object.keys(me.slots).length;
-    if (prev && (!myVotes || !dirty)) {
-      me = { ...blank(), ...prev, name: v };
-      rows.delete(keyOf(v));
+    nameEl.value = v;
+    if (!v) return needName();
+    if (keyOf(v) !== keyOf(me.name || '')) {
+      const prev = rows.get(keyOf(v));
+      me = prev ? { ...blank(), ...prev, name: v } : { ...blank(), name: v };
       dirty = false;
-      persistLocal();
-      render();
-      mark('Welcome back');
-      return;
     }
     me.name = v;
     persistLocal();
-    renderResults();
-    if (myVotes && v) changed();
+    go('dates');
   }
 
+  // Beat 2's Next: write the row, then show the house.
+  function save() {
+    if (!hasName()) return go('name');
+    rows.delete(keyOf(me.name));   // these answers replace whatever that name had on the server
+    dirty = true;
+    pending = true;
+    submitted = true;
+    persistLocal();
+    push().then(() => { if (cloud.live) load().catch(() => {}); });
+    go('results');
+  }
+
+  // Taps are kept on the phone; nothing is written until Save names whose answers they are.
   function changed() {
     dirty = true;
     persistLocal();
     render();
-    clearTimeout(cloud.timer);
-    cloud.timer = setTimeout(push, 500);
   }
 
   // ---------- cloud ----------
@@ -278,18 +378,9 @@
       return;
     }
     dirty = false;
+    pending = false;
     persistLocal();
     mark('Saved ✓');
-  }
-
-  async function setMeta(patch) {
-    if (!cloud.live) { mark('Needs live sharing', true); return; }
-    const next = { ...meta, ...patch };
-    const { error } = await cloud.sb.from(TABLE).upsert(
-      { poll_id: POLL, person: META, answers: next, updated_at: new Date().toISOString() },
-      { onConflict: 'poll_id,person' });
-    if (error) { mark('Could not save the day', true); return; }
-    meta = next; persistLocal(); render(); mark('Saved ✓');
   }
 
   async function load() {
@@ -302,6 +393,7 @@
       else if (!r.person.startsWith('__')) next.set(r.person, r.answers || {});
     });
     rows = next;
+    cloud.loaded = true;
     meta = nextMeta;
     // Another device answered under this name and nothing here is waiting to save: take theirs.
     const mine = hasName() && rows.get(keyOf(me.name));
@@ -324,7 +416,7 @@
     }
     cloud.live = true;
     localNotice(false);
-    if (dirty) push();
+    if (pending) push();
 
     try {
       cloud.sb.channel('house-polls-' + POLL)

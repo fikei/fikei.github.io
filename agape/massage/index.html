@@ -24,214 +24,180 @@
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/design-system/tokens.css">
 <link rel="stylesheet" href="/design-system/components.css">
 <style>
-  /* Agape massage poll — Sassy CTRL layer (tokens.css + components.css), the Halloween guide's
-     mobile idiom: square corners, borders over fills, terminal accents for state, sentence case. */
+  /* Agape massage poll on Sassy CTRL (tokens.css + components.css).
+     No hierarchy: one font, one size (--text-base), one weight, sentence case. The only thing that
+     varies is a date's state on the Can do · Possible · Can't scale, said in words on every row
+     and carried by its border (solid green, dashed amber, quiet grey). */
   :root {
     --mp-can: var(--accent-green);
-    --mp-can-tint: rgba(57, 255, 20, 0.08);
     --mp-maybe: var(--accent-amber);
-    --mp-maybe-tint: rgba(255, 176, 0, 0.10);
+    --mp-cant: var(--fg-muted);
     --mp-no: var(--color-error);
-    --mp-pick: var(--accent-amber);
-    --accent: var(--mp-pick); /* massage.js colours the star tally with var(--accent) */
-    --mp-top-h: 48px;
-    --mp-row-h: 48px;
+    --mp-row-h: var(--space-12);
+    --mp-col: 30rem;
   }
   :root.light {
     --mp-can: #1f7a10;
-    --mp-can-tint: rgba(34, 197, 94, 0.12);
     --mp-maybe: #b86e00;
-    --mp-maybe-tint: rgba(184, 110, 0, 0.10);
-    --mp-pick: #b86e00;
   }
 
   html, body { background: var(--bg); color: var(--fg); }
-  body {
+  body, body * {
     font-family: var(--font-primary);
-    font-size: var(--text-sm);
-    line-height: var(--leading-tight);
-    -webkit-tap-highlight-color: transparent;
+    font-size: var(--text-base);
+    font-weight: 400;
+    font-style: normal;
+    letter-spacing: 0;
+    text-transform: none;
   }
-  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  body { line-height: var(--leading-tight); -webkit-tap-highlight-color: transparent; }
+  body .btn, body .input { font-size: var(--text-base); text-transform: none; letter-spacing: 0; }
+  button { color: inherit; background: none; border: none; cursor: pointer; }
   button:focus-visible, .input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 
-  /* ---------- Top bar (guide .top, renamed so it never collides with .res .top) ---------- */
+  /* ---------- Bar: name of the page and the saved mark, nothing louder than the rows ---------- */
   .appbar {
-    position: sticky; top: 0; z-index: var(--z-sticky);
-    height: var(--mp-top-h);
-    display: flex; align-items: center; gap: var(--space-3);
-    padding: 0 max(var(--space-4), calc((100% - 480px) / 2 + var(--space-4)));
-    padding-top: env(safe-area-inset-top, 0px);
-    box-sizing: content-box;
-    background: var(--bg);
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    min-height: var(--mp-row-h);
+    padding: env(safe-area-inset-top, 0) max(var(--space-4), calc((100% - var(--mp-col)) / 2 + var(--space-4))) 0;
     border-bottom: var(--border-thin) solid var(--border-subtle);
   }
-  .appbar__brand { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; flex: 1; }
-  .appbar__title {
-    font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
-    letter-spacing: var(--tracking-display); white-space: nowrap; margin: 0;
-  }
-  .appbar__sub { font-size: var(--text-xs); color: var(--fg-muted); white-space: nowrap; }
-  /* The saved mark: a status pill, green when it lands, red when it hasn't. */
-  .saved {
-    font-size: var(--text-xs); color: var(--mp-can);
-    border: var(--border-thin) solid var(--mp-can);
-    padding: 2px var(--space-2); white-space: nowrap;
-    opacity: 0; transition: opacity var(--duration-slower) var(--ease-default);
-  }
-  .saved:empty { border-color: transparent; }
-  .saved.err { color: var(--mp-no); border-color: var(--mp-no); }
+  .appbar__title { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .appbar__sub { color: var(--fg-muted); }
+  .saved { color: var(--mp-can); white-space: nowrap; opacity: 0; transition: opacity var(--duration-slower) var(--ease-default); }
+  .saved.err { color: var(--mp-no); }
 
-  /* ---------- Page ---------- */
+  /* ---------- Page and beats ---------- */
   main {
-    max-width: 480px; margin: 0 auto;
-    padding: var(--space-3) var(--space-4) calc(var(--space-12) + env(safe-area-inset-bottom, 0px));
-    display: flex; flex-direction: column; gap: var(--space-3);
+    max-width: var(--mp-col); margin: 0 auto;
+    padding: var(--space-3) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0));
   }
-  .sub { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--leading-tight); }
-
-  /* On-device notice (Halloween .banner: amber tint, amber rule) */
-  .notice {
-    background: var(--mp-maybe-tint); color: var(--fg);
-    border: var(--border-thin) solid var(--mp-maybe);
-    padding: var(--space-2) var(--space-3); font-size: var(--text-xs); line-height: var(--leading-normal);
-  }
-  .notice[hidden] { display: none; }
-
-  /* Name field: CTRL .input; 16px so iOS never zooms on focus */
-  .name-row .input {
-    min-height: var(--mp-row-h); font-size: 16px;
-    border-color: var(--border-subtle); background: var(--bg-surface);
-  }
-  .name-row .input:focus { box-shadow: none; border-color: var(--fg); }
-  .name-row .input.want { border-color: var(--mp-maybe); animation: nudge .3s; }
-  @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-
-  .legend { font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-2); }
+  .beat { display: none; flex-direction: column; gap: var(--space-3); }
+  body[data-beat="dates"] .beat--dates,
+  body[data-beat="name"] .beat--name,
+  body[data-beat="results"] .beat--results { display: flex; }
+  .sub, .legend, .hint { color: var(--fg-muted); line-height: var(--leading-normal); }
   .legend.is-off { opacity: 0.5; }
 
-  /* ---------- Date rows ---------- */
+  /* ---------- The scale: one row per date ---------- */
   .list { display: flex; flex-direction: column; gap: var(--space-1); }
   .tile {
-    position: relative; display: flex; align-items: stretch;
-    background: transparent;
+    display: flex; align-items: stretch;
     border: var(--border-thin) solid var(--border-subtle);
-    transition: border-color var(--duration-normal), background var(--duration-normal);
+    transition: border-color var(--duration-normal);
   }
   .tile .cycle {
     flex: 1; min-width: 0; min-height: var(--mp-row-h);
-    display: flex; flex-direction: column; justify-content: center;
-    padding: var(--space-2) var(--space-3); text-align: left;
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+    padding: 0 var(--space-3); text-align: left;
   }
-  .tile .d { font-family: var(--font-display); font-weight: 700; font-size: var(--text-md); letter-spacing: var(--tracking-display); }
-  .tile .w { font-size: var(--text-sm); color: var(--fg-muted); }
-  .tile .s { font-size: var(--text-sm); font-weight: 700; color: var(--fg-muted); }
-
-  .tile.row .cycle { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-2); }
-  .tile.row .l { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
-  .tile.row .d { font-size: var(--text-lg); }
-
-  .tile[data-v="can"] { border-color: var(--mp-can); background: var(--mp-can-tint); box-shadow: inset 3px 0 0 var(--mp-can); }
+  .tile .l { display: flex; gap: var(--space-2); min-width: 0; }
+  .tile .w { color: var(--fg-muted); }
+  .tile .s { color: var(--mp-cant); white-space: nowrap; }
+  .tile[data-v="can"] { border-color: var(--mp-can); }
   .tile[data-v="can"] .s { color: var(--mp-can); }
   .tile[data-v="maybe"] { border-color: var(--mp-maybe); border-style: dashed; }
   .tile[data-v="maybe"] .s { color: var(--mp-maybe); }
-  .tile[data-v="no"] { border-color: var(--mp-no); }
-  .tile[data-v="no"] .s { color: var(--mp-no); }
-  .tile:not([data-v="can"]):not([data-v="maybe"]) .cycle:hover { background: var(--bg-surface); }
-
-  /* Star: the pick, top two */
   .tile .star {
-    width: 52px; flex: 0 0 52px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-    font-size: var(--text-lg); line-height: 1; color: var(--fg-subtle);
+    width: var(--mp-row-h); flex: 0 0 var(--mp-row-h);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    line-height: var(--leading-none); color: var(--fg-muted);
     border-left: var(--border-thin) solid var(--border-subtle);
   }
-  .tile .star small { font-size: var(--text-2xs); color: var(--fg-muted); }
-  .tile .star.on { color: var(--mp-pick); }
-  .tile .star.on small { color: var(--mp-pick); font-weight: 700; }
-  .tile .star:disabled { opacity: 0.35; cursor: default; }
+  .tile .star.on { color: var(--mp-maybe); }
 
-  /* ---------- Admin phase 2: hour grid ---------- */
-  .grid.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
-  .slots .cycle { min-height: 56px; }
-  .slots .d { font-size: var(--text-sm); }
-  .slots .s { font-size: var(--text-xs); }
-  .chosen {
-    border: var(--border-thin) solid var(--mp-can); background: var(--mp-can-tint);
-    box-shadow: inset 3px 0 0 var(--mp-can);
-    padding: var(--space-3); margin-bottom: var(--space-3);
-  }
-  .chosen b { font-family: var(--font-display); color: var(--mp-can); }
+  /* Hours grid (organizer phase 2) */
+  .grid.slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+  .chosen { color: var(--fg-muted); }
+  .chosen b { color: var(--fg); }
 
-  /* ---------- Results (section header + Halloween pcards) ---------- */
-  h2 {
-    font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
-    letter-spacing: var(--tracking-display); margin-top: var(--space-6);
-  }
-  .count-line { font-family: var(--font-primary); font-weight: 400; font-size: var(--text-xs); color: var(--fg-muted); letter-spacing: 0; }
-  .res { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
-  .res li {
-    background: var(--bg-surface);
-    border: var(--border-thin) solid var(--border-subtle);
-    padding: var(--space-3);
-  }
-  .res li.lead { border-color: var(--mp-pick); box-shadow: inset 3px 0 0 var(--mp-pick); }
-  .res .top { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; }
-  .res .when { font-family: var(--font-display); font-weight: 700; font-size: var(--text-md); }
-  .res .nums { font-size: var(--text-xs); white-space: nowrap; color: var(--fg-muted); }
+  /* ---------- Actions: CTRL .btn at the page size, sentence case ---------- */
+  /* One primary per beat: "Next", full width of the column. Back is a quiet link under it. */
+  .actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
+  .actions .btn { width: 100%; min-height: var(--mp-row-h); padding: 0 var(--space-4); }
+  .actions .link { align-self: flex-start; }
+  .btn:disabled, .btn:disabled:hover { opacity: 0.35; background: transparent; color: var(--fg); cursor: default; }
+  .link { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; padding: var(--space-2) 0; }
+  .link[hidden] { display: none; }
+
+  /* ---------- Name ---------- */
+  .name-row .input { min-height: var(--mp-row-h); border-color: var(--border-subtle); background: var(--bg); }
+  .name-row .input:focus { box-shadow: none; border-color: var(--fg); }
+  .name-row .input.want { border-color: var(--mp-no); animation: nudge .3s; }
+  @keyframes nudge { 25% { transform: translateX(calc(-1 * var(--space-1))); } 75% { transform: translateX(var(--space-1)); } }
+  label[for="name"] { line-height: var(--leading-normal); }
+
+  /* ---------- Results ---------- */
+  .notice { color: var(--mp-maybe); border: var(--border-thin) dashed var(--mp-maybe); padding: var(--space-2) var(--space-3); line-height: var(--leading-normal); }
+  .notice[hidden] { display: none; }
+  body.no-poll .beat { display: none; }
+  #missing { margin-bottom: var(--space-3); }
+  .res { list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+  .res li { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); }
+  .res .top { display: flex; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+  .res .nums { color: var(--fg-muted); white-space: nowrap; }
   .res .nums .c { color: var(--mp-can); }
   .res .nums .m { color: var(--mp-maybe); }
-  .res .bar { display: flex; height: 4px; overflow: hidden; background: var(--bg-elevated); margin: var(--space-2) 0; }
+  .res .bar { display: flex; height: var(--space-1); overflow: hidden; background: var(--border-subtle); margin: var(--space-2) 0; }
   .res .bar i { display: block; }
   .res .bar .c { background: var(--mp-can); }
   .res .bar .m { background: var(--mp-maybe); }
-  .res .who { font-size: var(--text-xs); color: var(--fg-muted); line-height: var(--leading-normal); }
-  .res .who .out { color: var(--mp-no); }
-  /* Organizer "Pick this day": CTRL .btn--sm, sentence case */
-  .res .pick, .admin-row button {
-    display: inline-flex; align-items: center; min-height: 32px;
-    margin-top: var(--space-2); padding: var(--space-1) var(--space-3);
-    font-size: var(--text-xs); color: var(--fg);
-    border: var(--border-thin) solid var(--border);
-    transition: background var(--duration-normal), color var(--duration-normal);
-  }
+  .res .who { color: var(--fg-muted); line-height: var(--leading-normal); }
+  .res .pick, .admin-row button { margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border: var(--border-thin) solid var(--border); }
   .res .pick:hover, .admin-row button:hover { background: var(--fg); color: var(--bg); }
-  .res li.empty { color: var(--fg-muted); font-size: var(--text-sm); background: transparent; border-style: dashed; }
-  .admin-row { font-size: var(--text-xs); color: var(--fg-muted); line-height: var(--leading-normal); }
+  .res li.empty { color: var(--fg-muted); border-style: dashed; }
+  .me-line { color: var(--fg-muted); display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap; }
+  .me-line b { color: var(--fg); }
+  .admin-row { color: var(--fg-muted); line-height: var(--leading-normal); }
   .admin-row[hidden] { display: none; }
-  .admin-row button { margin: 0 0 0 var(--space-2); }
 </style>
 </head>
-<body>
+<body data-beat="name">
 <header class="appbar">
-  <div class="appbar__brand">
-    <h1 class="appbar__title">Massage day</h1>
-    <span class="appbar__sub">Agape · with Didi</span>
-  </div>
+  <h1 class="appbar__title"><span id="title">Massage day</span> <span class="appbar__sub" id="subtitle">· Agape, with Didi</span></h1>
   <span class="saved" id="saved" aria-live="polite"></span>
 </header>
 <main>
-  <p class="sub" id="sub">Didi is coming to the house. Tap the dates you can do. Tap again for maybe. Leave the rest.</p>
-  <p class="notice" id="notice" hidden></p>
+  <p class="notice" id="missing" hidden>There’s no poll at this link yet. Check the link you were sent.</p>
 
-  <div class="name-row">
-    <input id="name" class="input" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="done"
-           placeholder="Your name" aria-label="Your name" maxlength="40">
-  </div>
+  <!-- Beat 1: who's voting -->
+  <section class="beat beat--name" aria-label="Your name">
+    <label for="name">Who’s voting?</label>
+    <div class="name-row">
+      <input id="name" class="input" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"
+             placeholder="Your name" maxlength="40">
+    </div>
+    <button class="link" id="not-you" type="button" hidden>Not you?</button>
+    <div class="actions">
+      <button class="btn btn--filled btn--block" id="continue" type="button">Next</button>
+    </div>
+  </section>
 
-  <section id="vote"></section>
+  <!-- Beat 2: day preferences -->
+  <section class="beat beat--dates" aria-label="Dates">
+    <p class="sub" id="sub">Didi is coming to the house. Tap a date: Can do, then Possible, then back to Can’t.</p>
+    <div id="vote"></div>
+    <div class="actions">
+      <button class="btn btn--filled btn--block" id="save" type="button" disabled>Next</button>
+      <button class="link" id="back" type="button">Back</button>
+    </div>
+  </section>
 
-  <h2 id="results-title">The house so far <span class="count-line" id="count-line"></span></h2>
-  <ul class="res" id="results"></ul>
-
-  <p class="admin-row" id="admin-row" hidden></p>
+  <!-- Beat 3: the house -->
+  <section class="beat beat--results" aria-label="Results">
+    <p class="me-line">Saved for <b id="me-name"></b> <button class="link" id="edit" type="button">Change my answers</button></p>
+    <p class="notice" id="notice" hidden></p>
+    <p id="results-title">The house so far <span class="count-line" id="count-line"></span></p>
+    <ul class="res" id="results"></ul>
+    <p class="admin-row" id="admin-row" hidden></p>
+  </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="massage.js?v=1.2.0"></script>
+<script src="massage.js?v=3.0.0"></script>
 </body>
 </html>
