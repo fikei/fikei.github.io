@@ -120,7 +120,6 @@
   .actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
   .actions .btn { width: 100%; min-height: var(--mp-row-h); padding: 0 var(--space-4); }
   .actions .link { align-self: flex-start; }
-  .beat--dates .actions { position: sticky; bottom: 0; padding: var(--space-2) 0 env(safe-area-inset-bottom, 0); background: var(--bg); }
   .btn:disabled, .btn:disabled:hover { opacity: 0.35; background: transparent; color: var(--fg); cursor: default; }
   .link { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; padding: var(--space-2) 0; }
   .link[hidden] { display: none; }
@@ -135,6 +134,8 @@
   /* ---------- Results ---------- */
   .notice { color: var(--mp-maybe); border: var(--border-thin) dashed var(--mp-maybe); padding: var(--space-2) var(--space-3); line-height: var(--leading-normal); }
   .notice[hidden] { display: none; }
+  body.no-poll .beat { display: none; }
+  #missing { margin-bottom: var(--space-3); }
   .res { list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
   .res li { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); }
   .res .top { display: flex; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
@@ -155,38 +156,40 @@
   .admin-row[hidden] { display: none; }
 </style>
 </head>
-<body data-beat="dates">
+<body data-beat="name">
 <header class="appbar">
-  <h1 class="appbar__title">Massage day <span class="appbar__sub">· Agape, with Didi</span></h1>
+  <h1 class="appbar__title"><span id="title">Massage day</span> <span class="appbar__sub" id="subtitle">· Agape, with Didi</span></h1>
   <span class="saved" id="saved" aria-live="polite"></span>
 </header>
 <main>
-  <!-- Beat 1: the dates -->
-  <section class="beat beat--dates" aria-label="Dates">
-    <p class="sub" id="sub">Didi is coming to the house. Tap a date: Can do, then Possible, then back to Can’t.</p>
-    <div id="vote"></div>
-    <div class="actions">
-      <button class="btn btn--filled btn--block" id="continue" type="button" disabled>Next</button>
-    </div>
-  </section>
+  <p class="notice" id="missing" hidden>There’s no poll at this link yet. Check the link you were sent.</p>
 
-  <!-- Beat 2: who's voting -->
+  <!-- Beat 1: who's voting -->
   <section class="beat beat--name" aria-label="Your name">
     <label for="name">Who’s voting?</label>
     <div class="name-row">
-      <input id="name" class="input" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="done"
+      <input id="name" class="input" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"
              placeholder="Your name" maxlength="40">
     </div>
     <button class="link" id="not-you" type="button" hidden>Not you?</button>
     <div class="actions">
-      <button class="btn btn--filled btn--block" id="save" type="button">Next</button>
-      <button class="link" id="back" type="button">Back to the dates</button>
+      <button class="btn btn--filled btn--block" id="continue" type="button">Next</button>
+    </div>
+  </section>
+
+  <!-- Beat 2: day preferences -->
+  <section class="beat beat--dates" aria-label="Dates">
+    <p class="sub" id="sub">Didi is coming to the house. Tap a date: Can do, then Possible, then back to Can’t.</p>
+    <div id="vote"></div>
+    <div class="actions">
+      <button class="btn btn--filled btn--block" id="save" type="button" disabled>Next</button>
+      <button class="link" id="back" type="button">Back</button>
     </div>
   </section>
 
   <!-- Beat 3: the house -->
   <section class="beat beat--results" aria-label="Results">
-    <p class="me-line">Saved for <b id="me-name"></b> <button class="link" id="edit" type="button">Change my dates</button></p>
+    <p class="me-line">Saved for <b id="me-name"></b> <button class="link" id="edit" type="button">Change my answers</button></p>
     <p class="notice" id="notice" hidden></p>
     <p id="results-title">The house so far <span class="count-line" id="count-line"></span></p>
     <ul class="res" id="results"></ul>
@@ -195,6 +198,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="massage.js?v=2.1.0"></script>
+<script src="massage.js?v=3.0.0"></script>
 </body>
 </html>
