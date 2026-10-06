@@ -80,6 +80,17 @@
   .tile .star.on small { color: var(--accent); }
   .tile .star:disabled { opacity: .35; cursor: default; }
 
+  .list { display: flex; flex-direction: column; gap: 6px; }
+  .tile.row { min-height: 48px; }
+  .tile.row .cycle { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 8px 14px; }
+  .tile.row .l { display: flex; gap: 8px; align-items: baseline; }
+  .tile.row .d { font-size: 16px; }
+  .tile.row .w { font-size: 14px; }
+  .tile.row .s { font-size: 14px; margin: 0; text-transform: lowercase; }
+  .tile.row[data-v="can"] { border-width: 2px; }
+  .tile.row[data-v="can"] .s { font-weight: 800; }
+  .tile.row[data-v="maybe"] { border-style: dashed; background: transparent; }
+  .tile.row .star { width: 56px; }
   .slots { grid-template-columns: 1fr 1fr 1fr; }
   .slots .tile { min-height: 52px; }
 
@@ -119,7 +130,7 @@
     <h1>Massage day</h1>
     <span class="saved" id="saved" aria-live="polite"></span>
   </header>
-  <p class="sub" id="sub">Didi is coming to the house. Tap each date: can, maybe or no. Star your first and second pick.</p>
+  <p class="sub" id="sub">Didi is coming to the house. Tap the dates you can do. Tap again for maybe. Leave the rest.</p>
   <p class="notice" id="notice" hidden></p>
 
   <div class="name-row">
@@ -136,6 +147,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="massage.js?v=1.0.0"></script>
+<script src="massage.js?v=1.1.0"></script>
 </body>
 </html>

@@ -17,8 +17,9 @@
     '2026-11-07', '2026-11-11', '2026-11-15', '2026-11-18',
     '2026-11-23', '2026-11-25', '2026-11-28', '2026-11-30'];
   const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]; // slot starts, 9am to 9pm
-  const NEXT = { undefined: 'can', can: 'maybe', maybe: 'no', no: 'can' };
-  const WORD = { can: 'Can', maybe: 'Maybe', no: 'No' };
+  // Untapped = can't. Dates cycle: (nothing) -> can -> maybe -> (nothing). Hours use the same cycle.
+  const NEXT = { undefined: 'can', can: 'maybe', maybe: undefined };
+  const WORD = { can: 'Can', maybe: 'Maybe' };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -71,29 +72,30 @@
   }
 
   function renderDates() {
-    $('sub').textContent = 'Didi is coming to the house. Tap each date: can, maybe or no. Star your first and second pick.';
-    const tiles = DATES.map((d) => {
-      const v = me.dates[d];
+    $('sub').textContent = 'Didi is coming to the house. Tap the dates you can do. Tap again for maybe. Leave the rest.';
+    const rowsHtml = DATES.map((d) => {
+      const v = me.dates[d] === 'can' || me.dates[d] === 'maybe' ? me.dates[d] : '';
       const star = me.first === d ? 1 : me.second === d ? 2 : 0;
-      const starText = star === 1 ? '1st' : star === 2 ? '2nd' : 'pick';
-      return `<div class="tile" data-v="${v || ''}">
-        <button class="cycle" data-date="${d}" aria-label="${esc(longDate(d))}: ${v ? WORD[v] : 'no answer'}. Tap to change.">
-          <span class="d">${esc(dayLabel(d))}</span>
-          <span class="w">${esc(weekday(d))}</span>
-          <span class="s">${v ? WORD[v] : 'Tap to answer'}</span>
-        </button>
-        <button class="star${star ? ' on' : ''}" data-star="${d}" ${v === 'can' ? '' : 'disabled'}
+      const starText = star === 1 ? '1st' : star === 2 ? '2nd' : 'star';
+      const starBtn = v === 'can'
+        ? `<button class="star${star ? ' on' : ''}" data-star="${d}"
           aria-label="${star ? (star === 1 ? 'First pick' : 'Second pick') : 'Not starred'}. Tap to star ${esc(dayLabel(d))}.">
-          ${star ? '★' : '☆'}<small>${starText}</small>
-        </button>
+          ${star ? '★' : '☆'}<small>${starText}</small></button>` : '';
+      return `<div class="tile row" data-v="${v}">
+        <button class="cycle" data-date="${d}" aria-label="${esc(longDate(d))}: ${v ? WORD[v] : 'can\u2019t'}. Tap to change.">
+          <span class="l"><span class="d">${esc(weekday(d))}</span> <span class="w">${esc(dayLabel(d))}</span></span>
+          <span class="s">${v ? WORD[v].toLowerCase() : ''}</span>
+        </button>${starBtn}
       </div>`;
     }).join('');
-    $('vote').innerHTML = `<div class="legend"><span>Tap: can → maybe → no</span><span>☆ on a “can” date: 1st → 2nd</span></div><div class="grid">${tiles}</div>`;
+    const anyCan = DATES.some((d) => me.dates[d] === 'can');
+    const hint = anyCan ? '<div class="legend"><span>☆ Star your top two (optional)</span></div>' : '';
+    $('vote').innerHTML = `<div class="legend"><span>Not tapped = can’t</span><span>Tap: can → maybe → can’t</span></div>${hint}<div class="list">${rowsHtml}</div>`;
   }
 
   function renderSlots() {
     const d = meta.chosen_date;
-    $('sub').textContent = 'Which hours work for you that day? Tap each: can, maybe or no.';
+    $('sub').textContent = 'Which hours work for you that day? Tap the hours you can do. Tap again for maybe.';
     const tiles = HOURS.map((h) => {
       const v = me.slots[h];
       return `<div class="tile" data-v="${v || ''}">
@@ -150,14 +152,14 @@
   }
 
   function tally(people, get) {
-    const t = { can: [], maybe: [], no: [] };
+    const t = { can: [], maybe: [] };
     people.forEach((a) => { const v = get(a); if (t[v]) t[v].push(a.name); });
     return t;
   }
 
   function item(when, t, total, lead, extra) {
     const pc = (n) => (total ? (100 * n) / total : 0);
-    const who = [namesLine(t.can, '', 'Can'), namesLine(t.maybe, '', 'Maybe'), namesLine(t.no, 'out', 'Out')]
+    const who = [namesLine(t.can, '', 'Can'), namesLine(t.maybe, '', 'Maybe')]
       .filter(Boolean).join(' · ');
     return `<li class="${lead ? 'lead' : ''}">
       <div class="top"><span class="when">${esc(when)}</span>
@@ -194,8 +196,8 @@
 
     if (b.dataset.date) {
       const d = b.dataset.date;
-      const v = NEXT[me.dates[d]];
-      me.dates[d] = v;
+      const v = NEXT[me.dates[d] === 'no' ? undefined : me.dates[d]];
+      if (v) me.dates[d] = v; else delete me.dates[d];
       if (v !== 'can') { if (me.first === d) me.first = null; if (me.second === d) me.second = null; }
     } else if (b.dataset.star) {
       const d = b.dataset.star;
@@ -207,7 +209,8 @@
       else me.second = d;
     } else if (b.dataset.hour) {
       const h = b.dataset.hour;
-      me.slots[h] = NEXT[me.slots[h]];
+      const nv = NEXT[me.slots[h]];
+      if (nv) me.slots[h] = nv; else delete me.slots[h];
     } else return;
 
     changed();
@@ -260,7 +263,8 @@
   async function push() {
     if (!hasName()) return;
     if (!cloud.live) { mark('Saved on this phone'); return; }
-    const answers = { ...me, updated: new Date().toISOString() };
+    const keep = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v === 'can' || v === 'maybe'));
+    const answers = { ...me, dates: keep(me.dates), slots: keep(me.slots), updated: new Date().toISOString() };
     const { error } = await cloud.sb.from(TABLE).upsert(
       { poll_id: POLL, person: keyOf(me.name), answers, updated_at: new Date().toISOString() },
       { onConflict: 'poll_id,person' });
