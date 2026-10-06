@@ -85,13 +85,15 @@
       return `<div class="tile row" data-v="${v}">
         <button class="cycle" data-date="${d}" aria-label="${esc(longDate(d))}: ${v ? WORD[v] : 'can\u2019t'}. Tap to change.">
           <span class="l"><span class="d">${esc(weekday(d))}</span> <span class="w">${esc(dayLabel(d))}</span></span>
-          <span class="s">${v ? WORD[v].toLowerCase() : ''}</span>
+          <span class="s">${v ? WORD[v] : ''}</span>
         </button>${starBtn}
       </div>`;
     }).join('');
     const anyCan = DATES.some((d) => me.dates[d] === 'can');
-    const hint = anyCan ? '<div class="legend"><span>☆ Star your top two (optional)</span></div>' : '';
-    $('vote').innerHTML = `<div class="legend"><span>Not tapped = can’t</span><span>Tap: can → maybe → can’t</span></div>${hint}<div class="list">${rowsHtml}</div>`;
+    // The sub line already says untapped = can't and tap again = maybe, so the only legend is the star hint.
+    // It always holds its line (dimmed until a date is a can) so the first tap never shifts the rows.
+    const hint = `<p class="legend${anyCan ? '' : ' is-off'}">☆ Star your top two (optional)</p>`;
+    $('vote').innerHTML = `${hint}<div class="list">${rowsHtml}</div>`;
   }
 
   function renderSlots() {

@@ -3,138 +3,223 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0d0d10">
+<meta name="theme-color" content="#111110">
 <meta name="description" content="Pick the house massage day with Didi. Tap the dates that work for you.">
 <title>Massage day · Agape</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.ico" sizes="any">
+<script>
+  // Sassy CTRL is dark-first; `:root.light` flips it. This page follows the phone's setting.
+  (function () {
+    var mq = window.matchMedia && matchMedia('(prefers-color-scheme: light)');
+    var set = function () {
+      var light = !!(mq && mq.matches);
+      document.documentElement.classList.toggle('light', light);
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.content = light ? '#faf9f7' : '#111110';
+    };
+    set();
+    if (mq && mq.addEventListener) mq.addEventListener('change', set);
+    document.addEventListener('DOMContentLoaded', set);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/design-system/tokens.css">
+<link rel="stylesheet" href="/design-system/components.css">
 <style>
+  /* Agape massage poll — Sassy CTRL layer (tokens.css + components.css), the Halloween guide's
+     mobile idiom: square corners, borders over fills, terminal accents for state, sentence case. */
   :root {
-    --bg: #0d0d10;
-    --surface: #17171c;
-    --surface-2: #1f1f26;
-    --border: #2b2b34;
-    --text: #ececf1;
-    --text-dim: #8b8b98;
-    --accent: #f5c542;
-    --accent-dim: #8a6f25;
-    --can: #4ade80;
-    --can-bg: #12301d;
-    --maybe: #fbbf24;
-    --maybe-bg: #33280b;
-    --no: #f87171;
-    --no-bg: #331616;
-    --radius: 14px;
+    --mp-can: var(--accent-green);
+    --mp-can-tint: rgba(57, 255, 20, 0.08);
+    --mp-maybe: var(--accent-amber);
+    --mp-maybe-tint: rgba(255, 176, 0, 0.10);
+    --mp-no: var(--color-error);
+    --mp-pick: var(--accent-amber);
+    --accent: var(--mp-pick); /* massage.js colours the star tally with var(--accent) */
+    --mp-top-h: 48px;
+    --mp-row-h: 48px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root.light {
+    --mp-can: #1f7a10;
+    --mp-can-tint: rgba(34, 197, 94, 0.12);
+    --mp-maybe: #b86e00;
+    --mp-maybe-tint: rgba(184, 110, 0, 0.10);
+    --mp-pick: #b86e00;
+  }
+
+  html, body { background: var(--bg); color: var(--fg); }
   body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 15px; line-height: 1.35;
+    font-family: var(--font-primary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-  main { max-width: 480px; margin: 0 auto; padding: 16px 16px 48px; }
+  button:focus-visible, .input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-  h1 { font-size: 22px; font-weight: 800; color: var(--accent); }
-  .saved { font-size: 12px; color: var(--text-dim); min-height: 1em; transition: opacity .3s; }
-  .saved.err { color: var(--no); }
-  .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 12px; }
+  /* ---------- Top bar (guide .top, renamed so it never collides with .res .top) ---------- */
+  .appbar {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    height: var(--mp-top-h);
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: 0 max(var(--space-4), calc((100% - 480px) / 2 + var(--space-4)));
+    padding-top: env(safe-area-inset-top, 0px);
+    box-sizing: content-box;
+    background: var(--bg);
+    border-bottom: var(--border-thin) solid var(--border-subtle);
+  }
+  .appbar__brand { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; flex: 1; }
+  .appbar__title {
+    font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
+    letter-spacing: var(--tracking-display); white-space: nowrap; margin: 0;
+  }
+  .appbar__sub { font-size: var(--text-xs); color: var(--fg-muted); white-space: nowrap; }
+  /* The saved mark: a status pill, green when it lands, red when it hasn't. */
+  .saved {
+    font-size: var(--text-xs); color: var(--mp-can);
+    border: var(--border-thin) solid var(--mp-can);
+    padding: 2px var(--space-2); white-space: nowrap;
+    opacity: 0; transition: opacity var(--duration-slower) var(--ease-default);
+  }
+  .saved:empty { border-color: transparent; }
+  .saved.err { color: var(--mp-no); border-color: var(--mp-no); }
+
+  /* ---------- Page ---------- */
+  main {
+    max-width: 480px; margin: 0 auto;
+    padding: var(--space-3) var(--space-4) calc(var(--space-12) + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: var(--space-3);
+  }
+  .sub { color: var(--fg-muted); font-size: var(--text-sm); line-height: var(--leading-tight); }
+
+  /* On-device notice (Halloween .banner: amber tint, amber rule) */
   .notice {
-    background: var(--maybe-bg); color: var(--maybe); border-radius: 10px;
-    padding: 8px 12px; font-size: 13px; margin-bottom: 12px;
+    background: var(--mp-maybe-tint); color: var(--fg);
+    border: var(--border-thin) solid var(--mp-maybe);
+    padding: var(--space-2) var(--space-3); font-size: var(--text-xs); line-height: var(--leading-normal);
   }
   .notice[hidden] { display: none; }
 
-  .name-row { margin-bottom: 12px; }
-  .name-row input {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px 14px; color: var(--text); font-size: 16px;
+  /* Name field: CTRL .input; 16px so iOS never zooms on focus */
+  .name-row .input {
+    min-height: var(--mp-row-h); font-size: 16px;
+    border-color: var(--border-subtle); background: var(--bg-surface);
   }
-  .name-row input:focus { outline: none; border-color: var(--accent-dim); }
-  .name-row input.want { border-color: var(--accent); animation: nudge .3s; }
+  .name-row .input:focus { box-shadow: none; border-color: var(--fg); }
+  .name-row .input.want { border-color: var(--mp-maybe); animation: nudge .3s; }
   @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
-  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; flex-wrap: wrap; }
+  .legend { font-size: var(--text-xs); color: var(--fg-muted); margin-bottom: var(--space-2); }
+  .legend.is-off { opacity: 0.5; }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* ---------- Date rows ---------- */
+  .list { display: flex; flex-direction: column; gap: var(--space-1); }
   .tile {
     position: relative; display: flex; align-items: stretch;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    min-height: 58px;
+    background: transparent;
+    border: var(--border-thin) solid var(--border-subtle);
+    transition: border-color var(--duration-normal), background var(--duration-normal);
   }
-  .tile .cycle { flex: 1; text-align: left; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; }
-  .tile .d { font-weight: 700; font-size: 15px; }
-  .tile .w { font-size: 12px; color: var(--text-dim); }
-  .tile .s { font-size: 12px; font-weight: 700; margin-top: 2px; color: var(--text-dim); }
-  .tile[data-v="can"] { background: var(--can-bg); border-color: var(--can); }
-  .tile[data-v="can"] .s { color: var(--can); }
-  .tile[data-v="maybe"] { background: var(--maybe-bg); border-color: var(--maybe); }
-  .tile[data-v="maybe"] .s { color: var(--maybe); }
-  .tile[data-v="no"] { background: var(--no-bg); border-color: var(--no); }
-  .tile[data-v="no"] .s { color: var(--no); }
+  .tile .cycle {
+    flex: 1; min-width: 0; min-height: var(--mp-row-h);
+    display: flex; flex-direction: column; justify-content: center;
+    padding: var(--space-2) var(--space-3); text-align: left;
+  }
+  .tile .d { font-family: var(--font-display); font-weight: 700; font-size: var(--text-md); letter-spacing: var(--tracking-display); }
+  .tile .w { font-size: var(--text-sm); color: var(--fg-muted); }
+  .tile .s { font-size: var(--text-sm); font-weight: 700; color: var(--fg-muted); }
+
+  .tile.row .cycle { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .tile.row .l { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+  .tile.row .d { font-size: var(--text-lg); }
+
+  .tile[data-v="can"] { border-color: var(--mp-can); background: var(--mp-can-tint); box-shadow: inset 3px 0 0 var(--mp-can); }
+  .tile[data-v="can"] .s { color: var(--mp-can); }
+  .tile[data-v="maybe"] { border-color: var(--mp-maybe); border-style: dashed; }
+  .tile[data-v="maybe"] .s { color: var(--mp-maybe); }
+  .tile[data-v="no"] { border-color: var(--mp-no); }
+  .tile[data-v="no"] .s { color: var(--mp-no); }
+  .tile:not([data-v="can"]):not([data-v="maybe"]) .cycle:hover { background: var(--bg-surface); }
+
+  /* Star: the pick, top two */
   .tile .star {
-    width: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 20px; color: var(--border); border-left: 1px solid rgba(255,255,255,.06);
+    width: 52px; flex: 0 0 52px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    font-size: var(--text-lg); line-height: 1; color: var(--fg-subtle);
+    border-left: var(--border-thin) solid var(--border-subtle);
   }
-  .tile .star small { font-size: 10px; font-weight: 700; color: var(--text-dim); }
-  .tile .star.on { color: var(--accent); }
-  .tile .star.on small { color: var(--accent); }
-  .tile .star:disabled { opacity: .35; cursor: default; }
+  .tile .star small { font-size: var(--text-2xs); color: var(--fg-muted); }
+  .tile .star.on { color: var(--mp-pick); }
+  .tile .star.on small { color: var(--mp-pick); font-weight: 700; }
+  .tile .star:disabled { opacity: 0.35; cursor: default; }
 
-  .list { display: flex; flex-direction: column; gap: 6px; }
-  .tile.row { min-height: 48px; }
-  .tile.row .cycle { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 8px 14px; }
-  .tile.row .l { display: flex; gap: 8px; align-items: baseline; }
-  .tile.row .d { font-size: 16px; }
-  .tile.row .w { font-size: 14px; }
-  .tile.row .s { font-size: 14px; margin: 0; text-transform: lowercase; }
-  .tile.row[data-v="can"] { border-width: 2px; }
-  .tile.row[data-v="can"] .s { font-weight: 800; }
-  .tile.row[data-v="maybe"] { border-style: dashed; background: transparent; }
-  .tile.row .star { width: 56px; }
-  .slots { grid-template-columns: 1fr 1fr 1fr; }
-  .slots .tile { min-height: 52px; }
-
-  h2 { font-size: 15px; font-weight: 700; margin: 24px 0 8px; }
-  .count-line { color: var(--text-dim); font-size: 12px; font-weight: 400; }
-  .res { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-  .res li {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 12px;
-  }
-  .res .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .res .when { font-weight: 700; }
-  .res .nums { font-size: 13px; white-space: nowrap; }
-  .res .nums .c { color: var(--can); }
-  .res .nums .m { color: var(--maybe); }
-  .res .bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--surface-2); margin: 6px 0 4px; }
-  .res .bar i { display: block; }
-  .res .bar .c { background: var(--can); }
-  .res .bar .m { background: var(--maybe); }
-  .res .who { font-size: 12px; color: var(--text-dim); }
-  .res .who .out { color: var(--no); }
-  .res .pick { margin-top: 6px; font-size: 12px; color: var(--accent); text-decoration: underline; }
-  .res li.lead { border-color: var(--accent-dim); }
-  .empty { color: var(--text-dim); font-size: 13px; }
+  /* ---------- Admin phase 2: hour grid ---------- */
+  .grid.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+  .slots .cycle { min-height: 56px; }
+  .slots .d { font-size: var(--text-sm); }
+  .slots .s { font-size: var(--text-xs); }
   .chosen {
-    background: var(--can-bg); border: 1px solid var(--can); border-radius: var(--radius);
-    padding: 12px 14px; margin-bottom: 12px;
+    border: var(--border-thin) solid var(--mp-can); background: var(--mp-can-tint);
+    box-shadow: inset 3px 0 0 var(--mp-can);
+    padding: var(--space-3); margin-bottom: var(--space-3);
   }
-  .chosen b { color: var(--can); }
-  .admin-row { margin-top: 16px; font-size: 12px; color: var(--text-dim); }
-  .admin-row button { text-decoration: underline; color: var(--accent); font-size: 12px; }
+  .chosen b { font-family: var(--font-display); color: var(--mp-can); }
+
+  /* ---------- Results (section header + Halloween pcards) ---------- */
+  h2 {
+    font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
+    letter-spacing: var(--tracking-display); margin-top: var(--space-6);
+  }
+  .count-line { font-family: var(--font-primary); font-weight: 400; font-size: var(--text-xs); color: var(--fg-muted); letter-spacing: 0; }
+  .res { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+  .res li {
+    background: var(--bg-surface);
+    border: var(--border-thin) solid var(--border-subtle);
+    padding: var(--space-3);
+  }
+  .res li.lead { border-color: var(--mp-pick); box-shadow: inset 3px 0 0 var(--mp-pick); }
+  .res .top { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; }
+  .res .when { font-family: var(--font-display); font-weight: 700; font-size: var(--text-md); }
+  .res .nums { font-size: var(--text-xs); white-space: nowrap; color: var(--fg-muted); }
+  .res .nums .c { color: var(--mp-can); }
+  .res .nums .m { color: var(--mp-maybe); }
+  .res .bar { display: flex; height: 4px; overflow: hidden; background: var(--bg-elevated); margin: var(--space-2) 0; }
+  .res .bar i { display: block; }
+  .res .bar .c { background: var(--mp-can); }
+  .res .bar .m { background: var(--mp-maybe); }
+  .res .who { font-size: var(--text-xs); color: var(--fg-muted); line-height: var(--leading-normal); }
+  .res .who .out { color: var(--mp-no); }
+  /* Organizer "Pick this day": CTRL .btn--sm, sentence case */
+  .res .pick, .admin-row button {
+    display: inline-flex; align-items: center; min-height: 32px;
+    margin-top: var(--space-2); padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs); color: var(--fg);
+    border: var(--border-thin) solid var(--border);
+    transition: background var(--duration-normal), color var(--duration-normal);
+  }
+  .res .pick:hover, .admin-row button:hover { background: var(--fg); color: var(--bg); }
+  .res li.empty { color: var(--fg-muted); font-size: var(--text-sm); background: transparent; border-style: dashed; }
+  .admin-row { font-size: var(--text-xs); color: var(--fg-muted); line-height: var(--leading-normal); }
+  .admin-row[hidden] { display: none; }
+  .admin-row button { margin: 0 0 0 var(--space-2); }
 </style>
 </head>
 <body>
+<header class="appbar">
+  <div class="appbar__brand">
+    <h1 class="appbar__title">Massage day</h1>
+    <span class="appbar__sub">Agape · with Didi</span>
+  </div>
+  <span class="saved" id="saved" aria-live="polite"></span>
+</header>
 <main>
-  <header>
-    <h1>Massage day</h1>
-    <span class="saved" id="saved" aria-live="polite"></span>
-  </header>
   <p class="sub" id="sub">Didi is coming to the house. Tap the dates you can do. Tap again for maybe. Leave the rest.</p>
   <p class="notice" id="notice" hidden></p>
 
   <div class="name-row">
-    <input id="name" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="done"
+    <input id="name" class="input" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="done"
            placeholder="Your name" aria-label="Your name" maxlength="40">
   </div>
 
@@ -147,6 +232,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="massage.js?v=1.1.0"></script>
+<script src="massage.js?v=1.2.0"></script>
 </body>
 </html>
