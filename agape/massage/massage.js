@@ -43,18 +43,19 @@
   const blank = () => ({ name: '', dates: {}, first: null, second: null, slots: {} });
   let me = blank();
   let dirty = false;         // local answers not yet on the server
-  let pending = false;       // Save was pressed but the write has not landed yet
+  let pending = false;       // the final Next was pressed but the write has not landed yet
+  let submitted = false;     // this phone has been through both beats; results are shown only after that
   let rows = new Map();      // person key -> answers (other people, from the server)
   let meta = {};
   const cloud = { sb: null, live: false, timer: null, retry: null };
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
-    if (saved && saved.me) { me = { ...blank(), ...saved.me }; dirty = !!saved.dirty; pending = !!saved.pending; meta = saved.meta || {}; }
+    if (saved && saved.me) { me = { ...blank(), ...saved.me }; dirty = !!saved.dirty; pending = !!saved.pending; submitted = !!saved.submitted; meta = saved.meta || {}; }
   } catch (_) { /* private mode: run without memory */ }
 
   const persistLocal = () => {
-    try { localStorage.setItem(STORE, JSON.stringify({ me, dirty, pending, meta })); } catch (_) {}
+    try { localStorage.setItem(STORE, JSON.stringify({ me, dirty, pending, submitted, meta })); } catch (_) {}
   };
 
   // ---------- saved mark ----------
@@ -70,7 +71,8 @@
   const hasName = () => keyOf(me.name).length > 0;
   const phase2 = () => !!meta.chosen_date;
 
-  let beat = 'dates';          // 'dates' -> 'name' -> 'results'
+  // 'dates' -> 'name' -> 'results'. A visitor who already submitted on this phone lands on results.
+  let beat = submitted && me.name ? 'results' : 'dates';
   const answered = () => (phase2()
     ? Object.values(me.slots).some((v) => v === 'can' || v === 'maybe')
     : Object.values(me.dates).some((v) => v === 'can' || v === 'maybe'));
@@ -149,6 +151,7 @@
   }
 
   function renderResults() {
+    if (!submitted) { $('results').innerHTML = ''; $('count-line').textContent = ''; return; }
     const people = everyone();
     $('count-line').textContent = people.length ? `· ${people.length} ${people.length === 1 ? 'person' : 'people'} answered` : '';
     const ul = $('results');
@@ -266,6 +269,7 @@
     rows.delete(keyOf(v));   // these answers replace whatever that name had on the server
     dirty = true;
     pending = true;
+    submitted = true;
     persistLocal();
     push().then(() => { if (cloud.live) load().catch(() => {}); });
     go('results');

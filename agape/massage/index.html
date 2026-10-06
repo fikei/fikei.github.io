@@ -116,9 +116,10 @@
   .chosen b { color: var(--fg); }
 
   /* ---------- Actions: CTRL .btn at the page size, sentence case ---------- */
-  .actions { display: flex; gap: var(--space-2); }
-  .actions .btn { flex: 1; min-height: var(--mp-row-h); padding: 0 var(--space-4); }
-  .actions .btn--ghost { flex: 0 0 auto; color: var(--fg-muted); }
+  /* One primary per beat: "Next", full width of the column. Back is a quiet link under it. */
+  .actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
+  .actions .btn { width: 100%; min-height: var(--mp-row-h); padding: 0 var(--space-4); }
+  .actions .link { align-self: flex-start; }
   .beat--dates .actions { position: sticky; bottom: 0; padding: var(--space-2) 0 env(safe-area-inset-bottom, 0); background: var(--bg); }
   .btn:disabled, .btn:disabled:hover { opacity: 0.35; background: transparent; color: var(--fg); cursor: default; }
   .link { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 3px; padding: var(--space-2) 0; }
@@ -165,7 +166,7 @@
     <p class="sub" id="sub">Didi is coming to the house. Tap a date: Can do, then Possible, then back to Can’t.</p>
     <div id="vote"></div>
     <div class="actions">
-      <button class="btn btn--filled" id="continue" type="button" disabled>Continue</button>
+      <button class="btn btn--filled btn--block" id="continue" type="button" disabled>Next</button>
     </div>
   </section>
 
@@ -178,8 +179,8 @@
     </div>
     <button class="link" id="not-you" type="button" hidden>Not you?</button>
     <div class="actions">
-      <button class="btn btn--ghost" id="back" type="button">Back</button>
-      <button class="btn btn--filled" id="save" type="button">Save</button>
+      <button class="btn btn--filled btn--block" id="save" type="button">Next</button>
+      <button class="link" id="back" type="button">Back to the dates</button>
     </div>
   </section>
 
@@ -194,6 +195,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="massage.js?v=2.0.0"></script>
+<script src="massage.js?v=2.1.0"></script>
 </body>
 </html>
