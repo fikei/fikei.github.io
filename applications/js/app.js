@@ -10,8 +10,8 @@
    manual moves go through the recruit_set_stage RPC. Candidates are
    auto-placed into every open listing they qualify for
    (recruit_listing_candidates, migration 123). */
-const VERSION = '3.85.5';
-console.log(`[applications] v${VERSION} - program listings: pink residency badge`);
+const VERSION = '3.86.0';
+console.log(`[applications] v${VERSION} - boot-opt: cached gate verdict skips access-check wait on warm boot`);
 
 /* Cache-bust guard. index.html carries ?v= on the stylesheet and the scripts,
    and those are three separate strings that a merge can move independently —
@@ -6780,6 +6780,66 @@ function stall(sub, hint) {
   } catch { /* never let reporting break the gate */ }
 }
 
+// boot-opt: cached gate verdict. Telemetry (9 days, n=36) showed boot_access
+// p75 1064ms vs boot_data p75 790ms — the gate check, not the data load, was
+// the slower boot leg. A verdict cached under 6h ago lets _checkMembershipAndEnter
+// skip awaiting the discord-membership round-trip and enter immediately; the
+// real check still runs and reconciles here once it lands.
+const GATE_CACHE_KEY = 'agape:gate';
+const GATE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+function _readCachedGate(userId) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GATE_CACHE_KEY) || 'null');
+    if (raw && raw.userId === userId && Date.now() - raw.at < GATE_CACHE_MAX_AGE_MS) return raw;
+  } catch { /* corrupt cache — fall through to the normal check */ }
+  return null;
+}
+
+function _writeCachedGate(userId, status) {
+  localStorage.setItem(GATE_CACHE_KEY, JSON.stringify({
+    userId, username: status.discordUsername || null,
+    isAdmin: status.isRecruitingAdmin === true, at: Date.now(),
+  }));
+}
+
+// A refused or failed check must never be cached; on either, tear the app
+// back down to the gate — the housemate was let in on a verdict that no
+// longer holds.
+function _reconcileGateVerdict(verifyP, userId, token) {
+  verifyP.then(({ resp, status }) => {
+    if (resp.ok && status.linked && status.isRecruitingMember) {
+      _writeCachedGate(userId, status);
+      return;
+    }
+    localStorage.removeItem(GATE_CACHE_KEY);
+    document.getElementById('app').hidden = true;
+    document.getElementById('gate').hidden = false;
+    _entering = false;
+    if (!resp.ok) {
+      stall('The access check failed.',
+        `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+    } else if (!status.linked) {
+      setGate('Your account has no Discord linked.', 'Link Discord',
+        'Link the Discord account that’s in the Agape server, then try again.');
+      document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
+    } else {
+      setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+        'Re-check access',
+        'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+      document.getElementById('gate-btn').onclick = async () => {
+        setGate('Re-checking…', null);
+        await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ action: 'verify' }),
+        });
+        checkMembershipAndEnter();
+      };
+    }
+  }).catch(() => { /* reconciliation itself glitched — leave the cached session alone */ });
+}
+
 async function checkMembershipAndEnter() {
   // CtrlAuth can dispatch signedin twice (fast-restore + auth event); the
   // enter sequence (load + auto-pass + toast) must only run once.
@@ -6840,46 +6900,67 @@ async function _checkMembershipAndEnter() {
   const dataP = loadAll().then(() => { tData = performance.now(); });
   dataP.catch(() => {}); // surfaced at the await below; never unhandled here
   try {
+    const cachedUser = window.CtrlAuth.getUser();
+    const cachedGate = _readCachedGate(cachedUser?.id);
+
     // No timeout here once cost a housemate a permanent spinner.
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 20000);
-    let resp;
-    try {
-      resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ action: 'status' }),
-        signal: ctl.signal,
-      });
-    } finally { clearTimeout(timer); }
-    const status = await resp.json().catch(() => ({}));
-    // A 500 used to fall through to "no Discord linked", sending people off to
-    // re-link an account that was never the problem. Say what actually broke.
-    if (!resp.ok) {
-      stall('The access check failed.',
-        `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
-      return;
-    }
-    if (!status.linked) {
-      setGate('Your account has no Discord linked.', 'Link Discord',
-        'Link the Discord account that’s in the Agape server, then try again.');
-      document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
-      return;
-    }
-    if (!status.isRecruitingMember) {
-      setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
-        'Re-check access',
-        'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
-      document.getElementById('gate-btn').onclick = async () => {
-        setGate('Re-checking…', null);
-        await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+    const verifyP = (async () => {
+      let resp;
+      try {
+        resp = await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ action: 'verify' }),
+          body: JSON.stringify({ action: 'status' }),
+          signal: ctl.signal,
         });
-        checkMembershipAndEnter();
+      } finally { clearTimeout(timer); }
+      const respStatus = await resp.json().catch(() => ({}));
+      return { resp, status: respStatus };
+    })();
+
+    let status;
+    if (cachedGate) {
+      // Warm boot — enter on the cached verdict now; verifyP reconciles below.
+      status = {
+        linked: true, isRecruitingMember: true,
+        discordUsername: cachedGate.username, isRecruitingAdmin: cachedGate.isAdmin,
       };
-      return;
+      _reconcileGateVerdict(verifyP, cachedUser.id, token);
+    } else {
+      const real = await verifyP;
+      const resp = real.resp;
+      status = real.status;
+      // A 500 used to fall through to "no Discord linked", sending people off to
+      // re-link an account that was never the problem. Say what actually broke.
+      if (!resp.ok) {
+        stall('The access check failed.',
+          `${status.error || `Server returned ${resp.status}`} — this is on our side, not your account.`);
+        return;
+      }
+      if (!status.linked) {
+        setGate('Your account has no Discord linked.', 'Link Discord',
+          'Link the Discord account that’s in the Agape server, then try again.');
+        document.getElementById('gate-btn').onclick = () => window.CtrlAuth.linkDiscord(location.href);
+        return;
+      }
+      if (!status.isRecruitingMember) {
+        setGate(`Signed in as ${status.discordUsername || 'you'} — but this account can’t see the Recruiting Society channel.`,
+          'Re-check access',
+          'Ask in the Agape server for access to the Recruiting Society channel, then re-check.');
+        document.getElementById('gate-btn').onclick = async () => {
+          setGate('Re-checking…', null);
+          await fetch(`${SUPABASE_URL}/functions/v1/discord-membership`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ action: 'verify' }),
+          });
+          checkMembershipAndEnter();
+        };
+        return;
+      }
+      _writeCachedGate(cachedUser.id, status);
     }
     // in — identify self, load data, render
     const user = window.CtrlAuth.getUser();
