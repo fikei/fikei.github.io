@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Instagram audit — @fikei</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/design-system/tokens.css">
+  <link rel="stylesheet" href="/design-system/components.css">
+  <style>
+    /* Page-local layout only. Every value is a Sassy token; no local sizes or colours. */
+    body { background: var(--bg); color: var(--fg); font-family: var(--font-mono); font-size: var(--text-md); line-height: var(--leading-normal); margin: 0; }
+    .ig { max-width: var(--container-terminal); margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-16); }
+    .ig h1 { font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-tight); margin: 0 0 var(--space-2); }
+    .ig h2 { font-size: var(--text-lg); font-weight: 500; margin: var(--space-10) 0 var(--space-3); }
+    .ig h3 { font-size: var(--text-md); font-weight: 500; margin: var(--space-6) 0 var(--space-2); }
+    .ig p { margin: 0 0 var(--space-3); }
+    .ig .muted { color: var(--fg-muted); }
+    .ig .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); margin: var(--space-4) 0; }
+    @media (min-width: 600px) { .ig .stats { grid-template-columns: repeat(4, 1fr); } }
+    .ig .stat { border: var(--border-thin) solid var(--border-subtle); padding: var(--space-3); border-radius: var(--radius-none); }
+    .ig .stat__value { display: block; font-size: var(--text-xl); line-height: var(--leading-tight); }
+    .ig .stat__label { display: block; color: var(--fg-muted); font-size: var(--text-sm); margin-top: var(--space-1); text-transform: none; letter-spacing: var(--tracking-normal); }
+    .ig ol.findings { padding-left: var(--space-5); margin: 0 0 var(--space-4); }
+    .ig ol.findings li { margin-bottom: var(--space-3); }
+    .ig .data-table { font-size: var(--text-sm); }
+    .ig .data-table th { text-transform: none; letter-spacing: var(--tracking-normal); }
+    .ig .data-table td.num, .ig .data-table th.num { text-align: right; white-space: nowrap; }
+    .ig .data-table tr.cut td { opacity: 0.45; }
+    .ig .data-table input[type=checkbox] { accent-color: var(--fg); width: 16px; height: 16px; margin: 0; }
+    .ig .row-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-3) 0; }
+    .ig .pending { border: var(--border-thin) dashed var(--border-subtle); padding: var(--space-3); color: var(--fg-muted); }
+    .ig footer { margin-top: var(--space-12); padding-top: var(--space-4); border-top: var(--border-thin) solid var(--border-subtle); color: var(--fg-muted); font-size: var(--text-sm); }
+    .ig a { color: var(--color-link); text-decoration: none; }
+    .ig a:hover { text-decoration: underline; }
+    .ig .inf { color: var(--fg-subtle); }
+  </style>
+</head>
+<body>
+<main class="ig" id="app">
+  <header>
+    <h1>Instagram audit — @fikei</h1>
+    <p class="muted" id="subtitle">Loading…</p>
+  </header>
+
+  <section id="findings">
+    <h2>What matters</h2>
+    <ol class="findings" id="findings-list"></ol>
+  </section>
+
+  <section id="summary">
+    <h2>Thirty seconds</h2>
+    <div class="stats" id="stats"></div>
+    <div id="summary-text"></div>
+  </section>
+
+  <section id="interests">
+    <h2>Interest map</h2>
+    <p class="muted">Clusters of the accounts you follow, by what they post. Engaged means you have liked one of their posts in the last three years.</p>
+    <div class="data-table-wrap"><table class="data-table" id="interests-table"></table></div>
+  </section>
+
+  <section id="classes">
+    <h2>What kind of accounts</h2>
+    <div class="data-table-wrap"><table class="data-table" id="classes-table"></table></div>
+  </section>
+
+  <section id="people">
+    <h2>Real people</h2>
+    <p class="muted">Everything in this table past username and name is an inference from public posts and your own like history.</p>
+    <div class="data-table-wrap"><table class="data-table" id="people-table"></table></div>
+  </section>
+
+  <section id="usage">
+    <h2>How you use it</h2>
+    <div id="usage-text"></div>
+  </section>
+
+  <section id="cuts">
+    <h2>Cut lists</h2>
+    <p class="muted">Tick a row when you have unfollowed it. Ticks stay in this browser only.</p>
+    <div id="cut-lists"></div>
+  </section>
+
+  <section id="recs">
+    <h2>Recommendations</h2>
+    <ol id="recs-list"></ol>
+  </section>
+
+  <footer id="footer"></footer>
+</main>
+<div class="toast-container" id="toasts"></div>
+<script src="report.js?v=1"></script>
+</body>
+</html>
